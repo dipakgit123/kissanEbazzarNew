@@ -105,7 +105,7 @@ const AIAssistant = () => {
   return (
     <>
       {/* Floating AI Assistant Button */}
-      <div className="fixed bottom-6 right-6 z-50">
+      <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-50">
         {/* Pulsing Ring Animation */}
         {!isOpen && (
           <div className="absolute inset-0 rounded-full bg-gradient-to-r from-[#15BB73] to-[#0FA568] animate-ping opacity-20"></div>
