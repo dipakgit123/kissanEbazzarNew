@@ -196,14 +196,14 @@ const Layout = ({ showHeaderFooter = true, wishlistCount = 0 }) => {
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
             </svg>
-            <span className="text-xs mt-1">Animall</span>
+            <span className="text-xs mt-1">Home</span>
           </Link>
 
           <button className="flex flex-col items-center text-gray-400 p-1 sm:p-2 rounded-lg cursor-not-allowed">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
             </svg>
-            <span className="text-xs mt-1">पशु खरीदें</span>
+            <span className="text-xs mt-1">Buy Animal</span>
           </button>
 
           <Link
@@ -213,7 +213,7 @@ const Layout = ({ showHeaderFooter = true, wishlistCount = 0 }) => {
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span className="text-xs mt-1">पशु बेचें</span>
+            <span className="text-xs mt-1">Sell Animal</span>
           </Link>
 
           <Link
@@ -244,7 +244,7 @@ const Layout = ({ showHeaderFooter = true, wishlistCount = 0 }) => {
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
-            <span className="text-xs mt-1">पशु डॉक्टर</span>
+            <span className="text-xs mt-1">Veterinarian</span>
           </Link>
         </footer>
       )}

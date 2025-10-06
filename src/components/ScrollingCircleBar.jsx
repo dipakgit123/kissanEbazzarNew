@@ -6,11 +6,12 @@ import goat from '../assets/images/goat.jpg';
 import horse from '../assets/images/horse.png';
 
 const images = [
-  { src: cow, alt: 'गाय' },
-  { src: buffello, alt: 'भैंस' },
-  { src: bull, alt: 'बैल' },
-  { src: goat, alt: 'बकरा' },
-  { src: horse, alt: 'घोड़ा' },
+  { src: cow, alt: 'Cow' },
+  { src: buffello, alt: 'Buffalo' },
+  { src: bull, alt: 'Bull' },
+  { src: goat, alt: 'Goat' },
+  { src: horse, alt: 'Horse' },
+  {src:dog, alt:"Dog"}
 ];
 
 const ITEM_SIZE = 120; // adjust as needed (px)

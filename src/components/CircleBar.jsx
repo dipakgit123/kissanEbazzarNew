@@ -7,12 +7,12 @@ import horse from '../assets/images/horse.png';
 import dog from '../assets/images/dog.jpg';
 
 const images = [
-  { src: cow, alt: 'गाय' },
-  { src: buffello, alt: 'भैंस' },
-  { src: bull, alt: 'बैल' },
-  { src: goat, alt: 'बकरा' },
-  { src: horse, alt: 'घोड़ा' },
-  {src:dog, alt:"कुत्रा"}
+  { src: cow, alt: 'Cow' },
+  { src: buffello, alt: 'Buffalo  ' },
+  { src: bull, alt: 'Bull' }, 
+  { src: goat, alt: 'Goat' },
+  { src: horse, alt: 'Horse' },
+  {src:dog, alt:"Dog"}
 ];
 
 const CircleBar = () => (
