@@ -280,90 +280,156 @@ class LocationService {
   /**
    * Geocode address to get coordinates (using free service)
    */
-  async geocodeAddress(addressData) {
-    try {
-      const addressString = [
+  // Updated geocodeAddress method for locationService.js
+// Replace the existing geocodeAddress method with this improved version
+
+async geocodeAddress(addressData) {
+  try {
+    // Try multiple address formats for better geocoding results
+    const addressVariations = [
+      // Full address
+      [
         addressData.address,
         addressData.city,
         addressData.state,
         addressData.country,
         addressData.postal_code
-      ].filter(Boolean).join(', ');
-  
-      console.log('Geocoding address:', addressString);
-  
-      // Use Nominatim (OpenStreetMap) - free service
-      const response = await axios.get('https://nominatim.openstreetmap.org/search', {
-        params: {
-          q: addressString,
-          format: 'json',
-          limit: 1
-        },
-        headers: {
-          'User-Agent': 'WhatsApp-OTP-App/1.0'
-        },
-        timeout: 10000 // 10 second timeout
-      });
-  
-      console.log('Geocoding response:', response.data);
-  
-      if (response.data && response.data.length > 0) {
-        const lat = parseFloat(response.data[0].lat);
-        const lon = parseFloat(response.data[0].lon);
-        console.log(`Geocoded coordinates: lat=${lat}, lon=${lon}`);
-        
-        return {
-          latitude: lat,
-          longitude: lon
-        };
-      }
-  
-      console.log('No geocoding results found for address:', addressString);
+      ].filter(Boolean).join(', '),
       
-      // Try with just city and country if full address fails
-      if (addressData.address) {
-        const simplifiedAddress = `${addressData.city}, ${addressData.country}`;
-        console.log('Trying simplified address:', simplifiedAddress);
-        
-        const retryResponse = await axios.get('https://nominatim.openstreetmap.org/search', {
+      // City, State, Country with postal code
+      [
+        addressData.city,
+        addressData.state,
+        addressData.country,
+        addressData.postal_code
+      ].filter(Boolean).join(', '),
+      
+      // Just City and State
+      `${addressData.city}, ${addressData.state}, ${addressData.country}`,
+      
+      // City with alternate spellings (for Indian cities)
+      `${addressData.city.replace('Ahemednagar', 'Ahmednagar')}, ${addressData.state}, ${addressData.country}`,
+      
+      // Just postal code and country (often works well)
+      addressData.postal_code ? `${addressData.postal_code}, ${addressData.country}` : null
+    ].filter(Boolean);
+
+    console.log('Trying geocoding with variations:', addressVariations);
+
+    for (const addressString of addressVariations) {
+      console.log('Attempting to geocode:', addressString);
+      
+      try {
+        const response = await axios.get('https://nominatim.openstreetmap.org/search', {
           params: {
-            q: simplifiedAddress,
+            q: addressString,
             format: 'json',
-            limit: 1
+            limit: 1,
+            countrycodes: 'in' // Restrict to India for better results
           },
           headers: {
             'User-Agent': 'WhatsApp-OTP-App/1.0'
           },
           timeout: 10000
         });
-  
-        if (retryResponse.data && retryResponse.data.length > 0) {
-          const lat = parseFloat(retryResponse.data[0].lat);
-          const lon = parseFloat(retryResponse.data[0].lon);
-          console.log(`Geocoded with simplified address: lat=${lat}, lon=${lon}`);
+
+        if (response.data && response.data.length > 0) {
+          const lat = parseFloat(response.data[0].lat);
+          const lon = parseFloat(response.data[0].lon);
+          console.log(`Successfully geocoded with: "${addressString}" - lat=${lat}, lon=${lon}`);
           
           return {
             latitude: lat,
             longitude: lon
           };
         }
+      } catch (err) {
+        console.log(`Failed with address: "${addressString}"`, err.message);
+        continue; // Try next variation
       }
-  
-      throw new Error('Unable to geocode address');
-    } catch (error) {
-      console.error('Geocoding error details:', {
-        message: error.message,
-        code: error.code,
-        response: error.response?.data
-      });
-      
-      // Return null coordinates on error
+    }
+
+    // If Nominatim fails, try with Google-like search for Indian locations
+    // This is a fallback for common Indian cities
+    const cityCoordinates = {
+      'ahmednagar': { lat: 19.0948, lon: 74.7480 },
+      'ahemednagar': { lat: 19.0948, lon: 74.7480 },
+      'ahmadnagar': { lat: 19.0948, lon: 74.7480 },
+      'pune': { lat: 18.5204, lon: 73.8567 },
+      'mumbai': { lat: 19.0760, lon: 72.8777 },
+      'delhi': { lat: 28.6139, lon: 77.2090 },
+      'bangalore': { lat: 12.9716, lon: 77.5946 },
+      'chennai': { lat: 13.0827, lon: 80.2707 },
+      'kolkata': { lat: 22.5726, lon: 88.3639 },
+      'hyderabad': { lat: 17.3850, lon: 78.4867 },
+      'nagpur': { lat: 21.1458, lon: 79.0882 },
+      'nashik': { lat: 20.0063, lon: 73.7798 },
+      'aurangabad': { lat: 19.8762, lon: 75.3433 }
+    };
+
+    const cityLower = addressData.city.toLowerCase();
+    if (cityCoordinates[cityLower]) {
+      console.log(`Using fallback coordinates for ${addressData.city}`);
       return {
-        latitude: null,
-        longitude: null
+        latitude: cityCoordinates[cityLower].lat,
+        longitude: cityCoordinates[cityLower].lon
       };
     }
+
+    // If still no results, try postal code based geocoding
+    if (addressData.postal_code) {
+      try {
+        const response = await axios.get('https://api.postalpincode.in/pincode/' + addressData.postal_code);
+        if (response.data && response.data[0] && response.data[0].Status === 'Success') {
+          const postOffice = response.data[0].PostOffice[0];
+          // Try to geocode the post office location
+          const searchStr = `${postOffice.Name}, ${postOffice.District}, ${postOffice.State}, India`;
+          console.log('Trying postal code location:', searchStr);
+          
+          const geoResponse = await axios.get('https://nominatim.openstreetmap.org/search', {
+            params: {
+              q: searchStr,
+              format: 'json',
+              limit: 1
+            },
+            headers: {
+              'User-Agent': 'WhatsApp-OTP-App/1.0'
+            },
+            timeout: 10000
+          });
+
+          if (geoResponse.data && geoResponse.data.length > 0) {
+            return {
+              latitude: parseFloat(geoResponse.data[0].lat),
+              longitude: parseFloat(geoResponse.data[0].lon)
+            };
+          }
+        }
+      } catch (err) {
+        console.log('Postal code geocoding failed:', err.message);
+      }
+    }
+
+    console.log('All geocoding attempts failed, returning approximate coordinates');
+    
+    // Last resort: Return approximate coordinates for Maharashtra if state matches
+    if (addressData.state && addressData.state.toLowerCase().includes('maharashtra')) {
+      console.log('Using Maharashtra state center as fallback');
+      return {
+        latitude: 19.7515,
+        longitude: 75.7139
+      };
+    }
+
+    throw new Error('Unable to geocode address - no coordinates found');
+    
+  } catch (error) {
+    console.error('Geocoding error:', error.message);
+    
+    // Don't return null coordinates - throw error instead
+    throw new Error('Geocoding failed - please try with a different address or use current location');
   }
+}
   /**
    * Get users within radius
    */

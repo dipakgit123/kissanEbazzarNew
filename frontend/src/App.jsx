@@ -1,26 +1,38 @@
+// App.js - Corrected to work with your LoginForm that has built-in OTP
 import { useState } from 'react';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import './App.css';
-import LoginForm from './components/LoginForm';
-import MobileVerification from './components/MobileVerification';
-import ProfilePage from './components/ProfilePage';
-import { Routes, Route, Navigate } from 'react-router-dom';
 import HomePage from './components/HomePage';
+import Layout from './components/Layout';
+import LocationSetup from './components/LocationSetup'; // Add location component
+import LoginForm from './components/LoginForm'; // Your LoginForm with OTP built-in
+import MapView from './components/MapView';
+import PregnancyCalendar from './components/PregnancyCalendar';
+import ProfilePage from './components/ProfilePage';
 import SellAnimalForm from './components/SellAnimalForm';
 import VeterinarianPage from './components/VeterinarianPage';
-import PregnancyCalendar from './components/PregnancyCalendar';
 import WishlistPage from './components/WishlistPage';
-import MapView from './components/MapView';
-import Layout from './components/Layout';
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('login'); // 'login', 'verification', or 'home'
-  const [formData, setFormData] = useState(null);
+  const [currentPage, setCurrentPage] = useState('login'); // 'login', 'location', or 'home'
   const [wishlist, setWishlist] = useState([]);
+  const [hasLocation, setHasLocation] = useState(false);
+  const [userData, setUserData] = useState(null);
 
-  // Handle form submission from LoginForm
-  const handleLoginSubmit = (data) => {
-    setFormData(data);
-    setCurrentPage('verification');
+  // Handle successful login (after OTP verification in LoginForm)
+  const handleLoginSuccess = (response) => {
+    // Store user data if needed
+    if (response && response.user) {
+      setUserData(response.user);
+    }
+    // Move to location setup after successful OTP verification
+    setCurrentPage('location');
+  };
+
+  // Handle location setup completion
+  const handleLocationSet = () => {
+    setHasLocation(true);
+    setCurrentPage('home');
   };
 
   // Wishlist functions
@@ -40,18 +52,8 @@ function App() {
     return wishlist.some(item => item.id === animalId);
   };
 
-  // Handle back button from MobileVerification
-  const handleBackToLogin = () => {
-    setCurrentPage('login');
-  };
-
-  // Handle successful OTP verification
-  const handleVerificationSuccess = () => {
-    setCurrentPage('home');
-  };
-
   // Determine if we should show header/footer
-  const shouldShowHeaderFooter = !['login', 'verification'].includes(currentPage);
+  const shouldShowHeaderFooter = !['login', 'location'].includes(currentPage);
 
   return (
     <Routes>
@@ -60,11 +62,11 @@ function App() {
           path="/" 
           element={
             currentPage === 'login' ? (
-              <LoginForm onSubmit={handleLoginSubmit} />
-            ) : currentPage === 'verification' ? (
-              <MobileVerification 
-                onBack={handleBackToLogin} 
-                onSuccess={handleVerificationSuccess} 
+              <LoginForm onLoginSuccess={handleLoginSuccess} />
+            ) : currentPage === 'location' ? (
+              <LocationSetup 
+                onLocationSet={handleLocationSet}
+                skipAllowed={true}
               />
             ) : (
               <HomePage 
@@ -72,6 +74,7 @@ function App() {
                 addToWishlist={addToWishlist}
                 removeFromWishlist={removeFromWishlist}
                 isInWishlist={isInWishlist}
+                hasLocation={hasLocation}
               />
             )
           } 

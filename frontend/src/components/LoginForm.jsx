@@ -16,7 +16,7 @@ const LockIcon = () => (
   </svg>
 );
 
-const OtpLogin = ({ onLoginSuccess }) => {
+const LoginForm = ({ onLoginSuccess }) => {
   // States
   const [step, setStep] = useState(1); // 1: Phone, 2: OTP
   const [isLoading, setIsLoading] = useState(false);
@@ -385,4 +385,4 @@ const OtpLogin = ({ onLoginSuccess }) => {
   );
 };
 
-export default OtpLogin;
+export default LoginForm;
