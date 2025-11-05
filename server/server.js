@@ -5,6 +5,12 @@ const morgan = require('morgan');
 const { connectDB } = require('./src/config/database');
 const authRoutes = require('./src/routes/authRoutes');
 const locationRoutes = require('./src/routes/locationRoutes');
+const animalListingRoutes = require('./src/routes/animalListingRoutes'); // NEW
+const buffaloListingRoutes = require('./src/routes/buffaloListingRoutes'); // NEW
+const horseListingRoutes = require('./src/routes/horseListingRoutes'); // NEW
+const goatListingRoutes = require('./src/routes/goatListingRoutes'); // NEW
+const catListingRoutes = require('./src/routes/catListingRoutes'); // NEW
+const dogListingRoutes = require('./src/routes/dogListingRoutes'); // NEW
 const otpService = require('./src/services/otpService');
 require('dotenv').config();
 
@@ -24,7 +30,13 @@ app.set('trust proxy', true);
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/location', locationRoutes);  // Added location routes
+app.use('/api/location', locationRoutes);
+app.use('/api/animals', animalListingRoutes);  // NEW - Animal listing routes
+app.use('/api/buffalos', buffaloListingRoutes);  // NEW - Buffalo listing routes
+app.use('/api/horses', horseListingRoutes);  // NEW - Horse listing routes
+app.use('/api/goats', goatListingRoutes);  // NEW - Goat listing routes
+app.use('/api/cats', catListingRoutes);  // NEW - Cat listing routes
+app.use('/api/dogs', dogListingRoutes);  // NEW - Dog listing routes
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
@@ -49,7 +61,7 @@ app.get('/health', async (req, res) => {
 app.get('/api', (req, res) => {
   res.json({
     success: true,
-    message: 'WhatsApp OTP Authentication API with Location Services',
+    message: 'WhatsApp OTP Authentication API with Location Services & Animal Marketplace',
     version: '1.0.0',
     endpoints: {
       auth: {
@@ -66,9 +78,76 @@ app.get('/api', (req, res) => {
         checkStatus: 'GET /api/location/status',
         nearbyUsers: 'GET /api/location/nearby'
       },
+      animals: {  // NEW - Animal listing endpoints
+        create: 'POST /api/animals/listings (Auth Required)',
+        getAll: 'GET /api/animals/listings (Public)',
+        getSingle: 'GET /api/animals/listings/:id (Public)',
+        getNearby: 'GET /api/animals/listings/nearby (Public)',
+        update: 'PUT /api/animals/listings/:id (Auth Required)',
+        delete: 'DELETE /api/animals/listings/:id (Auth Required)',
+        myListings: 'GET /api/animals/my-listings (Auth Required)',
+        markSold: 'PATCH /api/animals/listings/:id/sold (Auth Required)'
+      },
+      buffalos: {  // NEW - Buffalo listing endpoints
+        create: 'POST /api/buffalos/listings (Auth Required)',
+        getAll: 'GET /api/buffalos/listings (Public)',
+        getSingle: 'GET /api/buffalos/listings/:id (Public)',
+        getNearby: 'GET /api/buffalos/listings/nearby (Public)',
+        update: 'PUT /api/buffalos/listings/:id (Auth Required)',
+        delete: 'DELETE /api/buffalos/listings/:id (Auth Required)',
+        myListings: 'GET /api/buffalos/my-listings (Auth Required)',
+        markSold: 'PATCH /api/buffalos/listings/:id/sold (Auth Required)'
+      },
+      horses: {  // NEW - Horse listing endpoints
+        create: 'POST /api/horses/listings (Auth Required)',
+        getAll: 'GET /api/horses/listings (Public)',
+        getSingle: 'GET /api/horses/listings/:id (Public)',
+        getNearby: 'GET /api/horses/listings/nearby (Public)',
+        update: 'PUT /api/horses/listings/:id (Auth Required)',
+        delete: 'DELETE /api/horses/listings/:id (Auth Required)',
+        myListings: 'GET /api/horses/my-listings (Auth Required)',
+        markSold: 'PATCH /api/horses/listings/:id/sold (Auth Required)'
+      },
+      goats: {  // NEW - Goat listing endpoints
+        create: 'POST /api/goats/listings (Auth Required)',
+        getAll: 'GET /api/goats/listings (Public)',
+        getSingle: 'GET /api/goats/listings/:id (Public)',
+        getNearby: 'GET /api/goats/listings/nearby (Public)',
+        update: 'PUT /api/goats/listings/:id (Auth Required)',
+        delete: 'DELETE /api/goats/listings/:id (Auth Required)',
+        myListings: 'GET /api/goats/my-listings (Auth Required)',
+        markSold: 'PATCH /api/goats/listings/:id/sold (Auth Required)'
+      },
+      cats: {  // NEW - Cat listing endpoints
+        create: 'POST /api/cats/listings (Auth Required)',
+        getAll: 'GET /api/cats/listings (Public)',
+        getSingle: 'GET /api/cats/listings/:id (Public)',
+        getNearby: 'GET /api/cats/listings/nearby (Public)',
+        update: 'PUT /api/cats/listings/:id (Auth Required)',
+        delete: 'DELETE /api/cats/listings/:id (Auth Required)',
+        myListings: 'GET /api/cats/my-listings (Auth Required)',
+        markSold: 'PATCH /api/cats/listings/:id/sold (Auth Required)'
+      },
+      dogs: {  // NEW - Dog listing endpoints
+        create: 'POST /api/dogs/listings (Auth Required)',
+        getAll: 'GET /api/dogs/listings (Public)',
+        getSingle: 'GET /api/dogs/listings/:id (Public)',
+        getNearby: 'GET /api/dogs/listings/nearby (Public)',
+        update: 'PUT /api/dogs/listings/:id (Auth Required)',
+        delete: 'DELETE /api/dogs/listings/:id (Auth Required)',
+        myListings: 'GET /api/dogs/my-listings (Auth Required)',
+        markSold: 'PATCH /api/dogs/listings/:id/sold (Auth Required)'
+      },
       health: {
         status: 'GET /health'
       }
+    },
+    notes: {
+      authentication: 'Protected endpoints require Bearer token in Authorization header',
+      publicAccess: 'Animal, Buffalo, Horse, Goat, Cat, and Dog listings can be viewed without authentication',
+      fileUploads: 'Use multipart/form-data for image and video uploads',
+      imageLimits: 'Max 5MB per image (JPEG, PNG, WebP)',
+      videoLimits: 'Max 25MB per video (MP4, MOV, AVI, WebM)'
     }
   });
 });
@@ -76,6 +155,22 @@ app.get('/api', (req, res) => {
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
+  
+  // Handle Multer errors
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(400).json({
+      success: false,
+      message: 'File size limit exceeded'
+    });
+  }
+  
+  if (err.message && err.message.includes('Invalid file type')) {
+    return res.status(400).json({
+      success: false,
+      message: err.message
+    });
+  }
+
   res.status(500).json({
     success: false,
     message: 'Something went wrong!',
@@ -113,6 +208,10 @@ const startServer = async () => {
 ║   🚀 Server is running on port ${PORT}         ║
 ║   📱 WhatsApp OTP Service with Sequelize    ║
 ║   📍 Location Services Enabled               ║
+║   🐄 Animal Marketplace Active              ║
+║   🐃 Buffalo Marketplace Active             ║
+║   🐴 Horse Marketplace Active               ║
+║   ☁️  Cloudinary Integration Enabled        ║
 ║   🗄️  Database: PostgreSQL                   ║
 ║   🔐 Environment: ${process.env.NODE_ENV || 'development'}     ║
 ╚══════════════════════════════════════════════╝
@@ -132,9 +231,75 @@ Available endpoints:
     GET  /api/location/status
     GET  /api/location/nearby
 
+  Animal Listings:
+    POST /api/animals/listings        [Auth Required]
+    GET  /api/animals/listings        [Public Access]
+    GET  /api/animals/listings/nearby [Public Access]
+    GET  /api/animals/listings/:id    [Public Access]
+    PUT  /api/animals/listings/:id    [Auth Required]
+    DELETE /api/animals/listings/:id  [Auth Required]
+    GET  /api/animals/my-listings     [Auth Required]
+    PATCH /api/animals/listings/:id/sold [Auth Required]
+
+  Buffalo Listings:
+    POST /api/buffalos/listings        [Auth Required]
+    GET  /api/buffalos/listings        [Public Access]
+    GET  /api/buffalos/listings/nearby [Public Access]
+    GET  /api/buffalos/listings/:id    [Public Access]
+    PUT  /api/buffalos/listings/:id    [Auth Required]
+    DELETE /api/buffalos/listings/:id  [Auth Required]
+    GET  /api/buffalos/my-listings     [Auth Required]
+    PATCH /api/buffalos/listings/:id/sold [Auth Required]
+
+  Horse Listings:
+    POST /api/horses/listings        [Auth Required]
+    GET  /api/horses/listings        [Public Access]
+    GET  /api/horses/listings/nearby [Public Access]
+    GET  /api/horses/listings/:id    [Public Access]
+    PUT  /api/horses/listings/:id    [Auth Required]
+    DELETE /api/horses/listings/:id  [Auth Required]
+    GET  /api/horses/my-listings     [Auth Required]
+    PATCH /api/horses/listings/:id/sold [Auth Required]
+
+  Goat Listings:
+    POST /api/goats/listings        [Auth Required]
+    GET  /api/goats/listings        [Public Access]
+    GET  /api/goats/listings/nearby [Public Access]
+    GET  /api/goats/listings/:id    [Public Access]
+    PUT  /api/goats/listings/:id    [Auth Required]
+    DELETE /api/goats/listings/:id  [Auth Required]
+    GET  /api/goats/my-listings     [Auth Required]
+    PATCH /api/goats/listings/:id/sold [Auth Required]
+
+  Cat Listings:
+    POST /api/cats/listings        [Auth Required]
+    GET  /api/cats/listings        [Public Access]
+    GET  /api/cats/listings/nearby [Public Access]
+    GET  /api/cats/listings/:id    [Public Access]
+    PUT  /api/cats/listings/:id    [Auth Required]
+    DELETE /api/cats/listings/:id  [Auth Required]
+    GET  /api/cats/my-listings     [Auth Required]
+    PATCH /api/cats/listings/:id/sold [Auth Required]
+
+  Dog Listings:
+    POST /api/dogs/listings        [Auth Required]
+    GET  /api/dogs/listings        [Public Access]
+    GET  /api/dogs/listings/nearby [Public Access]
+    GET  /api/dogs/listings/:id    [Public Access]
+    PUT  /api/dogs/listings/:id    [Auth Required]
+    DELETE /api/dogs/listings/:id  [Auth Required]
+    GET  /api/dogs/my-listings     [Auth Required]
+    PATCH /api/dogs/listings/:id/sold [Auth Required]
+
   Health:
     GET  /health
     GET  /api
+
+Notes:
+  - Public endpoints allow viewing listings without authentication
+  - Protected endpoints require Bearer token in Authorization header
+  - File uploads support: Images (5MB) and Videos (25MB)
+  - Cloudinary handles all media storage
       `);
     });
   } catch (error) {
