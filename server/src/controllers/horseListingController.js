@@ -47,29 +47,28 @@ exports.createHorseListing = async (req, res) => {
     if (req.files) {
       if (req.files.frontPhoto) {
         frontPhotoData = await uploadToCloudinary(
-          req.files.frontPhoto[0].buffer,
-          'horse-listings/images'
+          req.files.frontPhoto[0],
+          'image'
         );
       }
 
       if (req.files.sidePhoto) {
         sidePhotoData = await uploadToCloudinary(
-          req.files.sidePhoto[0].buffer,
-          'horse-listings/images'
+          req.files.sidePhoto[0],
+          'image'
         );
       }
 
       if (req.files.fullBodyPhoto) {
         fullBodyPhotoData = await uploadToCloudinary(
-          req.files.fullBodyPhoto[0].buffer,
-          'horse-listings/images'
+          req.files.fullBodyPhoto[0],
+          'image'
         );
       }
 
       if (req.files.video) {
         videoData = await uploadToCloudinary(
-          req.files.video[0].buffer,
-          'horse-listings/videos',
+          req.files.video[0],
           'video'
         );
       }
@@ -364,8 +363,8 @@ exports.updateHorseListing = async (req, res) => {
         }
         // Upload new photo
         const photoData = await uploadToCloudinary(
-          req.files.frontPhoto[0].buffer,
-          'horse-listings/images'
+          req.files.frontPhoto[0],
+          'image'
         );
         updateData.frontPhoto = photoData.secure_url;
         updateData.frontPhotoPublicId = photoData.public_id;
@@ -376,8 +375,8 @@ exports.updateHorseListing = async (req, res) => {
           await deleteFromCloudinary(listing.sidePhotoPublicId);
         }
         const photoData = await uploadToCloudinary(
-          req.files.sidePhoto[0].buffer,
-          'horse-listings/images'
+          req.files.sidePhoto[0],
+          'image'
         );
         updateData.sidePhoto = photoData.secure_url;
         updateData.sidePhotoPublicId = photoData.public_id;
@@ -388,8 +387,8 @@ exports.updateHorseListing = async (req, res) => {
           await deleteFromCloudinary(listing.fullBodyPhotoPublicId);
         }
         const photoData = await uploadToCloudinary(
-          req.files.fullBodyPhoto[0].buffer,
-          'horse-listings/images'
+          req.files.fullBodyPhoto[0],
+          'image'
         );
         updateData.fullBodyPhoto = photoData.secure_url;
         updateData.fullBodyPhotoPublicId = photoData.public_id;
@@ -400,8 +399,7 @@ exports.updateHorseListing = async (req, res) => {
           await deleteFromCloudinary(listing.videoPublicId);
         }
         const videoData = await uploadToCloudinary(
-          req.files.video[0].buffer,
-          'horse-listings/videos',
+          req.files.video[0],
           'video'
         );
         updateData.video = videoData.secure_url;

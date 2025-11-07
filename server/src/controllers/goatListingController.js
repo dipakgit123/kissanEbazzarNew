@@ -53,8 +53,8 @@ exports.createGoatListing = async (req, res) => {
         if (req.files[fieldName] && req.files[fieldName][0]) {
           try {
             const result = await uploadToCloudinary(
-              req.files[fieldName][0].buffer,
-              'goat-listings/images'
+              req.files[fieldName][0],
+              'image'
             );
             photoData[fieldName] = result.secure_url;
             photoData[`${fieldName}PublicId`] = result.public_id;
@@ -68,8 +68,7 @@ exports.createGoatListing = async (req, res) => {
       if (req.files.video && req.files.video[0]) {
         try {
           const result = await uploadToCloudinary(
-            req.files.video[0].buffer,
-            'goat-listings/videos',
+            req.files.video[0],
             'video'
           );
           photoData.video = result.secure_url;
@@ -373,8 +372,8 @@ exports.updateGoatListing = async (req, res) => {
 
           // Upload new photo
           const result = await uploadToCloudinary(
-            req.files[fieldName][0].buffer,
-            'goat-listings/images'
+            req.files[fieldName][0],
+            'image'
           );
           updateData[fieldName] = result.secure_url;
           updateData[publicIdField] = result.public_id;
@@ -390,8 +389,7 @@ exports.updateGoatListing = async (req, res) => {
 
         // Upload new video
         const result = await uploadToCloudinary(
-          req.files.video[0].buffer,
-          'goat-listings/videos',
+          req.files.video[0],
           'video'
         );
         updateData.video = result.secure_url;

@@ -8,6 +8,13 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
+// Log configuration status (without exposing secrets)
+if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+  console.warn('WARNING: Cloudinary credentials are not fully configured');
+} else {
+  console.log(`Cloudinary configured for cloud: ${process.env.CLOUDINARY_CLOUD_NAME}`);
+}
+
 const imageStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: async (req, file) => {
@@ -49,26 +56,45 @@ const uploadFields = multer({
 // Process and upload files to Cloudinary
 const uploadToCloudinary = async (file, resourceType = 'image') => {
   return new Promise((resolve, reject) => {
-    const uploadOptions = {
-      resource_type: resourceType,
-      folder: resourceType === 'video' ? 'animal-listings/videos' : 'animal-listings/images'
-    };
+    try {
+      const uploadOptions = {
+        resource_type: resourceType,
+        folder: resourceType === 'video' ? 'animal-listings/videos' : 'animal-listings/images'
+      };
 
-    if (resourceType === 'image') {
-      uploadOptions.transformation = [
-        { width: 1200, height: 1200, crop: 'limit', quality: 'auto' }
-      ];
-    }
-
-    const uploadStream = cloudinary.uploader.upload_stream(
-      uploadOptions,
-      (error, result) => {
-        if (error) reject(error);
-        else resolve(result);
+      if (resourceType === 'image') {
+        uploadOptions.transformation = [
+          { width: 1200, height: 1200, crop: 'limit', quality: 'auto' }
+        ];
       }
-    );
 
-    uploadStream.end(file.buffer);
+      const uploadStream = cloudinary.uploader.upload_stream(
+        uploadOptions,
+        (error, result) => {
+          if (error) {
+            console.error('Cloudinary upload error:', error);
+            reject(error);
+          } else {
+            resolve(result);
+          }
+        }
+      );
+
+      // Handle both Buffer and file object with buffer property
+      const buffer = file.buffer || file;
+
+      // Ensure buffer is a Buffer instance
+      if (Buffer.isBuffer(buffer)) {
+        uploadStream.end(buffer);
+      } else if (buffer instanceof ArrayBuffer) {
+        uploadStream.end(Buffer.from(buffer));
+      } else {
+        reject(new Error('Invalid file buffer type'));
+      }
+    } catch (error) {
+      console.error('Error in uploadToCloudinary:', error);
+      reject(error);
+    }
   });
 };
 

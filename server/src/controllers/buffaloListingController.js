@@ -48,29 +48,28 @@ exports.createBuffaloListing = async (req, res) => {
     if (req.files) {
       if (req.files.frontPhoto) {
         frontPhotoData = await uploadToCloudinary(
-          req.files.frontPhoto[0].buffer,
-          'buffalo-listings/images'
+          req.files.frontPhoto[0],
+          'image'
         );
       }
 
       if (req.files.sidePhoto) {
         sidePhotoData = await uploadToCloudinary(
-          req.files.sidePhoto[0].buffer,
-          'buffalo-listings/images'
+          req.files.sidePhoto[0],
+          'image'
         );
       }
 
       if (req.files.milkScenePhoto) {
         milkScenePhotoData = await uploadToCloudinary(
-          req.files.milkScenePhoto[0].buffer,
-          'buffalo-listings/images'
+          req.files.milkScenePhoto[0],
+          'image'
         );
       }
 
       if (req.files.video) {
         videoData = await uploadToCloudinary(
-          req.files.video[0].buffer,
-          'buffalo-listings/videos',
+          req.files.video[0],
           'video'
         );
       }
@@ -113,6 +112,16 @@ exports.createBuffaloListing = async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating buffalo listing:', error);
+
+    // Handle Cloudinary specific errors
+    if (error.http_code === 404) {
+      return res.status(500).json({
+        success: false,
+        message: 'Cloudinary upload failed - Invalid credentials or configuration',
+        error: 'Please check Cloudinary configuration'
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Failed to create buffalo listing',
@@ -366,8 +375,8 @@ exports.updateBuffaloListing = async (req, res) => {
         }
         // Upload new photo
         const photoData = await uploadToCloudinary(
-          req.files.frontPhoto[0].buffer,
-          'buffalo-listings/images'
+          req.files.frontPhoto[0],
+          'image'
         );
         updateData.frontPhoto = photoData.secure_url;
         updateData.frontPhotoPublicId = photoData.public_id;
@@ -378,8 +387,8 @@ exports.updateBuffaloListing = async (req, res) => {
           await deleteFromCloudinary(listing.sidePhotoPublicId);
         }
         const photoData = await uploadToCloudinary(
-          req.files.sidePhoto[0].buffer,
-          'buffalo-listings/images'
+          req.files.sidePhoto[0],
+          'image'
         );
         updateData.sidePhoto = photoData.secure_url;
         updateData.sidePhotoPublicId = photoData.public_id;
@@ -390,8 +399,8 @@ exports.updateBuffaloListing = async (req, res) => {
           await deleteFromCloudinary(listing.milkScenePhotoPublicId);
         }
         const photoData = await uploadToCloudinary(
-          req.files.milkScenePhoto[0].buffer,
-          'buffalo-listings/images'
+          req.files.milkScenePhoto[0],
+          'image'
         );
         updateData.milkScenePhoto = photoData.secure_url;
         updateData.milkScenePhotoPublicId = photoData.public_id;
@@ -399,11 +408,10 @@ exports.updateBuffaloListing = async (req, res) => {
 
       if (req.files.video) {
         if (listing.videoPublicId) {
-          await deleteFromCloudinary(listing.videoPublicId);
+          await deleteFromCloudinary(listing.videoPublicId, 'video');
         }
         const videoData = await uploadToCloudinary(
-          req.files.video[0].buffer,
-          'buffalo-listings/videos',
+          req.files.video[0],
           'video'
         );
         updateData.video = videoData.secure_url;

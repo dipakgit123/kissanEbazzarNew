@@ -9,30 +9,44 @@ import LoginForm from './components/LoginForm'; // Your LoginForm with OTP built
 import MapView from './components/MapView';
 import PregnancyCalendar from './components/PregnancyCalendar';
 import ProfilePage from './components/ProfilePage';
-import SellAnimalForm from './components/SellAnimalForm';
+import AnimalListingPage from './components/AnimalListingPage';
 import VeterinarianPage from './components/VeterinarianPage';
 import WishlistPage from './components/WishlistPage';
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('login'); // 'login', 'location', or 'home'
+  // Initialize state from localStorage
+  const [currentPage, setCurrentPage] = useState(() => {
+    return localStorage.getItem('currentPage') || 'login';
+  });
   const [wishlist, setWishlist] = useState([]);
-  const [hasLocation, setHasLocation] = useState(false);
-  const [userData, setUserData] = useState(null);
+  const [hasLocation, setHasLocation] = useState(() => {
+    return localStorage.getItem('hasLocation') === 'true';
+  });
+  const [userData, setUserData] = useState(() => {
+    const saved = localStorage.getItem('userData');
+    return saved ? JSON.parse(saved) : null;
+  });
 
   // Handle successful login (after OTP verification in LoginForm)
   const handleLoginSuccess = (response) => {
     // Store user data if needed
     if (response && response.user) {
       setUserData(response.user);
+      localStorage.setItem('userData', JSON.stringify(response.user));
     }
     // Move to location setup after successful OTP verification
     setCurrentPage('location');
+    localStorage.setItem('currentPage', 'location');
+    window.location.href = '/location-setup';
   };
 
   // Handle location setup completion
   const handleLocationSet = () => {
     setHasLocation(true);
     setCurrentPage('home');
+    localStorage.setItem('hasLocation', 'true');
+    localStorage.setItem('currentPage', 'home');
+    window.location.href = '/';
   };
 
   // Wishlist functions
@@ -52,24 +66,31 @@ function App() {
     return wishlist.some(item => item.id === animalId);
   };
 
-  // Determine if we should show header/footer
-  const shouldShowHeaderFooter = !['login', 'location'].includes(currentPage);
-
   return (
     <Routes>
-      <Route element={<Layout showHeaderFooter={shouldShowHeaderFooter} wishlistCount={wishlist.length} />}>
-        <Route 
-          path="/" 
+      {/* Routes without header/footer */}
+      <Route element={<Layout showHeaderFooter={false} wishlistCount={wishlist.length} />}>
+        <Route
+          path="/login"
+          element={<LoginForm onLoginSuccess={handleLoginSuccess} />}
+        />
+        <Route
+          path="/location-setup"
+          element={<LocationSetup onLocationSet={handleLocationSet} skipAllowed={true} />}
+        />
+      </Route>
+
+      {/* Routes with header/footer */}
+      <Route element={<Layout showHeaderFooter={true} wishlistCount={wishlist.length} />}>
+        <Route
+          path="/"
           element={
             currentPage === 'login' ? (
-              <LoginForm onLoginSuccess={handleLoginSuccess} />
+              <Navigate to="/login" replace />
             ) : currentPage === 'location' ? (
-              <LocationSetup 
-                onLocationSet={handleLocationSet}
-                skipAllowed={true}
-              />
+              <Navigate to="/location-setup" replace />
             ) : (
-              <HomePage 
+              <HomePage
                 wishlist={wishlist}
                 addToWishlist={addToWishlist}
                 removeFromWishlist={removeFromWishlist}
@@ -77,10 +98,10 @@ function App() {
                 hasLocation={hasLocation}
               />
             )
-          } 
+          }
         />
         <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/sell-animal" element={<SellAnimalForm />} />
+        <Route path="/sell-animal" element={<AnimalListingPage />} />
         <Route path="/veterinarian" element={<VeterinarianPage />} />
         <Route path="/pregnancy-calendar" element={<PregnancyCalendar />} />
         <Route path="/wishlist" element={<WishlistPage wishlist={wishlist} removeFromWishlist={removeFromWishlist} isInWishlist={isInWishlist} />} />

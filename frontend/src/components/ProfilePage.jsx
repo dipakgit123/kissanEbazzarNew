@@ -1,20 +1,148 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import EditProfileForm from './EditProfileForm';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 /*
-  Simple profile dashboard page inspired by the provided screenshot.  
+  Simple profile dashboard page inspired by the provided screenshot.
   Props
   -----
   onBack : optional callback to navigate back to the previous page
 */
 const ProfilePage = ({ onBack }) => {
   const [editing, setEditing] = useState(false);
-  // Dummy user info – in a real app these would come from an API / context
-  const user = {
+  const [user, setUser] = useState({
     name: 'dipak',
     location: 'Nagpur, Maharashtra',
     phone: '9022589579',
     completion: 57,
+  });
+
+  const [animalListings, setAnimalListings] = useState([]);
+  const [buffaloListings, setBuffaloListings] = useState([]);
+  const [catListings, setCatListings] = useState([]);
+  const [dogListings, setDogListings] = useState([]);
+  const [goatListings, setGoatListings] = useState([]);
+  const [horseListings, setHorseListings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showMyAnimals, setShowMyAnimals] = useState(false);
+  const [selectedAnimal, setSelectedAnimal] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
+
+  useEffect(() => {
+    fetchAllListings();
+  }, []);
+
+  const fetchAllListings = async () => {
+    setLoading(true);
+    const token = localStorage.getItem('token');
+
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const config = {
+        headers: { Authorization: `Bearer ${token}` }
+      };
+
+      // Fetch all animal types in parallel
+      const [animals, buffalos, cats, dogs, goats, horses] = await Promise.all([
+        axios.get(`${API_URL}/api/animals/my-listings`, config).catch(() => ({ data: { data: [] } })),
+        axios.get(`${API_URL}/api/buffalos/my-listings`, config).catch(() => ({ data: { data: [] } })),
+        axios.get(`${API_URL}/api/cats/my-listings`, config).catch(() => ({ data: { data: [] } })),
+        axios.get(`${API_URL}/api/dogs/my-listings`, config).catch(() => ({ data: { data: [] } })),
+        axios.get(`${API_URL}/api/goats/my-listings`, config).catch(() => ({ data: { data: [] } })),
+        axios.get(`${API_URL}/api/horses/my-listings`, config).catch(() => ({ data: { data: [] } }))
+      ]);
+
+      console.log('API Responses:', { animals: animals.data, buffalos: buffalos.data });
+
+      // Handle different response structures
+      const getListings = (response) => {
+        if (Array.isArray(response?.data?.data)) return response.data.data;
+        if (Array.isArray(response?.data)) return response.data;
+        return [];
+      };
+
+      setAnimalListings(getListings(animals));
+      setBuffaloListings(getListings(buffalos));
+      setCatListings(getListings(cats));
+      setDogListings(getListings(dogs));
+      setGoatListings(getListings(goats));
+      setHorseListings(getListings(horses));
+    } catch (error) {
+      console.error('Error fetching listings:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getTotalListings = () => {
+    const total = (animalListings?.length || 0) +
+                  (buffaloListings?.length || 0) +
+                  (catListings?.length || 0) +
+                  (dogListings?.length || 0) +
+                  (goatListings?.length || 0) +
+                  (horseListings?.length || 0);
+    return total;
+  };
+
+  const handleDelete = async (id, type) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      const endpoints = {
+        animal: `/api/animals/listings/${id}`,
+        buffalo: `/api/buffalos/listings/${id}`,
+        cat: `/api/cats/listings/${id}`,
+        dog: `/api/dogs/listings/${id}`,
+        goat: `/api/goats/listings/${id}`,
+        horse: `/api/horses/listings/${id}`
+      };
+
+      await axios.delete(`${API_URL}${endpoints[type]}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      // Refresh listings
+      await fetchAllListings();
+      setShowDeleteConfirm(null);
+      alert('Listing deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting listing:', error);
+      alert('Failed to delete listing');
+    }
+  };
+
+  const handleMarkAsSold = async (id, type) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      const endpoints = {
+        animal: `/api/animals/listings/${id}/sold`,
+        buffalo: `/api/buffalos/listings/${id}/sold`,
+        cat: `/api/cats/listings/${id}/sold`,
+        dog: `/api/dogs/listings/${id}/sold`,
+        goat: `/api/goats/listings/${id}/sold`,
+        horse: `/api/horses/listings/${id}/sold`
+      };
+
+      await axios.patch(`${API_URL}${endpoints[type]}`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      // Refresh listings
+      await fetchAllListings();
+      alert('Listing marked as sold!');
+    } catch (error) {
+      console.error('Error marking as sold:', error);
+      alert('Failed to mark as sold');
+    }
   };
 
   // Helper component for small stat cards
@@ -68,7 +196,7 @@ const ProfilePage = ({ onBack }) => {
 
         {/* Journey statistics */}
         <section className="flex gap-3">
-          <StatCard label="Animals Listed" value="0" />
+          <StatCard label="Animals Listed" value={loading ? '...' : getTotalListings()} />
           <StatCard label="Calls Made" value="0" />
           <StatCard label="Calls Received" value="0" />
         </section>
@@ -77,7 +205,15 @@ const ProfilePage = ({ onBack }) => {
         <section className="bg-white rounded-xl shadow divide-y">
           <h3 className="px-4 py-3 font-semibold text-gray-800">Selling Related</h3>
           <RowButton text="My Plan" />
-          <RowButton text="Animals" />
+          <button
+            onClick={() => setShowMyAnimals(true)}
+            className="w-full flex justify-between items-center py-3 px-4 border-b text-gray-700 hover:bg-gray-50"
+          >
+            <span>Animals ({getTotalListings()})</span>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
           <RowButton text="Calls Received" />
         </section>
 
@@ -110,6 +246,216 @@ const ProfilePage = ({ onBack }) => {
           </div>
         </div>
       )}
+
+      {/* My Animals Modal */}
+      {showMyAnimals && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="max-w-4xl w-full bg-white rounded-xl shadow-xl max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="p-4 border-b flex justify-between items-center bg-violet-50">
+              <h2 className="text-xl font-bold text-gray-800">My Animals ({getTotalListings()})</h2>
+              <button
+                onClick={() => setShowMyAnimals(false)}
+                className="text-gray-500 hover:text-gray-700 p-2 rounded-full hover:bg-gray-100"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="overflow-y-auto p-4 space-y-4">
+              {loading ? (
+                <div className="text-center py-8 text-gray-500">Loading...</div>
+              ) : getTotalListings() === 0 ? (
+                <div className="text-center py-8 text-gray-500">No animals listed yet</div>
+              ) : (
+                <>
+                  {/* Animals/Cows */}
+                  {animalListings.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold text-gray-700 mb-2">🐄 Animals/Cows ({animalListings.length})</h3>
+                      <div className="space-y-2">
+                        {animalListings.map(animal => (
+                          <AnimalCard key={animal.id} animal={animal} type="animal" onDelete={handleDelete} onMarkSold={handleMarkAsSold} setShowDeleteConfirm={setShowDeleteConfirm} showDeleteConfirm={showDeleteConfirm} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Buffalos */}
+                  {buffaloListings.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold text-gray-700 mb-2">🐃 Buffalos ({buffaloListings.length})</h3>
+                      <div className="space-y-2">
+                        {buffaloListings.map(animal => (
+                          <AnimalCard key={animal.id} animal={animal} type="buffalo" onDelete={handleDelete} onMarkSold={handleMarkAsSold} setShowDeleteConfirm={setShowDeleteConfirm} showDeleteConfirm={showDeleteConfirm} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Cats */}
+                  {catListings.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold text-gray-700 mb-2">🐱 Cats ({catListings.length})</h3>
+                      <div className="space-y-2">
+                        {catListings.map(animal => (
+                          <AnimalCard key={animal.id} animal={animal} type="cat" onDelete={handleDelete} onMarkSold={handleMarkAsSold} setShowDeleteConfirm={setShowDeleteConfirm} showDeleteConfirm={showDeleteConfirm} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Dogs */}
+                  {dogListings.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold text-gray-700 mb-2">🐕 Dogs ({dogListings.length})</h3>
+                      <div className="space-y-2">
+                        {dogListings.map(animal => (
+                          <AnimalCard key={animal.id} animal={animal} type="dog" onDelete={handleDelete} onMarkSold={handleMarkAsSold} setShowDeleteConfirm={setShowDeleteConfirm} showDeleteConfirm={showDeleteConfirm} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Goats */}
+                  {goatListings.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold text-gray-700 mb-2">🐐 Goats ({goatListings.length})</h3>
+                      <div className="space-y-2">
+                        {goatListings.map(animal => (
+                          <AnimalCard key={animal.id} animal={animal} type="goat" onDelete={handleDelete} onMarkSold={handleMarkAsSold} setShowDeleteConfirm={setShowDeleteConfirm} showDeleteConfirm={showDeleteConfirm} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Horses */}
+                  {horseListings.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold text-gray-700 mb-2">🐴 Horses ({horseListings.length})</h3>
+                      <div className="space-y-2">
+                        {horseListings.map(animal => (
+                          <AnimalCard key={animal.id} animal={animal} type="horse" onDelete={handleDelete} onMarkSold={handleMarkAsSold} setShowDeleteConfirm={setShowDeleteConfirm} showDeleteConfirm={showDeleteConfirm} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full">
+            <h3 className="text-lg font-bold mb-2">Delete Listing?</h3>
+            <p className="text-gray-600 mb-6">Are you sure you want to delete this listing? This action cannot be undone.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(null)}
+                className="flex-1 py-2 px-4 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDelete(showDeleteConfirm.id, showDeleteConfirm.type)}
+                className="flex-1 py-2 px-4 bg-red-500 text-white rounded-lg hover:bg-red-600"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Animal Card Component
+const AnimalCard = ({ animal, type, onDelete, onMarkSold, setShowDeleteConfirm, showDeleteConfirm }) => {
+  const getDisplayName = () => {
+    if (animal.breedName) return animal.breedName;
+    if (animal.breed_name) return animal.breed_name;
+    return 'Unknown Breed';
+  };
+
+  const getPrice = () => {
+    if (animal.expectedPrice) return animal.expectedPrice;
+    if (animal.expected_price) return animal.expected_price;
+    return '0';
+  };
+
+  const getStatus = () => {
+    return animal.status || 'active';
+  };
+
+  const getAge = () => {
+    return animal.age || 'N/A';
+  };
+
+  const statusColors = {
+    active: 'bg-green-100 text-green-700',
+    sold: 'bg-blue-100 text-blue-700',
+    expired: 'bg-gray-100 text-gray-700',
+    deleted: 'bg-red-100 text-red-700'
+  };
+
+  return (
+    <div className="bg-white border rounded-lg p-4 hover:shadow-md transition">
+      <div className="flex gap-4">
+        {/* Image */}
+        <div className="w-24 h-24 bg-gray-200 rounded-lg flex-shrink-0 overflow-hidden">
+          {(animal.frontPhoto || animal.front_photo || animal.photo_1 || animal.photo1) ? (
+            <img
+              src={animal.frontPhoto || animal.front_photo || animal.photo_1 || animal.photo1}
+              alt={getDisplayName()}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-gray-400">
+              No Image
+            </div>
+          )}
+        </div>
+
+        {/* Details */}
+        <div className="flex-1">
+          <div className="flex justify-between items-start mb-2">
+            <div>
+              <h4 className="font-semibold text-gray-800">{getDisplayName()}</h4>
+              <p className="text-sm text-gray-600">Age: {getAge()}</p>
+              <p className="text-sm font-semibold text-green-600">₹{Number(getPrice()).toLocaleString()}</p>
+            </div>
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[getStatus()]}`}>
+              {getStatus().toUpperCase()}
+            </span>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-2 mt-3">
+            {getStatus() === 'active' && (
+              <button
+                onClick={() => onMarkSold(animal.id, type)}
+                className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+              >
+                Mark as Sold
+              </button>
+            )}
+            <button
+              onClick={() => setShowDeleteConfirm({ id: animal.id, type })}
+              className="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
