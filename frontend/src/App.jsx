@@ -6,6 +6,7 @@ import HomePage from './components/HomePage';
 import Layout from './components/Layout';
 import LocationSetup from './components/LocationSetup'; // Add location component
 import LoginForm from './components/LoginForm'; // Your LoginForm with OTP built-in
+import ProfileCompletion from './components/ProfileCompletion'; // Profile completion for first-time users
 import MapView from './components/MapView';
 import PregnancyCalendar from './components/PregnancyCalendar';
 import ProfilePage from './components/ProfilePage';
@@ -34,10 +35,46 @@ function App() {
       setUserData(response.user);
       localStorage.setItem('userData', JSON.stringify(response.user));
     }
-    // Move to location setup after successful OTP verification
-    setCurrentPage('location');
-    localStorage.setItem('currentPage', 'location');
-    window.location.href = '/location-setup';
+
+    // Check if user needs to complete profile (first-time login)
+    if (response.requiresProfileCompletion) {
+      setCurrentPage('profile-completion');
+      localStorage.setItem('currentPage', 'profile-completion');
+      window.location.href = '/profile-completion';
+    }
+    // Check if user needs to set location
+    else if (response.requiresLocation) {
+      setCurrentPage('location');
+      localStorage.setItem('currentPage', 'location');
+      window.location.href = '/location-setup';
+    }
+    // User is fully set up, go to home
+    else {
+      setCurrentPage('home');
+      localStorage.setItem('currentPage', 'home');
+      setHasLocation(true);
+      localStorage.setItem('hasLocation', 'true');
+      window.location.href = '/';
+    }
+  };
+
+  // Handle profile completion (first-time users)
+  const handleProfileComplete = (response) => {
+    // Update user data
+    const currentUser = JSON.parse(localStorage.getItem('userData') || '{}');
+    const updatedUser = {
+      ...currentUser,
+      ...response.location
+    };
+    setUserData(updatedUser);
+    localStorage.setItem('userData', JSON.stringify(updatedUser));
+
+    // Profile completed, location should be set too, go to home
+    setCurrentPage('home');
+    localStorage.setItem('currentPage', 'home');
+    setHasLocation(true);
+    localStorage.setItem('hasLocation', 'true');
+    window.location.href = '/';
   };
 
   // Handle location setup completion
@@ -75,6 +112,10 @@ function App() {
           element={<LoginForm onLoginSuccess={handleLoginSuccess} />}
         />
         <Route
+          path="/profile-completion"
+          element={<ProfileCompletion onComplete={handleProfileComplete} />}
+        />
+        <Route
           path="/location-setup"
           element={<LocationSetup onLocationSet={handleLocationSet} skipAllowed={true} />}
         />
@@ -87,6 +128,8 @@ function App() {
           element={
             currentPage === 'login' ? (
               <Navigate to="/login" replace />
+            ) : currentPage === 'profile-completion' ? (
+              <Navigate to="/profile-completion" replace />
             ) : currentPage === 'location' ? (
               <Navigate to="/location-setup" replace />
             ) : (

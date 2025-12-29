@@ -20,6 +20,9 @@ router.post('/resend-otp', validatePhone, authController.resendOTP);
 // Get user profile
 router.get('/profile', authMiddleware, authController.getUserProfile);
 
+// Complete user profile (first-time login)
+router.post('/complete-profile', authMiddleware, authController.completeProfile);
+
 // Get user stats (if you have this method)
 if (authController.getUserStats) {
   router.get('/stats/:phoneNumber', authMiddleware, authController.getUserStats);

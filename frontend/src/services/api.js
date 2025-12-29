@@ -70,6 +70,58 @@ export const otpService = {
   },
 };
 
+// Animal Listing Services
+export const animalListingService = {
+  // Get all animals by category
+  getAnimalsByCategory: async (endpoint, params = {}) => {
+    try {
+      const queryString = new URLSearchParams(params).toString();
+      const url = `/api/${endpoint}/listings${queryString ? `?${queryString}` : ''}`;
+      const response = await api.get(url);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Get nearby animals based on user location
+  getNearbyAnimals: async (endpoint, radius = 50, params = {}) => {
+    try {
+      const queryString = new URLSearchParams({ ...params, radius }).toString();
+      const url = `/api/${endpoint}/listings/nearby${queryString ? `?${queryString}` : ''}`;
+      const response = await api.get(url);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Get single animal listing
+  getAnimalById: async (endpoint, id) => {
+    try {
+      const response = await api.get(`/api/${endpoint}/listings/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Search across all animal types
+  searchAllAnimals: async (searchQuery) => {
+    try {
+      const endpoints = ['animals', 'buffalos', 'goats', 'horses', 'dogs', 'cats'];
+      const promises = endpoints.map(endpoint =>
+        api.get(`/api/${endpoint}/listings?search=${searchQuery}`).catch(() => ({ data: { data: { listings: [] } } }))
+      );
+      const results = await Promise.all(promises);
+      const allListings = results.flatMap(r => r.data?.data?.listings || []);
+      return { success: true, data: { listings: allListings } };
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  }
+};
+
 export const locationService = {
   async checkStatus() {
     const token = localStorage.getItem('token');
@@ -165,12 +217,35 @@ export const locationService = {
         'Authorization': `Bearer ${token}`
       }
     });
-    
+
     if (!response.ok) {
       throw new Error('Failed to get nearby users');
     }
-    
+
     return response.json();
+  }
+};
+
+// User Profile Services
+export const userService = {
+  // Complete user profile (first-time login)
+  completeProfile: async (profileData) => {
+    try {
+      const response = await api.post('/api/auth/complete-profile', profileData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Get user profile
+  getProfile: async () => {
+    try {
+      const response = await api.get('/api/auth/profile');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
   }
 };
 

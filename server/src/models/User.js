@@ -20,6 +20,11 @@ module.exports = (sequelize, DataTypes) => {
       },
       field: 'phone_number'
     },
+    full_name: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: 'full_name'
+    },
     email: {
       type: DataTypes.STRING(255),
       allowNull: true,

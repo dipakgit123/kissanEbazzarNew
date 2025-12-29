@@ -7,30 +7,36 @@ import horse from '../assets/images/horse.png';
 import dog from '../assets/images/dog.jpg';
 
 const images = [
-  { src: cow, alt: 'Cow' },
-  { src: buffello, alt: 'Buffalo  ' },
-  { src: bull, alt: 'Bull' }, 
-  { src: goat, alt: 'Goat' },
-  { src: horse, alt: 'Horse' },
-  {src:dog, alt:"Dog"}
+  { src: cow, alt: 'Cow', category: 'cow', apiEndpoint: 'animals' },
+  { src: buffello, alt: 'Buffalo', category: 'buffalo', apiEndpoint: 'buffalos' },
+  { src: bull, alt: 'Bull', category: 'bull', apiEndpoint: 'animals' },
+  { src: goat, alt: 'Goat', category: 'goat', apiEndpoint: 'goats' },
+  { src: horse, alt: 'Horse', category: 'horse', apiEndpoint: 'horses' },
+  { src: dog, alt: 'Dog', category: 'dog', apiEndpoint: 'dogs' },
+  { src: dog, alt: 'Cat', category: 'cat', apiEndpoint: 'cats' }
 ];
 
-const CircleBar = () => (
+const CircleBar = ({ onCategoryClick, selectedCategory }) => (
   <div className="w-full bg-white/50 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20">
     <div className="flex justify-center flex-wrap gap-6 lg:gap-8">
       {images.map((img, index) => (
-        <div 
-          key={img.alt} 
+        <div
+          key={img.alt}
           className="flex flex-col items-center group cursor-pointer transform hover:scale-110 transition-all duration-300"
           style={{ animationDelay: `${index * 0.1}s` }}
+          onClick={() => onCategoryClick && onCategoryClick(img.category, img.apiEndpoint)}
         >
           {/* Circle Container with Enhanced Styling */}
           <div className="relative">
             {/* Outer Glow Effect */}
-            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-[#15BB73] to-[#0FA568] opacity-0 group-hover:opacity-30 blur-lg transition-opacity duration-300 scale-110"></div>
-            
+            <div className={`absolute inset-0 rounded-full bg-gradient-to-r from-[#15BB73] to-[#0FA568] blur-lg transition-opacity duration-300 scale-110 ${
+              selectedCategory === img.category ? 'opacity-50' : 'opacity-0 group-hover:opacity-30'
+            }`}></div>
+
             {/* Main Circle */}
-            <div className="relative rounded-full overflow-hidden border-3 border-[#15BB73] shadow-xl w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 group-hover:border-[#0FA568] group-hover:shadow-2xl transition-all duration-300">
+            <div className={`relative rounded-full overflow-hidden border-3 shadow-xl w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 group-hover:border-[#0FA568] group-hover:shadow-2xl transition-all duration-300 ${
+              selectedCategory === img.category ? 'border-[#0FA568] ring-4 ring-[#15BB73]/30' : 'border-[#15BB73]'
+            }`}>
               <img 
                 src={img.src} 
                 alt={img.alt} 
@@ -54,14 +60,18 @@ const CircleBar = () => (
           </div>
           
           {/* Label with Enhanced Styling */}
-          <span className="text-xs sm:text-sm font-medium text-gray-700 mt-3 group-hover:text-[#15BB73] transition-colors duration-300 whitespace-nowrap">
+          <span className={`text-xs sm:text-sm font-medium mt-3 transition-colors duration-300 whitespace-nowrap ${
+            selectedCategory === img.category ? 'text-[#15BB73] font-bold' : 'text-gray-700 group-hover:text-[#15BB73]'
+          }`}>
             {img.alt}
           </span>
-          
-          {/* Count Badge (Optional) */}
-          <div className="mt-1 px-2 py-1 bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white text-xs rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            {Math.floor(Math.random() * 50) + 10}+
-          </div>
+
+          {/* Selected Indicator */}
+          {selectedCategory === img.category && (
+            <div className="mt-1 px-3 py-1 bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white text-xs rounded-full font-medium">
+              Selected
+            </div>
+          )}
         </div>
       ))}
     </div>

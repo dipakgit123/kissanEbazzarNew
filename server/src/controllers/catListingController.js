@@ -35,13 +35,24 @@ exports.createCatListing = async (req, res) => {
       expectedPrice,
       isNegotiable,
       detailsConfirmed,
-      termsAccepted,
-      latitude,
-      longitude,
-      city,
-      state,
-      pincode
+      termsAccepted
     } = req.body;
+
+    // Fetch user's location from the User table
+    const user = await db.User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Use location from user's profile
+    const latitude = user.latitude ? parseFloat(user.latitude) : null;
+    const longitude = user.longitude ? parseFloat(user.longitude) : null;
+    const city = user.city;
+    const state = user.state;
+    const pincode = user.postal_code;
 
     // Upload photos to Cloudinary (up to 5 photos)
     const photoData = {};
@@ -97,8 +108,8 @@ exports.createCatListing = async (req, res) => {
       detailsConfirmed: detailsConfirmed === 'true' || detailsConfirmed === true,
       termsAccepted: termsAccepted === 'true' || termsAccepted === true,
       ...photoData,
-      latitude: latitude ? parseFloat(latitude) : null,
-      longitude: longitude ? parseFloat(longitude) : null,
+      latitude,
+      longitude,
       city,
       state,
       pincode,

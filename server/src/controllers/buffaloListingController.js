@@ -31,13 +31,24 @@ exports.createBuffaloListing = async (req, res) => {
       isNegotiable,
       vaccinationDetails,
       deliveryAvailable,
-      additionalNotes,
-      latitude,
-      longitude,
-      city,
-      state,
-      pincode
+      additionalNotes
     } = req.body;
+
+    // Fetch user's location from the User table
+    const user = await db.User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Use location from user's profile
+    const latitude = user.latitude ? parseFloat(user.latitude) : null;
+    const longitude = user.longitude ? parseFloat(user.longitude) : null;
+    const city = user.city;
+    const state = user.state;
+    const pincode = user.postal_code;
 
     // Upload photos to Cloudinary
     let frontPhotoData = null;
@@ -97,8 +108,8 @@ exports.createBuffaloListing = async (req, res) => {
       vaccinationDetails,
       deliveryAvailable: deliveryAvailable === 'true' || deliveryAvailable === true,
       additionalNotes,
-      latitude: latitude ? parseFloat(latitude) : null,
-      longitude: longitude ? parseFloat(longitude) : null,
+      latitude,
+      longitude,
       city,
       state,
       pincode,

@@ -26,22 +26,23 @@ class AnimalListingController {
         });
       }
 
-      // Get user's location if available
-      let locationData = {};
-      if (db.Location) {
-        const userLocation = await db.Location.findOne({ 
-          where: { user_id: userIdInt } 
+      // Fetch user's location from the User table
+      const user = await db.User.findByPk(userIdInt);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
         });
-        if (userLocation) {
-          locationData = {
-            latitude: userLocation.latitude,
-            longitude: userLocation.longitude,
-            city: userLocation.city,
-            state: userLocation.state,
-            pincode: userLocation.pincode
-          };
-        }
       }
+
+      // Use location from user's profile
+      const locationData = {
+        latitude: user.latitude,
+        longitude: user.longitude,
+        city: user.city,
+        state: user.state,
+        pincode: user.postal_code
+      };
 
       // Process uploaded files
       const uploadedFiles = {};
