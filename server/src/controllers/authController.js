@@ -1,5 +1,6 @@
 const otpService = require('../services/otpService');
 const geocodingService = require('../services/geocodingService');
+const { uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudinary');
 const jwt = require('jsonwebtoken');
 const db = require('../models');
 require('dotenv').config();
@@ -135,11 +136,20 @@ class AuthController {
         });
       }
 
-      // Prepare safe user object
+      // Prepare safe user object with all profile fields
       const userResponse = {
         id: user.id,
         phone_number: user.phone_number,
+        full_name: user.full_name,
         email: user.email,
+        address: user.address,
+        postal_code: user.postal_code,
+        city: user.city,
+        state: user.state,
+        country: user.country,
+        latitude: user.latitude,
+        longitude: user.longitude,
+        profile_photo: user.profile_photo,
         is_verified: user.is_verified,
         verified_at: user.verified_at,
         created_at: user.created_at,
@@ -263,6 +273,224 @@ class AuthController {
       res.status(500).json({
         success: false,
         message: error.message || 'Failed to complete profile'
+      });
+    }
+  }
+
+  async updateProfile(req, res) {
+    try {
+      const { User } = db;
+      const userId = req.user?.userId; // From JWT middleware
+      const { full_name, address, postal_code } = req.body;
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: 'User ID not found in request'
+        });
+      }
+
+      // Find user
+      const user = await User.findByPk(userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      // Validate inputs
+      if (full_name && full_name.trim().length < 2) {
+        return res.status(400).json({
+          success: false,
+          message: 'Name must be at least 2 characters'
+        });
+      }
+
+      if (postal_code && postal_code.trim().length !== 6) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide a valid 6-digit pincode'
+        });
+      }
+
+      // Build update object
+      const updateData = {};
+
+      if (full_name) {
+        updateData.full_name = full_name.trim();
+      }
+
+      if (address) {
+        updateData.address = address.trim();
+      }
+
+      // If postal code is being updated, fetch location data
+      if (postal_code && postal_code !== user.postal_code) {
+        updateData.postal_code = postal_code.trim();
+
+        try {
+          const locationData = await geocodingService.getLocationFromPostalCode(
+            postal_code.trim(),
+            'IN'
+          );
+          console.log('Location fetched from postal code:', locationData);
+
+          if (locationData.latitude) updateData.latitude = locationData.latitude;
+          if (locationData.longitude) updateData.longitude = locationData.longitude;
+          if (locationData.city) updateData.city = locationData.city;
+          if (locationData.state) updateData.state = locationData.state;
+          if (locationData.country) updateData.country = locationData.country || 'India';
+          updateData.location_type = 'manual';
+          updateData.location_set_at = new Date();
+        } catch (error) {
+          console.error('Geocoding error:', error.message);
+          // Continue without location data if geocoding fails
+        }
+      }
+
+      // Update user profile
+      if (Object.keys(updateData).length > 0) {
+        await user.update(updateData);
+      }
+
+      // Reload user to get updated data
+      await user.reload();
+
+      res.status(200).json({
+        success: true,
+        message: 'Profile updated successfully',
+        user: {
+          id: user.id,
+          phone_number: user.phone_number,
+          full_name: user.full_name,
+          address: user.address,
+          postal_code: user.postal_code,
+          city: user.city,
+          state: user.state,
+          country: user.country,
+          latitude: user.latitude,
+          longitude: user.longitude
+        }
+      });
+    } catch (error) {
+      console.error('Update profile error:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to update profile'
+      });
+    }
+  }
+
+  async uploadProfilePhoto(req, res) {
+    try {
+      const { User } = db;
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: 'User ID not found in request'
+        });
+      }
+
+      // Check if file was uploaded
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: 'No photo file provided'
+        });
+      }
+
+      // Find user
+      const user = await User.findByPk(userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      // Delete old photo from Cloudinary if exists
+      if (user.profile_photo_public_id) {
+        try {
+          await deleteFromCloudinary(user.profile_photo_public_id, 'image');
+          console.log('Old profile photo deleted:', user.profile_photo_public_id);
+        } catch (error) {
+          console.error('Error deleting old profile photo:', error);
+        }
+      }
+
+      // Upload new photo to Cloudinary
+      const result = await uploadToCloudinary(req.file, 'image');
+      console.log('Profile photo uploaded:', result.secure_url);
+
+      // Update user with new photo URL
+      await user.update({
+        profile_photo: result.secure_url,
+        profile_photo_public_id: result.public_id
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Profile photo uploaded successfully',
+        profile_photo: result.secure_url
+      });
+    } catch (error) {
+      console.error('Upload profile photo error:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to upload profile photo'
+      });
+    }
+  }
+
+  async deleteProfilePhoto(req, res) {
+    try {
+      const { User } = db;
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: 'User ID not found in request'
+        });
+      }
+
+      // Find user
+      const user = await User.findByPk(userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      // Delete photo from Cloudinary if exists
+      if (user.profile_photo_public_id) {
+        try {
+          await deleteFromCloudinary(user.profile_photo_public_id, 'image');
+          console.log('Profile photo deleted:', user.profile_photo_public_id);
+        } catch (error) {
+          console.error('Error deleting profile photo from Cloudinary:', error);
+        }
+      }
+
+      // Update user to remove photo
+      await user.update({
+        profile_photo: null,
+        profile_photo_public_id: null
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Profile photo deleted successfully'
+      });
+    } catch (error) {
+      console.error('Delete profile photo error:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to delete profile photo'
       });
     }
   }

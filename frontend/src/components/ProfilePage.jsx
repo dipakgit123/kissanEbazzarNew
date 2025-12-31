@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import EditProfileForm from './EditProfileForm';
+import { userService } from '../services/api';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -12,11 +13,16 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 */
 const ProfilePage = ({ onBack }) => {
   const [editing, setEditing] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
   const [user, setUser] = useState({
-    name: 'dipak',
-    location: 'Nagpur, Maharashtra',
-    phone: '9022589579',
-    completion: 57,
+    name: '',
+    location: '',
+    phone: '',
+    address: '',
+    postal_code: '',
+    city: '',
+    state: '',
+    completion: 0,
   });
 
   const [animalListings, setAnimalListings] = useState([]);
@@ -31,8 +37,49 @@ const ProfilePage = ({ onBack }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
 
   useEffect(() => {
+    fetchUserProfile();
     fetchAllListings();
   }, []);
+
+  const fetchUserProfile = async () => {
+    try {
+      const response = await userService.getProfile();
+      if (response.success && response.user) {
+        const userData = response.user;
+
+        // Calculate profile completion
+        let completion = 0;
+        if (userData.full_name) completion += 20;
+        if (userData.phone_number) completion += 20;
+        if (userData.address) completion += 20;
+        if (userData.postal_code) completion += 20;
+        if (userData.profile_photo) completion += 20;
+
+        // Format location string
+        const locationParts = [];
+        if (userData.city) locationParts.push(userData.city);
+        if (userData.state) locationParts.push(userData.state);
+        const location = locationParts.length > 0 ? locationParts.join(', ') : 'Location not set';
+
+        setUser({
+          name: userData.full_name || 'User',
+          full_name: userData.full_name || '',
+          location: location,
+          phone: userData.phone_number || '',
+          phone_number: userData.phone_number || '',
+          address: userData.address || '',
+          postal_code: userData.postal_code || '',
+          city: userData.city || '',
+          state: userData.state || '',
+          country: userData.country || '',
+          profile_photo: userData.profile_photo || null,
+          completion: completion,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
 
   const fetchAllListings = async () => {
     setLoading(true);
@@ -145,6 +192,75 @@ const ProfilePage = ({ onBack }) => {
     }
   };
 
+  const handleSaveProfile = async (profileData) => {
+    setSavingProfile(true);
+    try {
+      const response = await userService.updateProfile(profileData);
+      if (response.success) {
+        // Update local state with new data
+        const userData = response.user;
+
+        // Calculate profile completion (keep current photo status)
+        let completion = 0;
+        if (userData.full_name) completion += 20;
+        if (userData.phone_number) completion += 20;
+        if (userData.address) completion += 20;
+        if (userData.postal_code) completion += 20;
+        if (user.profile_photo) completion += 20;
+
+        // Format location string
+        const locationParts = [];
+        if (userData.city) locationParts.push(userData.city);
+        if (userData.state) locationParts.push(userData.state);
+        const location = locationParts.length > 0 ? locationParts.join(', ') : 'Location not set';
+
+        setUser(prev => ({
+          ...prev,
+          name: userData.full_name || 'User',
+          full_name: userData.full_name || '',
+          location: location,
+          phone: userData.phone_number || '',
+          phone_number: userData.phone_number || '',
+          address: userData.address || '',
+          postal_code: userData.postal_code || '',
+          city: userData.city || '',
+          state: userData.state || '',
+          country: userData.country || '',
+          completion: completion,
+        }));
+
+        setEditing(false);
+        alert('Profile updated successfully!');
+      } else {
+        alert(response.message || 'Failed to update profile');
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      alert(error.message || 'Failed to update profile');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handlePhotoUpdate = (newPhotoUrl) => {
+    setUser(prev => {
+      const hasPhoto = !!newPhotoUrl;
+      // Recalculate completion
+      let completion = 0;
+      if (prev.full_name) completion += 20;
+      if (prev.phone_number || prev.phone) completion += 20;
+      if (prev.address) completion += 20;
+      if (prev.postal_code) completion += 20;
+      if (hasPhoto) completion += 20;
+
+      return {
+        ...prev,
+        profile_photo: newPhotoUrl,
+        completion: completion,
+      };
+    });
+  };
+
   // Helper component for small stat cards
   const StatCard = ({ label, value }) => (
     <div className="bg-violet-50 text-center rounded-lg p-4 flex-1 min-w-[6rem]">
@@ -180,8 +296,12 @@ const ProfilePage = ({ onBack }) => {
       <main className="flex-1 overflow-y-auto p-4 space-y-6">
         {/* Top user info */}
         <section className="bg-white rounded-xl shadow p-6 flex flex-col sm:flex-row items-center gap-4">
-          <div className="h-16 w-16 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center text-xl font-bold text-gray-600">
-            {user.name[0].toUpperCase()}
+          <div className="h-16 w-16 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center text-xl font-bold text-gray-600 overflow-hidden">
+            {user.profile_photo ? (
+              <img src={user.profile_photo} alt={user.name} className="w-full h-full object-cover" />
+            ) : (
+              user.name ? user.name[0].toUpperCase() : '?'
+            )}
           </div>
           <div className="flex-1">
             <h2 className="text-lg font-bold text-gray-800">{user.name}</h2>
@@ -241,8 +361,14 @@ const ProfilePage = ({ onBack }) => {
       {/* Edit modal */}
       {editing && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="max-w-xl w-full">
-            <EditProfileForm onCancel={() => setEditing(false)} onSave={(data)=>{console.log('save',data);setEditing(false);}} initialData={user} />
+          <div className="max-w-md w-full">
+            <EditProfileForm
+              onCancel={() => setEditing(false)}
+              onSave={handleSaveProfile}
+              initialData={user}
+              loading={savingProfile}
+              onPhotoUpdate={handlePhotoUpdate}
+            />
           </div>
         </div>
       )}
@@ -275,7 +401,7 @@ const ProfilePage = ({ onBack }) => {
                   {/* Animals/Cows */}
                   {animalListings.length > 0 && (
                     <div>
-                      <h3 className="font-semibold text-gray-700 mb-2">🐄 Animals/Cows ({animalListings.length})</h3>
+                      <h3 className="font-semibold text-gray-700 mb-2">Animals/Cows ({animalListings.length})</h3>
                       <div className="space-y-2">
                         {animalListings.map(animal => (
                           <AnimalCard key={animal.id} animal={animal} type="animal" onDelete={handleDelete} onMarkSold={handleMarkAsSold} setShowDeleteConfirm={setShowDeleteConfirm} showDeleteConfirm={showDeleteConfirm} />
@@ -287,7 +413,7 @@ const ProfilePage = ({ onBack }) => {
                   {/* Buffalos */}
                   {buffaloListings.length > 0 && (
                     <div>
-                      <h3 className="font-semibold text-gray-700 mb-2">🐃 Buffalos ({buffaloListings.length})</h3>
+                      <h3 className="font-semibold text-gray-700 mb-2">Buffalos ({buffaloListings.length})</h3>
                       <div className="space-y-2">
                         {buffaloListings.map(animal => (
                           <AnimalCard key={animal.id} animal={animal} type="buffalo" onDelete={handleDelete} onMarkSold={handleMarkAsSold} setShowDeleteConfirm={setShowDeleteConfirm} showDeleteConfirm={showDeleteConfirm} />
@@ -299,7 +425,7 @@ const ProfilePage = ({ onBack }) => {
                   {/* Cats */}
                   {catListings.length > 0 && (
                     <div>
-                      <h3 className="font-semibold text-gray-700 mb-2">🐱 Cats ({catListings.length})</h3>
+                      <h3 className="font-semibold text-gray-700 mb-2">Cats ({catListings.length})</h3>
                       <div className="space-y-2">
                         {catListings.map(animal => (
                           <AnimalCard key={animal.id} animal={animal} type="cat" onDelete={handleDelete} onMarkSold={handleMarkAsSold} setShowDeleteConfirm={setShowDeleteConfirm} showDeleteConfirm={showDeleteConfirm} />
@@ -311,7 +437,7 @@ const ProfilePage = ({ onBack }) => {
                   {/* Dogs */}
                   {dogListings.length > 0 && (
                     <div>
-                      <h3 className="font-semibold text-gray-700 mb-2">🐕 Dogs ({dogListings.length})</h3>
+                      <h3 className="font-semibold text-gray-700 mb-2">Dogs ({dogListings.length})</h3>
                       <div className="space-y-2">
                         {dogListings.map(animal => (
                           <AnimalCard key={animal.id} animal={animal} type="dog" onDelete={handleDelete} onMarkSold={handleMarkAsSold} setShowDeleteConfirm={setShowDeleteConfirm} showDeleteConfirm={showDeleteConfirm} />
@@ -323,7 +449,7 @@ const ProfilePage = ({ onBack }) => {
                   {/* Goats */}
                   {goatListings.length > 0 && (
                     <div>
-                      <h3 className="font-semibold text-gray-700 mb-2">🐐 Goats ({goatListings.length})</h3>
+                      <h3 className="font-semibold text-gray-700 mb-2">Goats ({goatListings.length})</h3>
                       <div className="space-y-2">
                         {goatListings.map(animal => (
                           <AnimalCard key={animal.id} animal={animal} type="goat" onDelete={handleDelete} onMarkSold={handleMarkAsSold} setShowDeleteConfirm={setShowDeleteConfirm} showDeleteConfirm={showDeleteConfirm} />
@@ -335,7 +461,7 @@ const ProfilePage = ({ onBack }) => {
                   {/* Horses */}
                   {horseListings.length > 0 && (
                     <div>
-                      <h3 className="font-semibold text-gray-700 mb-2">🐴 Horses ({horseListings.length})</h3>
+                      <h3 className="font-semibold text-gray-700 mb-2">Horses ({horseListings.length})</h3>
                       <div className="space-y-2">
                         {horseListings.map(animal => (
                           <AnimalCard key={animal.id} animal={animal} type="horse" onDelete={handleDelete} onMarkSold={handleMarkAsSold} setShowDeleteConfirm={setShowDeleteConfirm} showDeleteConfirm={showDeleteConfirm} />

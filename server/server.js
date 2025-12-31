@@ -11,6 +11,7 @@ const horseListingRoutes = require('./src/routes/horseListingRoutes'); // NEW
 const goatListingRoutes = require('./src/routes/goatListingRoutes'); // NEW
 const catListingRoutes = require('./src/routes/catListingRoutes'); // NEW
 const dogListingRoutes = require('./src/routes/dogListingRoutes'); // NEW
+const combinedListingsRoutes = require('./src/routes/combinedListingsRoutes'); // Combined listings
 const otpService = require('./src/services/otpService');
 require('dotenv').config();
 
@@ -37,6 +38,7 @@ app.use('/api/horses', horseListingRoutes);  // NEW - Horse listing routes
 app.use('/api/goats', goatListingRoutes);  // NEW - Goat listing routes
 app.use('/api/cats', catListingRoutes);  // NEW - Cat listing routes
 app.use('/api/dogs', dogListingRoutes);  // NEW - Dog listing routes
+app.use('/api/listings', combinedListingsRoutes);  // Combined listings from all categories
 
 // Health check endpoint
 app.get('/health', async (req, res) => {

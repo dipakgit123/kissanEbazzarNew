@@ -11,6 +11,7 @@ import MapView from './components/MapView';
 import PregnancyCalendar from './components/PregnancyCalendar';
 import ProfilePage from './components/ProfilePage';
 import AnimalListingPage from './components/AnimalListingPage';
+import AnimalDetailPage from './components/AnimalDetailPage';
 import VeterinarianPage from './components/VeterinarianPage';
 import WishlistPage from './components/WishlistPage';
 
@@ -145,6 +146,7 @@ function App() {
         />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/sell-animal" element={<AnimalListingPage />} />
+        <Route path="/animal/:animalType/:id" element={<AnimalDetailPage />} />
         <Route path="/veterinarian" element={<VeterinarianPage />} />
         <Route path="/pregnancy-calendar" element={<PregnancyCalendar />} />
         <Route path="/wishlist" element={<WishlistPage wishlist={wishlist} removeFromWishlist={removeFromWishlist} isInWishlist={isInWishlist} />} />

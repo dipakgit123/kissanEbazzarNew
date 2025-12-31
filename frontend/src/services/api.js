@@ -226,6 +226,43 @@ export const locationService = {
   }
 };
 
+// Listings Service - Combined listings from all categories
+export const listingsService = {
+  // Get nearby listings from all animal categories (sorted by distance)
+  getNearbyListings: async (latitude, longitude, radius = 100, limit = 20) => {
+    try {
+      const response = await api.get(`/api/listings/nearby`, {
+        params: { latitude, longitude, radius, limit }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Get featured listings (most recent from all categories)
+  getFeaturedListings: async (limit = 20) => {
+    try {
+      const response = await api.get(`/api/listings/featured`, {
+        params: { limit }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Get single listing by animal type and ID
+  getListingById: async (animalType, id) => {
+    try {
+      const response = await api.get(`/api/listings/${animalType}/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  }
+};
+
 // User Profile Services
 export const userService = {
   // Complete user profile (first-time login)
@@ -242,6 +279,43 @@ export const userService = {
   getProfile: async () => {
     try {
       const response = await api.get('/api/auth/profile');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Update user profile
+  updateProfile: async (profileData) => {
+    try {
+      const response = await api.put('/api/auth/update-profile', profileData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Upload profile photo
+  uploadProfilePhoto: async (photoFile) => {
+    try {
+      const formData = new FormData();
+      formData.append('photo', photoFile);
+
+      const response = await api.post('/api/auth/upload-photo', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Delete profile photo
+  deleteProfilePhoto: async () => {
+    try {
+      const response = await api.delete('/api/auth/delete-photo');
       return response.data;
     } catch (error) {
       throw error.response?.data || error;

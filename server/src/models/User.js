@@ -129,6 +129,17 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.JSONB,
       allowNull: true,
       defaultValue: {}
+    },
+    // Profile photo fields
+    profile_photo: {
+      type: DataTypes.STRING(500),
+      allowNull: true,
+      field: 'profile_photo'
+    },
+    profile_photo_public_id: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: 'profile_photo_public_id'
     }
   }, {
     sequelize,

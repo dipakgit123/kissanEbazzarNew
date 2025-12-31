@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import CircleBar from './CircleBar';
 import AnimalCard from './AnimalCard';
+import { listingsService, userService } from '../services/api';
 
 import { Link } from 'react-router-dom';
 
@@ -8,6 +9,9 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredAnimals, setFilteredAnimals] = useState([]);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [animalData, setAnimalData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [userLocation, setUserLocation] = useState(null);
 
   // Toggle wishlist function
   const handleToggleWishlist = (animalId) => {
@@ -19,61 +23,125 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
     }
   };
 
-  // Sample animal data
-  const animalData = [
-    {
-      id: 1,
-      title: "High Quality Gir Cow | 20L Milk Daily",
-      price: "85,000",
-      location: "Pune (45 km)",
-      datePosted: "2 hours ago",
-      imageSrc: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTS4LKYx3t9wCKfn3DIRuxJB7-biALX_vle8w&s",
-      sellerName: "Rajesh Kumar",
-      phoneNumber: "9922527421",
-      breed: "Gir",
-      animalType: "Cow",
-      milkProduction: "20L"
-    },
-    {
-      id: 2,
-      title: "Healthy Buffalo | 15L Milk Capacity",
-      price: "65,000",
-      location: "Nashik (32 km)",
-      datePosted: "5 hours ago",
-      imageSrc: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTZI7ygovOufLvKEqHIIHKL0F64m1rGjVdIAA&s",
-      sellerName: "Priya Sharma",
-      phoneNumber: "9876543210",
-      breed: "Murrah",
-      animalType: "Buffalo",
-      milkProduction: "15L"
-    },
-    {
-      id: 3,
-      title: "Strong Bull | For Farming Work",
-      price: "45,000",
-      location: "Aurangabad (28 km)",
-      datePosted: "1 day ago",
-      imageSrc: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQa4irO93j7AcYNU2cAcvh2pXtcfo2gCw4Vbw&s",
-      sellerName: "Vikram Singh",
-      phoneNumber: "9876543211",
-      breed: "Holstein",
-      animalType: "Bull",
-      milkProduction: "N/A"
-    },
-    {
-      id: 4,
-      title: "Young Goat | Healthy & Active",
-      price: "8,500",
-      location: "Kolhapur (15 km)",
-      datePosted: "3 days ago",
-      imageSrc: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRbL_CglUlWLL2eRNQNws2BS6KkX5MZTay5gg&s",
-      sellerName: "Anita Patil",
-      phoneNumber: "9876543212",
-      breed: "Boer",
-      animalType: "Goat",
-      milkProduction: "2L"
-    }
-  ];
+  // Fetch user location and nearby listings
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        // Try to get user's location from profile first
+        const token = localStorage.getItem('token');
+        let lat = null;
+        let lng = null;
+
+        if (token) {
+          try {
+            const profileResponse = await userService.getProfile();
+            if (profileResponse.success && profileResponse.user) {
+              lat = profileResponse.user.latitude;
+              lng = profileResponse.user.longitude;
+              setUserLocation({
+                latitude: lat,
+                longitude: lng,
+                city: profileResponse.user.city,
+                state: profileResponse.user.state
+              });
+            }
+          } catch (err) {
+            console.log('Could not fetch user profile:', err);
+          }
+        }
+
+        // If no user location, try browser geolocation
+        if (!lat || !lng) {
+          try {
+            const position = await new Promise((resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(resolve, reject, {
+                timeout: 5000,
+                enableHighAccuracy: false
+              });
+            });
+            lat = position.coords.latitude;
+            lng = position.coords.longitude;
+            setUserLocation({ latitude: lat, longitude: lng });
+          } catch (err) {
+            console.log('Could not get browser location:', err);
+          }
+        }
+
+        // Fetch listings based on location
+        let listings = [];
+        let usedNearby = false;
+
+        if (lat && lng) {
+          // Try to get nearby listings sorted by distance
+          const response = await listingsService.getNearbyListings(lat, lng, 100, 20);
+          if (response.success && response.data && response.data.length > 0) {
+            listings = response.data;
+            usedNearby = true;
+          }
+        }
+
+        // Fallback to featured listings if no location or nearby returned empty
+        if (listings.length === 0) {
+          const response = await listingsService.getFeaturedListings(20);
+          if (response.success) {
+            listings = response.data;
+          }
+          // Clear user location indicator if we're showing featured instead of nearby
+          if (usedNearby === false && lat && lng) {
+            // Keep location but note that we're showing all listings
+            setUserLocation(prev => prev ? { ...prev, showingFeatured: true } : null);
+          }
+        }
+
+        // Transform listings data for AnimalCard component
+        const transformedListings = listings.map(listing => ({
+          id: `${listing.animal_type}-${listing.id}`,
+          listingId: listing.id,
+          title: `${listing.breed_name || 'Unknown Breed'} | ${listing.animal_type.charAt(0).toUpperCase() + listing.animal_type.slice(1)}`,
+          price: listing.expected_price ? Number(listing.expected_price).toLocaleString('en-IN') : '0',
+          location: `${listing.city || 'Unknown'}${listing.distance ? ` (${Math.round(listing.distance)} km)` : ''}`,
+          datePosted: formatTimeAgo(listing.created_at),
+          imageSrc: listing.front_photo || listing.side_photo || 'https://via.placeholder.com/300x200?text=No+Image',
+          sellerName: listing.seller?.name || 'Unknown Seller',
+          phoneNumber: listing.seller?.phone || '',
+          breed: listing.breed_name || 'Unknown',
+          animalType: listing.animal_type.charAt(0).toUpperCase() + listing.animal_type.slice(1),
+          milkProduction: listing.milk_capacity ? `${listing.milk_capacity}L` : 'N/A',
+          distance: listing.distance,
+          status: listing.status,
+          sellerPhoto: listing.seller?.profile_photo
+        }));
+
+        setAnimalData(transformedListings);
+      } catch (error) {
+        console.error('Error fetching listings:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Helper function to format time ago
+  const formatTimeAgo = (dateString) => {
+    if (!dateString) return 'Recently';
+
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 60) return `${diffMins} minutes ago`;
+    if (diffHours < 24) return `${diffHours} hours ago`;
+    if (diffDays === 1) return '1 day ago';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+    return `${Math.floor(diffDays / 30)} months ago`;
+  };
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -89,7 +157,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
       animal.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
       animal.sellerName.toLowerCase().includes(searchQuery.toLowerCase())
     );
-    
+
     setFilteredAnimals(filtered);
   };
 
@@ -143,7 +211,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
                   >
                     Sell
                   </Link>
-                  
+
                   {/* Wishlist Button */}
                   <Link
                     to="/wishlist"
@@ -158,7 +226,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
                       </span>
                     )}
                   </Link>
-                  
+
                   <Link
                     to="/profile"
                     className="w-8 h-8 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full flex items-center justify-center"
@@ -169,7 +237,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
                   </Link>
                 </div>
               </div>
-              
+
               {/* Search Bar */}
               <form onSubmit={handleSearch} className="relative">
                 <input
@@ -182,7 +250,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
                 <svg className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
-                <button 
+                <button
                   type="submit"
                   className="absolute right-1 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-3 py-1 rounded-md font-medium text-xs"
                 >
@@ -219,7 +287,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
                   <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
-                  <button 
+                  <button
                     type="submit"
                     className="absolute right-1 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-4 py-2 rounded-lg font-medium hover:shadow-lg transition-all duration-300 text-sm"
                   >
@@ -236,7 +304,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
                 >
                   Sell Now
                 </Link>
-                
+
                 {/* Wishlist Button */}
                 <Link
                   to="/wishlist"
@@ -251,7 +319,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
                     </span>
                   )}
                 </Link>
-                
+
                 <Link
                   to="/profile"
                   className="w-10 h-10 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full flex items-center justify-center hover:from-[#15BB73] hover:to-[#0FA568] hover:text-white transition-all duration-300"
@@ -273,10 +341,17 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
             Find Your Perfect Farm Animal
           </h2>
           <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
-            Connect directly with farmers and find the best quality animals for your farm. 
+            Connect directly with farmers and find the best quality animals for your farm.
             Browse through verified listings and make informed decisions.
           </p>
-          
+
+          {/* Location indicator */}
+          {userLocation && (userLocation.city || userLocation.state) && (
+            <p className="text-sm text-gray-500 mb-4">
+              Showing animals near <span className="font-semibold text-[#15BB73]">{userLocation.city}{userLocation.state ? `, ${userLocation.state}` : ''}</span>
+            </p>
+          )}
+
           {/* Search Bar */}
           <div className="max-w-2xl mx-auto">
             <form onSubmit={handleSearch} className="relative">
@@ -290,7 +365,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
               <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
-              <button 
+              <button
                 type="submit"
                 className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-6 py-2 rounded-xl font-medium hover:shadow-lg transition-all duration-300"
               >
@@ -308,7 +383,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
           <h3 className="text-2xl font-bold text-[#000600] mb-6 text-center">Browse by Category</h3>
           <CircleBar />
         </div>
-        
+
         <div className="max-w-7xl mx-auto">
           {/* Search Results Header */}
           {filteredAnimals.length > 0 && (
@@ -324,16 +399,33 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
 
           {/* Featured Listings */}
           <div className="mb-8">
-            <h3 className="text-2xl font-bold text-[#000600] mb-6">
-              {filteredAnimals.length > 0 ? 'Search Results' : 'Featured Listings'}
-            </h3>
-            
-            {displayAnimals.length > 0 ? (
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-bold text-[#000600]">
+                {filteredAnimals.length > 0 ? 'Search Results' : (userLocation && !userLocation.showingFeatured) ? 'Nearby Listings' : 'Featured Listings'}
+              </h3>
+              {userLocation && !userLocation.showingFeatured && !filteredAnimals.length && (
+                <span className="text-sm text-gray-500 flex items-center">
+                  <svg className="w-4 h-4 mr-1 text-[#15BB73]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Sorted by distance
+                </span>
+              )}
+            </div>
+
+            {loading ? (
+              <div className="flex justify-center items-center py-20">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#15BB73]"></div>
+                <span className="ml-3 text-gray-600">Loading listings...</span>
+              </div>
+            ) : displayAnimals.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {displayAnimals.map((animal) => (
                   <AnimalCard
                     key={animal.id}
                     id={animal.id}
+                    listingId={animal.listingId}
                     title={animal.title}
                     price={animal.price}
                     location={animal.location}
@@ -351,20 +443,32 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
               </div>
             ) : (
               <div className="text-center py-12">
-                <div className="text-6xl mb-4">🔍</div>
+                <div className="text-6xl mb-4">🐄</div>
                 <h3 className="text-2xl font-bold text-gray-600 mb-2">No animals found</h3>
                 <p className="text-gray-500 mb-6">
-                  Try searching with different keywords like "cow", "buffalo", "goat", or location names
+                  {searchQuery ?
+                    'Try searching with different keywords like "cow", "buffalo", "goat", or location names' :
+                    'Be the first to list an animal in your area!'
+                  }
                 </p>
-                <button
-                  onClick={() => {
-                    setSearchQuery('');
-                    setFilteredAnimals([]);
-                  }}
-                  className="bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-300"
-                >
-                  Clear Search
-                </button>
+                {searchQuery ? (
+                  <button
+                    onClick={() => {
+                      setSearchQuery('');
+                      setFilteredAnimals([]);
+                    }}
+                    className="bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-300"
+                  >
+                    Clear Search
+                  </button>
+                ) : (
+                  <Link
+                    to="/sell-animal"
+                    className="inline-block bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-300"
+                  >
+                    List Your Animal
+                  </Link>
+                )}
               </div>
             )}
           </div>
@@ -396,7 +500,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
               <h4 className="text-lg font-semibold mb-4">Quick Links</h4>
               <ul className="space-y-2 text-sm text-gray-400">
                 <li><Link to="/" className="hover:text-[#15BB73] transition-colors">Home</Link></li>
-                <li><Link to="/sell" className="hover:text-[#15BB73] transition-colors">Sell Animal</Link></li>
+                <li><Link to="/sell-animal" className="hover:text-[#15BB73] transition-colors">Sell Animal</Link></li>
                 <li><Link to="/profile" className="hover:text-[#15BB73] transition-colors">Profile</Link></li>
                 <li><Link to="/about" className="hover:text-[#15BB73] transition-colors">About Us</Link></li>
               </ul>

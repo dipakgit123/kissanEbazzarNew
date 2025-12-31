@@ -2,9 +2,25 @@
 
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const authController = require('../controllers/authController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { validatePhone, validateOTP } = require('../middlewares/validationMiddleware');
+
+// Multer configuration for profile photo upload
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB max
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'), false);
+    }
+  }
+});
 
 // Public routes
 // Send OTP
@@ -22,6 +38,15 @@ router.get('/profile', authMiddleware, authController.getUserProfile);
 
 // Complete user profile (first-time login)
 router.post('/complete-profile', authMiddleware, authController.completeProfile);
+
+// Update user profile
+router.put('/update-profile', authMiddleware, authController.updateProfile);
+
+// Upload profile photo
+router.post('/upload-photo', authMiddleware, upload.single('photo'), authController.uploadProfilePhoto);
+
+// Delete profile photo
+router.delete('/delete-photo', authMiddleware, authController.deleteProfilePhoto);
 
 // Get user stats (if you have this method)
 if (authController.getUserStats) {
