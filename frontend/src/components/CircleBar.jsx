@@ -1,86 +1,171 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import cow from '../assets/images/cow.jpg';
 import buffello from '../assets/images/buffello.jpg';
 import bull from '../assets/images/bull.jpg';
 import goat from '../assets/images/goat.jpg';
 import horse from '../assets/images/horse.png';
 import dog from '../assets/images/dog.jpg';
+import cat from '../assets/cliparts/cat_clipart.png';
 
 const images = [
-  { src: cow, alt: 'Cow', category: 'cow', apiEndpoint: 'animals' },
-  { src: buffello, alt: 'Buffalo', category: 'buffalo', apiEndpoint: 'buffalos' },
-  { src: bull, alt: 'Bull', category: 'bull', apiEndpoint: 'animals' },
-  { src: goat, alt: 'Goat', category: 'goat', apiEndpoint: 'goats' },
-  { src: horse, alt: 'Horse', category: 'horse', apiEndpoint: 'horses' },
-  { src: dog, alt: 'Dog', category: 'dog', apiEndpoint: 'dogs' },
-  { src: dog, alt: 'Cat', category: 'cat', apiEndpoint: 'cats' }
+  { src: cow, alt: 'Cow', category: 'cow', apiEndpoint: 'animals', color: '#22C55E', lightBg: '#DCFCE7' },
+  { src: buffello, alt: 'Buffalo', category: 'buffalo', apiEndpoint: 'buffalos', color: '#6366F1', lightBg: '#E0E7FF' },
+  { src: bull, alt: 'Bull', category: 'bull', apiEndpoint: 'animals', color: '#F59E0B', lightBg: '#FEF3C7' },
+  { src: goat, alt: 'Goat', category: 'goat', apiEndpoint: 'goats', color: '#EC4899', lightBg: '#FCE7F3' },
+  { src: horse, alt: 'Horse', category: 'horse', apiEndpoint: 'horses', color: '#8B5CF6', lightBg: '#EDE9FE' },
+  { src: dog, alt: 'Dog', category: 'dog', apiEndpoint: 'dogs', color: '#14B8A6', lightBg: '#CCFBF1' },
+  { src: cat, alt: 'Cat', category: 'cat', apiEndpoint: 'cats', color: '#F97316', lightBg: '#FFEDD5' }
 ];
 
-const CircleBar = ({ onCategoryClick, selectedCategory }) => (
-  <div className="w-full bg-white/50 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20">
-    <div className="flex justify-center flex-wrap gap-6 lg:gap-8">
-      {images.map((img, index) => (
-        <div
-          key={img.alt}
-          className="flex flex-col items-center group cursor-pointer transform hover:scale-110 transition-all duration-300"
-          style={{ animationDelay: `${index * 0.1}s` }}
-          onClick={() => onCategoryClick && onCategoryClick(img.category, img.apiEndpoint)}
-        >
-          {/* Circle Container with Enhanced Styling */}
-          <div className="relative">
-            {/* Outer Glow Effect */}
-            <div className={`absolute inset-0 rounded-full bg-gradient-to-r from-[#15BB73] to-[#0FA568] blur-lg transition-opacity duration-300 scale-110 ${
-              selectedCategory === img.category ? 'opacity-50' : 'opacity-0 group-hover:opacity-30'
-            }`}></div>
+const CircleBar = ({ onCategoryClick, selectedCategory }) => {
+  const [hoveredIndex, setHoveredIndex] = useState(null);
 
-            {/* Main Circle */}
-            <div className={`relative rounded-full overflow-hidden border-3 shadow-xl w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 group-hover:border-[#0FA568] group-hover:shadow-2xl transition-all duration-300 ${
-              selectedCategory === img.category ? 'border-[#0FA568] ring-4 ring-[#15BB73]/30' : 'border-[#15BB73]'
-            }`}>
-              <img 
-                src={img.src} 
-                alt={img.alt} 
-                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
-              />
-              
-              {/* Overlay on Hover */}
-              <div className="absolute inset-0 bg-gradient-to-t from-[#15BB73]/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                <div className="text-white text-center">
-                  <svg className="w-6 h-6 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                  <p className="text-xs font-medium">View</p>
+  const activeItem = useMemo(() => {
+    if (selectedCategory) {
+      return images.find(img => img.category === selectedCategory);
+    }
+    return null;
+  }, [selectedCategory]);
+
+  return (
+    <div
+      className="w-full rounded-2xl transition-all duration-500 relative"
+      style={{
+        background: activeItem
+          ? `linear-gradient(135deg, ${activeItem.lightBg} 0%, white 50%, ${activeItem.lightBg}40 100%)`
+          : 'linear-gradient(135deg, #f8fafc 0%, white 50%, #f1f5f9 100%)'
+      }}
+    >
+      {/* Animated background blobs */}
+      {activeItem && (
+        <>
+          <div
+            className="absolute -top-20 -left-20 w-40 h-40 rounded-full blur-3xl opacity-40 transition-all duration-700"
+            style={{ backgroundColor: activeItem.color }}
+          />
+          <div
+            className="absolute -bottom-20 -right-20 w-40 h-40 rounded-full blur-3xl opacity-30 transition-all duration-700"
+            style={{ backgroundColor: activeItem.color }}
+          />
+        </>
+      )}
+
+      <div className="relative z-10 py-6 px-4">
+        <div className="flex justify-center items-center flex-wrap gap-4 sm:gap-6 md:gap-8 lg:gap-10">
+          {images.map((img, index) => {
+            const isSelected = selectedCategory === img.category;
+            const isHovered = hoveredIndex === index;
+
+            return (
+              <div
+                key={img.alt}
+                className="flex flex-col items-center cursor-pointer"
+                onClick={() => onCategoryClick && onCategoryClick(img.category, img.apiEndpoint)}
+                onMouseEnter={() => setHoveredIndex(index)}
+                onMouseLeave={() => setHoveredIndex(null)}
+              >
+                {/* Circle Container */}
+                <div className="relative p-2">
+                  {/* Glow Effect */}
+                  <div
+                    className="absolute inset-0 rounded-full blur-xl transition-all duration-300"
+                    style={{
+                      background: img.color,
+                      opacity: isHovered || isSelected ? 0.3 : 0,
+                      transform: isHovered || isSelected ? 'scale(1.3)' : 'scale(1)'
+                    }}
+                  />
+
+                  {/* Outer Ring */}
+                  {(isSelected || isHovered) && (
+                    <div
+                      className="absolute inset-0 rounded-full transition-all duration-300"
+                      style={{
+                        background: `linear-gradient(135deg, ${img.color}, ${img.color}60)`,
+                        padding: '3px'
+                      }}
+                    />
+                  )}
+
+                  {/* Main Circle */}
+                  <div
+                    className="relative rounded-full overflow-hidden w-[80px] h-[80px] sm:w-[95px] sm:h-[95px] md:w-[110px] md:h-[110px] transition-all duration-300 bg-white"
+                    style={{
+                      boxShadow: isHovered || isSelected
+                        ? `0 12px 35px -8px ${img.color}80`
+                        : '0 4px 15px -5px rgba(0,0,0,0.1)',
+                      border: isSelected
+                        ? `4px solid ${img.color}`
+                        : isHovered
+                          ? `3px solid ${img.color}`
+                          : '3px solid #e5e7eb',
+                      transform: isHovered ? 'scale(1.08)' : 'scale(1)'
+                    }}
+                  >
+                    <img
+                      src={img.src}
+                      alt={img.alt}
+                      className="w-full h-full object-cover transition-transform duration-400"
+                      style={{
+                        transform: isHovered ? 'scale(1.15)' : 'scale(1)'
+                      }}
+                    />
+
+                    {/* Hover Overlay */}
+                    <div
+                      className="absolute inset-0 flex items-center justify-center transition-all duration-300"
+                      style={{
+                        background: `linear-gradient(to top, ${img.color}EE 0%, ${img.color}AA 50%, transparent 100%)`,
+                        opacity: isHovered ? 1 : 0
+                      }}
+                    >
+                      <div className="text-white text-center mt-4">
+                        <svg className="w-7 h-7 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <span className="text-xs font-bold">View All</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Checkmark Badge */}
+                  {isSelected && (
+                    <div
+                      className="absolute top-0 right-0 w-7 h-7 rounded-full flex items-center justify-center shadow-lg border-2 border-white"
+                      style={{ backgroundColor: img.color }}
+                    >
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  )}
                 </div>
-              </div>
-            </div>
-            
-            {/* Pulse Animation Ring */}
-            <div className="absolute inset-0 rounded-full border-2 border-[#15BB73] opacity-0 group-hover:opacity-100 group-hover:animate-ping"></div>
-          </div>
-          
-          {/* Label with Enhanced Styling */}
-          <span className={`text-xs sm:text-sm font-medium mt-3 transition-colors duration-300 whitespace-nowrap ${
-            selectedCategory === img.category ? 'text-[#15BB73] font-bold' : 'text-gray-700 group-hover:text-[#15BB73]'
-          }`}>
-            {img.alt}
-          </span>
 
-          {/* Selected Indicator */}
-          {selectedCategory === img.category && (
-            <div className="mt-1 px-3 py-1 bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white text-xs rounded-full font-medium">
-              Selected
-            </div>
-          )}
+                {/* Label */}
+                <span
+                  className="mt-2 text-sm sm:text-base font-semibold transition-all duration-300"
+                  style={{
+                    color: isSelected || isHovered ? img.color : '#4B5563'
+                  }}
+                >
+                  {img.alt}
+                </span>
+
+                {/* Underline */}
+                <div
+                  className="h-[3px] rounded-full transition-all duration-300 mt-1"
+                  style={{
+                    width: isSelected || isHovered ? '100%' : '0%',
+                    backgroundColor: img.color
+                  }}
+                />
+              </div>
+            );
+          })}
         </div>
-      ))}
+      </div>
     </div>
-    
-    {/* Decorative Elements */}
-    <div className="absolute top-4 left-4 w-2 h-2 bg-[#15BB73] rounded-full animate-pulse"></div>
-    <div className="absolute top-6 right-6 w-1 h-1 bg-[#0FA568] rounded-full animate-pulse" style={{animationDelay: '0.5s'}}></div>
-    <div className="absolute bottom-4 left-8 w-1.5 h-1.5 bg-[#15BB73] rounded-full animate-pulse" style={{animationDelay: '1s'}}></div>
-  </div>
-);
+  );
+};
 
 export default CircleBar;

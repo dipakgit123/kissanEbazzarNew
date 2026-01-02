@@ -14,6 +14,7 @@ import AnimalListingPage from './components/AnimalListingPage';
 import AnimalDetailPage from './components/AnimalDetailPage';
 import VeterinarianPage from './components/VeterinarianPage';
 import WishlistPage from './components/WishlistPage';
+import AIHealthCheck from './components/AIHealthCheck';
 
 function App() {
   // Initialize state from localStorage
@@ -149,6 +150,7 @@ function App() {
         <Route path="/animal/:animalType/:id" element={<AnimalDetailPage />} />
         <Route path="/veterinarian" element={<VeterinarianPage />} />
         <Route path="/pregnancy-calendar" element={<PregnancyCalendar />} />
+        <Route path="/health-check" element={<AIHealthCheck />} />
         <Route path="/wishlist" element={<WishlistPage wishlist={wishlist} removeFromWishlist={removeFromWishlist} isInWishlist={isInWishlist} />} />
         <Route path="/map" element={<MapView wishlist={wishlist} addToWishlist={addToWishlist} removeFromWishlist={removeFromWishlist} isInWishlist={isInWishlist} />} />
         <Route path="*" element={<Navigate to="/" replace />} />

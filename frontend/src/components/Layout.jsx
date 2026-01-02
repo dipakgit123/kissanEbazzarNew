@@ -81,17 +81,30 @@ const Layout = ({ showHeaderFooter = true, wishlistCount = 0 }) => {
                     pathname.startsWith('/map') ? 'w-full' : 'w-0 group-hover:w-full'
                   }`}></span>
                 </Link>
-                <Link 
-                  to="/profile" 
+                <Link
+                  to="/profile"
                   className={`font-semibold transition-all duration-200 relative group ${
-                    pathname.startsWith('/profile') 
-                      ? 'text-[#15BB73]' 
+                    pathname.startsWith('/profile')
+                      ? 'text-[#15BB73]'
                       : 'text-gray-600 hover:text-[#15BB73]'
                   }`}
                 >
                   Profile
                   <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${
                     pathname.startsWith('/profile') ? 'w-full' : 'w-0 group-hover:w-full'
+                  }`}></span>
+                </Link>
+                <Link
+                  to="/health-check"
+                  className={`font-semibold transition-all duration-200 relative group ${
+                    pathname.startsWith('/health-check')
+                      ? 'text-[#15BB73]'
+                      : 'text-gray-600 hover:text-[#15BB73]'
+                  }`}
+                >
+                  AI Health
+                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${
+                    pathname.startsWith('/health-check') ? 'w-full' : 'w-0 group-hover:w-full'
                   }`}></span>
                 </Link>
               </div>
@@ -245,6 +258,16 @@ const Layout = ({ showHeaderFooter = true, wishlistCount = 0 }) => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
             <span className="text-xs mt-1">Veterinarian</span>
+          </Link>
+
+          <Link
+            to="/health-check"
+            className={`flex flex-col items-center p-1 sm:p-2 rounded-lg transition ${isActive('/health-check') ? 'text-green-600' : 'text-gray-700 hover:bg-green-50'}`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            <span className="text-xs mt-1">AI Health</span>
           </Link>
         </footer>
       )}

@@ -153,5 +153,16 @@ module.exports = (sequelize) => {
     }
   };
 
-  return AnimalListing;
+  // Instance methods
+  AnimalListing.prototype.incrementViews = async function() {
+    this.views += 1;
+    await this.save();
+  };
+
+  AnimalListing.prototype.markAsSold = async function() {
+    this.status = 'sold';
+    await this.save();
+  };
+
+  return AnimalListing
 };

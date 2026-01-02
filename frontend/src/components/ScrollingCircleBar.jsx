@@ -1,114 +1,227 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import cow from '../assets/images/cow.jpg';
 import buffello from '../assets/images/buffello.jpg';
 import bull from '../assets/images/bull.jpg';
 import goat from '../assets/images/goat.jpg';
 import horse from '../assets/images/horse.png';
+import dog from '../assets/images/dog.jpg';
+import cat from '../assets/cliparts/cat_clipart.png';
 
 const images = [
-  { src: cow, alt: 'Cow' },
-  { src: buffello, alt: 'Buffalo' },
-  { src: bull, alt: 'Bull' },
-  { src: goat, alt: 'Goat' },
-  { src: horse, alt: 'Horse' },
-  {src:dog, alt:"Dog"}
+  { src: cow, alt: 'Cow', color: '#22C55E', lightBg: '#DCFCE7' },
+  { src: buffello, alt: 'Buffalo', color: '#6366F1', lightBg: '#E0E7FF' },
+  { src: bull, alt: 'Bull', color: '#F59E0B', lightBg: '#FEF3C7' },
+  { src: goat, alt: 'Goat', color: '#EC4899', lightBg: '#FCE7F3' },
+  { src: horse, alt: 'Horse', color: '#8B5CF6', lightBg: '#EDE9FE' },
+  { src: dog, alt: 'Dog', color: '#14B8A6', lightBg: '#CCFBF1' },
+  { src: cat, alt: 'Cat', color: '#F97316', lightBg: '#FFEDD5' }
 ];
 
-const ITEM_SIZE = 120; // adjust as needed (px)
-const GAP = 10;        // adjust as needed (px)
-
 const ScrollingCircleBar = () => {
-  const [index, setIndex] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [hoveredIndex, setHoveredIndex] = useState(null);
 
   useEffect(() => {
     const id = setInterval(() => {
-      setIndex((prev) => (prev + 1) % images.length);
-    }, 3000); // 3-second step for smoother experience
+      setActiveIndex((prev) => (prev + 1) % images.length);
+    }, 3000);
     return () => clearInterval(id);
   }, []);
 
-  const translate = -(ITEM_SIZE + GAP) * index;
+  const activeItem = useMemo(() => images[activeIndex], [activeIndex]);
 
   return (
-    <div className="w-full overflow-hidden bg-gradient-to-r from-[#15BB73]/5 to-[#0FA568]/5 rounded-2xl py-6 mt-5 relative">
-      {/* Background Pattern */}
-      <div className="absolute inset-0 opacity-10">
-        <div className="absolute top-2 left-8 w-16 h-16 bg-[#15BB73]/20 rounded-full blur-xl"></div>
-        <div className="absolute bottom-2 right-12 w-12 h-12 bg-[#0FA568]/30 rounded-full blur-lg"></div>
+    <div
+      className="w-full rounded-2xl transition-all duration-500 relative overflow-hidden mt-4"
+      style={{
+        background: `linear-gradient(135deg, ${activeItem.lightBg} 0%, white 50%, ${activeItem.lightBg}40 100%)`
+      }}
+    >
+      {/* Animated background blobs */}
+      <div
+        className="absolute -top-20 -left-20 w-40 h-40 rounded-full blur-3xl opacity-40 transition-all duration-700"
+        style={{ backgroundColor: activeItem.color }}
+      />
+      <div
+        className="absolute -bottom-20 -right-20 w-40 h-40 rounded-full blur-3xl opacity-30 transition-all duration-700"
+        style={{ backgroundColor: activeItem.color }}
+      />
+      <div
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-60 h-60 rounded-full blur-3xl opacity-20 transition-all duration-700"
+        style={{ backgroundColor: activeItem.color }}
+      />
+
+      {/* Decorative pattern */}
+      <div className="absolute inset-0 opacity-5">
+        <div className="absolute top-4 left-10 w-8 h-8 border-2 border-gray-400 rounded-full" />
+        <div className="absolute bottom-4 right-10 w-6 h-6 border-2 border-gray-400 rounded-full" />
+        <div className="absolute top-6 right-1/4 w-4 h-4 bg-gray-400 rounded-full" />
+        <div className="absolute bottom-6 left-1/4 w-3 h-3 bg-gray-400 rounded-full" />
       </div>
-      
-      {/* Scroll Container */}
-      <div className="relative">
-        <div
-          className="flex items-center transition-transform duration-700 ease-in-out"
-          style={{ transform: `translateX(${translate}px)` }}
-        >
-          {images.map((img, idx) => (
-            <div 
-              key={idx} 
-              className="flex flex-col items-center mx-4 sm:mx-6 group cursor-pointer"
-            >
-              {/* Enhanced Circle Container */}
-              <div className="relative">
-                {/* Glow Effect */}
-                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-[#15BB73] to-[#0FA568] opacity-0 group-hover:opacity-40 blur-lg transition-opacity duration-300 scale-110"></div>
-                
-                {/* Main Circle */}
-                <div className="relative w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-full overflow-hidden border-3 border-[#15BB73] shadow-xl group-hover:border-[#0FA568] group-hover:shadow-2xl transition-all duration-300">
-                  <img
-                    src={img.src}
-                    alt={img.alt}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+
+      <div className="relative z-10 pt-8 pb-6 px-4">
+        <div className="flex justify-center items-center gap-3 sm:gap-5 md:gap-8 lg:gap-10 overflow-x-auto scrollbar-hide">
+          {images.map((img, index) => {
+            const isActive = activeIndex === index;
+            const isHovered = hoveredIndex === index;
+
+            return (
+              <div
+                key={index}
+                className="flex flex-col items-center cursor-pointer flex-shrink-0"
+                onMouseEnter={() => setHoveredIndex(index)}
+                onMouseLeave={() => setHoveredIndex(null)}
+                onClick={() => setActiveIndex(index)}
+              >
+                {/* Circle Container with proper spacing */}
+                <div
+                  className="relative transition-all duration-300 ease-out"
+                  style={{
+                    transform: isHovered || isActive ? 'scale(1.1)' : 'scale(1)',
+                  }}
+                >
+                  {/* Animated Glow Effect */}
+                  <div
+                    className="absolute -inset-3 rounded-full blur-xl transition-all duration-500"
+                    style={{
+                      background: `radial-gradient(circle, ${img.color}50 0%, transparent 70%)`,
+                      opacity: isHovered || isActive ? 1 : 0,
+                    }}
                   />
-                  
-                  {/* Hover Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#15BB73]/90 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                    <div className="text-white text-center">
-                      <svg className="w-5 h-5 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                      <p className="text-xs font-medium">Browse</p>
+
+                  {/* Rotating Ring for Active */}
+                  {isActive && (
+                    <div
+                      className="absolute -inset-2 rounded-full animate-spin"
+                      style={{
+                        background: `conic-gradient(from 0deg, ${img.color}, transparent, ${img.color})`,
+                        animationDuration: '3s'
+                      }}
+                    />
+                  )}
+
+                  {/* Outer Ring */}
+                  <div
+                    className="absolute -inset-1.5 rounded-full transition-all duration-300"
+                    style={{
+                      background: isActive
+                        ? `linear-gradient(135deg, ${img.color}, ${img.color}80)`
+                        : isHovered
+                          ? `linear-gradient(135deg, ${img.color}40, ${img.color}20)`
+                          : 'transparent',
+                    }}
+                  />
+
+                  {/* Main Circle */}
+                  <div
+                    className="relative rounded-full overflow-hidden w-[72px] h-[72px] sm:w-[88px] sm:h-[88px] md:w-[100px] md:h-[100px] transition-all duration-300 bg-white"
+                    style={{
+                      boxShadow: isHovered || isActive
+                        ? `0 15px 50px -12px ${img.color}90, 0 8px 25px -8px ${img.color}50`
+                        : '0 4px 20px -8px rgba(0,0,0,0.15)',
+                      border: isActive
+                        ? '3px solid white'
+                        : isHovered
+                          ? `3px solid ${img.color}`
+                          : '3px solid #f3f4f6',
+                    }}
+                  >
+                    <img
+                      src={img.src}
+                      alt={img.alt}
+                      className="w-full h-full object-cover transition-transform duration-500"
+                      style={{
+                        transform: isHovered ? 'scale(1.2)' : 'scale(1)'
+                      }}
+                    />
+
+                    {/* Gradient Overlay on Hover */}
+                    <div
+                      className="absolute inset-0 flex items-center justify-center transition-all duration-300"
+                      style={{
+                        background: `linear-gradient(to top, ${img.color}F0 0%, ${img.color}90 40%, transparent 100%)`,
+                        opacity: isHovered ? 1 : 0
+                      }}
+                    >
+                      <div className="text-white text-center transform translate-y-3">
+                        <svg className="w-7 h-7 sm:w-8 sm:h-8 mx-auto mb-1 drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <span className="text-xs font-bold tracking-wide">View All</span>
+                      </div>
                     </div>
                   </div>
+
+                  {/* Active Indicator */}
+                  {isActive && (
+                    <div
+                      className="absolute -top-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center shadow-lg z-10 border-2 border-white"
+                      style={{ backgroundColor: img.color }}
+                    >
+                      <div className="w-2.5 h-2.5 bg-white rounded-full animate-pulse" />
+                    </div>
+                  )}
+
+                  {/* Hover Ring Pulse */}
+                  {isHovered && !isActive && (
+                    <div
+                      className="absolute -inset-1 rounded-full animate-ping opacity-30"
+                      style={{ backgroundColor: img.color }}
+                    />
+                  )}
                 </div>
-                
-                {/* Pulse Ring */}
-                <div className="absolute inset-0 rounded-full border-2 border-[#15BB73] opacity-0 group-hover:opacity-100 group-hover:animate-ping"></div>
+
+                {/* Label */}
+                <div className="mt-4 text-center">
+                  <span
+                    className="text-sm sm:text-base font-bold transition-all duration-300 relative px-1"
+                    style={{
+                      color: isActive || isHovered ? img.color : '#4B5563'
+                    }}
+                  >
+                    {img.alt}
+                    {/* Animated underline */}
+                    <span
+                      className="absolute -bottom-1 left-0 h-[3px] rounded-full transition-all duration-300"
+                      style={{
+                        width: isActive || isHovered ? '100%' : '0%',
+                        backgroundColor: img.color
+                      }}
+                    />
+                  </span>
+                </div>
               </div>
-              
-              {/* Enhanced Label */}
-              <span className="text-xs sm:text-sm font-medium text-gray-700 mt-3 group-hover:text-[#15BB73] transition-colors duration-300 whitespace-nowrap">
-                {img.alt}
-              </span>
-              
-              {/* Count Badge */}
-              <div className="mt-1 px-2 py-1 bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white text-xs rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                {Math.floor(Math.random() * 30) + 5}+
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
-        
-        {/* Navigation Dots */}
-        <div className="flex justify-center mt-4 space-x-2">
-          {images.map((_, idx) => (
+
+        {/* Enhanced Navigation Dots */}
+        <div className="flex justify-center mt-5 gap-2">
+          {images.map((img, idx) => (
             <button
               key={idx}
-              onClick={() => setIndex(idx)}
-              className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                idx === index 
-                  ? 'bg-[#15BB73] w-6' 
-                  : 'bg-gray-300 hover:bg-[#15BB73]/50'
-              }`}
-            />
+              onClick={() => setActiveIndex(idx)}
+              className="relative group"
+            >
+              <div
+                className="rounded-full transition-all duration-300"
+                style={{
+                  width: idx === activeIndex ? '28px' : '10px',
+                  height: '10px',
+                  backgroundColor: idx === activeIndex ? img.color : '#D1D5DB',
+                  boxShadow: idx === activeIndex ? `0 2px 10px -2px ${img.color}` : 'none'
+                }}
+              />
+              {idx === activeIndex && (
+                <div
+                  className="absolute inset-0 rounded-full animate-ping opacity-40"
+                  style={{ backgroundColor: img.color }}
+                />
+              )}
+            </button>
           ))}
         </div>
       </div>
-      
-      {/* Decorative Elements */}
-      <div className="absolute top-3 left-6 w-1.5 h-1.5 bg-[#15BB73] rounded-full animate-pulse"></div>
-      <div className="absolute bottom-3 right-8 w-1 h-1 bg-[#0FA568] rounded-full animate-pulse" style={{animationDelay: '0.7s'}}></div>
     </div>
   );
 };

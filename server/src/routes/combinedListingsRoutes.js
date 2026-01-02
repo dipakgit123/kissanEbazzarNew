@@ -14,6 +14,14 @@ router.get('/nearby', combinedListingsController.getAllNearbyListings);
 // GET /api/listings/featured?limit=20
 router.get('/featured', combinedListingsController.getFeaturedListings);
 
+// Search listings across all categories
+// GET /api/listings/search?query=xxx&animalType=xxx&minPrice=xxx&maxPrice=xxx
+router.get('/search', combinedListingsController.searchListings);
+
+// Get listings by animal type
+// GET /api/listings/type/:animalType?limit=50
+router.get('/type/:animalType', combinedListingsController.getListingsByType);
+
 // Get single listing by animal type and ID
 // GET /api/listings/:animalType/:id
 router.get('/:animalType/:id', combinedListingsController.getListingById);

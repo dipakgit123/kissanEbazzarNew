@@ -260,6 +260,25 @@ export const listingsService = {
     } catch (error) {
       throw error.response?.data || error;
     }
+  },
+
+  // Search listings across all categories
+  searchListings: async (query, options = {}) => {
+    try {
+      const { animalType, minPrice, maxPrice, limit = 50 } = options;
+      const response = await api.get(`/api/listings/search`, {
+        params: {
+          query,
+          animalType,
+          minPrice,
+          maxPrice,
+          limit
+        }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
   }
 };
 

@@ -1,9 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import CircleBar from './CircleBar';
 import AnimalCard from './AnimalCard';
+import DistanceToggle from './DistanceToggle';
+import CowLoader from './CowLoader';
 import { listingsService, userService } from '../services/api';
 
 import { Link } from 'react-router-dom';
+
+// Debounce hook for search
+const useDebounce = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+
+  return debouncedValue;
+};
 
 const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -12,6 +29,51 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
   const [animalData, setAnimalData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState(null);
+  const [distanceMode, setDistanceMode] = useState('all'); // 'all' = 500km, 'nearby' = 100km
+  const [selectedCategory, setSelectedCategory] = useState(null); // Category filter from CircleBar
+
+  // Search-related states
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [recentSearches, setRecentSearches] = useState([]);
+  const [searchMode, setSearchMode] = useState('local'); // 'local' or 'api'
+  const searchInputRef = useRef(null);
+  const suggestionsRef = useRef(null);
+
+  // Debounced search query for real-time search
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
+
+  // Quick search tags
+  const quickSearchTags = useMemo(() => [
+    { label: 'Cow', icon: '🐄', query: 'cow' },
+    { label: 'Buffalo', icon: '🐃', query: 'buffalo' },
+    { label: 'Goat', icon: '🐐', query: 'goat' },
+    { label: 'Horse', icon: '🐴', query: 'horse' },
+    { label: 'Dog', icon: '🐕', query: 'dog' },
+    { label: 'Cat', icon: '🐱', query: 'cat' },
+  ], []);
+
+  // Load recent searches from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('recentSearches');
+    if (saved) {
+      setRecentSearches(JSON.parse(saved).slice(0, 5));
+    }
+  }, []);
+
+  // Save search to recent searches
+  const saveRecentSearch = useCallback((query) => {
+    if (!query.trim()) return;
+    const updated = [query, ...recentSearches.filter(s => s !== query)].slice(0, 5);
+    setRecentSearches(updated);
+    localStorage.setItem('recentSearches', JSON.stringify(updated));
+  }, [recentSearches]);
+
+  // Clear recent searches
+  const clearRecentSearches = useCallback(() => {
+    setRecentSearches([]);
+    localStorage.removeItem('recentSearches');
+  }, []);
 
   // Toggle wishlist function
   const handleToggleWishlist = (animalId) => {
@@ -23,12 +85,29 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
     }
   };
 
-  // Fetch user location and nearby listings
+  // Helper function to format time ago - defined before useEffect
+  const formatTimeAgo = useCallback((dateString) => {
+    if (!dateString) return 'Recently';
+
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 60) return `${diffMins} minutes ago`;
+    if (diffHours < 24) return `${diffHours} hours ago`;
+    if (diffDays === 1) return '1 day ago';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+    return `${Math.floor(diffDays / 30)} months ago`;
+  }, []);
+
+  // Fetch user location on mount
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
+    const fetchUserLocation = async () => {
       try {
-        // Try to get user's location from profile first
         const token = localStorage.getItem('token');
         let lat = null;
         let lng = null;
@@ -45,6 +124,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
                 city: profileResponse.user.city,
                 state: profileResponse.user.state
               });
+              return;
             }
           } catch (err) {
             console.log('Could not fetch user profile:', err);
@@ -67,30 +147,40 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
             console.log('Could not get browser location:', err);
           }
         }
+      } catch (error) {
+        console.error('Error fetching user location:', error);
+      }
+    };
 
-        // Fetch listings based on location
+    fetchUserLocation();
+  }, []);
+
+  // Fetch listings based on distance mode
+  useEffect(() => {
+    const fetchListings = async () => {
+      setLoading(true);
+      try {
         let listings = [];
-        let usedNearby = false;
+        const radius = distanceMode === 'nearby' ? 100 : 500; // 100km for nearby, 500km for all
 
-        if (lat && lng) {
-          // Try to get nearby listings sorted by distance
-          const response = await listingsService.getNearbyListings(lat, lng, 100, 20);
+        if (userLocation?.latitude && userLocation?.longitude) {
+          // Fetch listings based on user location and selected radius
+          const response = await listingsService.getNearbyListings(
+            userLocation.latitude,
+            userLocation.longitude,
+            radius,
+            50 // increased limit
+          );
           if (response.success && response.data && response.data.length > 0) {
             listings = response.data;
-            usedNearby = true;
           }
         }
 
-        // Fallback to featured listings if no location or nearby returned empty
+        // Fallback to featured listings if no location or no listings found
         if (listings.length === 0) {
-          const response = await listingsService.getFeaturedListings(20);
+          const response = await listingsService.getFeaturedListings(50);
           if (response.success) {
             listings = response.data;
-          }
-          // Clear user location indicator if we're showing featured instead of nearby
-          if (usedNearby === false && lat && lng) {
-            // Keep location but note that we're showing all listings
-            setUserLocation(prev => prev ? { ...prev, showingFeatured: true } : null);
           }
         }
 
@@ -121,54 +211,235 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
       }
     };
 
-    fetchData();
-  }, []);
+    fetchListings();
+  }, [distanceMode, userLocation, formatTimeAgo]);
 
-  // Helper function to format time ago
-  const formatTimeAgo = (dateString) => {
-    if (!dateString) return 'Recently';
+  // Transform listing data helper
+  const transformListing = useCallback((listing) => ({
+    id: `${listing.animal_type}-${listing.id}`,
+    listingId: listing.id,
+    title: `${listing.breed_name || 'Unknown Breed'} | ${listing.animal_type?.charAt(0).toUpperCase() + listing.animal_type?.slice(1)}`,
+    price: listing.expected_price ? Number(listing.expected_price).toLocaleString('en-IN') : '0',
+    location: `${listing.city || 'Unknown'}${listing.distance ? ` (${Math.round(listing.distance)} km)` : ''}`,
+    datePosted: formatTimeAgo(listing.created_at),
+    imageSrc: listing.front_photo || listing.side_photo || listing.photo_1 || 'https://via.placeholder.com/300x200?text=No+Image',
+    sellerName: listing.seller?.name || 'Unknown Seller',
+    phoneNumber: listing.seller?.phone || '',
+    breed: listing.breed_name || 'Unknown',
+    animalType: listing.animal_type?.charAt(0).toUpperCase() + listing.animal_type?.slice(1),
+    milkProduction: listing.milk_capacity ? `${listing.milk_capacity}L` : 'N/A',
+    distance: listing.distance,
+    status: listing.status,
+    sellerPhoto: listing.seller?.profile_photo
+  }), [formatTimeAgo]);
 
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+  // Perform local search (fast, on existing data)
+  const performLocalSearch = useCallback((query) => {
+    if (!query.trim()) {
+      setFilteredAnimals([]);
+      return [];
+    }
 
-    if (diffMins < 60) return `${diffMins} minutes ago`;
-    if (diffHours < 24) return `${diffHours} hours ago`;
-    if (diffDays === 1) return '1 day ago';
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-    return `${Math.floor(diffDays / 30)} months ago`;
-  };
+    const searchTerms = query.toLowerCase().split(' ').filter(t => t.length > 0);
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (searchQuery.trim() === '') {
+    const filtered = animalData.filter(animal => {
+      const searchableText = [
+        animal.title,
+        animal.breed,
+        animal.animalType,
+        animal.location,
+        animal.sellerName
+      ].join(' ').toLowerCase();
+
+      return searchTerms.every(term => searchableText.includes(term));
+    });
+
+    // Sort by relevance (exact matches first)
+    filtered.sort((a, b) => {
+      const aExact = a.title.toLowerCase().includes(query.toLowerCase()) ? 1 : 0;
+      const bExact = b.title.toLowerCase().includes(query.toLowerCase()) ? 1 : 0;
+      return bExact - aExact;
+    });
+
+    setFilteredAnimals(filtered);
+    return filtered;
+  }, [animalData]);
+
+  // Perform API search (comprehensive, searches database)
+  const performApiSearch = useCallback(async (query) => {
+    if (!query.trim()) {
       setFilteredAnimals([]);
       return;
     }
 
-    const filtered = animalData.filter(animal =>
-      animal.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      animal.breed.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      animal.animalType.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      animal.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      animal.sellerName.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    setFilteredAnimals(filtered);
-  };
-
-  const handleInputChange = (e) => {
-    setSearchQuery(e.target.value);
-    if (e.target.value.trim() === '') {
-      setFilteredAnimals([]);
+    setIsSearching(true);
+    try {
+      const response = await listingsService.searchListings(query, { limit: 50 });
+      if (response.success && response.data) {
+        const transformedResults = response.data.map(transformListing);
+        setFilteredAnimals(transformedResults);
+        setSearchMode('api');
+      }
+    } catch (error) {
+      console.error('API search error:', error);
+      // Fallback to local search
+      performLocalSearch(query);
+    } finally {
+      setIsSearching(false);
     }
-  };
+  }, [transformListing, performLocalSearch]);
 
-  const displayAnimals = filteredAnimals.length > 0 ? filteredAnimals : animalData;
+  // Real-time search effect (debounced)
+  useEffect(() => {
+    if (debouncedSearchQuery.trim()) {
+      // First do local search for instant results
+      const localResults = performLocalSearch(debouncedSearchQuery);
+
+      // If local results are few, also search API for more comprehensive results
+      if (localResults.length < 5 && debouncedSearchQuery.length >= 2) {
+        performApiSearch(debouncedSearchQuery);
+      }
+    } else {
+      setFilteredAnimals([]);
+      setSearchMode('local');
+    }
+  }, [debouncedSearchQuery, performLocalSearch, performApiSearch]);
+
+  // Handle form submit (explicit search)
+  const handleSearch = useCallback((e) => {
+    e?.preventDefault();
+    if (searchQuery.trim()) {
+      saveRecentSearch(searchQuery.trim());
+      setShowSuggestions(false);
+      performApiSearch(searchQuery);
+    }
+  }, [searchQuery, saveRecentSearch, performApiSearch]);
+
+  // Handle input change
+  const handleInputChange = useCallback((e) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    setShowSuggestions(true);
+
+    if (value.trim() === '') {
+      setFilteredAnimals([]);
+      setSearchMode('local');
+    }
+  }, []);
+
+  // Handle quick search tag click
+  const handleQuickSearch = useCallback((query) => {
+    setSearchQuery(query);
+    saveRecentSearch(query);
+    setShowSuggestions(false);
+    performApiSearch(query);
+  }, [saveRecentSearch, performApiSearch]);
+
+  // Handle recent search click
+  const handleRecentSearchClick = useCallback((query) => {
+    setSearchQuery(query);
+    setShowSuggestions(false);
+    performApiSearch(query);
+  }, [performApiSearch]);
+
+  // Clear search
+  const clearSearch = useCallback(() => {
+    setSearchQuery('');
+    setFilteredAnimals([]);
+    setSearchMode('local');
+    setShowSuggestions(false);
+    searchInputRef.current?.focus();
+  }, []);
+
+  // Handle category click from CircleBar
+  const handleCategoryClick = useCallback((category, apiEndpoint) => {
+    // Toggle category - if same category is clicked, deselect it
+    if (selectedCategory === category) {
+      setSelectedCategory(null);
+    } else {
+      setSelectedCategory(category);
+      // Clear any active search when selecting a category
+      if (searchQuery) {
+        setSearchQuery('');
+        setFilteredAnimals([]);
+      }
+    }
+  }, [selectedCategory, searchQuery]);
+
+  // Clear category filter
+  const clearCategoryFilter = useCallback(() => {
+    setSelectedCategory(null);
+  }, []);
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(event.target) &&
+        searchInputRef.current &&
+        !searchInputRef.current.contains(event.target)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Get search suggestions based on current input
+  const searchSuggestions = useMemo(() => {
+    if (!searchQuery.trim() || searchQuery.length < 2) return [];
+
+    const query = searchQuery.toLowerCase();
+    const suggestions = [];
+
+    // Add matching animal types
+    quickSearchTags.forEach(tag => {
+      if (tag.query.includes(query) && !suggestions.includes(tag.query)) {
+        suggestions.push(tag.query);
+      }
+    });
+
+    // Add matching breeds from existing data
+    animalData.forEach(animal => {
+      const breed = animal.breed.toLowerCase();
+      if (breed.includes(query) && !suggestions.includes(breed)) {
+        suggestions.push(breed);
+      }
+    });
+
+    // Add matching locations
+    animalData.forEach(animal => {
+      const location = animal.location.split(' (')[0].toLowerCase();
+      if (location.includes(query) && !suggestions.includes(location)) {
+        suggestions.push(location);
+      }
+    });
+
+    return suggestions.slice(0, 5);
+  }, [searchQuery, quickSearchTags, animalData]);
+
+  // Filter animals by selected category
+  const categoryFilteredAnimals = useMemo(() => {
+    if (!selectedCategory) return animalData;
+
+    return animalData.filter(animal => {
+      const animalType = animal.animalType?.toLowerCase();
+      const category = selectedCategory.toLowerCase();
+
+      // Match category to animal type
+      if (category === 'cow' || category === 'bull') {
+        return animalType === 'cow' || animalType === 'bull' || animalType === 'animal';
+      }
+      return animalType === category || animalType?.includes(category);
+    });
+  }, [animalData, selectedCategory]);
+
+  const displayAnimals = filteredAnimals.length > 0 || searchQuery.trim() ? filteredAnimals : categoryFilteredAnimals;
+  const isShowingSearchResults = searchQuery.trim() && filteredAnimals.length > 0;
+  const isShowingCategoryResults = selectedCategory && !searchQuery.trim();
 
   // Handle scroll effect
   useEffect(() => {
@@ -353,57 +624,243 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
           )}
 
           {/* Search Bar */}
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-2xl mx-auto relative">
             <form onSubmit={handleSearch} className="relative">
               <input
+                ref={searchInputRef}
                 type="text"
                 placeholder="Search for animals, breeds, or locations..."
                 value={searchQuery}
                 onChange={handleInputChange}
-                className="w-full px-6 py-4 pl-12 pr-32 rounded-2xl border-2 border-gray-200 focus:border-[#15BB73] focus:outline-none focus:ring-4 focus:ring-[#15BB73]/20 text-lg shadow-lg"
+                onFocus={() => setShowSuggestions(true)}
+                className="w-full px-6 py-4 pl-12 pr-32 rounded-2xl border-2 border-gray-200 focus:border-[#15BB73] focus:outline-none focus:ring-4 focus:ring-[#15BB73]/20 text-lg shadow-lg bg-white"
               />
               <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
+
+              {/* Clear button */}
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  className="absolute right-28 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+
+              {/* Search button with loading state */}
               <button
                 type="submit"
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-6 py-2 rounded-xl font-medium hover:shadow-lg transition-all duration-300"
+                disabled={isSearching}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-6 py-2 rounded-xl font-medium hover:shadow-lg transition-all duration-300 disabled:opacity-70 flex items-center gap-2"
               >
-                Search
+                {isSearching ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Searching</span>
+                  </>
+                ) : (
+                  'Search'
+                )}
               </button>
             </form>
+
+            {/* Search Suggestions Dropdown */}
+            {showSuggestions && (searchSuggestions.length > 0 || recentSearches.length > 0) && !searchQuery.trim() && (
+              <div
+                ref={suggestionsRef}
+                className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50"
+              >
+                {/* Recent Searches */}
+                {recentSearches.length > 0 && (
+                  <div className="p-3 border-b border-gray-100">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-gray-500 uppercase">Recent Searches</span>
+                      <button
+                        onClick={clearRecentSearches}
+                        className="text-xs text-[#15BB73] hover:underline"
+                      >
+                        Clear all
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {recentSearches.map((search, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => handleRecentSearchClick(search)}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-full text-sm text-gray-700 transition-colors"
+                        >
+                          <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          {search}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Quick Search Tags */}
+                <div className="p-3">
+                  <span className="text-xs font-semibold text-gray-500 uppercase block mb-2">Quick Search</span>
+                  <div className="flex flex-wrap gap-2">
+                    {quickSearchTags.map((tag) => (
+                      <button
+                        key={tag.query}
+                        onClick={() => handleQuickSearch(tag.query)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-[#15BB73]/10 to-[#0FA568]/10 hover:from-[#15BB73]/20 hover:to-[#0FA568]/20 rounded-full text-sm font-medium text-[#15BB73] transition-colors"
+                      >
+                        <span>{tag.icon}</span>
+                        {tag.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Live Suggestions while typing */}
+            {showSuggestions && searchQuery.trim() && searchSuggestions.length > 0 && (
+              <div
+                ref={suggestionsRef}
+                className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50"
+              >
+                <div className="p-2">
+                  {searchSuggestions.map((suggestion, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleQuickSearch(suggestion)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 rounded-lg text-left transition-colors"
+                    >
+                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      <span className="text-gray-700">{suggestion}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* Quick Search Tags (visible when not focused) */}
+          {!showSuggestions && (
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              {quickSearchTags.map((tag) => (
+                <button
+                  key={tag.query}
+                  onClick={() => handleQuickSearch(tag.query)}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-white/80 hover:bg-white rounded-full text-sm font-medium text-gray-700 hover:text-[#15BB73] shadow-sm hover:shadow transition-all duration-200"
+                >
+                  <span>{tag.icon}</span>
+                  {tag.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
       {/* Main Content */}
       <main className={`flex-1 p-4 pb-20 transition-all duration-300 ${isScrolled ? 'pt-16 sm:pt-20' : ''}`}>
         {/* Animal Categories */}
-        <div className="max-w-7xl mx-auto mb-8">
+        <div className="max-w-7xl mx-auto mb-6">
           <h3 className="text-2xl font-bold text-[#000600] mb-6 text-center">Browse by Category</h3>
-          <CircleBar />
+          <CircleBar
+            onCategoryClick={handleCategoryClick}
+            selectedCategory={selectedCategory}
+          />
+        </div>
+
+        {/* Distance Toggle */}
+        <div className="max-w-7xl mx-auto mb-8">
+          <DistanceToggle
+            activeMode={distanceMode}
+            onModeChange={setDistanceMode}
+          />
         </div>
 
         <div className="max-w-7xl mx-auto">
           {/* Search Results Header */}
-          {filteredAnimals.length > 0 && (
-            <div className="mb-6">
-              <h3 className="text-2xl font-bold text-[#000600] mb-2">
-                Search Results for "{searchQuery}"
-              </h3>
-              <p className="text-gray-600">
-                Found {filteredAnimals.length} animal{filteredAnimals.length !== 1 ? 's' : ''} matching your search
-              </p>
+          {isShowingSearchResults && (
+            <div className="mb-6 bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-xl font-bold text-[#000600]">
+                      Search Results for "{searchQuery}"
+                    </h3>
+                    {searchMode === 'api' && (
+                      <span className="px-2 py-0.5 bg-[#15BB73]/10 text-[#15BB73] text-xs font-medium rounded-full">
+                        Database Search
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-gray-600 text-sm">
+                    Found {filteredAnimals.length} animal{filteredAnimals.length !== 1 ? 's' : ''} matching your search
+                    {isSearching && <span className="ml-2 text-[#15BB73]">• Searching for more...</span>}
+                  </p>
+                </div>
+                <button
+                  onClick={clearSearch}
+                  className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-[#15BB73] hover:bg-gray-50 rounded-lg transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Clear
+                </button>
+              </div>
             </div>
           )}
 
-          {/* Featured Listings */}
+          {/* Category Filter Header */}
+          {isShowingCategoryResults && (
+            <div className="mb-6 bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-xl font-bold text-[#000600]">
+                      {selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}s
+                    </h3>
+                    <span className="px-2 py-0.5 bg-[#15BB73]/10 text-[#15BB73] text-xs font-medium rounded-full">
+                      Category Filter
+                    </span>
+                  </div>
+                  <p className="text-gray-600 text-sm">
+                    Found {categoryFilteredAnimals.length} {selectedCategory}{categoryFilteredAnimals.length !== 1 ? 's' : ''} available
+                  </p>
+                </div>
+                <button
+                  onClick={clearCategoryFilter}
+                  className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-[#15BB73] hover:bg-gray-50 rounded-lg transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Clear Filter
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Listings */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-2xl font-bold text-[#000600]">
-                {filteredAnimals.length > 0 ? 'Search Results' : (userLocation && !userLocation.showingFeatured) ? 'Nearby Listings' : 'Featured Listings'}
+                {isShowingSearchResults
+                  ? 'Search Results'
+                  : isShowingCategoryResults
+                    ? `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}s`
+                    : distanceMode === 'nearby'
+                      ? 'Nearby Animals (100 km)'
+                      : 'All Available Animals (500 km)'}
               </h3>
-              {userLocation && !userLocation.showingFeatured && !filteredAnimals.length && (
+              {userLocation && !isShowingSearchResults && (
                 <span className="text-sm text-gray-500 flex items-center">
                   <svg className="w-4 h-4 mr-1 text-[#15BB73]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -414,10 +871,9 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
               )}
             </div>
 
-            {loading ? (
-              <div className="flex justify-center items-center py-20">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#15BB73]"></div>
-                <span className="ml-3 text-gray-600">Loading listings...</span>
+            {loading || (isSearching && filteredAnimals.length === 0) ? (
+              <div className="flex justify-center items-center py-12">
+                <CowLoader message={isSearching ? `Searching for "${searchQuery}"...` : "Finding animals for you..."} size="medium" />
               </div>
             ) : displayAnimals.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -441,34 +897,79 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
                   />
                 ))}
               </div>
+            ) : searchQuery.trim() ? (
+              <div className="text-center py-16 bg-white rounded-2xl shadow-sm">
+                <div className="text-6xl mb-4">🔍</div>
+                <h3 className="text-2xl font-bold text-gray-600 mb-2">No results for "{searchQuery}"</h3>
+                <p className="text-gray-500 mb-6 max-w-md mx-auto">
+                  We couldn't find any animals matching your search. Try different keywords or browse by category.
+                </p>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <button
+                    onClick={clearSearch}
+                    className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-colors"
+                  >
+                    Clear Search
+                  </button>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {quickSearchTags.slice(0, 4).map((tag) => (
+                      <button
+                        key={tag.query}
+                        onClick={() => handleQuickSearch(tag.query)}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white rounded-xl font-medium hover:shadow-lg transition-all"
+                      >
+                        <span>{tag.icon}</span>
+                        {tag.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : isShowingCategoryResults ? (
+              <div className="text-center py-16 bg-white rounded-2xl shadow-sm">
+                <div className="text-6xl mb-4">
+                  {selectedCategory === 'cow' ? '🐄' :
+                   selectedCategory === 'buffalo' ? '🐃' :
+                   selectedCategory === 'bull' ? '🐂' :
+                   selectedCategory === 'goat' ? '🐐' :
+                   selectedCategory === 'horse' ? '🐴' :
+                   selectedCategory === 'dog' ? '🐕' :
+                   selectedCategory === 'cat' ? '🐱' : '🐾'}
+                </div>
+                <h3 className="text-2xl font-bold text-gray-600 mb-2">
+                  No {selectedCategory}s found in your area
+                </h3>
+                <p className="text-gray-500 mb-6 max-w-md mx-auto">
+                  There are no {selectedCategory}s available within {distanceMode === 'nearby' ? '100' : '500'} km. Try browsing all categories or list your own.
+                </p>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <button
+                    onClick={clearCategoryFilter}
+                    className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-colors"
+                  >
+                    View All Animals
+                  </button>
+                  <Link
+                    to="/sell-animal"
+                    className="px-6 py-3 bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white rounded-xl font-semibold hover:shadow-lg transition-all"
+                  >
+                    List Your {selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}
+                  </Link>
+                </div>
+              </div>
             ) : (
               <div className="text-center py-12">
                 <div className="text-6xl mb-4">🐄</div>
                 <h3 className="text-2xl font-bold text-gray-600 mb-2">No animals found</h3>
                 <p className="text-gray-500 mb-6">
-                  {searchQuery ?
-                    'Try searching with different keywords like "cow", "buffalo", "goat", or location names' :
-                    'Be the first to list an animal in your area!'
-                  }
+                  Be the first to list an animal in your area!
                 </p>
-                {searchQuery ? (
-                  <button
-                    onClick={() => {
-                      setSearchQuery('');
-                      setFilteredAnimals([]);
-                    }}
-                    className="bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-300"
-                  >
-                    Clear Search
-                  </button>
-                ) : (
-                  <Link
-                    to="/sell-animal"
-                    className="inline-block bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-300"
-                  >
-                    List Your Animal
-                  </Link>
-                )}
+                <Link
+                  to="/sell-animal"
+                  className="inline-block bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-300"
+                >
+                  List Your Animal
+                </Link>
               </div>
             )}
           </div>

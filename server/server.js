@@ -12,6 +12,8 @@ const goatListingRoutes = require('./src/routes/goatListingRoutes'); // NEW
 const catListingRoutes = require('./src/routes/catListingRoutes'); // NEW
 const dogListingRoutes = require('./src/routes/dogListingRoutes'); // NEW
 const combinedListingsRoutes = require('./src/routes/combinedListingsRoutes'); // Combined listings
+const notificationRoutes = require('./src/routes/notificationRoutes'); // Notifications
+const aiHealthRoutes = require('./src/routes/aiHealthRoutes'); // AI Health Check
 const otpService = require('./src/services/otpService');
 require('dotenv').config();
 
@@ -39,6 +41,11 @@ app.use('/api/goats', goatListingRoutes);  // NEW - Goat listing routes
 app.use('/api/cats', catListingRoutes);  // NEW - Cat listing routes
 app.use('/api/dogs', dogListingRoutes);  // NEW - Dog listing routes
 app.use('/api/listings', combinedListingsRoutes);  // Combined listings from all categories
+app.use('/api/notifications', notificationRoutes);  // Notification routes
+app.use('/api/health-check', aiHealthRoutes);  // AI Health Check routes
+
+// Serve static files for web frontend
+app.use(express.static('public'));
 
 // Health check endpoint
 app.get('/health', async (req, res) => {

@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kissan E-Bazzar - AI Animal Health Check</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #15BB73;
+            --primary-dark: #0f9a5e;
+            --secondary-color: #F5F7FA;
+        }
+
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .navbar-brand {
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+
+        .hero-section {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            color: white;
+            padding: 60px 0;
+            margin-bottom: 40px;
+        }
+
+        .upload-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            margin-top: -80px;
+        }
+
+        .upload-zone {
+            border: 3px dashed #dee2e6;
+            border-radius: 15px;
+            padding: 60px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+
+        .upload-zone:hover {
+            border-color: var(--primary-color);
+            background: #f0fff8;
+        }
+
+        .upload-zone.dragover {
+            border-color: var(--primary-color);
+            background: #e0fff2;
+        }
+
+        .upload-zone i {
+            font-size: 4rem;
+            color: var(--primary-color);
+        }
+
+        .preview-image {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 15px;
+            object-fit: contain;
+        }
+
+        .animal-select {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .animal-btn {
+            padding: 12px 24px;
+            border: 2px solid #dee2e6;
+            border-radius: 50px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+        }
+
+        .animal-btn:hover {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .animal-btn.active {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            padding: 15px 40px;
+            font-size: 1.1rem;
+            border-radius: 50px;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            border-color: var(--primary-dark);
+        }
+
+        .result-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.05);
+        }
+
+        .health-score {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: white;
+            margin: 0 auto 20px;
+        }
+
+        .score-good { background: linear-gradient(135deg, #28a745, #20c997); }
+        .score-fair { background: linear-gradient(135deg, #ffc107, #fd7e14); }
+        .score-poor { background: linear-gradient(135deg, #dc3545, #e83e8c); }
+
+        .urgency-badge {
+            padding: 8px 20px;
+            border-radius: 50px;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .urgency-normal { background: #d4edda; color: #155724; }
+        .urgency-monitor { background: #fff3cd; color: #856404; }
+        .urgency-consult { background: #ffe5d0; color: #8a4500; }
+        .urgency-emergency { background: #f8d7da; color: #721c24; }
+
+        .issue-card {
+            border-left: 4px solid var(--primary-color);
+            padding: 15px;
+            margin-bottom: 15px;
+            background: #f8f9fa;
+            border-radius: 0 10px 10px 0;
+        }
+
+        .issue-card.high { border-left-color: #dc3545; }
+        .issue-card.medium { border-left-color: #ffc107; }
+        .issue-card.low { border-left-color: #28a745; }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255,255,255,0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            flex-direction: column;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .spinner-grow-lg {
+            width: 4rem;
+            height: 4rem;
+        }
+
+        .feature-card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            transition: transform 0.3s ease;
+            height: 100%;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+        }
+
+        .feature-card i {
+            font-size: 3rem;
+            color: var(--primary-color);
+            margin-bottom: 20px;
+        }
+
+        footer {
+            background: #2d3436;
+            color: white;
+            padding: 40px 0;
+            margin-top: 60px;
+        }
+
+        .disclaimer {
+            background: #fff3cd;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .hero-section {
+                padding: 40px 0;
+            }
+            .upload-card {
+                margin-top: -40px;
+                padding: 20px;
+            }
+            .upload-zone {
+                padding: 30px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-heart-pulse-fill me-2"></i>Kissan E-Bazzar
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#health-check">Health Check</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#common-issues">Common Issues</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#emergency">Emergency</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero-section" id="health-check">
+        <div class="container text-center">
+            <h1 class="display-4 fw-bold mb-3">AI Animal Health Check</h1>
+            <p class="lead mb-0">Upload a photo of your animal and get instant health analysis powered by AI</p>
+        </div>
+    </section>
+
+    <!-- Upload Section -->
+    <section class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="upload-card">
+                    <!-- Step 1: Select Animal -->
+                    <h5 class="mb-3"><span class="badge bg-primary me-2">1</span> Select Animal Type</h5>
+                    <div class="animal-select" id="animalSelect">
+                        <button class="animal-btn" data-animal="cow">🐄 Cow</button>
+                        <button class="animal-btn" data-animal="buffalo">🐃 Buffalo</button>
+                        <button class="animal-btn" data-animal="horse">🐴 Horse</button>
+                        <button class="animal-btn" data-animal="goat">🐐 Goat</button>
+                        <button class="animal-btn" data-animal="sheep">🐑 Sheep</button>
+                        <button class="animal-btn" data-animal="dog">🐕 Dog</button>
+                        <button class="animal-btn" data-animal="cat">🐈 Cat</button>
+                    </div>
+
+                    <!-- Step 2: Upload Image -->
+                    <h5 class="mb-3 mt-4"><span class="badge bg-primary me-2">2</span> Upload Photo</h5>
+                    <div class="upload-zone" id="uploadZone">
+                        <i class="bi bi-cloud-arrow-up"></i>
+                        <h4 class="mt-3">Drag & Drop or Click to Upload</h4>
+                        <p class="text-muted">Supports: JPG, PNG, WebP (Max 10MB)</p>
+                    </div>
+                    <input type="file" id="fileInput" accept="image/*" hidden>
+
+                    <!-- Image Preview -->
+                    <div id="previewContainer" class="text-center mt-4" style="display: none;">
+                        <img id="previewImage" class="preview-image" src="" alt="Preview">
+                        <button class="btn btn-outline-danger btn-sm mt-2" id="removeImage">
+                            <i class="bi bi-trash"></i> Remove
+                        </button>
+                    </div>
+
+                    <!-- Step 3: Additional Info (Optional) -->
+                    <h5 class="mb-3 mt-4"><span class="badge bg-secondary me-2">3</span> Additional Info (Optional)</h5>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Animal Age</label>
+                            <input type="text" class="form-control" id="animalAge" placeholder="e.g., 2 years">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Observed Symptoms</label>
+                            <input type="text" class="form-control" id="symptoms" placeholder="e.g., not eating, fever">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Any other information</label>
+                            <textarea class="form-control" id="additionalInfo" rows="2" placeholder="e.g., recent vaccinations, behavior changes..."></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Analyze Button -->
+                    <div class="text-center mt-4">
+                        <button class="btn btn-primary btn-lg" id="analyzeBtn" disabled>
+                            <i class="bi bi-cpu me-2"></i>Analyze Health
+                        </button>
+                    </div>
+
+                    <div class="disclaimer">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>Disclaimer:</strong> This AI-based analysis is for educational purposes only.
+                        Always consult a qualified veterinarian for proper diagnosis and treatment.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Results Section -->
+    <section class="container mt-5" id="resultsSection" style="display: none;">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <h2 class="text-center mb-4"><i class="bi bi-clipboard2-pulse me-2"></i>Health Analysis Report</h2>
+
+                <div class="row">
+                    <!-- Health Score -->
+                    <div class="col-md-4">
+                        <div class="result-card text-center">
+                            <h5 class="text-muted">Health Score</h5>
+                            <div class="health-score" id="healthScore">8</div>
+                            <h4 id="overallHealth">Good</h4>
+                            <span class="urgency-badge" id="urgencyBadge">Normal</span>
+                        </div>
+                    </div>
+
+                    <!-- Body Condition -->
+                    <div class="col-md-4">
+                        <div class="result-card text-center">
+                            <h5 class="text-muted">Body Condition</h5>
+                            <div class="display-1" id="bcsEmoji">✅</div>
+                            <h4 id="bcsText">Normal (3/5)</h4>
+                        </div>
+                    </div>
+
+                    <!-- Animal Type -->
+                    <div class="col-md-4">
+                        <div class="result-card text-center">
+                            <h5 class="text-muted">Detected Animal</h5>
+                            <div class="display-1" id="animalEmoji">🐄</div>
+                            <h4 id="detectedAnimal">Cow</h4>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Visible Signs -->
+                <div class="result-card mt-4">
+                    <h5><i class="bi bi-eye me-2 text-primary"></i>Visible Signs Observed</h5>
+                    <ul id="visibleSigns" class="list-group list-group-flush">
+                        <!-- Populated by JS -->
+                    </ul>
+                </div>
+
+                <!-- Potential Issues -->
+                <div class="result-card mt-4">
+                    <h5><i class="bi bi-exclamation-triangle me-2 text-warning"></i>Potential Health Issues</h5>
+                    <div id="potentialIssues">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Healthy Indicators -->
+                <div class="result-card mt-4">
+                    <h5><i class="bi bi-check-circle me-2 text-success"></i>Healthy Indicators</h5>
+                    <ul id="healthyIndicators" class="list-group list-group-flush">
+                        <!-- Populated by JS -->
+                    </ul>
+                </div>
+
+                <!-- Recommendations -->
+                <div class="result-card mt-4">
+                    <h5><i class="bi bi-lightbulb me-2 text-info"></i>Recommendations</h5>
+                    <ul id="recommendations" class="list-group list-group-flush">
+                        <!-- Populated by JS -->
+                    </ul>
+                </div>
+
+                <!-- When to See Vet -->
+                <div class="result-card mt-4 border-start border-danger border-4">
+                    <h5><i class="bi bi-hospital me-2 text-danger"></i>When to Consult Veterinarian</h5>
+                    <p id="whenToSeeVet" class="mb-0"></p>
+                </div>
+
+                <!-- Try Again Button -->
+                <div class="text-center mt-4">
+                    <button class="btn btn-outline-primary btn-lg" id="tryAgainBtn">
+                        <i class="bi bi-arrow-repeat me-2"></i>Analyze Another Animal
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Common Issues Section -->
+    <section class="container mt-5 py-5" id="common-issues">
+        <h2 class="text-center mb-5">Common Health Issues by Animal</h2>
+        <div class="row g-4">
+            <div class="col-md-6 col-lg-4">
+                <div class="feature-card">
+                    <div class="display-1 mb-3">🐄</div>
+                    <h4>Cattle</h4>
+                    <p class="text-muted">Mastitis, Foot Rot, Bloat, Milk Fever, Lumpy Skin Disease</p>
+                    <button class="btn btn-outline-primary btn-sm" onclick="showCommonIssues('cow')">View Details</button>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <div class="feature-card">
+                    <div class="display-1 mb-3">🐃</div>
+                    <h4>Buffalo</h4>
+                    <p class="text-muted">Hemorrhagic Septicemia, FMD, Black Quarter, Mastitis</p>
+                    <button class="btn btn-outline-primary btn-sm" onclick="showCommonIssues('buffalo')">View Details</button>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <div class="feature-card">
+                    <div class="display-1 mb-3">🐐</div>
+                    <h4>Goat & Sheep</h4>
+                    <p class="text-muted">PPR, Pneumonia, Enterotoxemia, Foot Rot, Worms</p>
+                    <button class="btn btn-outline-primary btn-sm" onclick="showCommonIssues('goat')">View Details</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Emergency Section -->
+    <section class="container py-5" id="emergency">
+        <div class="result-card bg-danger bg-opacity-10">
+            <h2 class="text-center text-danger mb-4"><i class="bi bi-exclamation-octagon me-2"></i>Emergency Symptoms</h2>
+            <p class="text-center text-muted mb-4">If your animal shows any of these symptoms, contact a veterinarian immediately!</p>
+            <div class="row" id="emergencySymptoms">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container text-center">
+            <h4 class="mb-3">Kissan E-Bazzar</h4>
+            <p class="text-muted">AI-Powered Animal Health Analysis</p>
+            <p class="small text-muted">
+                <i class="bi bi-info-circle me-1"></i>
+                This tool provides educational information only and should not replace professional veterinary advice.
+            </p>
+        </div>
+    </footer>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner-grow text-success spinner-grow-lg" role="status"></div>
+        <h4 class="mt-4 text-success">Analyzing Image...</h4>
+        <p class="text-muted">Our AI is examining your animal's health indicators</p>
+    </div>
+
+    <!-- Common Issues Modal -->
+    <div class="modal fade" id="issuesModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="issuesModalTitle">Common Health Issues</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="issuesModalBody">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // State
+        let selectedAnimal = null;
+        let selectedFile = null;
+        let uploadedImageUrl = null;
+
+        // DOM Elements
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+        const previewContainer = document.getElementById('previewContainer');
+        const previewImage = document.getElementById('previewImage');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const resultsSection = document.getElementById('resultsSection');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+
+        // Animal Selection
+        document.querySelectorAll('.animal-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.animal-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                selectedAnimal = this.dataset.animal;
+                updateAnalyzeButton();
+            });
+        });
+
+        // Upload Zone Events
+        uploadZone.addEventListener('click', () => fileInput.click());
+
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length) handleFile(files[0]);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) handleFile(e.target.files[0]);
+        });
+
+        document.getElementById('removeImage').addEventListener('click', () => {
+            selectedFile = null;
+            uploadedImageUrl = null;
+            previewContainer.style.display = 'none';
+            uploadZone.style.display = 'block';
+            fileInput.value = '';
+            updateAnalyzeButton();
+        });
+
+        document.getElementById('tryAgainBtn').addEventListener('click', () => {
+            resultsSection.style.display = 'none';
+            document.querySelector('.upload-card').scrollIntoView({ behavior: 'smooth' });
+            document.getElementById('removeImage').click();
+            document.querySelectorAll('.animal-btn').forEach(b => b.classList.remove('active'));
+            selectedAnimal = null;
+            document.getElementById('animalAge').value = '';
+            document.getElementById('symptoms').value = '';
+            document.getElementById('additionalInfo').value = '';
+        });
+
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                alert('Please upload an image file');
+                return;
+            }
+            if (file.size > 10 * 1024 * 1024) {
+                alert('File size should be less than 10MB');
+                return;
+            }
+
+            selectedFile = file;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImage.src = e.target.result;
+                uploadZone.style.display = 'none';
+                previewContainer.style.display = 'block';
+                updateAnalyzeButton();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function updateAnalyzeButton() {
+            analyzeBtn.disabled = !(selectedAnimal && selectedFile);
+        }
+
+        // Analyze Button Click
+        analyzeBtn.addEventListener('click', async () => {
+            if (!selectedAnimal || !selectedFile) return;
+
+            loadingOverlay.classList.add('active');
+
+            try {
+                // First upload the image
+                const formData = new FormData();
+                formData.append('image', selectedFile);
+                formData.append('animalType', selectedAnimal);
+                formData.append('age', document.getElementById('animalAge').value);
+                formData.append('symptoms', document.getElementById('symptoms').value);
+                formData.append('additionalInfo', document.getElementById('additionalInfo').value);
+
+                // For demo, we'll use the analyze endpoint with a sample URL
+                // In production, you'd first upload to Cloudinary then analyze
+                const response = await fetch('/api/health-check/upload-and-analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer demo-token' // Replace with actual token
+                    },
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    displayResults(result.data);
+                } else {
+                    throw new Error(result.message || 'Analysis failed');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error analyzing image: ' + error.message);
+            } finally {
+                loadingOverlay.classList.remove('active');
+            }
+        });
+
+        function displayResults(data) {
+            resultsSection.style.display = 'block';
+            resultsSection.scrollIntoView({ behavior: 'smooth' });
+
+            // Health Score
+            const score = data.healthScore || 5;
+            const healthScore = document.getElementById('healthScore');
+            healthScore.textContent = score;
+            healthScore.className = 'health-score ' + (score >= 7 ? 'score-good' : score >= 4 ? 'score-fair' : 'score-poor');
+
+            // Overall Health
+            document.getElementById('overallHealth').textContent = data.overallHealth || 'Unknown';
+
+            // Urgency Badge
+            const urgency = (data.urgencyLevel || 'Normal').toLowerCase().replace(/\s+/g, '-');
+            const urgencyBadge = document.getElementById('urgencyBadge');
+            urgencyBadge.textContent = data.urgencyLevel || 'Normal';
+            urgencyBadge.className = 'urgency-badge urgency-' +
+                (urgency.includes('emergency') ? 'emergency' :
+                 urgency.includes('consult') ? 'consult' :
+                 urgency.includes('monitor') ? 'monitor' : 'normal');
+
+            // Body Condition Score
+            const bcs = data.bodyConditionScore || '3';
+            document.getElementById('bcsEmoji').textContent =
+                bcs <= 2 ? '⚠️' : bcs >= 4 ? '⚠️' : '✅';
+            document.getElementById('bcsText').textContent =
+                `${bcs <= 2 ? 'Underweight' : bcs >= 4 ? 'Overweight' : 'Normal'} (${bcs}/5)`;
+
+            // Detected Animal
+            const animalEmojis = { cow: '🐄', buffalo: '🐃', horse: '🐴', goat: '🐐', sheep: '🐑', dog: '🐕', cat: '🐈' };
+            document.getElementById('animalEmoji').textContent = animalEmojis[selectedAnimal] || '🐾';
+            document.getElementById('detectedAnimal').textContent = data.animalType || selectedAnimal;
+
+            // Visible Signs
+            const signsList = document.getElementById('visibleSigns');
+            signsList.innerHTML = (data.visibleSigns || []).map(sign =>
+                `<li class="list-group-item"><i class="bi bi-eye text-primary me-2"></i>${sign}</li>`
+            ).join('') || '<li class="list-group-item text-muted">No specific signs detected</li>';
+
+            // Potential Issues
+            const issuesContainer = document.getElementById('potentialIssues');
+            issuesContainer.innerHTML = (data.potentialIssues || []).map(issue =>
+                `<div class="issue-card ${issue.likelihood?.toLowerCase() || 'medium'}">
+                    <h6><i class="bi bi-exclamation-circle me-2"></i>${issue.condition}</h6>
+                    <p class="mb-1 small">${issue.description || ''}</p>
+                    <span class="badge bg-${issue.likelihood === 'High' ? 'danger' : issue.likelihood === 'Low' ? 'success' : 'warning'}">
+                        ${issue.likelihood || 'Medium'} Likelihood
+                    </span>
+                </div>`
+            ).join('') || '<p class="text-muted">No significant issues detected</p>';
+
+            // Healthy Indicators
+            const healthyList = document.getElementById('healthyIndicators');
+            healthyList.innerHTML = (data.healthyIndicators || []).map(indicator =>
+                `<li class="list-group-item"><i class="bi bi-check-circle text-success me-2"></i>${indicator}</li>`
+            ).join('') || '<li class="list-group-item text-muted">Analysis complete</li>';
+
+            // Recommendations
+            const recsList = document.getElementById('recommendations');
+            recsList.innerHTML = (data.recommendations || []).map(rec =>
+                `<li class="list-group-item"><i class="bi bi-lightbulb text-warning me-2"></i>${rec}</li>`
+            ).join('') || '<li class="list-group-item">Continue regular health monitoring</li>';
+
+            // When to See Vet
+            document.getElementById('whenToSeeVet').textContent =
+                data.whenToSeeVet || 'Consult a veterinarian if symptoms persist or worsen.';
+        }
+
+        // Load Emergency Symptoms
+        async function loadEmergencySymptoms() {
+            try {
+                const response = await fetch('/api/health-check/emergency-symptoms');
+                const result = await response.json();
+
+                if (result.success) {
+                    const container = document.getElementById('emergencySymptoms');
+                    container.innerHTML = result.data.map(item =>
+                        `<div class="col-md-6 mb-3">
+                            <div class="d-flex align-items-start">
+                                <i class="bi bi-exclamation-triangle-fill text-danger me-3 mt-1"></i>
+                                <div>
+                                    <strong>${item.symptom}</strong>
+                                    <p class="small text-muted mb-0">${item.action}</p>
+                                </div>
+                            </div>
+                        </div>`
+                    ).join('');
+                }
+            } catch (error) {
+                console.error('Error loading emergency symptoms:', error);
+            }
+        }
+
+        // Show Common Issues Modal
+        async function showCommonIssues(animalType) {
+            try {
+                const response = await fetch(`/api/health-check/common-issues/${animalType}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    document.getElementById('issuesModalTitle').textContent =
+                        `Common Health Issues - ${animalType.charAt(0).toUpperCase() + animalType.slice(1)}`;
+
+                    document.getElementById('issuesModalBody').innerHTML = result.data.map(issue =>
+                        `<div class="issue-card ${issue.urgency?.toLowerCase() || 'medium'}">
+                            <h6>${issue.name}</h6>
+                            <p class="mb-1"><strong>Symptoms:</strong> ${issue.symptoms}</p>
+                            <span class="badge bg-${issue.urgency === 'Emergency' ? 'danger' : issue.urgency === 'High' ? 'warning' : 'info'}">
+                                ${issue.urgency || 'Medium'} Priority
+                            </span>
+                        </div>`
+                    ).join('');
+
+                    new bootstrap.Modal(document.getElementById('issuesModal')).show();
+                }
+            } catch (error) {
+                console.error('Error loading common issues:', error);
+            }
+        }
+
+        // Initialize
+        loadEmergencySymptoms();
+    </script>
+</body>
+</html>
