@@ -16,6 +16,8 @@ import VeterinarianPage from './components/VeterinarianPage';
 import VeterinarianRegistrationForm from './components/VeterinarianRegistrationForm';
 import VeterinarianLogin from './components/VeterinarianLogin';
 import VeterinarianDashboard from './components/VeterinarianDashboard';
+import NearbyVeterinarians from './components/NearbyVeterinarians';
+import AppointmentBookingForm from './components/AppointmentBookingForm';
 import WishlistPage from './components/WishlistPage';
 import AIHealthCheck from './components/AIHealthCheck';
 import AdminLogin from './components/admin/AdminLogin';
@@ -116,9 +118,14 @@ function App() {
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route path="/admin/dashboard" element={<AdminDashboard />} />
 
-      {/* Veterinarian Routes - No Layout */}
+      {/* Veterinarian Routes - No Layout (Separate Auth Flow) */}
       <Route path="/veterinarian/login" element={<VeterinarianLogin />} />
+      <Route path="/veterinarian/register" element={<VeterinarianRegistrationForm />} />
       <Route path="/veterinarian/dashboard" element={<VeterinarianDashboard />} />
+      
+      {/* Veterinarian Public Routes */}
+      <Route path="/veterinarians" element={<NearbyVeterinarians />} />
+      <Route path="/book-appointment/:vetId" element={<AppointmentBookingForm />} />
 
       {/* Routes without header/footer */}
       <Route element={<Layout showHeaderFooter={false} wishlistCount={wishlist.length} />}>
@@ -162,7 +169,6 @@ function App() {
         <Route path="/sell-animal" element={<AnimalListingPage />} />
         <Route path="/animal/:animalType/:id" element={<AnimalDetailPage />} />
         <Route path="/veterinarian" element={<VeterinarianPage />} />
-        <Route path="/veterinarian/register" element={<VeterinarianRegistrationForm />} />
         <Route path="/pregnancy-calendar" element={<PregnancyCalendar />} />
         <Route path="/health-check" element={<AIHealthCheck />} />
         <Route path="/wishlist" element={<WishlistPage wishlist={wishlist} removeFromWishlist={removeFromWishlist} isInWishlist={isInWishlist} />} />

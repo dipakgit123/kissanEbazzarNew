@@ -139,6 +139,7 @@ const AdminDashboard = () => {
     { id: 'analytics', label: 'Analytics', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
     { id: 'users', label: 'Users', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
     { id: 'listings', label: 'Listings', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' },
+    { id: 'veterinarians', label: 'Veterinarians', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
     { id: 'reports', label: 'Reports', icon: 'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
   ];
 
@@ -286,6 +287,7 @@ const AdminDashboard = () => {
           {activeTab === 'analytics' && <AnalyticsTab stats={stats} getAnimalEmoji={getAnimalEmoji} />}
           {activeTab === 'users' && <UsersTab API_URL={API_URL} />}
           {activeTab === 'listings' && <ListingsTab API_URL={API_URL} getAnimalEmoji={getAnimalEmoji} formatPrice={formatPrice} />}
+          {activeTab === 'veterinarians' && <VeterinariansTab API_URL={API_URL} formatDate={formatDate} />}
           {activeTab === 'reports' && <ReportsTab stats={stats} />}
         </main>
       </div>
@@ -1259,6 +1261,511 @@ const ListingsTab = ({ API_URL, getAnimalEmoji, formatPrice }) => {
 };
 
 // Reports Tab Component
+// Veterinarians Tab Component
+const VeterinariansTab = ({ API_URL, formatDate }) => {
+  const [veterinarians, setVeterinarians] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all'); // all, pending, verified, rejected, suspended
+  const [selectedVet, setSelectedVet] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+
+  useEffect(() => {
+    fetchVeterinarians();
+    fetchStats();
+  }, [filter]);
+
+  const fetchVeterinarians = async () => {
+    setLoading(true);
+    const token = localStorage.getItem('adminToken');
+    try {
+      const statusParam = filter !== 'all' ? `?status=${filter}` : '';
+      const response = await fetch(`${API_URL}/api/admin/veterinarians${statusParam}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setVeterinarians(data.data.veterinarians || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch veterinarians:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchStats = async () => {
+    const token = localStorage.getItem('adminToken');
+    try {
+      const response = await fetch(`${API_URL}/api/admin/veterinarians/stats`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setStats(data.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch stats:', error);
+    }
+  };
+
+  const handleVerify = async (vetId) => {
+    if (!confirm('Are you sure you want to verify this veterinarian? An email with login credentials will be sent.')) {
+      return;
+    }
+
+    setActionLoading(true);
+    const token = localStorage.getItem('adminToken');
+    try {
+      const response = await fetch(`${API_URL}/api/admin/veterinarians/${vetId}/verify`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ notes: 'Verified by admin' })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        alert(data.message);
+        fetchVeterinarians();
+        fetchStats();
+        setShowModal(false);
+        setSelectedVet(null);
+      } else {
+        alert('Verification failed: ' + data.message);
+      }
+    } catch (error) {
+      console.error('Verification error:', error);
+      alert('Failed to verify veterinarian');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleReject = async (vetId) => {
+    if (!rejectReason.trim()) {
+      alert('Please provide a rejection reason');
+      return;
+    }
+
+    setActionLoading(true);
+    const token = localStorage.getItem('adminToken');
+    try {
+      const response = await fetch(`${API_URL}/api/admin/veterinarians/${vetId}/reject`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ reason: rejectReason })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        alert('Veterinarian rejected successfully');
+        fetchVeterinarians();
+        fetchStats();
+        setShowModal(false);
+        setSelectedVet(null);
+        setRejectReason('');
+      } else {
+        alert('Rejection failed: ' + data.message);
+      }
+    } catch (error) {
+      console.error('Rejection error:', error);
+      alert('Failed to reject veterinarian');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'verified': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+      case 'pending': return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+      case 'rejected': return 'bg-red-500/20 text-red-400 border-red-500/30';
+      case 'suspended': return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+      default: return 'bg-slate-500/20 text-slate-400 border-slate-500/30';
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="bg-[#1e293b] rounded-xl p-4 border border-slate-700/50">
+          <p className="text-sm text-slate-400 mb-1">Total</p>
+          <p className="text-3xl font-bold text-white">{stats?.total || 0}</p>
+        </div>
+        <div className="bg-[#1e293b] rounded-xl p-4 border border-amber-500/20">
+          <p className="text-sm text-amber-400 mb-1">Pending</p>
+          <p className="text-3xl font-bold text-amber-400">{stats?.pending || 0}</p>
+        </div>
+        <div className="bg-[#1e293b] rounded-xl p-4 border border-emerald-500/20">
+          <p className="text-sm text-emerald-400 mb-1">Verified</p>
+          <p className="text-3xl font-bold text-emerald-400">{stats?.verified || 0}</p>
+        </div>
+        <div className="bg-[#1e293b] rounded-xl p-4 border border-red-500/20">
+          <p className="text-sm text-red-400 mb-1">Rejected</p>
+          <p className="text-3xl font-bold text-red-400">{stats?.rejected || 0}</p>
+        </div>
+        <div className="bg-[#1e293b] rounded-xl p-4 border border-gray-500/20">
+          <p className="text-sm text-gray-400 mb-1">Suspended</p>
+          <p className="text-3xl font-bold text-gray-400">{stats?.suspended || 0}</p>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex items-center space-x-3">
+        {['all', 'pending', 'verified', 'rejected', 'suspended'].map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`px-4 py-2 rounded-lg font-medium transition-all capitalize ${
+              filter === f
+                ? 'bg-emerald-500 text-white'
+                : 'bg-[#1e293b] text-slate-400 hover:text-white border border-slate-700/50'
+            }`}
+          >
+            {f}
+          </button>
+        ))}
+      </div>
+
+      {/* Veterinarians List */}
+      <div className="bg-[#1e293b] rounded-2xl border border-slate-700/50 overflow-hidden">
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full"></div>
+          </div>
+        ) : veterinarians.length === 0 ? (
+          <div className="text-center py-12">
+            <svg className="w-16 h-16 text-slate-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+            </svg>
+            <p className="text-slate-400">No veterinarians found</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-800/50 border-b border-slate-700/50">
+                <tr>
+                  <th className="text-left py-4 px-6 text-sm font-semibold text-slate-300">Veterinarian</th>
+                  <th className="text-left py-4 px-6 text-sm font-semibold text-slate-300">Contact</th>
+                  <th className="text-left py-4 px-6 text-sm font-semibold text-slate-300">License</th>
+                  <th className="text-left py-4 px-6 text-sm font-semibold text-slate-300">Specialization</th>
+                  <th className="text-left py-4 px-6 text-sm font-semibold text-slate-300">Location</th>
+                  <th className="text-left py-4 px-6 text-sm font-semibold text-slate-300">Status</th>
+                  <th className="text-left py-4 px-6 text-sm font-semibold text-slate-300">Registered</th>
+                  <th className="text-right py-4 px-6 text-sm font-semibold text-slate-300">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {veterinarians.map((vet) => (
+                  <tr key={vet.id} className="border-b border-slate-700/30 hover:bg-slate-800/30">
+                    <td className="py-4 px-6">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold">
+                          {vet.full_name?.[0]?.toUpperCase() || 'V'}
+                        </div>
+                        <div>
+                          <p className="text-white font-medium">{vet.full_name}</p>
+                          <p className="text-xs text-slate-400">{vet.qualification}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-4 px-6">
+                      <p className="text-sm text-white">{vet.phone_number}</p>
+                      <p className="text-xs text-slate-400">{vet.email || 'No email'}</p>
+                    </td>
+                    <td className="py-4 px-6">
+                      <p className="text-sm text-white font-mono">{vet.license_number}</p>
+                      <p className="text-xs text-slate-400">{vet.experience_years} years exp</p>
+                    </td>
+                    <td className="py-4 px-6">
+                      <p className="text-sm text-white capitalize">{vet.specialization}</p>
+                    </td>
+                    <td className="py-4 px-6">
+                      <p className="text-sm text-white">{vet.city}, {vet.state}</p>
+                      <p className="text-xs text-slate-400">{vet.pincode}</p>
+                    </td>
+                    <td className="py-4 px-6">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium border capitalize ${getStatusColor(vet.verification_status)}`}>
+                        {vet.verification_status}
+                      </span>
+                    </td>
+                    <td className="py-4 px-6">
+                      <p className="text-sm text-slate-400">{formatDate(vet.created_at)}</p>
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="flex items-center justify-end space-x-2">
+                        <button
+                          onClick={() => {
+                            setSelectedVet(vet);
+                            setShowModal(true);
+                          }}
+                          className="p-2 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
+                          title="View Details"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        </button>
+                        {vet.verification_status === 'pending' && (
+                          <>
+                            <button
+                              onClick={() => handleVerify(vet.id)}
+                              className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors"
+                              title="Verify"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedVet(vet);
+                                setShowModal(true);
+                              }}
+                              className="p-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                              title="Reject"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Modal */}
+      {showModal && selectedVet && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1e293b] rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-slate-700/50">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-[#1e293b] border-b border-slate-700/50 p-6 flex items-center justify-between">
+              <div>
+                <h3 className="text-2xl font-bold text-white">Veterinarian Details</h3>
+                <p className="text-slate-400 text-sm mt-1">Review and verify the application</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowModal(false);
+                  setSelectedVet(null);
+                  setRejectReason('');
+                }}
+                className="p-2 rounded-lg bg-slate-700/50 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6">
+              {/* Personal Info */}
+              <div className="bg-slate-800/50 rounded-xl p-6">
+                <h4 className="text-lg font-bold text-white mb-4 flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  Personal Information
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">Full Name</p>
+                    <p className="text-white font-medium">{selectedVet.full_name}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">Phone Number</p>
+                    <p className="text-white font-medium">{selectedVet.phone_number}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">Email</p>
+                    <p className="text-white font-medium">{selectedVet.email || 'Not provided'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">Experience</p>
+                    <p className="text-white font-medium">{selectedVet.experience_years} years</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Professional Info */}
+              <div className="bg-slate-800/50 rounded-xl p-6">
+                <h4 className="text-lg font-bold text-white mb-4 flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Professional Details
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">License Number</p>
+                    <p className="text-white font-medium font-mono">{selectedVet.license_number}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">Qualification</p>
+                    <p className="text-white font-medium">{selectedVet.qualification}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">Specialization</p>
+                    <p className="text-white font-medium capitalize">{selectedVet.specialization}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">Consultation Fee</p>
+                    <p className="text-white font-medium">₹{selectedVet.consultation_fee || 'Not set'}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-xs text-slate-400 mb-1">Services</p>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {selectedVet.services?.map((service, i) => (
+                        <span key={i} className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs">
+                          {service}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Location */}
+              <div className="bg-slate-800/50 rounded-xl p-6">
+                <h4 className="text-lg font-bold text-white mb-4 flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Location & Clinic
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">Clinic Name</p>
+                    <p className="text-white font-medium">{selectedVet.clinic_name || 'Not provided'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">City, State</p>
+                    <p className="text-white font-medium">{selectedVet.city}, {selectedVet.state}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-xs text-slate-400 mb-1">Address</p>
+                    <p className="text-white font-medium">{selectedVet.clinic_address || 'Not provided'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Documents */}
+              <div className="bg-slate-800/50 rounded-xl p-6">
+                <h4 className="text-lg font-bold text-white mb-4 flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Uploaded Documents
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  {selectedVet.license_document && (
+                    <a href={selectedVet.license_document} target="_blank" rel="noopener noreferrer" className="block p-4 bg-slate-700/50 rounded-lg hover:bg-slate-700 transition-colors">
+                      <p className="text-sm text-white font-medium mb-1">License Document</p>
+                      <p className="text-xs text-blue-400">View Document →</p>
+                    </a>
+                  )}
+                  {selectedVet.degree_certificate && (
+                    <a href={selectedVet.degree_certificate} target="_blank" rel="noopener noreferrer" className="block p-4 bg-slate-700/50 rounded-lg hover:bg-slate-700 transition-colors">
+                      <p className="text-sm text-white font-medium mb-1">Degree Certificate</p>
+                      <p className="text-xs text-blue-400">View Document →</p>
+                    </a>
+                  )}
+                  {selectedVet.aadhar_document && (
+                    <a href={selectedVet.aadhar_document} target="_blank" rel="noopener noreferrer" className="block p-4 bg-slate-700/50 rounded-lg hover:bg-slate-700 transition-colors">
+                      <p className="text-sm text-white font-medium mb-1">Aadhar Document</p>
+                      <p className="text-xs text-blue-400">View Document →</p>
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              {/* Actions for Pending */}
+              {selectedVet.verification_status === 'pending' && (
+                <div className="bg-slate-800/50 rounded-xl p-6">
+                  <h4 className="text-lg font-bold text-white mb-4">Verification Actions</h4>
+                  
+                  {/* Reject Reason Input */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Rejection Reason (if rejecting)
+                    </label>
+                    <textarea
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      placeholder="Enter reason for rejection..."
+                      rows="3"
+                      className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div className="flex items-center space-x-4">
+                    <button
+                      onClick={() => handleVerify(selectedVet.id)}
+                      disabled={actionLoading}
+                      className="flex-1 px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {actionLoading ? 'Processing...' : '✓ Verify & Send Credentials'}
+                    </button>
+                    <button
+                      onClick={() => handleReject(selectedVet.id)}
+                      disabled={actionLoading || !rejectReason.trim()}
+                      className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-rose-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {actionLoading ? 'Processing...' : '✗ Reject Application'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Status Info */}
+              {selectedVet.verification_status !== 'pending' && (
+                <div className={`rounded-xl p-4 border ${
+                  selectedVet.verification_status === 'verified' ? 'bg-emerald-500/10 border-emerald-500/30' :
+                  selectedVet.verification_status === 'rejected' ? 'bg-red-500/10 border-red-500/30' :
+                  'bg-gray-500/10 border-gray-500/30'
+                }`}>
+                  <p className="text-white font-medium">
+                    Status: <span className="capitalize">{selectedVet.verification_status}</span>
+                  </p>
+                  {selectedVet.rejection_reason && (
+                    <p className="text-sm text-slate-300 mt-2">
+                      Reason: {selectedVet.rejection_reason}
+                    </p>
+                  )}
+                  {selectedVet.verified_at && (
+                    <p className="text-sm text-slate-400 mt-2">
+                      Verified on: {formatDate(selectedVet.verified_at)}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const ReportsTab = ({ stats }) => {
   return (
     <div className="space-y-6">

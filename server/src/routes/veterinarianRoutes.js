@@ -57,21 +57,21 @@ const vetAuthMiddleware = (req, res, next) => {
  * @desc    Register a new veterinarian
  * @access  Public
  */
-router.post('/register', fileUploadConfig, veterinarianController.register);
+router.post('/register', fileUploadConfig, veterinarianController.register.bind(veterinarianController));
 
 /**
  * @route   POST /api/veterinarians/send-otp
  * @desc    Send OTP for login
  * @access  Public
  */
-router.post('/send-otp', veterinarianController.sendOtp);
+router.post('/send-otp', veterinarianController.sendOtp.bind(veterinarianController));
 
 /**
  * @route   POST /api/veterinarians/verify-otp
  * @desc    Verify OTP and login
  * @access  Public
  */
-router.post('/verify-otp', veterinarianController.verifyOtp);
+router.post('/verify-otp', veterinarianController.verifyOtp.bind(veterinarianController));
 
 /**
  * @route   POST /api/veterinarians/login
@@ -85,21 +85,21 @@ router.post('/login', veterinarianController.login.bind(veterinarianController))
  * @desc    Get nearby veterinarians based on location
  * @access  Public
  */
-router.get('/nearby', veterinarianController.getNearbyVeterinarians);
+router.get('/nearby', veterinarianController.getNearbyVeterinarians.bind(veterinarianController));
 
 /**
  * @route   GET /api/veterinarians
  * @desc    Get all verified veterinarians
  * @access  Public
  */
-router.get('/', veterinarianController.getAllVeterinarians);
+router.get('/', veterinarianController.getAllVeterinarians.bind(veterinarianController));
 
 /**
  * @route   GET /api/veterinarians/:id
  * @desc    Get veterinarian by ID
  * @access  Public
  */
-router.get('/:id', veterinarianController.getVeterinarianById);
+router.get('/:id', veterinarianController.getVeterinarianById.bind(veterinarianController));
 
 // ============ PROTECTED ROUTES (Vet's own profile) ============
 
@@ -108,13 +108,13 @@ router.get('/:id', veterinarianController.getVeterinarianById);
  * @desc    Get own profile
  * @access  Protected (Veterinarian)
  */
-router.get('/profile/me', vetAuthMiddleware, veterinarianController.getProfile);
+router.get('/profile/me', vetAuthMiddleware, veterinarianController.getProfile.bind(veterinarianController));
 
 /**
  * @route   PUT /api/veterinarians/profile/me
  * @desc    Update own profile
  * @access  Protected (Veterinarian)
  */
-router.put('/profile/me', vetAuthMiddleware, fileUploadConfig, veterinarianController.updateProfile);
+router.put('/profile/me', vetAuthMiddleware, fileUploadConfig, veterinarianController.updateProfile.bind(veterinarianController));
 
 module.exports = router;

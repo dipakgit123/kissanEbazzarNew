@@ -191,6 +191,128 @@ const createSystemNotification = async (db, userId, title, message, data = {}) =
   });
 };
 
+/**
+ * Send appointment notification to veterinarian or user
+ * @param {Object} recipient - Veterinarian or User object
+ * @param {Object} appointment - Appointment object
+ * @param {String} type - 'new', 'confirmed', 'cancelled', 'completed'
+ */
+async function sendAppointmentNotification(recipient, appointment, type) {
+  try {
+    let title, body, data;
+
+    switch (type) {
+      case 'new':
+        title = '🔔 New Appointment Request';
+        body = `${appointment.farmer_name} has booked an appointment for ${appointment.animal_type} on ${appointment.appointment_date} at ${appointment.appointment_time}`;
+        data = {
+          type: 'new_appointment',
+          appointment_id: appointment.id,
+          action: 'view_appointment'
+        };
+        break;
+
+      case 'confirmed':
+        title = '✅ Appointment Confirmed';
+        body = `Dr. ${appointment.veterinarian?.full_name || 'Veterinarian'} has confirmed your appointment for ${appointment.appointment_date} at ${appointment.appointment_time}`;
+        data = {
+          type: 'appointment_confirmed',
+          appointment_id: appointment.id,
+          action: 'view_appointment'
+        };
+        break;
+
+      case 'cancelled':
+        title = '❌ Appointment Cancelled';
+        body = `Appointment for ${appointment.appointment_date} at ${appointment.appointment_time} has been cancelled`;
+        data = {
+          type: 'appointment_cancelled',
+          appointment_id: appointment.id,
+          action: 'view_appointment'
+        };
+        break;
+
+      case 'completed':
+        title = '✔️ Appointment Completed';
+        body = `Appointment with ${appointment.farmer_name} has been marked as completed`;
+        data = {
+          type: 'appointment_completed',
+          appointment_id: appointment.id,
+          action: 'view_appointment'
+        };
+        break;
+
+      default:
+        title = 'Appointment Update';
+        body = `Your appointment status has been updated`;
+        data = {
+          type: 'appointment_update',
+          appointment_id: appointment.id
+        };
+    }
+
+    // Send push notification if recipient has device tokens
+    await sendPushNotification(recipient, title, body, data);
+
+    // Create in-app notification
+    const db = require('../models');
+    if (db.Notification) {
+      await db.Notification.create({
+        user_id: recipient.id,
+        title,
+        message: body,
+        type: data.type,
+        data: data,
+        is_read: false
+      });
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Send appointment notification error:', error);
+    return false;
+  }
+}
+
+/**
+ * Send call notification when user initiates a call
+ * @param {Object} veterinarian - Veterinarian object
+ * @param {Object} caller - User/Farmer object
+ */
+async function sendCallNotification(veterinarian, caller) {
+  try {
+    const title = '📞 Incoming Call';
+    const body = `${caller.full_name || 'A farmer'} is calling you regarding their animal`;
+    const data = {
+      type: 'incoming_call',
+      caller_id: caller.id,
+      caller_name: caller.full_name,
+      caller_phone: caller.phone_number,
+      action: 'answer_call'
+    };
+
+    await sendPushNotification(veterinarian, title, body, data);
+
+    // Create in-app notification
+    const db = require('../models');
+    if (db.Notification) {
+      await db.Notification.create({
+        user_id: veterinarian.id,
+        title,
+        message: body,
+        type: 'incoming_call',
+        data: data,
+        is_read: false
+      });
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Send call notification error:', error);
+    return false;
+  }
+}
+
 module.exports = {
   sendPushNotification,
   sendBulkPushNotifications,
@@ -198,4 +320,6 @@ module.exports = {
   notifyContactInquiry,
   notifyPregnancyReminder,
   createSystemNotification,
+  sendAppointmentNotification,
+  sendCallNotification
 };

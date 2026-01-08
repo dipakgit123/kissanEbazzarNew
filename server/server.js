@@ -19,6 +19,7 @@ const adminRoutes = require('./src/routes/adminRoutes'); // Admin Dashboard
 const veterinarianRoutes = require('./src/routes/veterinarianRoutes'); // Veterinarian routes
 const vetReviewRoutes = require('./src/routes/vetReviewRoutes'); // Veterinarian review routes
 const vetReportRoutes = require('./src/routes/vetReportRoutes'); // Veterinarian report routes
+const appointmentRoutes = require('./src/routes/appointmentRoutes'); // Appointment booking routes
 const otpService = require('./src/services/otpService');
 require('dotenv').config();
 
@@ -53,6 +54,7 @@ app.use('/api/admin', adminRoutes);  // Admin Dashboard routes
 app.use('/api/veterinarians', veterinarianRoutes);  // Veterinarian routes
 app.use('/api/vet-reviews', vetReviewRoutes);  // Veterinarian review routes
 app.use('/api/vet-reports', vetReportRoutes);  // Veterinarian report routes
+app.use('/api/appointments', appointmentRoutes);  // Appointment booking routes
 
 // Serve static files for web frontend
 app.use(express.static('public'));

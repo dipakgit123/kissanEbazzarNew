@@ -37,9 +37,9 @@ const veterinarianController = require('../controllers/veterinarianController');
 router.get('/veterinarians/stats', veterinarianController.getStats);
 router.get('/veterinarians/pending', veterinarianController.getPendingVerifications);
 router.get('/veterinarians', veterinarianController.getAllForAdmin);
-router.patch('/veterinarians/:id/verify', veterinarianController.verifyVeterinarian);
-router.patch('/veterinarians/:id/reject', veterinarianController.rejectVeterinarian);
-router.patch('/veterinarians/:id/suspend', veterinarianController.suspendVeterinarian);
+router.patch('/veterinarians/:id/verify', veterinarianController.verifyVeterinarian.bind(veterinarianController));
+router.patch('/veterinarians/:id/reject', veterinarianController.rejectVeterinarian.bind(veterinarianController));
+router.patch('/veterinarians/:id/suspend', veterinarianController.suspendVeterinarian.bind(veterinarianController));
 
 // Admin Management (super admin only)
 router.post('/admins', adminController.createAdmin);

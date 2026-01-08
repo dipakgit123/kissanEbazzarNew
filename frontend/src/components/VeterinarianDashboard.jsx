@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast, { Toaster } from 'react-hot-toast';
+import {
+  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  Legend, ResponsiveContainer
+} from 'recharts';
 
 // Icons
 const DashboardIcon = () => (
@@ -58,12 +63,29 @@ const CloseIcon = () => (
   </svg>
 );
 
+const MoonIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+  </svg>
+);
+
+const SunIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+  </svg>
+);
+
 const VeterinarianDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [veterinarian, setVeterinarian] = useState(null);
+  const [darkMode, setDarkMode] = useState(() => {
+    // Load dark mode preference from localStorage
+    const saved = localStorage.getItem('vetDarkMode');
+    return saved ? JSON.parse(saved) : false;
+  });
   const [stats, setStats] = useState({
     totalPatients: 0,
     appointmentsToday: 0,
@@ -72,6 +94,43 @@ const VeterinarianDashboard = () => {
   });
 
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+  // Mock data for charts - Replace with real API data later
+  const appointmentsData = [
+    { month: 'Jan', appointments: 45, revenue: 22500 },
+    { month: 'Feb', appointments: 52, revenue: 26000 },
+    { month: 'Mar', appointments: 48, revenue: 24000 },
+    { month: 'Apr', appointments: 61, revenue: 30500 },
+    { month: 'May', appointments: 55, revenue: 27500 },
+    { month: 'Jun', appointments: 67, revenue: 33500 },
+  ];
+
+  const patientTypeData = [
+    { name: 'Cattle', value: 45, color: '#3B82F6' },
+    { name: 'Buffalo', value: 25, color: '#8B5CF6' },
+    { name: 'Goat', value: 15, color: '#10B981' },
+    { name: 'Dog', value: 10, color: '#F59E0B' },
+    { name: 'Cat', value: 5, color: '#EF4444' },
+  ];
+
+  const weeklyAppointments = [
+    { day: 'Mon', appointments: 8, consultations: 6 },
+    { day: 'Tue', appointments: 12, consultations: 10 },
+    { day: 'Wed', appointments: 10, consultations: 8 },
+    { day: 'Thu', appointments: 15, consultations: 12 },
+    { day: 'Fri', appointments: 9, consultations: 7 },
+    { day: 'Sat', appointments: 14, consultations: 11 },
+    { day: 'Sun', appointments: 6, consultations: 5 },
+  ];
+
+  const revenueData = [
+    { month: 'Jan', consultation: 15000, surgery: 7500, vaccination: 3000 },
+    { month: 'Feb', consultation: 18000, surgery: 8000, vaccination: 3500 },
+    { month: 'Mar', consultation: 16000, surgery: 8000, vaccination: 3200 },
+    { month: 'Apr', consultation: 20000, surgery: 10500, vaccination: 4000 },
+    { month: 'May', consultation: 18500, surgery: 9000, vaccination: 3800 },
+    { month: 'Jun', consultation: 22000, surgery: 11500, vaccination: 4500 },
+  ];
 
   useEffect(() => {
     // Check if user is logged in
@@ -87,10 +146,10 @@ const VeterinarianDashboard = () => {
       const parsedVet = JSON.parse(vetData);
       setVeterinarian(parsedVet);
       setStats({
-        totalPatients: parsedVet.total_patients || 0,
+        totalPatients: Number(parsedVet.total_patients) || 0,
         appointmentsToday: 0,
-        rating: parsedVet.rating || 0,
-        totalReviews: parsedVet.total_reviews || 0
+        rating: Number(parsedVet.rating) || 0,
+        totalReviews: Number(parsedVet.total_reviews) || 0
       });
     } catch (error) {
       console.error('Error parsing vet data:', error);
@@ -99,6 +158,20 @@ const VeterinarianDashboard = () => {
 
     setIsLoading(false);
   }, [navigate]);
+
+  // Dark mode effect
+  useEffect(() => {
+    localStorage.setItem('vetDarkMode', JSON.stringify(darkMode));
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [darkMode]);
+
+  const toggleDarkMode = () => {
+    setDarkMode(!darkMode);
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('vetToken');
@@ -167,7 +240,7 @@ const VeterinarianDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'dark bg-gray-900' : 'bg-gray-100'}`}>
       <Toaster position="top-right" />
 
       {/* Mobile Sidebar Overlay */}
@@ -180,24 +253,24 @@ const VeterinarianDashboard = () => {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 z-50 h-full w-64 bg-white shadow-lg transform transition-transform duration-300 lg:translate-x-0 ${
+        className={`fixed top-0 left-0 z-50 h-full w-64 shadow-lg transform transition-all duration-300 lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        } ${darkMode ? 'bg-gray-800' : 'bg-white'}`}
       >
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           {/* Logo */}
-          <div className="flex items-center justify-between mb-8">
-            <h1 className="text-xl font-bold text-blue-600">Vet Portal</h1>
+          <div className="flex items-center justify-between mb-6 sm:mb-8">
+            <h1 className={`text-lg sm:text-xl font-bold ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>Vet Portal</h1>
             <button
               onClick={() => setSidebarOpen(false)}
-              className="lg:hidden text-gray-500 hover:text-gray-700"
+              className={`lg:hidden ${darkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'}`}
             >
               <CloseIcon />
             </button>
           </div>
 
           {/* User Info */}
-          <div className="mb-8 p-4 bg-blue-50 rounded-lg">
+          <div className={`mb-6 sm:mb-8 p-3 sm:p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-blue-50'}`}>
             <div className="flex items-center space-x-3">
               <div className="w-12 h-12 rounded-full bg-blue-200 flex items-center justify-center overflow-hidden">
                 {veterinarian?.profile_photo ? (
@@ -207,16 +280,16 @@ const VeterinarianDashboard = () => {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <span className="text-blue-600 font-bold text-lg">
+                  <span className={`font-bold text-lg ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
                     {veterinarian?.full_name?.charAt(0) || 'V'}
                   </span>
                 )}
               </div>
               <div>
-                <h3 className="font-semibold text-gray-800 text-sm">
+                <h3 className={`font-semibold text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
                   Dr. {veterinarian?.full_name || 'Veterinarian'}
                 </h3>
-                <p className="text-xs text-gray-500">
+                <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                   {formatSpecialization(veterinarian?.specialization)}
                 </p>
               </div>
@@ -235,10 +308,12 @@ const VeterinarianDashboard = () => {
                   setActiveTab(item.id);
                   setSidebarOpen(false);
                 }}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
+                className={`w-full flex items-center space-x-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg transition-colors text-sm sm:text-base ${
                   activeTab === item.id
                     ? 'bg-blue-600 text-white'
-                    : 'text-gray-600 hover:bg-gray-100'
+                    : darkMode 
+                      ? 'text-gray-300 hover:bg-gray-700' 
+                      : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
                 {item.icon}
@@ -247,10 +322,27 @@ const VeterinarianDashboard = () => {
             ))}
           </nav>
 
+          {/* Dark Mode Toggle */}
+          <button
+            onClick={toggleDarkMode}
+            className={`w-full flex items-center space-x-3 px-3 sm:px-4 py-2.5 sm:py-3 mt-4 rounded-lg transition-colors text-sm sm:text-base ${
+              darkMode 
+                ? 'text-yellow-400 hover:bg-gray-700' 
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            {darkMode ? <SunIcon /> : <MoonIcon />}
+            <span className="font-medium">{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
+          </button>
+
           {/* Logout Button */}
           <button
             onClick={handleLogout}
-            className="w-full flex items-center space-x-3 px-4 py-3 mt-8 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            className={`w-full flex items-center space-x-3 px-3 sm:px-4 py-2.5 sm:py-3 mt-4 rounded-lg transition-colors text-sm sm:text-base ${
+              darkMode 
+                ? 'text-red-400 hover:bg-gray-700' 
+                : 'text-red-600 hover:bg-red-50'
+            }`}
           >
             <LogoutIcon />
             <span className="font-medium">Logout</span>
@@ -261,163 +353,358 @@ const VeterinarianDashboard = () => {
       {/* Main Content */}
       <div className="lg:ml-64">
         {/* Top Bar */}
-        <header className="bg-white shadow-sm sticky top-0 z-30">
-          <div className="flex items-center justify-between px-6 py-4">
+        <header className={`shadow-sm sticky top-0 z-30 transition-colors ${darkMode ? 'bg-gray-800 border-b border-gray-700' : 'bg-white'}`}>
+          <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="lg:hidden text-gray-600 hover:text-gray-800"
+              className={`lg:hidden ${darkMode ? 'text-gray-300 hover:text-gray-100' : 'text-gray-600 hover:text-gray-800'}`}
             >
               <MenuIcon />
             </button>
 
-            <h2 className="text-xl font-semibold text-gray-800 capitalize">
+            <h2 className={`text-lg sm:text-xl font-semibold capitalize ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>
               {activeTab}
             </h2>
 
-            <div className="flex items-center space-x-4">
-              <button className="relative p-2 text-gray-400 hover:text-gray-600">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <button className={`hidden sm:block relative p-2 ${darkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-400 hover:text-gray-600'}`}>
+                <svg className="w-5 sm:w-6 h-5 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
                 <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
+              </button>
+              <button
+                onClick={toggleDarkMode}
+                className={`p-2 rounded-lg transition-colors ${
+                  darkMode 
+                    ? 'text-yellow-400 hover:bg-gray-700' 
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {darkMode ? <SunIcon /> : <MoonIcon />}
               </button>
             </div>
           </div>
         </header>
 
         {/* Page Content */}
-        <main className="p-6">
+        <main className="p-4 sm:p-6">
           {/* Dashboard Tab */}
           {activeTab === 'dashboard' && (
-            <div className="space-y-6">
-              {/* Stats Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="space-y-4 sm:space-y-6">
+              {/* Stats Cards with Animation */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                <div className={`rounded-xl shadow-lg p-4 sm:p-6 transform hover:scale-105 transition-all duration-300 hover:shadow-2xl animate-fadeInUp ${
+                  darkMode ? 'bg-gradient-to-br from-blue-600 to-blue-700' : 'bg-gradient-to-br from-blue-500 to-blue-600'
+                }`}>
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-500">Total Patients</p>
-                      <p className="text-2xl font-bold text-gray-800">{stats.totalPatients}</p>
-                    </div>
-                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                      <PatientsIcon />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-xl shadow-sm p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-500">Today's Appointments</p>
-                      <p className="text-2xl font-bold text-gray-800">{stats.appointmentsToday}</p>
-                    </div>
-                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                      <CalendarIcon />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-xl shadow-sm p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-500">Rating</p>
-                      <div className="flex items-center space-x-2">
-                        <p className="text-2xl font-bold text-gray-800">{stats.rating.toFixed(1)}</p>
-                        <div className="flex">{renderRatingStars(Math.round(stats.rating))}</div>
+                    <div className="text-white">
+                      <p className="text-sm text-blue-100 mb-2">Total Animals Treated</p>
+                      <p className="text-2xl sm:text-3xl font-bold mb-1">{stats.totalPatients}</p>
+                      <div className="flex items-center text-xs text-blue-100">
+                        <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z" clipRule="evenodd" />
+                        </svg>
+                        <span>+12% this month</span>
                       </div>
                     </div>
-                    <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
-                      <StarIcon filled />
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center animate-bounce-slow">
+                      <svg className="w-6 h-6 sm:w-8 sm:h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm p-6">
+                <div className={`rounded-xl shadow-lg p-4 sm:p-6 transform hover:scale-105 transition-all duration-300 hover:shadow-2xl animate-fadeInUp ${
+                  darkMode ? 'bg-gradient-to-br from-green-600 to-green-700' : 'bg-gradient-to-br from-green-500 to-green-600'
+                }`} style={{animationDelay: '0.1s'}}>
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-500">Total Reviews</p>
-                      <p className="text-2xl font-bold text-gray-800">{stats.totalReviews}</p>
+                    <div className="text-white">
+                      <p className="text-sm text-green-100 mb-2">Today's Appointments</p>
+                      <p className="text-2xl sm:text-3xl font-bold mb-1">{stats.appointmentsToday || 8}</p>
+                      <div className="flex items-center text-xs text-green-100">
+                        <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                        </svg>
+                        <span>3 pending</span>
+                      </div>
                     </div>
-                    <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                      <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center animate-pulse">
+                      <svg className="w-6 h-6 sm:w-8 sm:h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={`rounded-xl shadow-lg p-4 sm:p-6 transform hover:scale-105 transition-all duration-300 hover:shadow-2xl animate-fadeInUp ${
+                  darkMode ? 'bg-gradient-to-br from-yellow-600 to-orange-600' : 'bg-gradient-to-br from-yellow-500 to-orange-500'
+                }`} style={{animationDelay: '0.2s'}}>
+                  <div className="flex items-center justify-between">
+                    <div className="text-white">
+                      <p className="text-sm text-yellow-100 mb-2">Rating</p>
+                      <div className="flex items-center space-x-2 mb-1">
+                        <p className="text-2xl sm:text-3xl font-bold">{stats.rating.toFixed(1)}</p>
+                        <div className="flex">{renderRatingStars(Math.round(stats.rating || 4))}</div>
+                      </div>
+                      <div className="flex items-center text-xs text-yellow-100">
+                        <span>{stats.totalReviews} reviews</span>
+                      </div>
+                    </div>
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center animate-bounce-slow">
+                      <svg className="w-6 h-6 sm:w-8 sm:h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={`rounded-xl shadow-lg p-4 sm:p-6 transform hover:scale-105 transition-all duration-300 hover:shadow-2xl animate-fadeInUp ${
+                  darkMode ? 'bg-gradient-to-br from-purple-600 to-indigo-700' : 'bg-gradient-to-br from-purple-500 to-indigo-600'
+                }`} style={{animationDelay: '0.3s'}}>
+                  <div className="flex items-center justify-between">
+                    <div className="text-white">
+                      <p className="text-sm text-purple-100 mb-2">Monthly Revenue</p>
+                      <p className="text-2xl sm:text-3xl font-bold mb-1">₹33.5K</p>
+                      <div className="flex items-center text-xs text-purple-100">
+                        <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z" clipRule="evenodd" />
+                        </svg>
+                        <span>+18% from last month</span>
+                      </div>
+                    </div>
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center animate-pulse">
+                      <svg className="w-6 h-6 sm:w-8 sm:h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </div>
                   </div>
                 </div>
               </div>
 
+              {/* Charts Section */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                {/* Appointments Trend Chart */}
+                <div className={`rounded-xl shadow-lg p-4 sm:p-6 animate-fadeInUp ${darkMode ? 'bg-gray-800' : 'bg-white'}`} style={{animationDelay: '0.4s'}}>
+                  <h3 className={`text-base sm:text-lg font-semibold mb-4 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Appointments & Revenue Trend</h3>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <AreaChart data={appointmentsData}>
+                      <defs>
+                        <linearGradient id="colorAppointments" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                        </linearGradient>
+                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10B981" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#f0f0f0'} />
+                      <XAxis dataKey="month" stroke={darkMode ? '#9CA3AF' : '#6B7280'} style={{fontSize: '12px'}} />
+                      <YAxis stroke={darkMode ? '#9CA3AF' : '#6B7280'} style={{fontSize: '12px'}} />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: darkMode ? '#1F2937' : '#fff', 
+                          border: 'none', 
+                          borderRadius: '8px', 
+                          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                          color: darkMode ? '#F3F4F6' : '#111827'
+                        }}
+                      />
+                      <Legend />
+                      <Area type="monotone" dataKey="appointments" stroke="#3B82F6" fillOpacity={1} fill="url(#colorAppointments)" />
+                      <Area type="monotone" dataKey="revenue" stroke="#10B981" fillOpacity={1} fill="url(#colorRevenue)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Animal Types Distribution */}
+                <div className={`rounded-xl shadow-lg p-4 sm:p-6 animate-fadeInUp ${darkMode ? 'bg-gray-800' : 'bg-white'}`} style={{animationDelay: '0.5s'}}>
+                  <h3 className={`text-base sm:text-lg font-semibold mb-4 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Animal Types Distribution</h3>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <PieChart>
+                      <Pie
+                        data={patientTypeData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({name, percent}) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        outerRadius={100}
+                        fill="#8884d8"
+                        dataKey="value"
+                        animationBegin={0}
+                        animationDuration={800}
+                      >
+                        {patientTypeData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Weekly Performance Chart */}
+              <div className={`rounded-xl shadow-lg p-4 sm:p-6 animate-fadeInUp ${darkMode ? 'bg-gray-800' : 'bg-white'}`} style={{animationDelay: '0.6s'}}>
+                <h3 className={`text-base sm:text-lg font-semibold mb-4 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Weekly Performance</h3>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={weeklyAppointments}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#f0f0f0'} />
+                    <XAxis dataKey="day" stroke={darkMode ? '#9CA3AF' : '#6B7280'} style={{fontSize: '12px'}} />
+                    <YAxis stroke={darkMode ? '#9CA3AF' : '#6B7280'} style={{fontSize: '12px'}} />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: darkMode ? '#1F2937' : '#fff', 
+                        border: 'none', 
+                        borderRadius: '8px', 
+                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                        color: darkMode ? '#F3F4F6' : '#111827'
+                      }}
+                    />
+                    <Legend />
+                    <Bar dataKey="appointments" fill="#3B82F6" radius={[8, 8, 0, 0]} />
+                    <Bar dataKey="consultations" fill="#10B981" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Revenue Breakdown Chart */}
+              <div className={`rounded-xl shadow-lg p-4 sm:p-6 animate-fadeInUp ${darkMode ? 'bg-gray-800' : 'bg-white'}`} style={{animationDelay: '0.7s'}}>
+                <h3 className={`text-base sm:text-lg font-semibold mb-4 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Revenue Breakdown by Service</h3>
+                <ResponsiveContainer width="100%" height={250}>
+                  <LineChart data={revenueData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#f0f0f0'} />
+                    <XAxis dataKey="month" stroke={darkMode ? '#9CA3AF' : '#6B7280'} style={{fontSize: '12px'}} />
+                    <YAxis stroke={darkMode ? '#9CA3AF' : '#6B7280'} style={{fontSize: '12px'}} />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: darkMode ? '#1F2937' : '#fff', 
+                        border: 'none', 
+                        borderRadius: '8px', 
+                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                        color: darkMode ? '#F3F4F6' : '#111827'
+                      }}
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="consultation" stroke="#3B82F6" strokeWidth={3} dot={{ r: 5 }} activeDot={{ r: 8 }} />
+                    <Line type="monotone" dataKey="surgery" stroke="#8B5CF6" strokeWidth={3} dot={{ r: 5 }} activeDot={{ r: 8 }} />
+                    <Line type="monotone" dataKey="vaccination" stroke="#10B981" strokeWidth={3} dot={{ r: 5 }} activeDot={{ r: 8 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
               {/* Quick Info */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white rounded-xl shadow-sm p-6">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Profile Summary</h3>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                <div className={`rounded-xl shadow-lg p-4 sm:p-6 hover:shadow-xl transition-shadow duration-300 animate-fadeInUp ${darkMode ? 'bg-gray-800' : 'bg-white'}`} style={{animationDelay: '0.8s'}}>
+                  <div className="flex items-center mb-4">
+                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center mr-3 ${darkMode ? 'bg-blue-900' : 'bg-blue-100'}`}>
+                      <svg className={`w-5 h-5 sm:w-6 sm:h-6 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                    <h3 className={`text-base sm:text-lg font-semibold ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Profile Summary</h3>
+                  </div>
                   <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Specialization</span>
-                      <span className="font-medium">{formatSpecialization(veterinarian?.specialization)}</span>
+                    <div className={`flex justify-between items-center py-2 border-b ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
+                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Specialization</span>
+                      <span className={`font-medium text-xs sm:text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{formatSpecialization(veterinarian?.specialization)}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Experience</span>
-                      <span className="font-medium">{veterinarian?.experience_years || 0} years</span>
+                    <div className={`flex justify-between items-center py-2 border-b ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
+                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Experience</span>
+                      <span className={`font-medium text-xs sm:text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{veterinarian?.experience_years || 0} years</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Qualification</span>
-                      <span className="font-medium">{veterinarian?.qualification || 'N/A'}</span>
+                    <div className={`flex justify-between items-center py-2 border-b ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
+                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Qualification</span>
+                      <span className={`font-medium text-xs sm:text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{veterinarian?.qualification || 'N/A'}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Consultation Fee</span>
-                      <span className="font-medium">₹{veterinarian?.consultation_fee || 0}</span>
+                    <div className={`flex justify-between items-center py-2 border-b ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
+                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Consultation Fee</span>
+                      <span className="font-semibold text-xs sm:text-sm text-green-600">₹{veterinarian?.consultation_fee || 0}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Emergency Available</span>
-                      <span className={`font-medium ${veterinarian?.emergency_available ? 'text-green-600' : 'text-red-600'}`}>
-                        {veterinarian?.emergency_available ? 'Yes' : 'No'}
+                    <div className="flex justify-between items-center py-2">
+                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Emergency Available</span>
+                      <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold ${veterinarian?.emergency_available ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {veterinarian?.emergency_available ? 'Available' : 'Not Available'}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm p-6">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Clinic Information</h3>
+                <div className={`rounded-xl shadow-lg p-4 sm:p-6 hover:shadow-xl transition-shadow duration-300 animate-fadeInUp ${darkMode ? 'bg-gray-800' : 'bg-white'}`} style={{animationDelay: '0.9s'}}>
+                  <div className="flex items-center mb-4">
+                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center mr-3 ${darkMode ? 'bg-purple-900' : 'bg-purple-100'}`}>
+                      <svg className={`w-5 h-5 sm:w-6 sm:h-6 ${darkMode ? 'text-purple-400' : 'text-purple-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                    </div>
+                    <h3 className={`text-base sm:text-lg font-semibold ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Clinic Information</h3>
+                  </div>
                   <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Clinic Name</span>
-                      <span className="font-medium">{veterinarian?.clinic_name || 'N/A'}</span>
+                    <div className={`flex justify-between items-center py-2 border-b ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
+                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Clinic Name</span>
+                      <span className={`font-medium text-xs sm:text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{veterinarian?.clinic_name || 'N/A'}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">City</span>
-                      <span className="font-medium">{veterinarian?.city || 'N/A'}</span>
+                    <div className={`flex justify-between items-center py-2 border-b ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
+                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>City</span>
+                      <span className={`font-medium text-xs sm:text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{veterinarian?.city || 'N/A'}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">State</span>
-                      <span className="font-medium">{veterinarian?.state || 'N/A'}</span>
+                    <div className={`flex justify-between items-center py-2 border-b ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
+                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>State</span>
+                      <span className={`font-medium text-xs sm:text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{veterinarian?.state || 'N/A'}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Pincode</span>
-                      <span className="font-medium">{veterinarian?.pincode || 'N/A'}</span>
+                    <div className={`flex justify-between items-center py-2 border-b ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
+                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Pincode</span>
+                      <span className={`font-medium text-xs sm:text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{veterinarian?.pincode || 'N/A'}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Phone</span>
-                      <span className="font-medium">{veterinarian?.phone_number || 'N/A'}</span>
+                    <div className="flex justify-between items-center py-2">
+                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Phone</span>
+                      <span className={`font-medium text-xs sm:text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{veterinarian?.phone_number || 'N/A'}</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Coming Soon Features */}
-              <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl p-6 text-white">
-                <h3 className="text-lg font-semibold mb-2">Coming Soon!</h3>
-                <p className="text-blue-100 text-sm">
-                  We're working on exciting features like online appointment booking, patient records management,
-                  prescription generation, and more. Stay tuned!
-                </p>
+              {/* Quick Actions */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 animate-fadeInUp" style={{animationDelay: '1s'}}>
+                <button className={`rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 text-white ${
+                  darkMode ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800' : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700'
+                }`}>
+                  <svg className="w-6 h-6 sm:w-8 sm:h-8 mb-2 sm:mb-3 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <h4 className="font-semibold mb-1 text-sm sm:text-base">View Appointments</h4>
+                  <p className="text-xs text-blue-100">Manage your schedule</p>
+                </button>
+
+                <button className={`rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 text-white ${
+                  darkMode ? 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800' : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700'
+                }`}>
+                  <svg className="w-6 h-6 sm:w-8 sm:h-8 mb-2 sm:mb-3 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <h4 className="font-semibold mb-1 text-sm sm:text-base">Patient Records</h4>
+                  <p className="text-xs text-green-100">Access animal history</p>
+                </button>
+
+                <button className={`rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 text-white ${
+                  darkMode ? 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800' : 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700'
+                }`}>
+                  <svg className="w-6 h-6 sm:w-8 sm:h-8 mb-2 sm:mb-3 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                  </svg>
+                  <h4 className="font-semibold mb-1 text-sm sm:text-base">Generate Report</h4>
+                  <p className="text-xs text-purple-100">Create medical reports</p>
+                </button>
               </div>
             </div>
           )}
 
           {/* Profile Tab */}
           {activeTab === 'profile' && (
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-6">My Profile</h3>
+            <div className={`rounded-xl shadow-lg p-4 sm:p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+              <h3 className={`text-base sm:text-lg font-semibold mb-6 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>My Profile</h3>
 
               <div className="flex flex-col md:flex-row gap-8">
                 {/* Profile Photo */}
@@ -505,72 +792,76 @@ const VeterinarianDashboard = () => {
 
           {/* Appointments Tab */}
           {activeTab === 'appointments' && (
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Appointments</h3>
+            <div className={`rounded-xl shadow-lg p-4 sm:p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+              <h3 className={`text-base sm:text-lg font-semibold mb-4 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Appointments</h3>
               <div className="text-center py-12">
-                <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className={`w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 ${darkMode ? 'text-gray-600' : 'text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <p className="text-gray-500">No appointments yet</p>
-                <p className="text-sm text-gray-400 mt-2">Appointment booking feature coming soon!</p>
+                <p className={`text-sm sm:text-base ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>No appointments yet</p>
+                <p className={`text-xs sm:text-sm mt-2 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Appointment booking feature coming soon!</p>
               </div>
             </div>
           )}
 
           {/* Patients Tab */}
           {activeTab === 'patients' && (
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Patient Records</h3>
+            <div className={`rounded-xl shadow-lg p-4 sm:p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+              <h3 className={`text-base sm:text-lg font-semibold mb-4 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Patient Records</h3>
               <div className="text-center py-12">
-                <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className={`w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 ${darkMode ? 'text-gray-600' : 'text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
-                <p className="text-gray-500">No patient records yet</p>
-                <p className="text-sm text-gray-400 mt-2">Patient management feature coming soon!</p>
+                <p className={`text-sm sm:text-base ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>No patient records yet</p>
+                <p className={`text-xs sm:text-sm mt-2 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Patient management feature coming soon!</p>
               </div>
             </div>
           )}
 
           {/* Settings Tab */}
           {activeTab === 'settings' && (
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Settings</h3>
-              <div className="space-y-6">
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="font-medium text-gray-800">Email Notifications</p>
-                    <p className="text-sm text-gray-500">Receive email notifications for appointments</p>
+            <div className={`rounded-xl shadow-lg p-4 sm:p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+              <h3 className={`text-base sm:text-lg font-semibold mb-4 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Settings</h3>
+              <div className="space-y-4 sm:space-y-6">
+                <div className={`flex items-center justify-between p-3 sm:p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                  <div className="flex-1 mr-4">
+                    <p className={`font-medium text-sm sm:text-base ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Email Notifications</p>
+                    <p className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Receive email notifications for appointments</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input type="checkbox" className="sr-only peer" defaultChecked />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    <div className={`w-11 h-6 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600 ${darkMode ? 'bg-gray-600 after:border-gray-500' : 'bg-gray-200 after:border-gray-300'}`}></div>
                   </label>
                 </div>
 
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="font-medium text-gray-800">SMS Notifications</p>
-                    <p className="text-sm text-gray-500">Receive SMS alerts for new appointments</p>
+                <div className={`flex items-center justify-between p-3 sm:p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                  <div className="flex-1 mr-4">
+                    <p className={`font-medium text-sm sm:text-base ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>SMS Notifications</p>
+                    <p className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Receive SMS alerts for new appointments</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input type="checkbox" className="sr-only peer" />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    <div className={`w-11 h-6 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600 ${darkMode ? 'bg-gray-600 after:border-gray-500' : 'bg-gray-200 after:border-gray-300'}`}></div>
                   </label>
                 </div>
 
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="font-medium text-gray-800">Emergency Availability</p>
-                    <p className="text-sm text-gray-500">Show as available for emergency calls</p>
+                <div className={`flex items-center justify-between p-3 sm:p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                  <div className="flex-1 mr-4">
+                    <p className={`font-medium text-sm sm:text-base ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Emergency Availability</p>
+                    <p className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Show as available for emergency calls</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input type="checkbox" className="sr-only peer" defaultChecked={veterinarian?.emergency_available} />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    <div className={`w-11 h-6 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600 ${darkMode ? 'bg-gray-600 after:border-gray-500' : 'bg-gray-200 after:border-gray-300'}`}></div>
                   </label>
                 </div>
 
-                <div className="pt-6 border-t">
-                  <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                <div className={`pt-4 sm:pt-6 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                  <button className={`px-4 py-2 rounded-lg transition-colors text-sm sm:text-base ${
+                    darkMode 
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}>
                     Change Password
                   </button>
                 </div>
@@ -584,3 +875,74 @@ const VeterinarianDashboard = () => {
 };
 
 export default VeterinarianDashboard;
+
+// Add custom CSS animations
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes bounce-slow {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  .animate-fadeInUp {
+    animation: fadeInUp 0.6s ease-out forwards;
+    opacity: 0;
+  }
+
+  .animate-bounce-slow {
+    animation: bounce-slow 2s ease-in-out infinite;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #f1f1f1;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
+
+  /* Smooth gradient animations */
+  @keyframes gradient {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+
+  .animate-gradient {
+    background-size: 200% 200%;
+    animation: gradient 3s ease infinite;
+  }
+`;
+document.head.appendChild(style);
