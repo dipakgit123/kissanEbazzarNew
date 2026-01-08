@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,13 +9,21 @@ import {
   Image,
   Linking,
   Alert,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import { COLORS } from '../utils/constants';
+import { veterinarianService } from '../services/api';
 
 const VeterinarianScreen = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedService, setSelectedService] = useState(null);
+  const [veterinarians, setVeterinarians] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [userLocation, setUserLocation] = useState(null);
 
   const services = [
     {
@@ -80,58 +88,90 @@ const VeterinarianScreen = ({ navigation }) => {
     },
   ];
 
-  const veterinarians = [
-    {
-      id: 1,
-      name: 'Dr. Rajesh Kumar',
-      specialization: 'Large Animal Medicine',
-      experience: '15+ years',
-      rating: 4.8,
-      patients: 2500,
-      location: 'Pune, Maharashtra',
-      phone: '9876543210',
-      image: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=150&h=150&fit=crop&crop=face',
-      available: true,
-      nextAvailable: 'Today 2:00 PM',
-    },
-    {
-      id: 2,
-      name: 'Dr. Priya Sharma',
-      specialization: 'Small Animal Surgery',
-      experience: '12+ years',
-      rating: 4.9,
-      patients: 1800,
-      location: 'Nashik, Maharashtra',
-      phone: '9876543211',
-      image: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150&h=150&fit=crop&crop=face',
-      available: true,
-      nextAvailable: 'Today 4:30 PM',
-    },
-    {
-      id: 3,
-      name: 'Dr. Vikram Singh',
-      specialization: 'Livestock Health',
-      experience: '20+ years',
-      rating: 4.7,
-      patients: 3200,
-      location: 'Aurangabad, Maharashtra',
-      phone: '9876543212',
-      image: 'https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=150&h=150&fit=crop&crop=face',
-      available: false,
-      nextAvailable: 'Tomorrow 10:00 AM',
-    },
-  ];
+  useEffect(() => {
+    getUserLocation();
+  }, []);
+
+  useEffect(() => {
+    if (userLocation) {
+      fetchNearbyVets();
+    } else {
+      fetchAllVets();
+    }
+  }, [userLocation]);
+
+  const getUserLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        const location = await Location.getCurrentPositionAsync({});
+        setUserLocation({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        });
+      }
+    } catch (error) {
+      console.log('Error getting location:', error);
+    }
+  };
+
+  const fetchNearbyVets = async () => {
+    try {
+      const response = await veterinarianService.getNearby(
+        userLocation.latitude,
+        userLocation.longitude,
+        100
+      );
+      if (response.success) {
+        setVeterinarians(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching nearby vets:', error);
+      fetchAllVets();
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const fetchAllVets = async () => {
+    try {
+      const response = await veterinarianService.getAll(1, 50);
+      if (response.success) {
+        setVeterinarians(response.data.veterinarians || response.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching vets:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    if (userLocation) {
+      fetchNearbyVets();
+    } else {
+      fetchAllVets();
+    }
+  };
 
   const handleCall = (phone) => {
-    Linking.openURL(`tel:${phone}`);
+    if (phone) {
+      Linking.openURL(`tel:${phone.replace('+', '')}`);
+    }
   };
 
   const handleWhatsApp = (phone, name) => {
-    const message = `Hi Dr. ${name}! I would like to book an appointment for my animal.`;
-    const url = `whatsapp://send?phone=91${phone}&text=${encodeURIComponent(message)}`;
-    Linking.openURL(url).catch(() => {
-      Linking.openURL(`https://wa.me/91${phone}?text=${encodeURIComponent(message)}`);
-    });
+    if (phone) {
+      const phoneNumber = phone.replace('+', '');
+      const message = `Hi Dr. ${name}! I would like to book an appointment for my animal.`;
+      const url = `whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`;
+      Linking.openURL(url).catch(() => {
+        Linking.openURL(`https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`);
+      });
+    }
   };
 
   const handleEmergencyCall = () => {
@@ -145,6 +185,23 @@ const VeterinarianScreen = ({ navigation }) => {
     );
   };
 
+  const handleVetPress = (vet) => {
+    navigation.navigate('VetDetail', { vetId: vet.id });
+  };
+
+  const getSpecializationLabel = (spec) => {
+    const labels = {
+      'large_animal': 'Large Animal',
+      'small_animal': 'Small Animal',
+      'livestock': 'Livestock',
+      'surgery': 'Surgery',
+      'general': 'General Practice',
+      'emergency': 'Emergency Care',
+      'reproduction': 'Reproduction',
+    };
+    return labels[spec] || spec;
+  };
+
   const filteredServices = services.filter(
     (service) =>
       service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -153,13 +210,35 @@ const VeterinarianScreen = ({ navigation }) => {
 
   const filteredVets = veterinarians.filter(
     (vet) =>
-      vet.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      vet.specialization.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      vet.location.toLowerCase().includes(searchQuery.toLowerCase())
+      vet.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      vet.specialization?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      vet.city?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const renderStars = (rating) => {
+    return (
+      <View style={styles.starsContainer}>
+        {[1, 2, 3, 4, 5].map((star) => (
+          <Ionicons
+            key={star}
+            name={star <= Math.round(rating || 0) ? 'star' : 'star-outline'}
+            size={12}
+            color={star <= Math.round(rating || 0) ? '#FFD700' : COLORS.gray}
+            style={{ marginRight: 1 }}
+          />
+        ))}
+      </View>
+    );
+  };
+
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
+      }
+    >
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>पशु डॉक्टर</Text>
@@ -229,70 +308,103 @@ const VeterinarianScreen = ({ navigation }) => {
       {/* Veterinarians Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Our Veterinarians</Text>
-        {filteredVets.map((vet) => (
-          <View key={vet.id} style={styles.vetCard}>
-            <View style={styles.vetHeader}>
-              <Image source={{ uri: vet.image }} style={styles.vetImage} />
-              <View style={styles.vetInfo}>
-                <Text style={styles.vetName}>{vet.name}</Text>
-                <Text style={styles.vetSpec}>{vet.specialization}</Text>
-                <View style={styles.ratingRow}>
-                  <Ionicons name="star" size={14} color={COLORS.yellow} />
-                  <Text style={styles.ratingText}>
-                    {vet.rating} • {vet.patients} patients
-                  </Text>
+
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <Text style={styles.loadingText}>Finding veterinarians near you...</Text>
+          </View>
+        ) : filteredVets.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="medical-outline" size={60} color={COLORS.gray} />
+            <Text style={styles.emptyText}>No veterinarians found</Text>
+            <Text style={styles.emptySubtext}>Try adjusting your search or check back later</Text>
+          </View>
+        ) : (
+          filteredVets.map((vet) => (
+            <TouchableOpacity
+              key={vet.id}
+              style={styles.vetCard}
+              onPress={() => handleVetPress(vet)}
+            >
+              <View style={styles.vetHeader}>
+                {vet.profile_photo ? (
+                  <Image source={{ uri: vet.profile_photo }} style={styles.vetImage} />
+                ) : (
+                  <View style={[styles.vetImage, styles.vetImagePlaceholder]}>
+                    <Ionicons name="person" size={24} color={COLORS.gray} />
+                  </View>
+                )}
+                <View style={styles.vetInfo}>
+                  <Text style={styles.vetName}>Dr. {vet.full_name}</Text>
+                  <Text style={styles.vetSpec}>{getSpecializationLabel(vet.specialization)}</Text>
+                  <View style={styles.ratingRow}>
+                    {renderStars(vet.rating)}
+                    <Text style={styles.ratingText}>
+                      {vet.rating?.toFixed(1) || '0.0'} ({vet.total_reviews || 0} reviews)
+                    </Text>
+                  </View>
                 </View>
               </View>
-            </View>
 
-            <View style={styles.vetDetails}>
-              <View style={styles.detailRow}>
-                <Ionicons name="location-outline" size={16} color={COLORS.gray} />
-                <Text style={styles.detailText}>{vet.location}</Text>
+              <View style={styles.vetDetails}>
+                <View style={styles.detailRow}>
+                  <Ionicons name="location-outline" size={16} color={COLORS.gray} />
+                  <Text style={styles.detailText}>{vet.city}, {vet.state}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Ionicons name="time-outline" size={16} color={COLORS.gray} />
+                  <Text style={styles.detailText}>{vet.experience_years || 0}+ years experience</Text>
+                </View>
+                {vet.distance && (
+                  <View style={styles.detailRow}>
+                    <Ionicons name="navigate-outline" size={16} color={COLORS.primary} />
+                    <Text style={[styles.detailText, { color: COLORS.primary }]}>
+                      {vet.distance.toFixed(1)} km away
+                    </Text>
+                  </View>
+                )}
               </View>
-              <View style={styles.detailRow}>
-                <Ionicons name="time-outline" size={16} color={COLORS.gray} />
-                <Text style={styles.detailText}>{vet.experience}</Text>
+
+              {vet.emergency_available && (
+                <View style={styles.emergencyBadge}>
+                  <Ionicons name="alert-circle" size={14} color={COLORS.white} />
+                  <Text style={styles.emergencyBadgeText}>Emergency Available</Text>
+                </View>
+              )}
+
+              <View style={styles.vetActions}>
+                <TouchableOpacity
+                  style={styles.callBtn}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleCall(vet.phone_number);
+                  }}
+                >
+                  <Ionicons name="call" size={18} color={COLORS.white} />
+                  <Text style={styles.btnText}>Call</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.whatsappBtn}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleWhatsApp(vet.phone_number, vet.full_name);
+                  }}
+                >
+                  <Ionicons name="logo-whatsapp" size={18} color={COLORS.white} />
+                  <Text style={styles.btnText}>WhatsApp</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.viewBtn}
+                  onPress={() => handleVetPress(vet)}
+                >
+                  <Ionicons name="eye-outline" size={18} color={COLORS.primary} />
+                  <Text style={styles.viewBtnText}>View</Text>
+                </TouchableOpacity>
               </View>
-            </View>
-
-            <View
-              style={[
-                styles.availabilityBadge,
-                {
-                  backgroundColor: vet.available ? COLORS.green + '20' : COLORS.yellow + '20',
-                  alignSelf: 'flex-start',
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.availabilityText,
-                  { color: vet.available ? COLORS.green : COLORS.yellow },
-                ]}
-              >
-                {vet.available ? 'Available Now' : `Next: ${vet.nextAvailable}`}
-              </Text>
-            </View>
-
-            <View style={styles.vetActions}>
-              <TouchableOpacity
-                style={styles.callBtn}
-                onPress={() => handleCall(vet.phone)}
-              >
-                <Ionicons name="call" size={18} color={COLORS.white} />
-                <Text style={styles.btnText}>Call</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.whatsappBtn}
-                onPress={() => handleWhatsApp(vet.phone, vet.name)}
-              >
-                <Ionicons name="logo-whatsapp" size={18} color={COLORS.white} />
-                <Text style={styles.btnText}>WhatsApp</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ))}
+            </TouchableOpacity>
+          ))
+        )}
       </View>
 
       {/* Emergency Section */}
@@ -443,6 +555,30 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: COLORS.gray,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.gray,
+    marginTop: 12,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: COLORS.gray,
+    marginTop: 4,
+  },
   vetCard: {
     backgroundColor: COLORS.white,
     borderRadius: 16,
@@ -464,6 +600,11 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     marginRight: 12,
   },
+  vetImagePlaceholder: {
+    backgroundColor: COLORS.lightGray,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   vetInfo: {
     flex: 1,
   },
@@ -476,6 +617,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.gray,
     marginBottom: 4,
+  },
+  starsContainer: {
+    flexDirection: 'row',
   },
   ratingRow: {
     flexDirection: 'row',
@@ -499,35 +643,65 @@ const styles = StyleSheet.create({
     color: COLORS.gray,
     marginLeft: 6,
   },
+  emergencyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.red,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+    gap: 4,
+  },
+  emergencyBadgeText: {
+    color: COLORS.white,
+    fontSize: 11,
+    fontWeight: '600',
+  },
   vetActions: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 12,
+    gap: 8,
   },
   callBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.blue,
-    paddingVertical: 12,
-    borderRadius: 12,
-    gap: 6,
+    backgroundColor: '#3B82F6',
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 4,
   },
   whatsappBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.primary,
-    paddingVertical: 12,
-    borderRadius: 12,
-    gap: 6,
+    backgroundColor: '#25D366',
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 4,
+  },
+  viewBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary + '15',
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 4,
   },
   btnText: {
     color: COLORS.white,
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: 13,
+  },
+  viewBtnText: {
+    color: COLORS.primary,
+    fontWeight: '600',
+    fontSize: 13,
   },
   emergencyCard: {
     backgroundColor: COLORS.red,
@@ -568,7 +742,7 @@ const styles = StyleSheet.create({
   emergencyWhatsappBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.green,
+    backgroundColor: '#25D366',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 12,

@@ -19,7 +19,9 @@
       "Bash(ipconfig:*)",
       "Bash(powershell -Command:*)",
       "Bash(npx expo install:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(timeout:*)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []

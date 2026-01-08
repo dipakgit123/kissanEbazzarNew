@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,8 +7,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
-  ActivityIndicator,
-  ScrollView,
+  Keyboard,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -17,21 +17,64 @@ import { listingsService, userService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import AnimalCard from '../components/AnimalCard';
+import CircleBar from '../components/CircleBar';
+import DistanceToggle from '../components/DistanceToggle';
+import CowLoader from '../components/CowLoader';
+
+// Custom debounce hook
+const useDebounce = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+
+  return debouncedValue;
+};
 
 const HomeScreen = ({ navigation }) => {
   const { user } = useAuth();
   const { unreadCount } = useNotifications();
+
+  // Main states
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [userLocation, setUserLocation] = useState(null);
   const [wishlist, setWishlist] = useState([]);
-  const [showingFeatured, setShowingFeatured] = useState(false);
 
+  // Search states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [recentSearches, setRecentSearches] = useState([]);
+  const searchInputRef = useRef(null);
+
+  // Filter states
+  const [distanceMode, setDistanceMode] = useState('all'); // 'all' = 500km, 'nearby' = 100km
+  const [selectedCategory, setSelectedCategory] = useState(null);
+
+  // Debounced search
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
+
+  // Quick search tags
+  const quickSearchTags = useMemo(() => [
+    { label: 'Cow', icon: '🐄', query: 'cow' },
+    { label: 'Buffalo', icon: '🐃', query: 'buffalo' },
+    { label: 'Goat', icon: '🐐', query: 'goat' },
+    { label: 'Horse', icon: '🐴', query: 'horse' },
+    { label: 'Dog', icon: '🐕', query: 'dog' },
+    { label: 'Cat', icon: '🐱', query: 'cat' },
+  ], []);
+
+  // Fetch data on mount and when filters change
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [distanceMode]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -66,35 +109,31 @@ const HomeScreen = ({ navigation }) => {
         }
       }
 
-      // Fetch listings
+      // Fetch listings based on distance mode
       let fetchedListings = [];
-      let usedNearby = false;
+      const radius = distanceMode === 'nearby' ? 100 : 500;
 
       if (lat && lng) {
         try {
-          const response = await listingsService.getNearbyListings(lat, lng, 100, 20);
+          const response = await listingsService.getNearbyListings(lat, lng, radius, 50);
           if (response.success && response.data?.length > 0) {
             fetchedListings = response.data;
-            usedNearby = true;
           }
         } catch (err) {
           console.log('Error fetching nearby:', err);
         }
       }
 
-      // Fallback to featured if nearby empty
+      // Fallback to featured if no nearby listings
       if (fetchedListings.length === 0) {
         try {
-          const response = await listingsService.getFeaturedListings(20);
+          const response = await listingsService.getFeaturedListings(50);
           if (response.success) {
             fetchedListings = response.data;
-            setShowingFeatured(true);
           }
         } catch (err) {
           console.log('Error fetching featured:', err);
         }
-      } else {
-        setShowingFeatured(false);
       }
 
       setListings(fetchedListings);
@@ -109,8 +148,9 @@ const HomeScreen = ({ navigation }) => {
     setRefreshing(true);
     await fetchData();
     setRefreshing(false);
-  }, []);
+  }, [distanceMode]);
 
+  // Handle animal press
   const handleAnimalPress = (listing) => {
     navigation.navigate('AnimalDetail', {
       animalType: listing.animal_type,
@@ -118,10 +158,26 @@ const HomeScreen = ({ navigation }) => {
     });
   };
 
-  const handleCategoryPress = (category) => {
-    navigation.navigate('CategoryListings', { category });
-  };
+  // Handle category click
+  const handleCategoryClick = useCallback((category, endpoint) => {
+    if (selectedCategory === category) {
+      setSelectedCategory(null);
+    } else {
+      setSelectedCategory(category);
+      // Clear search when selecting category
+      if (searchQuery) {
+        setSearchQuery('');
+      }
+    }
+    setShowSuggestions(false);
+  }, [selectedCategory, searchQuery]);
 
+  // Clear category filter
+  const clearCategoryFilter = useCallback(() => {
+    setSelectedCategory(null);
+  }, []);
+
+  // Wishlist functions
   const toggleWishlist = (listing) => {
     const isInList = wishlist.some(item =>
       item.id === listing.id && item.animal_type === listing.animal_type
@@ -142,33 +198,125 @@ const HomeScreen = ({ navigation }) => {
     );
   };
 
-  const filteredListings = searchQuery
-    ? listings.filter(listing =>
-        listing.breed_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        listing.animal_type?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        listing.city?.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : listings;
+  // Search functions
+  const handleSearch = useCallback(() => {
+    if (searchQuery.trim()) {
+      // Save to recent searches
+      const updated = [searchQuery, ...recentSearches.filter(s => s !== searchQuery)].slice(0, 5);
+      setRecentSearches(updated);
+      setShowSuggestions(false);
+      Keyboard.dismiss();
+    }
+  }, [searchQuery, recentSearches]);
 
+  const handleQuickSearch = useCallback((query) => {
+    setSearchQuery(query);
+    setShowSuggestions(false);
+    Keyboard.dismiss();
+  }, []);
+
+  const clearSearch = useCallback(() => {
+    setSearchQuery('');
+    setShowSuggestions(false);
+    searchInputRef.current?.focus();
+  }, []);
+
+  // Filter by category
+  const categoryFilteredListings = useMemo(() => {
+    if (!selectedCategory) return listings;
+
+    return listings.filter(listing => {
+      const animalType = listing.animal_type?.toLowerCase();
+      const category = selectedCategory.toLowerCase();
+
+      // Match category to animal type
+      if (category === 'cow' || category === 'bull') {
+        return animalType === 'cow' || animalType === 'bull' || animalType === 'animal';
+      }
+      return animalType === category || animalType?.includes(category);
+    });
+  }, [listings, selectedCategory]);
+
+  // Filter by search query
+  const filteredListings = useMemo(() => {
+    const baseListings = categoryFilteredListings;
+
+    if (!debouncedSearchQuery.trim()) return baseListings;
+
+    const searchTerms = debouncedSearchQuery.toLowerCase().split(' ').filter(t => t.length > 0);
+
+    return baseListings.filter(listing => {
+      const searchableText = [
+        listing.breed_name,
+        listing.animal_type,
+        listing.city,
+        listing.seller?.name,
+      ].join(' ').toLowerCase();
+
+      return searchTerms.every(term => searchableText.includes(term));
+    });
+  }, [categoryFilteredListings, debouncedSearchQuery]);
+
+  // Get search suggestions
+  const searchSuggestions = useMemo(() => {
+    if (!searchQuery.trim() || searchQuery.length < 2) return [];
+
+    const query = searchQuery.toLowerCase();
+    const suggestions = [];
+
+    // Add matching animal types
+    quickSearchTags.forEach(tag => {
+      if (tag.query.includes(query) && !suggestions.includes(tag.query)) {
+        suggestions.push(tag.query);
+      }
+    });
+
+    // Add matching breeds from listings
+    listings.forEach(listing => {
+      const breed = listing.breed_name?.toLowerCase();
+      if (breed && breed.includes(query) && !suggestions.includes(breed)) {
+        suggestions.push(breed);
+      }
+    });
+
+    return suggestions.slice(0, 5);
+  }, [searchQuery, quickSearchTags, listings]);
+
+  const isShowingSearchResults = searchQuery.trim() && filteredListings.length > 0;
+  const isShowingCategoryResults = selectedCategory && !searchQuery.trim();
+
+  // Render header
   const renderHeader = () => (
     <View>
-      {/* App Header with Logo and Wishlist */}
+      {/* App Header */}
       <View style={styles.appHeader}>
         <View style={styles.logoContainer}>
           <View style={styles.logoCircle}>
             <Text style={styles.logoEmoji}>🐄</Text>
           </View>
-          <Text style={styles.appName}>Kissan E-Bazzar</Text>
+          <View>
+            <Text style={styles.appName}>Kissan E-Bazzar</Text>
+            <Text style={styles.appTagline}>Farmers Marketplace</Text>
+          </View>
         </View>
         <View style={styles.headerActions}>
-          {/* Notification Bell */}
+          {/* AI Health Check Button */}
+          <TouchableOpacity
+            style={styles.aiButton}
+            onPress={() => navigation.navigate('AIHealthCheck')}
+          >
+            <Ionicons name="medical" size={18} color={COLORS.white} />
+            <Text style={styles.aiButtonText}>AI</Text>
+          </TouchableOpacity>
+
+          {/* Notifications */}
           <TouchableOpacity
             style={styles.headerButton}
             onPress={() => navigation.navigate('Notifications')}
           >
             <Ionicons name="notifications-outline" size={24} color={COLORS.primary} />
             {unreadCount > 0 && (
-              <View style={styles.notificationBadge}>
+              <View style={styles.badge}>
                 <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
               </View>
             )}
@@ -181,7 +329,7 @@ const HomeScreen = ({ navigation }) => {
           >
             <Ionicons name="heart-outline" size={24} color={COLORS.primary} />
             {wishlist.length > 0 && (
-              <View style={styles.wishlistBadge}>
+              <View style={styles.badge}>
                 <Text style={styles.badgeText}>{wishlist.length}</Text>
               </View>
             )}
@@ -194,18 +342,60 @@ const HomeScreen = ({ navigation }) => {
         <View style={styles.searchBar}>
           <Ionicons name="search" size={20} color={COLORS.gray} />
           <TextInput
+            ref={searchInputRef}
             style={styles.searchInput}
-            placeholder="Search animals, breeds..."
+            placeholder="Search animals, breeds, locations..."
             placeholderTextColor={COLORS.gray}
             value={searchQuery}
-            onChangeText={setSearchQuery}
+            onChangeText={(text) => {
+              setSearchQuery(text);
+              setShowSuggestions(true);
+            }}
+            onFocus={() => setShowSuggestions(true)}
+            onSubmitEditing={handleSearch}
+            returnKeyType="search"
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <TouchableOpacity onPress={clearSearch}>
               <Ionicons name="close-circle" size={20} color={COLORS.gray} />
             </TouchableOpacity>
           )}
+          <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
+            <Ionicons name="arrow-forward" size={18} color={COLORS.white} />
+          </TouchableOpacity>
         </View>
+
+        {/* Search Suggestions */}
+        {showSuggestions && searchSuggestions.length > 0 && (
+          <View style={styles.suggestionsContainer}>
+            {searchSuggestions.map((suggestion, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.suggestionItem}
+                onPress={() => handleQuickSearch(suggestion)}
+              >
+                <Ionicons name="search" size={16} color={COLORS.gray} />
+                <Text style={styles.suggestionText}>{suggestion}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {/* Quick Search Tags */}
+        {!searchQuery && (
+          <View style={styles.quickTagsContainer}>
+            {quickSearchTags.map((tag) => (
+              <TouchableOpacity
+                key={tag.query}
+                style={styles.quickTag}
+                onPress={() => handleQuickSearch(tag.query)}
+              >
+                <Text style={styles.quickTagIcon}>{tag.icon}</Text>
+                <Text style={styles.quickTagLabel}>{tag.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
 
       {/* Location Banner */}
@@ -221,35 +411,75 @@ const HomeScreen = ({ navigation }) => {
         </View>
       )}
 
-      {/* Categories */}
-      <View style={styles.categoriesContainer}>
+      {/* Categories - CircleBar */}
+      <View style={styles.categoriesSection}>
         <Text style={styles.sectionTitle}>Browse by Category</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesList}
-        >
-          {ANIMAL_TYPES.map((category) => (
-            <TouchableOpacity
-              key={category.id}
-              style={styles.categoryItem}
-              onPress={() => handleCategoryPress(category)}
-            >
-              <View style={styles.categoryIcon}>
-                <Text style={styles.categoryEmoji}>{category.icon}</Text>
-              </View>
-              <Text style={styles.categoryName}>{category.name}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        <CircleBar
+          onCategoryClick={handleCategoryClick}
+          selectedCategory={selectedCategory}
+        />
       </View>
+
+      {/* Distance Toggle */}
+      <DistanceToggle
+        activeMode={distanceMode}
+        onModeChange={setDistanceMode}
+      />
+
+      {/* Category Filter Header */}
+      {isShowingCategoryResults && (
+        <View style={styles.filterHeader}>
+          <View>
+            <View style={styles.filterTitleRow}>
+              <Text style={styles.filterTitle}>
+                {selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}s
+              </Text>
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>Category Filter</Text>
+              </View>
+            </View>
+            <Text style={styles.filterSubtitle}>
+              Found {categoryFilteredListings.length} {selectedCategory}
+              {categoryFilteredListings.length !== 1 ? 's' : ''} available
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.clearFilterButton} onPress={clearCategoryFilter}>
+            <Ionicons name="close" size={16} color={COLORS.gray} />
+            <Text style={styles.clearFilterText}>Clear</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Search Results Header */}
+      {isShowingSearchResults && (
+        <View style={styles.filterHeader}>
+          <View>
+            <Text style={styles.filterTitle}>
+              Results for "{searchQuery}"
+            </Text>
+            <Text style={styles.filterSubtitle}>
+              Found {filteredListings.length} animal{filteredListings.length !== 1 ? 's' : ''}
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.clearFilterButton} onPress={clearSearch}>
+            <Ionicons name="close" size={16} color={COLORS.gray} />
+            <Text style={styles.clearFilterText}>Clear</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Listings Header */}
       <View style={styles.listingsHeader}>
         <Text style={styles.sectionTitle}>
-          {showingFeatured ? 'Featured Listings' : 'Nearby Listings'}
+          {isShowingSearchResults
+            ? 'Search Results'
+            : isShowingCategoryResults
+              ? `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}s`
+              : distanceMode === 'nearby'
+                ? 'Nearby Animals (100 km)'
+                : 'All Available Animals (500 km)'}
         </Text>
-        {!showingFeatured && (
+        {userLocation && !isShowingSearchResults && (
           <View style={styles.sortBadge}>
             <Ionicons name="location" size={12} color={COLORS.primary} />
             <Text style={styles.sortText}>By distance</Text>
@@ -259,31 +489,83 @@ const HomeScreen = ({ navigation }) => {
     </View>
   );
 
-  const renderEmpty = () => (
-    <View style={styles.emptyContainer}>
-      <Text style={styles.emptyIcon}>🐄</Text>
-      <Text style={styles.emptyTitle}>No animals found</Text>
-      <Text style={styles.emptySubtitle}>
-        {searchQuery
-          ? 'Try searching with different keywords'
-          : 'Be the first to list an animal in your area!'}
-      </Text>
-      {!searchQuery && (
+  // Render empty state
+  const renderEmpty = () => {
+    if (loading) return null;
+
+    const getCategoryEmoji = () => {
+      const emojis = {
+        cow: '🐄', buffalo: '🐃', bull: '🐂', goat: '🐐',
+        horse: '🐴', dog: '🐕', cat: '🐱'
+      };
+      return emojis[selectedCategory] || '🐾';
+    };
+
+    if (searchQuery.trim()) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyIcon}>🔍</Text>
+          <Text style={styles.emptyTitle}>No results for "{searchQuery}"</Text>
+          <Text style={styles.emptySubtitle}>
+            Try different keywords or browse by category
+          </Text>
+          <TouchableOpacity style={styles.emptyButton} onPress={clearSearch}>
+            <Text style={styles.emptyButtonText}>Clear Search</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (selectedCategory) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyIcon}>{getCategoryEmoji()}</Text>
+          <Text style={styles.emptyTitle}>
+            No {selectedCategory}s found in your area
+          </Text>
+          <Text style={styles.emptySubtitle}>
+            There are no {selectedCategory}s available within {distanceMode === 'nearby' ? '100' : '500'} km
+          </Text>
+          <View style={styles.emptyActions}>
+            <TouchableOpacity
+              style={[styles.emptyButton, styles.emptyButtonSecondary]}
+              onPress={clearCategoryFilter}
+            >
+              <Text style={styles.emptyButtonTextSecondary}>View All</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.emptyButton}
+              onPress={() => navigation.navigate('SellAnimal')}
+            >
+              <Text style={styles.emptyButtonText}>List Your {selectedCategory}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyIcon}>🐄</Text>
+        <Text style={styles.emptyTitle}>No animals found</Text>
+        <Text style={styles.emptySubtitle}>
+          Be the first to list an animal in your area!
+        </Text>
         <TouchableOpacity
           style={styles.emptyButton}
           onPress={() => navigation.navigate('SellAnimal')}
         >
           <Text style={styles.emptyButtonText}>List Your Animal</Text>
         </TouchableOpacity>
-      )}
-    </View>
-  );
+      </View>
+    );
+  };
 
+  // Loading state
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Loading listings...</Text>
+        <CowLoader message="Finding animals for you" size="large" />
       </View>
     );
   }
@@ -312,6 +594,11 @@ const HomeScreen = ({ navigation }) => {
             tintColor={COLORS.primary}
           />
         }
+        showsVerticalScrollIndicator={false}
+        onScrollBeginDrag={() => {
+          setShowSuggestions(false);
+          Keyboard.dismiss();
+        }}
       />
     </View>
   );
@@ -320,6 +607,12 @@ const HomeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: COLORS.background,
   },
   appHeader: {
@@ -338,43 +631,50 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
   },
   logoEmoji: {
-    fontSize: 22,
+    fontSize: 24,
   },
   appName: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: COLORS.black,
+  },
+  appTagline: {
+    fontSize: 11,
+    color: COLORS.gray,
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 4,
+  },
+  aiButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 4,
+  },
+  aiButtonText: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: '700',
   },
   headerButton: {
     position: 'relative',
     padding: 8,
   },
-  notificationBadge: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    backgroundColor: COLORS.red,
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  wishlistBadge: {
+  badge: {
     position: 'absolute',
     top: 2,
     right: 2,
@@ -387,19 +687,8 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     color: COLORS.white,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: 'bold',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.background,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: COLORS.gray,
   },
   searchContainer: {
     padding: 16,
@@ -409,15 +698,72 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.secondary,
-    borderRadius: 12,
+    borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 12,
+    gap: 10,
   },
   searchInput: {
     flex: 1,
-    marginLeft: 12,
-    fontSize: 16,
+    fontSize: 15,
     color: COLORS.black,
+  },
+  searchButton: {
+    backgroundColor: COLORS.primary,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  suggestionsContainer: {
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    marginTop: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.lightGray,
+  },
+  suggestionText: {
+    fontSize: 15,
+    color: COLORS.black,
+  },
+  quickTagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
+  quickTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary + '15',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 4,
+  },
+  quickTagIcon: {
+    fontSize: 14,
+  },
+  quickTagLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.primary,
   },
   locationBanner: {
     flexDirection: 'row',
@@ -436,10 +782,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.primary,
   },
-  categoriesContainer: {
-    paddingTop: 20,
-    paddingBottom: 12,
+  categoriesSection: {
     backgroundColor: COLORS.white,
+    paddingTop: 16,
+    paddingBottom: 8,
   },
   sectionTitle: {
     fontSize: 18,
@@ -448,29 +794,56 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 12,
   },
-  categoriesList: {
-    paddingHorizontal: 12,
-  },
-  categoryItem: {
+  filterHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginHorizontal: 8,
-    width: 70,
+    backgroundColor: COLORS.white,
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
   },
-  categoryIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: COLORS.secondary,
-    justifyContent: 'center',
+  filterTitleRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    gap: 8,
   },
-  categoryEmoji: {
-    fontSize: 28,
-  },
-  categoryName: {
-    fontSize: 12,
+  filterTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
     color: COLORS.black,
+  },
+  filterBadge: {
+    backgroundColor: COLORS.primary + '20',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  filterBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+  filterSubtitle: {
+    fontSize: 13,
+    color: COLORS.gray,
+    marginTop: 4,
+  },
+  clearFilterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: COLORS.secondary,
+    borderRadius: 8,
+    gap: 4,
+  },
+  clearFilterText: {
+    fontSize: 13,
+    color: COLORS.gray,
     fontWeight: '500',
   },
   listingsHeader: {
@@ -496,7 +869,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   listContent: {
-    paddingBottom: 20,
+    paddingBottom: 100,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -512,23 +885,37 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: COLORS.black,
     marginBottom: 8,
+    textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: 16,
+    fontSize: 15,
     color: COLORS.gray,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  emptyActions: {
+    flexDirection: 'row',
+    gap: 12,
   },
   emptyButton: {
     backgroundColor: COLORS.primary,
     paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderRadius: 12,
+  },
+  emptyButtonSecondary: {
+    backgroundColor: COLORS.secondary,
   },
   emptyButtonText: {
     color: COLORS.white,
     fontWeight: '600',
-    fontSize: 16,
+    fontSize: 15,
+  },
+  emptyButtonTextSecondary: {
+    color: COLORS.gray,
+    fontWeight: '600',
+    fontSize: 15,
   },
 });
 

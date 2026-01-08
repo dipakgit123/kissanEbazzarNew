@@ -14,6 +14,11 @@ const dogListingRoutes = require('./src/routes/dogListingRoutes'); // NEW
 const combinedListingsRoutes = require('./src/routes/combinedListingsRoutes'); // Combined listings
 const notificationRoutes = require('./src/routes/notificationRoutes'); // Notifications
 const aiHealthRoutes = require('./src/routes/aiHealthRoutes'); // AI Health Check
+const pregnancyRoutes = require('./src/routes/pregnancyRoutes'); // Pregnancy Calendar
+const adminRoutes = require('./src/routes/adminRoutes'); // Admin Dashboard
+const veterinarianRoutes = require('./src/routes/veterinarianRoutes'); // Veterinarian routes
+const vetReviewRoutes = require('./src/routes/vetReviewRoutes'); // Veterinarian review routes
+const vetReportRoutes = require('./src/routes/vetReportRoutes'); // Veterinarian report routes
 const otpService = require('./src/services/otpService');
 require('dotenv').config();
 
@@ -43,6 +48,11 @@ app.use('/api/dogs', dogListingRoutes);  // NEW - Dog listing routes
 app.use('/api/listings', combinedListingsRoutes);  // Combined listings from all categories
 app.use('/api/notifications', notificationRoutes);  // Notification routes
 app.use('/api/health-check', aiHealthRoutes);  // AI Health Check routes
+app.use('/api/pregnancy', pregnancyRoutes);  // Pregnancy Calendar routes
+app.use('/api/admin', adminRoutes);  // Admin Dashboard routes
+app.use('/api/veterinarians', veterinarianRoutes);  // Veterinarian routes
+app.use('/api/vet-reviews', vetReviewRoutes);  // Veterinarian review routes
+app.use('/api/vet-reports', vetReportRoutes);  // Veterinarian report routes
 
 // Serve static files for web frontend
 app.use(express.static('public'));

@@ -13,8 +13,13 @@ import ProfilePage from './components/ProfilePage';
 import AnimalListingPage from './components/AnimalListingPage';
 import AnimalDetailPage from './components/AnimalDetailPage';
 import VeterinarianPage from './components/VeterinarianPage';
+import VeterinarianRegistrationForm from './components/VeterinarianRegistrationForm';
+import VeterinarianLogin from './components/VeterinarianLogin';
+import VeterinarianDashboard from './components/VeterinarianDashboard';
 import WishlistPage from './components/WishlistPage';
 import AIHealthCheck from './components/AIHealthCheck';
+import AdminLogin from './components/admin/AdminLogin';
+import AdminDashboard from './components/admin/AdminDashboard';
 
 function App() {
   // Initialize state from localStorage
@@ -107,6 +112,14 @@ function App() {
 
   return (
     <Routes>
+      {/* Admin Routes - No Layout */}
+      <Route path="/admin/login" element={<AdminLogin />} />
+      <Route path="/admin/dashboard" element={<AdminDashboard />} />
+
+      {/* Veterinarian Routes - No Layout */}
+      <Route path="/veterinarian/login" element={<VeterinarianLogin />} />
+      <Route path="/veterinarian/dashboard" element={<VeterinarianDashboard />} />
+
       {/* Routes without header/footer */}
       <Route element={<Layout showHeaderFooter={false} wishlistCount={wishlist.length} />}>
         <Route
@@ -149,6 +162,7 @@ function App() {
         <Route path="/sell-animal" element={<AnimalListingPage />} />
         <Route path="/animal/:animalType/:id" element={<AnimalDetailPage />} />
         <Route path="/veterinarian" element={<VeterinarianPage />} />
+        <Route path="/veterinarian/register" element={<VeterinarianRegistrationForm />} />
         <Route path="/pregnancy-calendar" element={<PregnancyCalendar />} />
         <Route path="/health-check" element={<AIHealthCheck />} />
         <Route path="/wishlist" element={<WishlistPage wishlist={wishlist} removeFromWishlist={removeFromWishlist} isInWishlist={isInWishlist} />} />

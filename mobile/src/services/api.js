@@ -258,6 +258,114 @@ export const healthCheckService = {
   },
 };
 
+// Pregnancy Calendar Service
+export const pregnancyService = {
+  getRecords: async (status = null, animalType = null) => {
+    try {
+      const params = {};
+      if (status) params.status = status;
+      if (animalType) params.animal_type = animalType;
+      const response = await api.get('/api/pregnancy/records', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  getRecord: async (id) => {
+    try {
+      const response = await api.get(`/api/pregnancy/records/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  createRecord: async (data) => {
+    try {
+      const response = await api.post('/api/pregnancy/records', data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  updateRecord: async (id, data) => {
+    try {
+      const response = await api.put(`/api/pregnancy/records/${id}`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  deleteRecord: async (id) => {
+    try {
+      const response = await api.delete(`/api/pregnancy/records/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  markDelivered: async (id, deliveryData) => {
+    try {
+      const response = await api.patch(`/api/pregnancy/records/${id}/deliver`, deliveryData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  updateStatus: async (id, status, notes = null) => {
+    try {
+      const response = await api.patch(`/api/pregnancy/records/${id}/status`, { status, notes });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  getCalendar: async (month = null, year = null) => {
+    try {
+      const params = {};
+      if (month) params.month = month;
+      if (year) params.year = year;
+      const response = await api.get('/api/pregnancy/calendar', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  getStats: async () => {
+    try {
+      const response = await api.get('/api/pregnancy/stats');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  getMyAnimals: async () => {
+    try {
+      const response = await api.get('/api/pregnancy/my-animals');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  getDurations: async () => {
+    try {
+      const response = await api.get('/api/pregnancy/durations');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  }
+};
+
 // Animal Listing Service (for creating listings)
 export const animalListingService = {
   createListing: async (endpoint, listingData) => {
@@ -299,6 +407,198 @@ export const animalListingService = {
       throw error.response?.data || error;
     }
   }
+};
+
+// Veterinarian Service
+export const veterinarianService = {
+  // Registration
+  register: async (formData) => {
+    try {
+      const response = await api.post('/api/veterinarians/register', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        timeout: 60000, // 60 seconds for file uploads
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Send OTP for login
+  sendOTP: async (phoneNumber) => {
+    try {
+      const response = await api.post('/api/veterinarians/send-otp', { phone_number: phoneNumber });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Verify OTP
+  verifyOTP: async (phoneNumber, otp) => {
+    try {
+      const response = await api.post('/api/veterinarians/verify-otp', { phone_number: phoneNumber, otp });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Login with email and password
+  login: async (email, password) => {
+    try {
+      const response = await api.post('/api/veterinarians/login', { email, password });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Get profile
+  getProfile: async () => {
+    try {
+      const response = await api.get('/api/veterinarians/profile/me');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Update profile
+  updateProfile: async (profileData) => {
+    try {
+      const response = await api.put('/api/veterinarians/profile/me', profileData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Get nearby veterinarians (for farmers)
+  getNearby: async (latitude, longitude, radius = 50, specialization = null) => {
+    try {
+      const params = { latitude, longitude, radius };
+      if (specialization) params.specialization = specialization;
+      const response = await api.get('/api/veterinarians/nearby', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Get all veterinarians
+  getAll: async (page = 1, limit = 10, filters = {}) => {
+    try {
+      const response = await api.get('/api/veterinarians', {
+        params: { page, limit, ...filters }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Get veterinarian by ID
+  getById: async (id) => {
+    try {
+      const response = await api.get(`/api/veterinarians/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+};
+
+// Vet Review Service
+export const vetReviewService = {
+  // Get reviews for a veterinarian
+  getVetReviews: async (veterinarianId, page = 1, limit = 10, sort = 'newest') => {
+    try {
+      const response = await api.get(`/api/vet-reviews/veterinarian/${veterinarianId}`, {
+        params: { page, limit, sort }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Create a review
+  createReview: async (reviewData) => {
+    try {
+      const response = await api.post('/api/vet-reviews', reviewData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Get user's own review for a vet
+  getMyReview: async (veterinarianId) => {
+    try {
+      const response = await api.get(`/api/vet-reviews/my-review/${veterinarianId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Update review
+  updateReview: async (reviewId, reviewData) => {
+    try {
+      const response = await api.put(`/api/vet-reviews/${reviewId}`, reviewData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Delete review
+  deleteReview: async (reviewId) => {
+    try {
+      const response = await api.delete(`/api/vet-reviews/${reviewId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Mark review as helpful
+  markHelpful: async (reviewId) => {
+    try {
+      const response = await api.post(`/api/vet-reviews/${reviewId}/helpful`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+};
+
+// Vet Report Service
+export const vetReportService = {
+  // Create a report
+  createReport: async (reportData) => {
+    try {
+      const response = await api.post('/api/vet-reports', reportData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Get user's reports
+  getMyReports: async (page = 1, limit = 10) => {
+    try {
+      const response = await api.get('/api/vet-reports/my-reports', {
+        params: { page, limit }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
 };
 
 export default api;

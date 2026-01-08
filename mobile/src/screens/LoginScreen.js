@@ -11,6 +11,7 @@ import {
   Alert,
   Image,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../utils/constants';
 import { otpService } from '../services/api';
 
@@ -103,6 +104,33 @@ const LoginScreen = ({ navigation }) => {
             <Text style={styles.linkText}>Terms of Service</Text> and{' '}
             <Text style={styles.linkText}>Privacy Policy</Text>
           </Text>
+
+          {/* Veterinarian Links */}
+          <View style={styles.vetSection}>
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <TouchableOpacity
+              style={styles.vetButton}
+              onPress={() => navigation.navigate('VetLogin')}
+            >
+              <Ionicons name="medical" size={20} color="#3B82F6" />
+              <Text style={styles.vetButtonText}>Veterinarian Login</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.vetRegisterLink}
+              onPress={() => navigation.navigate('VetRegistration')}
+            >
+              <Text style={styles.vetRegisterText}>
+                Are you a veterinarian?{' '}
+                <Text style={styles.vetRegisterLinkText}>Register here</Text>
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </KeyboardAvoidingView>
@@ -220,6 +248,51 @@ const styles = StyleSheet.create({
   linkText: {
     color: COLORS.primary,
     fontWeight: '500',
+  },
+  vetSection: {
+    marginTop: 20,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: COLORS.lightGray,
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    fontSize: 12,
+    color: COLORS.gray,
+  },
+  vetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#3B82F6',
+    gap: 8,
+    marginBottom: 12,
+  },
+  vetButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#3B82F6',
+  },
+  vetRegisterLink: {
+    alignItems: 'center',
+  },
+  vetRegisterText: {
+    fontSize: 13,
+    color: COLORS.gray,
+  },
+  vetRegisterLinkText: {
+    color: '#3B82F6',
+    fontWeight: '600',
   },
 });
 

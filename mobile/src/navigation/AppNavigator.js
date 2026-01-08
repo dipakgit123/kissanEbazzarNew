@@ -6,12 +6,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { ActivityIndicator, View } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
+import { useVetAuth } from '../context/VetAuthContext';
 import { COLORS } from '../utils/constants';
 
 // Auth Screens
 import LoginScreen from '../screens/LoginScreen';
 import OTPVerificationScreen from '../screens/OTPVerificationScreen';
 import ProfileCompletionScreen from '../screens/ProfileCompletionScreen';
+
+// Veterinarian Screens
+import VetLoginScreen from '../screens/VetLoginScreen';
+import VetRegistrationScreen from '../screens/VetRegistrationScreen';
+import VetOTPVerificationScreen from '../screens/VetOTPVerificationScreen';
+import VetDashboardScreen from '../screens/VetDashboardScreen';
 
 // Main Screens
 import HomeScreen from '../screens/HomeScreen';
@@ -20,6 +27,7 @@ import ProfileScreen from '../screens/ProfileScreen';
 import SellAnimalScreen from '../screens/SellAnimalScreen';
 import MapScreen from '../screens/MapScreen';
 import VeterinarianScreen from '../screens/VeterinarianScreen';
+import VetDetailScreen from '../screens/VetDetailScreen';
 import PregnancyCalendarScreen from '../screens/PregnancyCalendarScreen';
 import WishlistScreen from '../screens/WishlistScreen';
 import AIHealthCheckScreen from '../screens/AIHealthCheckScreen';
@@ -99,13 +107,26 @@ const MainTabs = () => {
   );
 };
 
-// Auth Stack Navigator
+// Auth Stack Navigator (for farmers/users)
 const AuthStack = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="OTPVerification" component={OTPVerificationScreen} />
       <Stack.Screen name="ProfileCompletion" component={ProfileCompletionScreen} />
+      {/* Veterinarian Auth Screens - accessible from Login */}
+      <Stack.Screen name="VetLogin" component={VetLoginScreen} />
+      <Stack.Screen name="VetRegistration" component={VetRegistrationScreen} />
+      <Stack.Screen name="VetOTPVerification" component={VetOTPVerificationScreen} />
+    </Stack.Navigator>
+  );
+};
+
+// Veterinarian Stack Navigator (after vet login)
+const VetStack = () => {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="VetDashboard" component={VetDashboardScreen} />
     </Stack.Navigator>
   );
 };
@@ -151,6 +172,13 @@ const MainStack = () => {
         }}
       />
       <Stack.Screen
+        name="VetDetail"
+        component={VetDetailScreen}
+        options={{
+          animation: 'slide_from_right',
+        }}
+      />
+      <Stack.Screen
         name="PregnancyCalendar"
         component={PregnancyCalendarScreen}
         options={{
@@ -178,8 +206,9 @@ const MainStack = () => {
 // App Navigator
 const AppNavigator = () => {
   const { isAuthenticated, loading } = useAuth();
+  const { isVetAuthenticated, loading: vetLoading } = useVetAuth();
 
-  if (loading) {
+  if (loading || vetLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background }}>
         <ActivityIndicator size="large" color={COLORS.primary} />
@@ -187,9 +216,20 @@ const AppNavigator = () => {
     );
   }
 
+  // Determine which stack to show
+  const getActiveStack = () => {
+    if (isVetAuthenticated) {
+      return <VetStack />;
+    }
+    if (isAuthenticated) {
+      return <MainStack />;
+    }
+    return <AuthStack />;
+  };
+
   return (
     <NavigationContainer>
-      {isAuthenticated ? <MainStack /> : <AuthStack />}
+      {getActiveStack()}
     </NavigationContainer>
   );
 };

@@ -282,6 +282,125 @@ export const listingsService = {
   }
 };
 
+// Pregnancy Calendar Service
+export const pregnancyService = {
+  // Get pregnancy durations for all animal types
+  getDurations: async () => {
+    try {
+      const response = await api.get('/api/pregnancy/durations');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Get user's animals eligible for pregnancy tracking
+  getMyAnimals: async () => {
+    try {
+      const response = await api.get('/api/pregnancy/my-animals');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Get all pregnancy records
+  getRecords: async (status = null, animalType = null) => {
+    try {
+      const params = {};
+      if (status) params.status = status;
+      if (animalType) params.animal_type = animalType;
+      const response = await api.get('/api/pregnancy/records', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Get single pregnancy record
+  getRecord: async (id) => {
+    try {
+      const response = await api.get(`/api/pregnancy/records/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Create pregnancy record
+  createRecord: async (data) => {
+    try {
+      const response = await api.post('/api/pregnancy/records', data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Update pregnancy record
+  updateRecord: async (id, data) => {
+    try {
+      const response = await api.put(`/api/pregnancy/records/${id}`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Delete pregnancy record
+  deleteRecord: async (id) => {
+    try {
+      const response = await api.delete(`/api/pregnancy/records/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Mark as delivered
+  markDelivered: async (id, deliveryData) => {
+    try {
+      const response = await api.patch(`/api/pregnancy/records/${id}/deliver`, deliveryData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Update status
+  updateStatus: async (id, status, notes = null) => {
+    try {
+      const response = await api.patch(`/api/pregnancy/records/${id}/status`, { status, notes });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Get calendar view
+  getCalendar: async (month = null, year = null) => {
+    try {
+      const params = {};
+      if (month) params.month = month;
+      if (year) params.year = year;
+      const response = await api.get('/api/pregnancy/calendar', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Get statistics
+  getStats: async () => {
+    try {
+      const response = await api.get('/api/pregnancy/stats');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  }
+};
+
 // User Profile Services
 export const userService = {
   // Complete user profile (first-time login)
