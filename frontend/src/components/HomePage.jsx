@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import CircleBar from './CircleBar';
 import AnimalCard from './AnimalCard';
 import DistanceToggle from './DistanceToggle';
@@ -23,6 +24,7 @@ const useDebounce = (value, delay) => {
 };
 
 const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist }) => {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredAnimals, setFilteredAnimals] = useState([]);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -45,13 +47,13 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
 
   // Quick search tags
   const quickSearchTags = useMemo(() => [
-    { label: 'Cow', icon: '🐄', query: 'cow' },
-    { label: 'Buffalo', icon: '🐃', query: 'buffalo' },
-    { label: 'Goat', icon: '🐐', query: 'goat' },
-    { label: 'Horse', icon: '🐴', query: 'horse' },
-    { label: 'Dog', icon: '🐕', query: 'dog' },
-    { label: 'Cat', icon: '🐱', query: 'cat' },
-  ], []);
+    { label: t('animalTypes.cow'), icon: '🐄', query: 'cow' },
+    { label: t('animalTypes.buffalo'), icon: '🐃', query: 'buffalo' },
+    { label: t('animalTypes.goat'), icon: '🐐', query: 'goat' },
+    { label: t('animalTypes.horse'), icon: '🐴', query: 'horse' },
+    { label: t('animalTypes.dog'), icon: '🐕', query: 'dog' },
+    { label: t('animalTypes.cat'), icon: '🐱', query: 'cat' },
+  ], [t]);
 
   // Load recent searches from localStorage
   useEffect(() => {
@@ -161,26 +163,33 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
       setLoading(true);
       try {
         let listings = [];
-        const radius = distanceMode === 'nearby' ? 100 : 500; // 100km for nearby, 500km for all
 
-        if (userLocation?.latitude && userLocation?.longitude) {
-          // Fetch listings based on user location and selected radius
-          const response = await listingsService.getNearbyListings(
-            userLocation.latitude,
-            userLocation.longitude,
-            radius,
-            50 // increased limit
-          );
-          if (response.success && response.data && response.data.length > 0) {
+        if (distanceMode === 'all') {
+          // For "All Available" - fetch ALL animals without distance filter
+          const response = await listingsService.getFeaturedListings(100); // increased limit for all animals
+          if (response.success && response.data) {
             listings = response.data;
           }
-        }
+        } else {
+          // For "Nearby Animals" - fetch only within 100km radius
+          if (userLocation?.latitude && userLocation?.longitude) {
+            const response = await listingsService.getNearbyListings(
+              userLocation.latitude,
+              userLocation.longitude,
+              100, // Always 100km for nearby mode
+              50
+            );
+            if (response.success && response.data && response.data.length > 0) {
+              listings = response.data;
+            }
+          }
 
-        // Fallback to featured listings if no location or no listings found
-        if (listings.length === 0) {
-          const response = await listingsService.getFeaturedListings(50);
-          if (response.success) {
-            listings = response.data;
+          // Fallback to featured listings if no location or no nearby listings found
+          if (listings.length === 0) {
+            const response = await listingsService.getFeaturedListings(50);
+            if (response.success) {
+              listings = response.data;
+            }
           }
         }
 
@@ -480,7 +489,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
                     to="/sell-animal"
                     className="bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-3 py-1.5 rounded-lg font-semibold text-xs"
                   >
-                    Sell
+                    {t('header.sell')}
                   </Link>
 
                   {/* Wishlist Button */}
@@ -513,7 +522,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
               <form onSubmit={handleSearch} className="relative">
                 <input
                   type="text"
-                  placeholder="Search animals..."
+                  placeholder={t('home.searchPlaceholder')}
                   value={searchQuery}
                   onChange={handleInputChange}
                   className="w-full px-3 py-2 pl-8 pr-16 rounded-lg border-2 border-gray-200 focus:border-[#15BB73] focus:outline-none focus:ring-2 focus:ring-[#15BB73]/20 text-sm"
@@ -525,7 +534,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
                   type="submit"
                   className="absolute right-1 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-3 py-1 rounded-md font-medium text-xs"
                 >
-                  Search
+                  {t('common.search')}
                 </button>
               </form>
             </div>
@@ -550,7 +559,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
                 <form onSubmit={handleSearch} className="relative">
                   <input
                     type="text"
-                    placeholder="Search for animals, breeds, or locations..."
+                    placeholder={t('home.searchPlaceholder')}
                     value={searchQuery}
                     onChange={handleInputChange}
                     className="w-full px-4 py-3 pl-10 pr-24 rounded-xl border-2 border-gray-200 focus:border-[#15BB73] focus:outline-none focus:ring-2 focus:ring-[#15BB73]/20 text-sm shadow-sm"
@@ -562,7 +571,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
                     type="submit"
                     className="absolute right-1 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-4 py-2 rounded-lg font-medium hover:shadow-lg transition-all duration-300 text-sm"
                   >
-                    Search
+                    {t('common.search')}
                   </button>
                 </form>
               </div>
@@ -573,7 +582,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
                   to="/sell-animal"
                   className="bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-4 py-2 rounded-lg font-semibold hover:shadow-lg transition-all duration-300 text-sm"
                 >
-                  Sell Now
+                  {t('header.sell')}
                 </Link>
 
                 {/* Wishlist Button */}
@@ -858,7 +867,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
                     ? `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}s`
                     : distanceMode === 'nearby'
                       ? 'Nearby Animals (100 km)'
-                      : 'All Available Animals (500 km)'}
+                      : 'All Available Animals'}
               </h3>
               {userLocation && !isShowingSearchResults && (
                 <span className="text-sm text-gray-500 flex items-center">
@@ -940,7 +949,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
                   No {selectedCategory}s found in your area
                 </h3>
                 <p className="text-gray-500 mb-6 max-w-md mx-auto">
-                  There are no {selectedCategory}s available within {distanceMode === 'nearby' ? '100' : '500'} km. Try browsing all categories or list your own.
+                  There are no {selectedCategory}s available{distanceMode === 'nearby' ? ' within 100 km' : ''}. Try browsing all categories or list your own.
                 </p>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                   <button

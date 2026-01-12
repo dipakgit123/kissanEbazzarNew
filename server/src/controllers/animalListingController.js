@@ -356,7 +356,7 @@ class AnimalListingController {
     try {
       const userId = req.user.userId || req.user.id;
       const userIdInt = parseInt(userId);
-      const { status = 'all', page = 1, limit = 10 } = req.query;
+      const { status = 'all' } = req.query;
 
       const where = { user_id: userIdInt };
       
@@ -367,23 +367,14 @@ class AnimalListingController {
         where.status = { [Op.ne]: 'deleted' };
       }
 
-      const offset = (parseInt(page) - 1) * parseInt(limit);
-
-      const listings = await db.AnimalListing.findAndCountAll({
+      const listings = await db.AnimalListing.findAll({
         where,
-        limit: parseInt(limit),
-        offset: offset,
         order: [['created_at', 'DESC']]
       });
 
       res.json({ 
         success: true, 
-        data: {
-          listings: listings.rows,
-          totalCount: listings.count,
-          currentPage: parseInt(page),
-          totalPages: Math.ceil(listings.count / parseInt(limit))
-        }
+        data: listings
       });
     } catch (error) {
       console.error('Get user listings error:', error);

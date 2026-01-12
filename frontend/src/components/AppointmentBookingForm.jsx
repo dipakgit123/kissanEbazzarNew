@@ -3,6 +3,7 @@ import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import toast, { Toaster } from 'react-hot-toast';
 
 const AppointmentBookingForm = () => {
+  const { t } = useTranslation();
   const { vetId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();

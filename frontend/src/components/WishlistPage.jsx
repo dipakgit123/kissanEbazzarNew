@@ -1,7 +1,9 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 const WishlistPage = ({ wishlist, removeFromWishlist, isInWishlist }) => {
+  const { t } = useTranslation();
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -22,9 +24,9 @@ const WishlistPage = ({ wishlist, removeFromWishlist, isInWishlist }) => {
               </svg>
             </div>
             <div className="text-center sm:text-left">
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[#000600]">My Wishlist</h1>
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[#000600]">{t('wishlist.title')}</h1>
               <p className="text-sm sm:text-base lg:text-lg text-gray-600 mt-1 sm:mt-2">
-                {wishlist.length} {wishlist.length === 1 ? 'animal' : 'animals'} saved
+                {wishlist.length} {wishlist.length === 1 ? t('animalTypes.all').toLowerCase() : t('animalTypes.all').toLowerCase()} saved
               </p>
             </div>
           </div>
@@ -38,9 +40,9 @@ const WishlistPage = ({ wishlist, removeFromWishlist, isInWishlist }) => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
               </svg>
             </div>
-            <h3 className="text-xl sm:text-2xl font-bold text-gray-600 mb-3 sm:mb-4">No animals in wishlist yet</h3>
+            <h3 className="text-xl sm:text-2xl font-bold text-gray-600 mb-3 sm:mb-4">{t('wishlist.empty')}</h3>
             <p className="text-sm sm:text-base text-gray-500 mb-6 sm:mb-8 max-w-md mx-auto px-4">
-              Start exploring animals and add them to your wishlist by clicking the heart icon on any animal card.
+              {t('wishlist.addedOn')} - Start browsing animals now!
             </p>
             <Link
               to="/"
@@ -49,7 +51,7 @@ const WishlistPage = ({ wishlist, removeFromWishlist, isInWishlist }) => {
               <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
-              <span>Browse Animals</span>
+              <span>{t('home.viewAll')}</span>
             </Link>
           </div>
         ) : (
@@ -107,7 +109,7 @@ const WishlistPage = ({ wishlist, removeFromWishlist, isInWishlist }) => {
                   </div>
 
                   <div className="flex items-center justify-between text-xs sm:text-sm text-gray-500">
-                    <span className="truncate">Seller: {animal.sellerName}</span>
+                    <span className="truncate">{t('animalDetail.sellerInfo')}: {animal.sellerName}</span>
                     <span className="flex-shrink-0 ml-2">{animal.milkProduction}L/day</span>
                   </div>
 
@@ -117,7 +119,7 @@ const WishlistPage = ({ wishlist, removeFromWishlist, isInWishlist }) => {
                       onClick={() => window.open(`tel:${animal.phoneNumber}`, '_self')}
                       className="flex-1 bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white py-2 px-2 sm:px-3 rounded-lg font-semibold hover:shadow-lg transition-all duration-300 text-xs sm:text-sm"
                     >
-                      Call
+                      {t('animalDetail.callNow')}
                     </button>
                     <button
                       onClick={() => window.open(`https://wa.me/${animal.phoneNumber}?text=${encodeURIComponent(`Hi! I'm interested in your ${animal.title} (₹${animal.price}). Is it still available?`)}`, '_blank')}
@@ -142,7 +144,7 @@ const WishlistPage = ({ wishlist, removeFromWishlist, isInWishlist }) => {
               <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
-              <span>Back to Home</span>
+              <span>{t('common.back')}</span>
             </Link>
           </div>
         )}

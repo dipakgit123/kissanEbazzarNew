@@ -1,7 +1,9 @@
 import React, { useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { userService } from '../services/api';
 
 const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, onPhotoUpdate }) => {
+  const { t } = useTranslation();
   const [form, setForm] = useState({
     name: initialData.name || initialData.full_name || '',
     phone: initialData.phone || initialData.phone_number || '',
@@ -132,7 +134,7 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
       {/* Header */}
       <div className="bg-gradient-to-r from-[#15BB73] to-[#0FA568] px-6 py-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-white">Edit Profile</h2>
+          <h2 className="text-xl font-bold text-white">{t('profile.editProfile')}</h2>
           <button
             type="button"
             onClick={onCancel}
@@ -228,7 +230,7 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
         {/* Name Field */}
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1">
-            Full Name <span className="text-red-500">*</span>
+            {t('profile.name')} <span className="text-red-500">*</span>
           </label>
           <input
             name="name"
@@ -245,7 +247,7 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
         {/* Phone Field (readonly) */}
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1">
-            Phone Number
+            {t('profile.phone')}
           </label>
           <input
             value={form.phone}
@@ -258,7 +260,7 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
         {/* Address Field */}
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1">
-            Address <span className="text-red-500">*</span>
+            {t('profile.address')} <span className="text-red-500">*</span>
           </label>
           <textarea
             name="address"
@@ -276,7 +278,7 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
         {/* Pincode Field */}
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1">
-            Pincode <span className="text-red-500">*</span>
+            {t('profile.pincode')} <span className="text-red-500">*</span>
           </label>
           <input
             name="pincode"
@@ -299,7 +301,7 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
             disabled={loading || uploadingPhoto}
             className="flex-1 py-3 rounded-xl border-2 border-gray-300 font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all disabled:opacity-50"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             type="submit"
@@ -314,7 +316,7 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
                 </svg>
                 Saving...
               </>
-            ) : 'Save Changes'}
+            ) : t('profile.updateProfile')}
           </button>
         </div>
       </form>

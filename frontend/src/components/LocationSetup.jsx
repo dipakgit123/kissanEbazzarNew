@@ -1,5 +1,6 @@
 // LocationSetup.jsx - Fixed with proper API configuration
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import toast, { Toaster } from 'react-hot-toast';
 
 // Use the same API_BASE_URL as your other services
@@ -88,6 +89,7 @@ const locationService = {
 };
 
 const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
+  const { t } = useTranslation();
   const [step, setStep] = useState('choose'); // 'choose', 'current', 'manual'
   const [isLoading, setIsLoading] = useState(false);
   const [locationPermission, setLocationPermission] = useState('unknown');
@@ -397,7 +399,7 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
                     : 'bg-gradient-to-r from-[#15BB73] to-[#0FA568] hover:shadow-lg'
                 }`}
               >
-                {isLoading ? 'Setting...' : 'Set Location'}
+                {isLoading ? t('common.loading') : t('location.setupLocation')}
               </button>
             </div>
           </div>

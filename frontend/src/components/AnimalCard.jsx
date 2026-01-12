@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 /*
@@ -32,6 +33,7 @@ const AnimalCard = ({
   animalType,
   listingId
 }) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   // Handle call action
   const handleCall = () => {
@@ -99,7 +101,7 @@ const AnimalCard = ({
         
         {/* Status Badge */}
         <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm text-gray-700 px-2 py-1 rounded-full text-xs font-medium">
-          Available
+          {t('veterinarian.availability')}
         </div>
         
         {/* Wishlist Button */}
@@ -110,7 +112,7 @@ const AnimalCard = ({
               ? 'bg-red-500 text-white'
               : 'bg-white/90 backdrop-blur-sm text-gray-600 hover:bg-red-500 hover:text-white'
           }`}
-          aria-label={isInWishlist ? "Remove from wishlist" : "Add to wishlist"}
+          aria-label={isInWishlist ? t('wishlist.removeFromWishlist') : t('wishlist.title')}
         >
           <svg 
             className="w-5 h-5" 
@@ -158,7 +160,7 @@ const AnimalCard = ({
           </div>
           <div>
             <p className="text-sm font-medium text-gray-800">{sellerName}</p>
-            <p className="text-xs text-gray-500">Verified Seller</p>
+            <p className="text-xs text-gray-500">{t('animalDetail.sellerInfo')}</p>
           </div>
         </div>
 
@@ -171,7 +173,7 @@ const AnimalCard = ({
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
             </svg>
-            <span>Call</span>
+            <span>{t('animalDetail.callNow')}</span>
           </button>
           <button
             onClick={handleWhatsApp}

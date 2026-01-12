@@ -1,4 +1,5 @@
  import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import {
   FormInput,
@@ -14,6 +15,7 @@ import {
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const AnimalListingForm = () => {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     breedName: '',
     age: '',
@@ -145,7 +147,7 @@ const AnimalListingForm = () => {
       <FormSection number="1" title="Animal Details">
         <div className="form-row">
           <FormInput
-            label="Breed Name"
+            label={t('sellAnimal.breed')}
             name="breedName"
             value={formData.breedName}
             onChange={handleChange}
@@ -154,12 +156,12 @@ const AnimalListingForm = () => {
           />
 
           <FormInput
-            label="Age (years)"
+            label={t('sellAnimal.age')}
             name="age"
             type="number"
             value={formData.age}
             onChange={handleChange}
-            placeholder="e.g., 3.5"
+            placeholder={t('sellAnimal.age')}
             step="0.1"
             min="0"
             required
@@ -168,12 +170,12 @@ const AnimalListingForm = () => {
 
         <div className="form-row">
           <FormInput
-            label="Milk Capacity (liters/day)"
+            label={t('animalListing.milkPerDay')}
             name="milkCapacity"
             type="number"
             value={formData.milkCapacity}
             onChange={handleChange}
-            placeholder="e.g., 15"
+            placeholder={t('animalListing.milkPerDay')}
             step="0.01"
             min="0"
             required
@@ -199,8 +201,8 @@ const AnimalListingForm = () => {
             label="Has Horns?"
             name="hasHorns"
             options={[
-              { id: 'horns-yes', value: true, label: 'Yes' },
-              { id: 'horns-no', value: false, label: 'No' }
+              { id: 'horns-yes', value: true, label: t('common.yes') },
+              { id: 'horns-no', value: false, label: t('common.no') }
             ]}
             selectedValue={formData.hasHorns}
             onChange={(value) => setFormData(prev => ({ ...prev, hasHorns: value }))}
@@ -225,7 +227,7 @@ const AnimalListingForm = () => {
       <FormSection number="2" title="Photos & Videos">
         <div className="form-row">
           <FormFileInput
-            label="Front Photo"
+            label={t('animalListing.frontPhoto')}
             name="frontPhoto"
             id="frontPhoto"
             accept="image/*"
@@ -234,7 +236,7 @@ const AnimalListingForm = () => {
           />
 
           <FormFileInput
-            label="Side Photo"
+            label={t('animalListing.sidePhoto')}
             name="sidePhoto"
             id="sidePhoto"
             accept="image/*"
@@ -264,10 +266,10 @@ const AnimalListingForm = () => {
         </div>
       </FormSection>
 
-      <FormSection number="3" title="Price & Negotiation">
+      <FormSection number="3" title={t('animalListing.priceInfo')}>
         <div className="form-row">
           <FormInput
-            label="Expected Price (₹)"
+            label={t('sellAnimal.price') + ' (₹)'}
             name="expectedPrice"
             type="number"
             value={formData.expectedPrice}
@@ -281,7 +283,7 @@ const AnimalListingForm = () => {
           <FormCheckbox
             id="isNegotiable"
             name="isNegotiable"
-            label="Price is Negotiable"
+            label={t('animalListing.negotiable')}
             checked={formData.isNegotiable}
             onChange={handleChange}
           />
@@ -290,7 +292,7 @@ const AnimalListingForm = () => {
 
       <FormSection number="4" title="Additional Information">
         <FormInput
-          label="Vaccination Details"
+          label={t('animalListing.vaccinated')}
           name="vaccinationDetails"
           type="textarea"
           value={formData.vaccinationDetails}
@@ -300,7 +302,7 @@ const AnimalListingForm = () => {
         />
 
         <FormInput
-          label="Additional Notes"
+          label={t('appointment.additionalNotes')}
           name="additionalNotes"
           type="textarea"
           value={formData.additionalNotes}
@@ -321,7 +323,7 @@ const AnimalListingForm = () => {
       <FormSection number="5" title="Location">
         <div className="form-row">
           <FormInput
-            label="City"
+            label={t('profile.city')}
             name="city"
             value={formData.city}
             onChange={handleChange}
@@ -329,7 +331,7 @@ const AnimalListingForm = () => {
           />
 
           <FormInput
-            label="State"
+            label={t('profile.state')}
             name="state"
             value={formData.state}
             onChange={handleChange}
@@ -337,7 +339,7 @@ const AnimalListingForm = () => {
           />
 
           <FormInput
-            label="Pincode"
+            label={t('profile.pincode')}
             name="pincode"
             value={formData.pincode}
             onChange={handleChange}
@@ -347,7 +349,7 @@ const AnimalListingForm = () => {
         </div>
       </FormSection>
 
-      <SubmitButton loading={loading} loadingText="Submitting..." submitText="Submit Listing" />
+      <SubmitButton loading={loading} loadingText={t('common.loading')} submitText={t('sellAnimal.submitListing')} />
     </form>
   );
 };

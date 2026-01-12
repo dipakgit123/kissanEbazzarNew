@@ -1,5 +1,41 @@
 @tailwind base;
 
+/* Font Family Configuration for Multi-language Support */
+:root {
+  /* Noto Sans Devanagari is the best font for Hindi and Marathi
+     - Excellent Devanagari script support
+     - Clean and modern design
+     - Good readability
+     - Wide range of weights
+     - Maintained by Google Fonts
+  */
+  --font-primary: 'Noto Sans', 'Noto Sans Devanagari', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  --font-devanagari: 'Noto Sans Devanagari', 'Noto Sans', sans-serif;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Apply Devanagari font when Hindi or Marathi is active */
+html[lang="hi"] body,
+html[lang="mr"] body,
+html[lang="hi"] *,
+html[lang="mr"] * {
+  font-family: var(--font-devanagari);
+}
+
+/* Improve Devanagari text rendering */
+html[lang="hi"],
+html[lang="mr"] {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 @keyframes slide-left {
   0% {
     transform: translateX(0%);

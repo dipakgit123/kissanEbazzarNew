@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 const NearbyVeterinarians = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [veterinarians, setVeterinarians] = useState([]);
   const [loading, setLoading] = useState(true);

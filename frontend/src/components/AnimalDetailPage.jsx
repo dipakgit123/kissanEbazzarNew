@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { listingsService } from '../services/api';
 
 const AnimalDetailPage = () => {
+  const { t } = useTranslation();
   const { animalType, id } = useParams();
   const navigate = useNavigate();
   const [listing, setListing] = useState(null);

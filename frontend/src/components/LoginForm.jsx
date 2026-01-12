@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import toast, { Toaster } from 'react-hot-toast';
 import farmerImage from '../assets/images/6101100.jpg';
 import { otpService } from '../services/api';
@@ -18,6 +19,8 @@ const LockIcon = () => (
 );
 
 const LoginForm = ({ onLoginSuccess }) => {
+  const { t } = useTranslation();
+  
   // States
   const [step, setStep] = useState(1); // 1: Phone, 2: OTP
   const [isLoading, setIsLoading] = useState(false);
@@ -79,7 +82,7 @@ const LoginForm = ({ onLoginSuccess }) => {
     e.preventDefault();
     
     if (phoneNumber.length < 10) {
-      toast.error('Please enter a valid 10-digit phone number');
+      toast.error(t('auth.invalidPhone'));
       return;
     }
     
@@ -91,12 +94,12 @@ const LoginForm = ({ onLoginSuccess }) => {
       const response = await otpService.sendOTP(formattedPhone);
       
       if (response.success) {
-        toast.success('OTP sent successfully!');
+        toast.success(t('auth.otpSent'));
         setStep(2);
         setResendTimer(OTP_RESEND_DELAY);
       }
     } catch (error) {
-      toast.error(error.message || 'Failed to send OTP');
+      toast.error(error.message || t('auth.otpSent'));
     } finally {
       setIsLoading(false);
     }
@@ -159,7 +162,7 @@ const LoginForm = ({ onLoginSuccess }) => {
       const response = await otpService.verifyOTP(fullPhoneNumber, otpCode);
       
       if (response.success) {
-        toast.success('Login successful!');
+        toast.success(t('auth.loginSuccess'));
         
         // Store token and user info
         if (response.token) {
@@ -240,14 +243,14 @@ const LoginForm = ({ onLoginSuccess }) => {
           {step === 1 && (
             <div className="h-full flex flex-col justify-center">
               <div className="mb-8">
-                <h2 className="text-3xl font-bold text-gray-800 mb-2">Welcome Back</h2>
-                <p className="text-gray-600">Login with your phone number</p>
+                <h2 className="text-3xl font-bold text-gray-800 mb-2">{t('auth.welcomeBack')}</h2>
+                <p className="text-gray-600">{t('auth.loginToContinue')}</p>
               </div>
               
               <form onSubmit={handlePhoneSubmit} className="space-y-6">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Phone Number
+                    {t('auth.phoneNumber')}
                   </label>
                   <div className="flex space-x-2">
                     <select
@@ -266,7 +269,7 @@ const LoginForm = ({ onLoginSuccess }) => {
                         value={phoneNumber}
                         onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
                         className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all"
-                        placeholder="Enter phone number"
+                        placeholder={t('auth.enterPhone')}
                         maxLength="10"
                         required
                         autoFocus
@@ -290,7 +293,7 @@ const LoginForm = ({ onLoginSuccess }) => {
                       : 'bg-gradient-to-r from-[#15BB73] to-[#0FA568] hover:shadow-lg transform hover:-translate-y-0.5'
                   }`}
                 >
-                  {isLoading ? 'Sending...' : 'Get OTP'}
+                  {isLoading ? t('common.loading') : t('auth.sendOTP')}
                 </button>
 
                 {/* Info Note */}
@@ -313,9 +316,9 @@ const LoginForm = ({ onLoginSuccess }) => {
           {step === 2 && (
             <div className="h-full flex flex-col justify-center">
               <div className="mb-8">
-                <h2 className="text-3xl font-bold text-gray-800 mb-2">Verify OTP</h2>
+                <h2 className="text-3xl font-bold text-gray-800 mb-2">{t('auth.verifyOTP')}</h2>
                 <p className="text-gray-600">
-                  Enter the code sent to {fullPhoneNumber}
+                  {t('auth.enterOTP')} {fullPhoneNumber}
                 </p>
               </div>
               
@@ -361,7 +364,7 @@ const LoginForm = ({ onLoginSuccess }) => {
                       disabled={isLoading}
                       className="text-[#15BB73] font-semibold text-sm hover:underline disabled:opacity-50"
                     >
-                      Resend OTP
+                      {t('auth.resendOTP')}
                     </button>
                   )}
                 </div>
@@ -376,7 +379,7 @@ const LoginForm = ({ onLoginSuccess }) => {
                       : 'bg-gradient-to-r from-[#15BB73] to-[#0FA568] hover:shadow-lg transform hover:-translate-y-0.5'
                   }`}
                 >
-                  {isLoading ? 'Verifying...' : 'Verify & Login'}
+                  {isLoading ? t('common.loading') : t('auth.verifyOTP')}
                 </button>
                 
                 {/* Change Number */}

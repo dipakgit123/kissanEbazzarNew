@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import './AnimalListingPage.css';
 import AnimalListingForm from './AnimalListingForm';
 import BuffaloListingForm from './BuffaloListingForm';
@@ -14,15 +15,16 @@ import goatClipart from '../assets/cliparts/goat_clipart.jpg';
 import horseClipart from '../assets/cliparts/horse_clipart.jpg';
 
 const AnimalListingPage = () => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('animal');
 
   const tabs = [
-    { id: 'animal', label: 'Cow', icon: cowClipart },
-    { id: 'buffalo', label: 'Buffalo', icon: buffaloClipart },
-    { id: 'cat', label: 'Cat', icon: catClipart },
-    { id: 'dog', label: 'Dog', icon: dogClipart },
-    { id: 'goat', label: 'Goat', icon: goatClipart },
-    { id: 'horse', label: 'Horse', icon: horseClipart }
+    { id: 'animal', label: t('animalTypes.cow'), icon: cowClipart },
+    { id: 'buffalo', label: t('animalTypes.buffalo'), icon: buffaloClipart },
+    { id: 'cat', label: t('animalTypes.cat'), icon: catClipart },
+    { id: 'dog', label: t('animalTypes.dog'), icon: dogClipart },
+    { id: 'goat', label: t('animalTypes.goat'), icon: goatClipart },
+    { id: 'horse', label: t('animalTypes.horse'), icon: horseClipart }
   ];
 
   const renderForm = () => {

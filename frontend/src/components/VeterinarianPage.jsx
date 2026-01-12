@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -198,7 +199,7 @@ const VeterinarianPage = () => {
       <div className="bg-gradient-to-r from-[#15BB73]/10 to-[#0FA568]/10 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-4xl font-bold text-[#000600] mb-4">
-            पशु डॉक्टर / Veterinarian Services
+            {t('veterinarian.title')}
           </h1>
           <p className="text-lg text-gray-600 mb-8 max-w-3xl mx-auto">
             Professional veterinary care for your farm animals. Connect with experienced veterinarians for health checkups, emergency care, and specialized treatments.
@@ -256,7 +257,7 @@ const VeterinarianPage = () => {
             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
             </svg>
-            Register as Veterinarian / पशु चिकित्सक के रूप में पंजीकरण करें
+            {t('vetRegistration.title')}
           </Link>
         </div>
       </div>
@@ -264,7 +265,7 @@ const VeterinarianPage = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Services Section */}
         <div className="mb-12">
-          <h2 className="text-3xl font-bold text-[#000600] mb-8 text-center">Available Services</h2>
+          <h2 className="text-3xl font-bold text-[#000600] mb-8 text-center">{t('veterinarian.title')}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredServices.map((service) => (
               <div
@@ -304,7 +305,7 @@ const VeterinarianPage = () => {
         {/* Veterinarians Section */}
         <div className="mb-12">
           <h2 className="text-3xl font-bold text-[#000600] mb-8 text-center">
-            Nearby Veterinarians / आस-पास के पशु चिकित्सक
+            {t('veterinarian.nearbyVets')}
           </h2>
 
           {loading ? (
@@ -440,7 +441,7 @@ const VeterinarianPage = () => {
         <div className="bg-gradient-to-r from-red-500 to-red-600 text-white p-8 rounded-2xl shadow-xl">
           <div className="text-center">
             <h2 className="text-3xl font-bold mb-4">Emergency Veterinary Care</h2>
-            <p className="text-xl mb-2">24/7 Emergency Services Available</p>
+            <p className="text-xl mb-2">24/7 {t('appointment.emergency')}</p>
             <p className="mb-6">आपातकालीन पशु चिकित्सा सेवाएं 24/7 उपलब्ध</p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button

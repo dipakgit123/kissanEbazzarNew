@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import toast, { Toaster } from 'react-hot-toast';
 import { userService } from '../services/api';
 
@@ -16,6 +17,7 @@ const LocationIcon = () => (
 );
 
 const ProfileCompletion = ({ onComplete }) => {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     full_name: '',
     postal_code: ''
@@ -195,7 +197,7 @@ const ProfileCompletion = ({ onComplete }) => {
                 : 'bg-gradient-to-r from-[#15BB73] to-[#0FA568] hover:shadow-lg transform hover:-translate-y-0.5'
             }`}
           >
-            {isLoading ? 'Completing Profile...' : 'Continue'}
+            {isLoading ? t('common.loading') : t('profileCompletion.continue')}
           </button>
         </form>
       </div>

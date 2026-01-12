@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
 import './index.css';
+import './i18n/config'; // Initialize i18n
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

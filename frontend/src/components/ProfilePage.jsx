@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import EditProfileForm from './EditProfileForm';
 import { userService } from '../services/api';
@@ -12,6 +13,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   onBack : optional callback to navigate back to the previous page
 */
 const ProfilePage = ({ onBack }) => {
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [user, setUser] = useState({
@@ -290,7 +292,7 @@ const ProfilePage = ({ onBack }) => {
             </svg>
           </button>
         )}
-        <h1 className="text-lg font-semibold">Profile</h1>
+        <h1 className="text-lg font-semibold">{t('profile.myProfile')}</h1>
       </header>
 
       <main className="flex-1 overflow-y-auto p-4 space-y-6">
@@ -311,7 +313,7 @@ const ProfilePage = ({ onBack }) => {
             </div>
             <p className="text-xs text-gray-500 mt-1">{user.completion}% profile complete</p>
           </div>
-          <button onClick={()=>setEditing(true)} className="text-sm text-green-600 hover:text-green-800 font-medium whitespace-nowrap">Edit</button>
+          <button onClick={()=>setEditing(true)} className="text-sm text-green-600 hover:text-green-800 font-medium whitespace-nowrap">{t('common.edit')}</button>
         </section>
 
         {/* Journey statistics */}
@@ -323,7 +325,7 @@ const ProfilePage = ({ onBack }) => {
 
         {/* Selling related */}
         <section className="bg-white rounded-xl shadow divide-y">
-          <h3 className="px-4 py-3 font-semibold text-gray-800">Selling Related</h3>
+          <h3 className="px-4 py-3 font-semibold text-gray-800">{t('profile.myListings')}</h3>
           <RowButton text="My Plan" />
           <button
             onClick={() => setShowMyAnimals(true)}
@@ -339,7 +341,7 @@ const ProfilePage = ({ onBack }) => {
 
         {/* Buying related */}
         <section className="bg-white rounded-xl shadow divide-y">
-          <h3 className="px-4 py-3 font-semibold text-gray-800">Buying Related</h3>
+          <h3 className="px-4 py-3 font-semibold text-gray-800">{t('profile.savedAnimals')}</h3>
           <RowButton text="Calls Made" />
           <RowButton text="Liked Animals" />
         </section>
@@ -393,9 +395,9 @@ const ProfilePage = ({ onBack }) => {
             {/* Content */}
             <div className="overflow-y-auto p-4 space-y-4">
               {loading ? (
-                <div className="text-center py-8 text-gray-500">Loading...</div>
+                <div className="text-center py-8 text-gray-500">{t('common.loading')}</div>
               ) : getTotalListings() === 0 ? (
-                <div className="text-center py-8 text-gray-500">No animals listed yet</div>
+                <div className="text-center py-8 text-gray-500">{t('home.noAnimalsFound')}</div>
               ) : (
                 <>
                   {/* Animals/Cows */}
@@ -480,8 +482,8 @@ const ProfilePage = ({ onBack }) => {
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
           <div className="bg-white rounded-xl p-6 max-w-md w-full">
-            <h3 className="text-lg font-bold mb-2">Delete Listing?</h3>
-            <p className="text-gray-600 mb-6">Are you sure you want to delete this listing? This action cannot be undone.</p>
+            <h3 className="text-lg font-bold mb-2">{t('common.delete')} {t('animalListing.title')}?</h3>
+            <p className="text-gray-600 mb-6">{t('admin.delete')} - This action cannot be undone.</p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(null)}
@@ -505,6 +507,7 @@ const ProfilePage = ({ onBack }) => {
 
 // Animal Card Component
 const AnimalCard = ({ animal, type, onDelete, onMarkSold, setShowDeleteConfirm, showDeleteConfirm }) => {
+  const { t } = useTranslation();
   const getDisplayName = () => {
     if (animal.breedName) return animal.breedName;
     if (animal.breed_name) return animal.breed_name;
@@ -570,14 +573,14 @@ const AnimalCard = ({ animal, type, onDelete, onMarkSold, setShowDeleteConfirm, 
                 onClick={() => onMarkSold(animal.id, type)}
                 className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
               >
-                Mark as Sold
+                {t('common.save')}
               </button>
             )}
             <button
               onClick={() => setShowDeleteConfirm({ id: animal.id, type })}
               className="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600"
             >
-              Delete
+              {t('common.delete')}
             </button>
           </div>
         </div>
