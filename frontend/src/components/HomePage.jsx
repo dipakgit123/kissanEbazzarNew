@@ -463,335 +463,308 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
 
   return (
     <div className="bg-gradient-to-br from-[#E9F0F8] to-[#F0F8FF] min-h-screen flex flex-col">
-      {/* Sticky Search Bar */}
-      {isScrolled && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md shadow-lg border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 sm:py-3">
-            {/* Mobile Layout */}
-            <div className="block sm:hidden">
-              <div className="flex items-center justify-between mb-3">
-                {/* Logo */}
-                <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 bg-gradient-to-br from-[#15BB73] to-[#0FA568] rounded-lg flex items-center justify-center shadow-lg">
-                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+
+      {/* Hero Section */}
+      <section className="bg-gradient-to-br from-white via-[#F0F8FF] to-[#E9F0F8] py-8 sm:py-12 lg:py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Hero Content */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+            {/* Left Side - Banner Image */}
+            <div className="order-1 lg:order-1">
+              <div className="relative">
+                {/* Main Banner Image */}
+                <div className="relative rounded-2xl overflow-hidden shadow-2xl">
+                  <img 
+                    src="/src/assets/images/farmer_fixed_1920x1400.png" 
+                    alt="Find Your Perfect Farm Animal" 
+                    className="w-full h-auto object-contain"
+                  />
+                  {/* Overlay gradient for better text visibility if needed */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/5 to-transparent pointer-events-none"></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Side - Text Content and Search */}
+            <div className="order-2 lg:order-2 space-y-6">
+              {/* Heading */}
+              <div className="space-y-3">
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-[#000600] leading-tight">
+                  Find Your Perfect<br />
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#15BB73] to-[#0FA568]">
+                    Farm Animal
+                  </span>
+                </h1>
+                <p className="text-base sm:text-lg text-gray-600 max-w-xl">
+                  Connect directly with farmers and find the best quality animals for your farm. 
+                  Browse through verified listings and make informed decisions.
+                </p>
+              </div>
+
+              {/* Trust Indicators */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 py-4 px-4 bg-gradient-to-r from-[#15BB73]/5 to-[#0FA568]/5 rounded-xl border border-[#15BB73]/10">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-[#15BB73] to-[#0FA568] rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
                   </div>
                   <div>
-                    <h1 className="text-sm font-bold text-[#000600]">Kissan E-Bazzar</h1>
-                    <p className="text-xs text-gray-600">Farmers Marketplace</p>
+                    <div className="text-lg font-bold text-[#000600]">50,000+</div>
+                    <div className="text-xs text-gray-600">Farmers</div>
                   </div>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="flex items-center space-x-2">
-                  <Link
-                    to="/sell-animal"
-                    className="bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-3 py-1.5 rounded-lg font-semibold text-xs"
-                  >
-                    {t('header.sell')}
-                  </Link>
-
-                  {/* Wishlist Button */}
-                  <Link
-                    to="/wishlist"
-                    className="relative w-8 h-8 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full flex items-center justify-center"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-[#15BB73] to-[#0FA568] rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                     </svg>
-                    {wishlist && wishlist.length > 0 && (
-                      <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
-                        {wishlist.length}
-                      </span>
-                    )}
-                  </Link>
+                  </div>
+                  <div>
+                    <div className="text-lg font-bold text-[#000600]">Verified</div>
+                    <div className="text-xs text-gray-600">Sellers</div>
+                  </div>
+                </div>
 
-                  <Link
-                    to="/profile"
-                    className="w-8 h-8 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full flex items-center justify-center"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-[#15BB73] to-[#0FA568] rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
-                  </Link>
+                  </div>
+                  <div>
+                    <div className="text-lg font-bold text-[#000600]">Secure</div>
+                    <div className="text-xs text-gray-600">Chat & Deals</div>
+                  </div>
                 </div>
               </div>
 
-              {/* Search Bar */}
-              <form onSubmit={handleSearch} className="relative">
-                <input
-                  type="text"
-                  placeholder={t('home.searchPlaceholder')}
-                  value={searchQuery}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 pl-8 pr-16 rounded-lg border-2 border-gray-200 focus:border-[#15BB73] focus:outline-none focus:ring-2 focus:ring-[#15BB73]/20 text-sm"
-                />
-                <svg className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                <button
-                  type="submit"
-                  className="absolute right-1 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-3 py-1 rounded-md font-medium text-xs"
-                >
-                  {t('common.search')}
-                </button>
-              </form>
-            </div>
-
-            {/* Desktop Layout */}
-            <div className="hidden sm:flex items-center justify-between">
-              {/* Logo */}
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-[#15BB73] to-[#0FA568] rounded-xl flex items-center justify-center shadow-lg">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                </div>
-                <div>
-                  <h1 className="text-lg font-bold text-[#000600]">Kissan E-Bazzar</h1>
-                  <p className="text-xs text-gray-600">Farmers Marketplace</p>
-                </div>
-              </div>
-
-              {/* Search Bar */}
-              <div className="flex-1 max-w-2xl mx-8">
-                <form onSubmit={handleSearch} className="relative">
-                  <input
-                    type="text"
-                    placeholder={t('home.searchPlaceholder')}
-                    value={searchQuery}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 pl-10 pr-24 rounded-xl border-2 border-gray-200 focus:border-[#15BB73] focus:outline-none focus:ring-2 focus:ring-[#15BB73]/20 text-sm shadow-sm"
-                  />
-                  <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  <button
-                    type="submit"
-                    className="absolute right-1 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-4 py-2 rounded-lg font-medium hover:shadow-lg transition-all duration-300 text-sm"
-                  >
-                    {t('common.search')}
-                  </button>
-                </form>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center space-x-3">
+              {/* Buy and Sell Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-3">
                 <Link
                   to="/sell-animal"
-                  className="bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-4 py-2 rounded-lg font-semibold hover:shadow-lg transition-all duration-300 text-sm"
+                  className="flex-1 group relative overflow-hidden bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-6 py-3 rounded-lg font-semibold text-sm sm:text-base shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5"
                 >
-                  {t('header.sell')}
+                  <div className="relative z-10 flex items-center justify-center gap-2">
+                    <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>{t('header.sell')}</span>
+                  </div>
+                  <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
                 </Link>
 
-                {/* Wishlist Button */}
-                <Link
-                  to="/wishlist"
-                  className="relative w-10 h-10 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full flex items-center justify-center hover:from-[#15BB73] hover:to-[#0FA568] hover:text-white transition-all duration-300"
+                <button
+                  onClick={() => {
+                    // Scroll to animal listings section
+                    const listingsSection = document.querySelector('#animal-listings');
+                    if (listingsSection) {
+                      listingsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                  }}
+                  className="flex-1 group relative overflow-hidden bg-white text-[#15BB73] border-2 border-[#15BB73] px-6 py-3 rounded-lg font-semibold text-sm sm:text-base shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 hover:bg-[#15BB73] hover:text-white"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
-                  </svg>
-                  {wishlist && wishlist.length > 0 && (
-                    <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold animate-pulse">
-                      {wishlist.length}
-                    </span>
-                  )}
-                </Link>
-
-                <Link
-                  to="/profile"
-                  className="w-10 h-10 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full flex items-center justify-center hover:from-[#15BB73] hover:to-[#0FA568] hover:text-white transition-all duration-300"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                </Link>
+                  <div className="relative z-10 flex items-center justify-center gap-2">
+                    <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    </svg>
+                    <span>{t('home.buyAnimals')}</span>
+                  </div>
+                </button>
               </div>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Hero Section */}
-      <section className="bg-gradient-to-r from-[#15BB73]/10 to-[#0FA568]/10 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-4xl font-bold text-[#000600] mb-4">
-            Find Your Perfect Farm Animal
-          </h2>
-          <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
-            Connect directly with farmers and find the best quality animals for your farm.
-            Browse through verified listings and make informed decisions.
-          </p>
-
-          {/* Location indicator */}
-          {userLocation && (userLocation.city || userLocation.state) && (
-            <p className="text-sm text-gray-500 mb-4">
-              Showing animals near <span className="font-semibold text-[#15BB73]">{userLocation.city}{userLocation.state ? `, ${userLocation.state}` : ''}</span>
-            </p>
-          )}
-
-          {/* Search Bar */}
-          <div className="max-w-2xl mx-auto relative">
-            <form onSubmit={handleSearch} className="relative">
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Search for animals, breeds, or locations..."
-                value={searchQuery}
-                onChange={handleInputChange}
-                onFocus={() => setShowSuggestions(true)}
-                className="w-full px-6 py-4 pl-12 pr-32 rounded-2xl border-2 border-gray-200 focus:border-[#15BB73] focus:outline-none focus:ring-4 focus:ring-[#15BB73]/20 text-lg shadow-lg bg-white"
-              />
-              <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-
-              {/* Clear button */}
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={clearSearch}
-                  className="absolute right-28 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
-
-              {/* Search button with loading state */}
-              <button
-                type="submit"
-                disabled={isSearching}
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-6 py-2 rounded-xl font-medium hover:shadow-lg transition-all duration-300 disabled:opacity-70 flex items-center gap-2"
-              >
-                {isSearching ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Searching</span>
-                  </>
-                ) : (
-                  'Search'
-                )}
-              </button>
-            </form>
-
-            {/* Search Suggestions Dropdown */}
-            {showSuggestions && (searchSuggestions.length > 0 || recentSearches.length > 0) && !searchQuery.trim() && (
-              <div
-                ref={suggestionsRef}
-                className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50"
-              >
-                {/* Recent Searches */}
-                {recentSearches.length > 0 && (
-                  <div className="p-3 border-b border-gray-100">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold text-gray-500 uppercase">Recent Searches</span>
-                      <button
-                        onClick={clearRecentSearches}
-                        className="text-xs text-[#15BB73] hover:underline"
-                      >
-                        Clear all
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {recentSearches.map((search, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => handleRecentSearchClick(search)}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-full text-sm text-gray-700 transition-colors"
-                        >
-                          <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          {search}
-                        </button>
-                      ))}
-                    </div>
+          {/* Feature Cards Section */}
+          <div className="mt-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* AI Assistant Card */}
+            <Link
+              to="/ai-assistant"
+              className="group relative bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105"
+            >
+              <div className="relative h-56 overflow-hidden">
+                <img
+                  src="/src/assets/images/AI Assistant.png"
+                  alt="AI Assistant"
+                  className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-blue-900/60 via-blue-900/30 to-transparent"></div>
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-black/80 to-transparent">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xl font-bold text-white drop-shadow-lg">AI Assistant</h3>
+                    <p className="text-xs text-white/80 mt-1">Instant AI support</p>
                   </div>
-                )}
-
-                {/* Quick Search Tags */}
-                <div className="p-3">
-                  <span className="text-xs font-semibold text-gray-500 uppercase block mb-2">Quick Search</span>
-                  <div className="flex flex-wrap gap-2">
-                    {quickSearchTags.map((tag) => (
-                      <button
-                        key={tag.query}
-                        onClick={() => handleQuickSearch(tag.query)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-[#15BB73]/10 to-[#0FA568]/10 hover:from-[#15BB73]/20 hover:to-[#0FA568]/20 rounded-full text-sm font-medium text-[#15BB73] transition-colors"
-                      >
-                        <span>{tag.icon}</span>
-                        {tag.label}
-                      </button>
-                    ))}
+                  <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
+                    <svg className="w-6 h-6 text-white group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                    </svg>
                   </div>
                 </div>
               </div>
-            )}
+            </Link>
 
-            {/* Live Suggestions while typing */}
-            {showSuggestions && searchQuery.trim() && searchSuggestions.length > 0 && (
-              <div
-                ref={suggestionsRef}
-                className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50"
-              >
-                <div className="p-2">
-                  {searchSuggestions.map((suggestion, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => handleQuickSearch(suggestion)}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 rounded-lg text-left transition-colors"
-                    >
-                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                      <span className="text-gray-700">{suggestion}</span>
-                    </button>
-                  ))}
+            {/* Veterinarian Card */}
+            <Link
+              to="/veterinarian"
+              className="group relative bg-gradient-to-br from-green-500 to-green-600 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105"
+            >
+              <div className="relative h-56 overflow-hidden">
+                <img
+                  src="/src/assets/images/veternarian.png"
+                  alt="Veterinarian"
+                  className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-green-900/60 via-green-900/30 to-transparent"></div>
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-black/80 to-transparent">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xl font-bold text-white drop-shadow-lg">Veterinarian</h3>
+                    <p className="text-xs text-white/80 mt-1">Expert vet care</p>
+                  </div>
+                  <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
+                    <svg className="w-6 h-6 text-white group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
                 </div>
               </div>
-            )}
+            </Link>
+
+            {/* AI Health Card */}
+            <Link
+              to="/ai-health-check"
+              className="group relative bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105"
+            >
+              <div className="relative h-56 overflow-hidden">
+                <img
+                  src="/src/assets/images/AI health.png"
+                  alt="AI Health Check"
+                  className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-purple-900/60 via-purple-900/30 to-transparent"></div>
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-black/80 to-transparent">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xl font-bold text-white drop-shadow-lg">AI Health</h3>
+                    <p className="text-xs text-white/80 mt-1">Health monitoring</p>
+                  </div>
+                  <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
+                    <svg className="w-6 h-6 text-white group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </Link>
+
+            {/* Pregnancy Calendar Card */}
+            <Link
+              to="/pregnancy-calendar"
+              className="group relative bg-gradient-to-br from-pink-500 to-pink-600 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105"
+            >
+              <div className="relative h-56 overflow-hidden">
+                <img
+                  src="/src/assets/images/pregnancy calender.png"
+                  alt="Pregnancy Calendar"
+                  className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-pink-900/60 via-pink-900/30 to-transparent"></div>
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-black/80 to-transparent">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xl font-bold text-white drop-shadow-lg">Pregnancy Calendar</h3>
+                    <p className="text-xs text-white/80 mt-1">Track pregnancy</p>
+                  </div>
+                  <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
+                    <svg className="w-6 h-6 text-white group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </Link>
           </div>
 
-          {/* Quick Search Tags (visible when not focused) */}
-          {!showSuggestions && (
-            <div className="mt-4 flex flex-wrap justify-center gap-2">
-              {quickSearchTags.map((tag) => (
-                <button
-                  key={tag.query}
-                  onClick={() => handleQuickSearch(tag.query)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-white/80 hover:bg-white rounded-full text-sm font-medium text-gray-700 hover:text-[#15BB73] shadow-sm hover:shadow transition-all duration-200"
-                >
-                  <span>{tag.icon}</span>
-                  {tag.label}
-                </button>
+          {/* Animal Listings Preview Section */}
+          <div className="mt-16">
+            {/* Section Header */}
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl sm:text-3xl font-bold text-[#000600]">
+                All Available Animals
+              </h2>
+              <Link
+                to="/buy-animals"
+                className="flex items-center gap-2 bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold text-sm sm:text-base hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5"
+              >
+                <span>View All</span>
+                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
+
+            {/* Animal Cards Grid - First 4 */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {animalData.slice(0, 4).map((animal) => (
+                <AnimalCard
+                  key={animal.id}
+                  id={animal.id}
+                  listingId={animal.listingId}
+                  title={animal.title}
+                  price={animal.price}
+                  location={animal.location}
+                  datePosted={animal.datePosted}
+                  imageSrc={animal.imageSrc}
+                  sellerName={animal.sellerName}
+                  phoneNumber={animal.phoneNumber}
+                  breed={animal.breed}
+                  animalType={animal.animalType}
+                  milkProduction={animal.milkProduction}
+                  isInWishlist={isInWishlist(animal.id)}
+                  onToggleWishlist={handleToggleWishlist}
+                />
               ))}
             </div>
-          )}
+
+            {/* Show message if no animals available */}
+            {animalData.length === 0 && (
+              <div className="text-center py-12">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
+                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-700 mb-2">No Animals Available</h3>
+                <p className="text-gray-500">Check back later for new listings</p>
+              </div>
+            )}
+          </div>
+
         </div>
+      </section>
+
+      {/* App Download Banner - Full Width with Padding */}
+      <section className="w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] my-16 bg-gradient-to-r from-[#F0F8FF] to-[#E9F0F8] px-4 sm:px-6 md:px-8 lg:px-12 py-8">
+        <a 
+          href="#" 
+          className="block rounded-xl overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
+        >
+          <img 
+            src="/src/assets/images/playstore.png" 
+            alt="Download Kissan E-Bazzar App" 
+            className="w-full h-auto object-cover"
+          />
+        </a>
       </section>
 
       {/* Main Content */}
       <main className={`flex-1 p-4 pb-20 transition-all duration-300 ${isScrolled ? 'pt-16 sm:pt-20' : ''}`}>
-        {/* Animal Categories */}
-        <div className="max-w-7xl mx-auto mb-6">
-          <h3 className="text-2xl font-bold text-[#000600] mb-6 text-center">Browse by Category</h3>
-          <CircleBar
-            onCategoryClick={handleCategoryClick}
-            selectedCategory={selectedCategory}
-          />
-        </div>
-
-        {/* Distance Toggle */}
-        <div className="max-w-7xl mx-auto mb-8">
-          <DistanceToggle
-            activeMode={distanceMode}
-            onModeChange={setDistanceMode}
-          />
-        </div>
 
         <div className="max-w-7xl mx-auto">
           {/* Search Results Header */}
@@ -857,57 +830,45 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
             </div>
           )}
 
-          {/* Listings */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold text-[#000600]">
-                {isShowingSearchResults
-                  ? 'Search Results'
-                  : isShowingCategoryResults
-                    ? `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}s`
-                    : distanceMode === 'nearby'
-                      ? 'Nearby Animals (100 km)'
-                      : 'All Available Animals'}
-              </h3>
-              {userLocation && !isShowingSearchResults && (
-                <span className="text-sm text-gray-500 flex items-center">
-                  <svg className="w-4 h-4 mr-1 text-[#15BB73]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  Sorted by distance
-                </span>
-              )}
-            </div>
+          {/* Listings - Only show when searching or category filtering */}
+          {(isShowingSearchResults || isShowingCategoryResults) && (
+            <div id="animal-listings" className="mb-8 scroll-mt-20">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-2xl font-bold text-[#000600]">
+                  {isShowingSearchResults
+                    ? 'Search Results'
+                    : `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}s`}
+                </h3>
+              </div>
 
-            {loading || (isSearching && filteredAnimals.length === 0) ? (
-              <div className="flex justify-center items-center py-12">
-                <CowLoader message={isSearching ? `Searching for "${searchQuery}"...` : "Finding animals for you..."} size="medium" />
-              </div>
-            ) : displayAnimals.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {displayAnimals.map((animal) => (
-                  <AnimalCard
-                    key={animal.id}
-                    id={animal.id}
-                    listingId={animal.listingId}
-                    title={animal.title}
-                    price={animal.price}
-                    location={animal.location}
-                    datePosted={animal.datePosted}
-                    imageSrc={animal.imageSrc}
-                    sellerName={animal.sellerName}
-                    phoneNumber={animal.phoneNumber}
-                    breed={animal.breed}
-                    animalType={animal.animalType}
-                    milkProduction={animal.milkProduction}
-                    isInWishlist={isInWishlist(animal.id)}
-                    onToggleWishlist={handleToggleWishlist}
-                  />
-                ))}
-              </div>
-            ) : searchQuery.trim() ? (
-              <div className="text-center py-16 bg-white rounded-2xl shadow-sm">
+              {loading || (isSearching && filteredAnimals.length === 0) ? (
+                <div className="flex justify-center items-center py-12">
+                  <CowLoader message={isSearching ? `Searching for "${searchQuery}"...` : "Finding animals for you..."} size="medium" />
+                </div>
+              ) : displayAnimals.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {displayAnimals.map((animal) => (
+                    <AnimalCard
+                      key={animal.id}
+                      id={animal.id}
+                      listingId={animal.listingId}
+                      title={animal.title}
+                      price={animal.price}
+                      location={animal.location}
+                      datePosted={animal.datePosted}
+                      imageSrc={animal.imageSrc}
+                      sellerName={animal.sellerName}
+                      phoneNumber={animal.phoneNumber}
+                      breed={animal.breed}
+                      animalType={animal.animalType}
+                      milkProduction={animal.milkProduction}
+                      isInWishlist={isInWishlist(animal.id)}
+                      onToggleWishlist={handleToggleWishlist}
+                    />
+                  ))}
+                </div>
+              ) : searchQuery.trim() ? (
+                <div className="text-center py-16 bg-white rounded-2xl shadow-sm">
                 <div className="text-6xl mb-4">🔍</div>
                 <h3 className="text-2xl font-bold text-gray-600 mb-2">No results for "{searchQuery}"</h3>
                 <p className="text-gray-500 mb-6 max-w-md mx-auto">
@@ -981,8 +942,8 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
                 </Link>
               </div>
             )}
-          </div>
-
+            </div>
+          )}
         </div>
       </main>
 

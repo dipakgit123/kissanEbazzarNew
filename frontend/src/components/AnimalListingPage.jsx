@@ -7,6 +7,7 @@ import CatListingForm from './CatListingForm';
 import DogListingForm from './DogListingForm';
 import GoatListingForm from './GoatListingForm';
 import HorseListingForm from './HorseListingForm';
+import OtherAnimalListingForm from './OtherAnimalListingForm';
 import cowClipart from '../assets/cliparts/cow_cliparts.jpg';
 import buffaloClipart from '../assets/cliparts/buffello_clipart.jpg';
 import catClipart from '../assets/cliparts/cat_clipart.png';
@@ -24,7 +25,8 @@ const AnimalListingPage = () => {
     { id: 'cat', label: t('animalTypes.cat'), icon: catClipart },
     { id: 'dog', label: t('animalTypes.dog'), icon: dogClipart },
     { id: 'goat', label: t('animalTypes.goat'), icon: goatClipart },
-    { id: 'horse', label: t('animalTypes.horse'), icon: horseClipart }
+    { id: 'horse', label: t('animalTypes.horse'), icon: horseClipart },
+    { id: 'other', label: t('animalTypes.other') || 'Other', icon: null }
   ];
 
   const renderForm = () => {
@@ -41,6 +43,8 @@ const AnimalListingPage = () => {
         return <GoatListingForm />;
       case 'horse':
         return <HorseListingForm />;
+      case 'other':
+        return <OtherAnimalListingForm />;
       default:
         return <AnimalListingForm />;
     }
@@ -59,7 +63,11 @@ const AnimalListingPage = () => {
             >
               <span className="tab-icon">
                 <span className="tab-icon-inner">
-                  <img src={tab.icon} alt={tab.label} className="tab-icon-img" />
+                  {tab.icon ? (
+                    <img src={tab.icon} alt={tab.label} className="tab-icon-img" />
+                  ) : (
+                    <span className="tab-icon-text">?</span>
+                  )}
                 </span>
               </span>
               <span className="tab-label">{tab.label}</span>

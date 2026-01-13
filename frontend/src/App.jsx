@@ -20,13 +20,25 @@ import NearbyVeterinarians from './components/NearbyVeterinarians';
 import AppointmentBookingForm from './components/AppointmentBookingForm';
 import WishlistPage from './components/WishlistPage';
 import AIHealthCheck from './components/AIHealthCheck';
+import CallHistory from './components/CallHistory';
 import AdminLogin from './components/admin/AdminLogin';
 import AdminDashboard from './components/admin/AdminDashboard';
+import BuyAnimalsPage from './components/BuyAnimalsPage';
 
 function App() {
   // Initialize state from localStorage
   const [currentPage, setCurrentPage] = useState(() => {
-    return localStorage.getItem('currentPage') || 'login';
+    // Check if user has token (logged in before)
+    const token = localStorage.getItem('token');
+    const savedPage = localStorage.getItem('currentPage');
+    
+    // If user has token, go to saved page or home
+    if (token) {
+      return savedPage || 'home';
+    }
+    
+    // If no token, always show login page
+    return 'login';
   });
   const [wishlist, setWishlist] = useState([]);
   const [hasLocation, setHasLocation] = useState(() => {
@@ -166,11 +178,13 @@ function App() {
           }
         />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/buy-animals" element={<BuyAnimalsPage wishlist={wishlist} addToWishlist={addToWishlist} removeFromWishlist={removeFromWishlist} isInWishlist={isInWishlist} />} />
         <Route path="/sell-animal" element={<AnimalListingPage />} />
         <Route path="/animal/:animalType/:id" element={<AnimalDetailPage />} />
         <Route path="/veterinarian" element={<VeterinarianPage />} />
         <Route path="/pregnancy-calendar" element={<PregnancyCalendar />} />
         <Route path="/health-check" element={<AIHealthCheck />} />
+        <Route path="/call-history" element={<CallHistory />} />
         <Route path="/wishlist" element={<WishlistPage wishlist={wishlist} removeFromWishlist={removeFromWishlist} isInWishlist={isInWishlist} />} />
         <Route path="/map" element={<MapView wishlist={wishlist} addToWishlist={addToWishlist} removeFromWishlist={removeFromWishlist} isInWishlist={isInWishlist} />} />
         <Route path="*" element={<Navigate to="/" replace />} />

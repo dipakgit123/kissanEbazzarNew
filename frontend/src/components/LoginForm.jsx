@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import toast, { Toaster } from 'react-hot-toast';
-import farmerImage from '../assets/images/6101100.jpg';
+import loginImage from '../assets/images/login1.png';
 import { otpService } from '../services/api';
+import LanguageSwitcher from './LanguageSwitcher';
 
 // Icons
 const PhoneIcon = () => (
@@ -214,31 +215,29 @@ const LoginForm = ({ onLoginSuccess }) => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#E9F0F8] to-[#F0F8FF] p-4">
       <Toaster position="top-right" />
       
-      <div className="bg-white rounded-2xl shadow-2xl overflow-hidden w-full max-w-4xl flex flex-col lg:flex-row">
-        {/* Image Side */}
-        <div className="lg:w-1/2 relative overflow-hidden h-64 lg:h-auto bg-gradient-to-br from-[#15BB73]/10 to-[#0FA568]/20">
+      {/* Language Switcher - Top Right */}
+      <div className="fixed top-4 right-4 z-50">
+        <LanguageSwitcher />
+      </div>
+      
+      <div className="bg-white rounded-2xl shadow-2xl overflow-hidden w-full max-w-5xl lg:max-w-6xl flex flex-col lg:flex-row min-h-[600px]">
+        {/* Image Side - Left */}
+        <div className="lg:w-[58%] relative overflow-hidden h-56 sm:h-72 lg:h-auto">
           <img 
-            src={farmerImage} 
-            alt="Kissan E-Bazzar" 
-            className="w-full h-full object-cover"
+            src={loginImage} 
+            alt="Kissan E-Bazzar Login" 
+            className="w-full h-full object-cover object-center lg:object-left"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent"></div>
           
-          {/* Overlay Content */}
-          <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
-            <h1 className="text-3xl font-bold mb-2">Kissan E-Bazzar</h1>
-            <p className="text-sm opacity-90">
-              Connecting farmers directly to consumers
-            </p>
-            <div className="mt-4 flex space-x-1">
-              <div className={`w-8 h-1 rounded ${step >= 1 ? 'bg-[#15BB73]' : 'bg-white/40'}`}></div>
-              <div className={`w-8 h-1 rounded ${step >= 2 ? 'bg-[#15BB73]' : 'bg-white/40'}`}></div>
-            </div>
+          {/* Progress Indicator */}
+          <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 lg:bottom-8 lg:left-8 flex space-x-1">
+            <div className={`w-6 sm:w-8 h-1 rounded ${step >= 1 ? 'bg-[#15BB73]' : 'bg-white/40'}`}></div>
+            <div className={`w-6 sm:w-8 h-1 rounded ${step >= 2 ? 'bg-[#15BB73]' : 'bg-white/40'}`}></div>
           </div>
         </div>
         
-        {/* Form Side */}
-        <div className="lg:w-1/2 p-8 lg:p-12">
+        {/* Form Side - Right */}
+        <div className="lg:w-[42%] p-6 sm:p-8 lg:p-8 xl:p-10">
           {/* Step 1: Phone Number */}
           {step === 1 && (
             <div className="h-full flex flex-col justify-center">
@@ -280,7 +279,7 @@ const LoginForm = ({ onLoginSuccess }) => {
                     </div>
                   </div>
                   <p className="text-xs text-gray-500 mt-2">
-                    We'll send you a one-time password
+                    {t('auth.otpMessage')}
                   </p>
                 </div>
                 
@@ -299,12 +298,12 @@ const LoginForm = ({ onLoginSuccess }) => {
                 {/* Info Note */}
                 <div className="mt-6 text-center">
                   <p className="text-sm text-gray-600">
-                    Are you a veterinarian?{' '}
+                    {t('auth.areYouVeterinarian')}{' '}
                     <Link
                       to="/veterinarian/login"
                       className="text-blue-600 hover:text-blue-700 font-semibold"
                     >
-                      Click here to login
+                      {t('auth.clickHereToLogin')}
                     </Link>
                   </p>
                 </div>
@@ -326,7 +325,7 @@ const LoginForm = ({ onLoginSuccess }) => {
                 {/* OTP Input */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-4">
-                    Enter 6-digit code
+                    {t('auth.enter6DigitCode')}
                   </label>
                   <div className="flex space-x-3 justify-center">
                     {otp.map((digit, index) => (
@@ -356,7 +355,7 @@ const LoginForm = ({ onLoginSuccess }) => {
                 <div className="text-center">
                   {resendTimer > 0 ? (
                     <p className="text-gray-600 text-sm">
-                      Resend code in <span className="font-semibold">{resendTimer}</span> seconds
+                      {t('auth.resendCodeIn')} <span className="font-semibold">{resendTimer}</span> {t('auth.seconds')}
                     </p>
                   ) : (
                     <button
@@ -391,7 +390,7 @@ const LoginForm = ({ onLoginSuccess }) => {
                   }}
                   className="w-full text-center text-sm text-gray-600 hover:text-[#15BB73] transition-colors"
                 >
-                  Change phone number
+                  {t('auth.changePhoneNumber')}
                 </button>
               </div>
             </div>

@@ -229,6 +229,40 @@ class CombinedListingsController {
           WHERE status = 'active'
             AND latitude IS NOT NULL
             AND longitude IS NOT NULL
+
+          UNION ALL
+
+          SELECT
+            id,
+            animal_type as animal_type,
+            breed_name,
+            COALESCE(age, '') as age,
+            NULL::text as milk_capacity,
+            NULL::text as pregnancy_status,
+            health_condition::text as health_condition,
+            expected_price,
+            is_negotiable,
+            front_photo,
+            side_photo,
+            city,
+            state,
+            pincode,
+            latitude,
+            longitude,
+            status::text as status,
+            user_id,
+            created_at,
+            (6371 * acos(
+              LEAST(1.0,
+                cos(radians($1)) * cos(radians(latitude)) *
+                cos(radians(longitude) - radians($2)) +
+                sin(radians($1)) * sin(radians(latitude))
+              )
+            )) AS distance
+          FROM other_animal_listings
+          WHERE status = 'active'
+            AND latitude IS NOT NULL
+            AND longitude IS NOT NULL
         ) AS combined_listings
         WHERE distance < $3
         ORDER BY distance ASC

@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import toast, { Toaster } from 'react-hot-toast';
-import vetImage from '../assets/images/6101100.jpg';
+import vetLoginImage from '../assets/images/login2.png';
+import LanguageSwitcher from './LanguageSwitcher';
 
 // Icons
 const EmailIcon = () => (
@@ -31,6 +33,7 @@ const EyeOffIcon = () => (
 
 const VeterinarianLogin = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -126,75 +129,25 @@ const VeterinarianLogin = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4">
       <Toaster position="top-right" />
+      
+      {/* Language Switcher - Top Right */}
+      <div className="fixed top-4 right-4 z-50">
+        <LanguageSwitcher />
+      </div>
 
-      <div className="bg-white rounded-3xl shadow-2xl overflow-hidden w-full max-w-5xl flex flex-col lg:flex-row">
-        {/* Left Side - Branding/Image */}
-        <div className="lg:w-2/5 relative overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 p-10 flex flex-col justify-between">
-          {/* Decorative Background Pattern */}
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-0 left-0 w-64 h-64 bg-white rounded-full -translate-x-1/2 -translate-y-1/2"></div>
-            <div className="absolute bottom-0 right-0 w-96 h-96 bg-white rounded-full translate-x-1/3 translate-y-1/3"></div>
-          </div>
-
-          {/* Logo Section */}
-          <div className="relative z-10">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl mb-6">
-              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
-            </div>
-            <h1 className="text-4xl font-bold text-white mb-3">
-              Veterinarian Portal
-            </h1>
-            <p className="text-blue-100 text-lg mb-8">
-              पशु चिकित्सक पोर्टल
-            </p>
-            <p className="text-white/90 leading-relaxed">
-              Access your professional dashboard to manage appointments, connect with farmers, and provide veterinary services
-            </p>
-          </div>
-
-          {/* Features List */}
-          <div className="relative z-10 space-y-4">
-            <div className="flex items-start space-x-3">
-              <div className="flex-shrink-0 w-6 h-6 bg-white/20 rounded-full flex items-center justify-center mt-1">
-                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-white font-semibold">Secure Access</p>
-                <p className="text-blue-100 text-sm">Verified veterinarian accounts only</p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <div className="flex-shrink-0 w-6 h-6 bg-white/20 rounded-full flex items-center justify-center mt-1">
-                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-white font-semibold">Manage Appointments</p>
-                <p className="text-blue-100 text-sm">Track and organize consultations</p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <div className="flex-shrink-0 w-6 h-6 bg-white/20 rounded-full flex items-center justify-center mt-1">
-                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-white font-semibold">Connect with Farmers</p>
-                <p className="text-blue-100 text-sm">Build your professional network</p>
-              </div>
-            </div>
-          </div>
+      <div className="bg-white rounded-2xl shadow-2xl overflow-hidden w-full max-w-5xl lg:max-w-6xl flex flex-col lg:flex-row min-h-[600px]">
+        {/* Image Side - Left */}
+        <div className="lg:w-[58%] relative overflow-hidden h-56 sm:h-72 lg:h-auto">
+          <img 
+            src={vetLoginImage} 
+            alt="Veterinarian Login" 
+            className="w-full h-full object-cover object-center lg:object-left"
+          />
         </div>
 
-        {/* Right Side - Login Form */}
-        <div className="lg:w-3/5 p-8 lg:p-12">
-          <div className="max-w-md mx-auto">
+        {/* Form Side - Right */}
+        <div className="lg:w-[42%] p-6 sm:p-8 lg:p-8 xl:p-10">
+          <div className="h-full flex flex-col justify-center">
             {/* Header */}
             <div className="mb-8">
               <h2 className="text-3xl font-bold text-gray-800 mb-2">Welcome Back! 👋</h2>

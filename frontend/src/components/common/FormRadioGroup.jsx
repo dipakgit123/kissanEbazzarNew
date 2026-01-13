@@ -2,29 +2,31 @@ import React from 'react';
 
 const FormRadioGroup = ({
   label,
-  marathiLabel,
   name,
-  options,
-  selectedValue,
-  onChange
+  value,
+  onChange,
+  options
 }) => {
   return (
-    <div className="form-group">
-      <label>
+    <div className="form-group mb-6">
+      <label className="form-label block mb-3 font-semibold text-gray-700">
         {label}
-        {marathiLabel && <span className="marathi">{marathiLabel}</span>}
       </label>
-      <div className="radio-group">
+      <div className="radio-group flex flex-wrap gap-4">
         {options.map((option) => (
-          <div key={option.value} className="radio-option">
+          <div key={option.value} className="radio-option flex items-center">
             <input
               type="radio"
-              id={option.id}
+              id={`${name}-${option.value}`}
               name={name}
-              checked={selectedValue === option.value}
-              onChange={() => onChange(option.value)}
+              value={option.value}
+              checked={value === option.value}
+              onChange={onChange}
+              className="w-4 h-4 text-green-600 focus:ring-green-500 border-gray-300"
             />
-            <label htmlFor={option.id}>{option.label}</label>
+            <label htmlFor={`${name}-${option.value}`} className="ml-2 text-gray-700 cursor-pointer">
+              {option.label}
+            </label>
           </div>
         ))}
       </div>

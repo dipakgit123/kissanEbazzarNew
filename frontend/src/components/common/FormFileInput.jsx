@@ -1,62 +1,60 @@
 import React from 'react';
 
 const FormFileInput = ({
-  id,
   name,
   label,
   accept,
   onChange,
-  file,
-  fileName,
+  helperText,
   required = false
 }) => {
+  const [fileName, setFileName] = React.useState('');
+
   const handleChange = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
-      // Call onChange with the file directly (as expected by parent components)
-      onChange(selectedFile);
+      setFileName(selectedFile.name);
+      onChange(e);
     }
   };
 
-  // Get display name from file object or fileName prop
-  const displayName = file?.name || fileName || `Choose ${label}`;
-
   return (
-    <div className="form-group">
-      <label className="form-label">
-        {label} {required && <span className="required">*</span>}
+    <div className="form-group mb-6">
+      <label className="form-label block mb-2 font-semibold text-gray-700">
+        {label} {required && <span className="required text-red-500">*</span>}
       </label>
       <div className="file-input-wrapper">
         <input
           type="file"
-          id={id}
+          id={name}
           name={name}
           accept={accept}
           onChange={handleChange}
-          required={required && !file}
+          required={required}
+          className="hidden"
         />
-        <label htmlFor={id} className="file-input-label">
-          {file ? (
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: '#22c55e' }}>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
+        <label 
+          htmlFor={name} 
+          className="file-input-label flex items-center justify-center w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-green-500 hover:bg-green-50 transition-all duration-200"
+        >
+          {fileName ? (
+            <>
+              <svg className="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <span className="text-green-700 font-medium truncate max-w-xs">{fileName}</span>
+            </>
           ) : (
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
+            <>
+              <svg className="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              <span className="text-gray-600">Choose file or drag here</span>
+            </>
           )}
-          <span style={{
-            color: file ? '#22c55e' : 'inherit',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            maxWidth: '200px',
-            display: 'inline-block'
-          }}>
-            {displayName}
-          </span>
         </label>
       </div>
+      {helperText && <p className="text-sm text-gray-500 mt-2">{helperText}</p>}
     </div>
   );
 };

@@ -59,6 +59,19 @@ const Layout = ({ showHeaderFooter = true, wishlistCount = 0 }) => {
                   }`}></span>
                 </Link>
                 <Link 
+                  to="/buy-animals" 
+                  className={`font-semibold transition-all duration-200 relative group ${
+                    pathname.startsWith('/buy-animals') 
+                      ? 'text-[#15BB73]' 
+                      : 'text-gray-600 hover:text-[#15BB73]'
+                  }`}
+                >
+                  {t('home.buyAnimals')}
+                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${
+                    pathname.startsWith('/buy-animals') ? 'w-full' : 'w-0 group-hover:w-full'
+                  }`}></span>
+                </Link>
+                <Link 
                   to="/sell-animal" 
                   className={`font-semibold transition-all duration-200 relative group ${
                     pathname.startsWith('/sell') 
@@ -69,32 +82,6 @@ const Layout = ({ showHeaderFooter = true, wishlistCount = 0 }) => {
                   {t('header.sell')}
                   <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${
                     pathname.startsWith('/sell') ? 'w-full' : 'w-0 group-hover:w-full'
-                  }`}></span>
-                </Link>
-                <Link 
-                  to="/map" 
-                  className={`font-semibold transition-all duration-200 relative group ${
-                    pathname.startsWith('/map') 
-                      ? 'text-[#15BB73]' 
-                      : 'text-gray-600 hover:text-[#15BB73]'
-                  }`}
-                >
-                  {t('header.map')}
-                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${
-                    pathname.startsWith('/map') ? 'w-full' : 'w-0 group-hover:w-full'
-                  }`}></span>
-                </Link>
-                <Link
-                  to="/profile"
-                  className={`font-semibold transition-all duration-200 relative group ${
-                    pathname.startsWith('/profile')
-                      ? 'text-[#15BB73]'
-                      : 'text-gray-600 hover:text-[#15BB73]'
-                  }`}
-                >
-                  {t('header.profile')}
-                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${
-                    pathname.startsWith('/profile') ? 'w-full' : 'w-0 group-hover:w-full'
                   }`}></span>
                 </Link>
                 <Link
@@ -120,13 +107,13 @@ const Layout = ({ showHeaderFooter = true, wishlistCount = 0 }) => {
                 {/* Sell Now Button - Responsive sizing */}
                 <Link
                   to="/sell-animal"
-                  className="bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-3 py-2 sm:px-6 sm:py-3 rounded-xl font-semibold hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 hover:scale-105 relative overflow-hidden group"
+                  className="bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-2.5 py-1.5 sm:px-5 sm:py-2.5 rounded-lg font-semibold hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 hover:scale-105 relative overflow-hidden group whitespace-nowrap"
                 >
-                  <span className="relative z-10 flex items-center space-x-1 sm:space-x-2">
-                    <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <span className="relative z-10 flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
-                    <span className="text-xs sm:text-base">{t('header.sell')}</span>
+                    <span className="text-xs sm:text-sm">{t('header.sell')}</span>
                   </span>
                   <div className="absolute inset-0 bg-gradient-to-r from-[#0FA568] to-[#15BB73] opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 </Link>
@@ -218,12 +205,15 @@ const Layout = ({ showHeaderFooter = true, wishlistCount = 0 }) => {
             <span className="text-xs mt-1">{t('header.home')}</span>
           </Link>
 
-          <button className="flex flex-col items-center text-gray-400 p-1 sm:p-2 rounded-lg cursor-not-allowed">
+          <Link
+            to="/buy-animals"
+            className={`flex flex-col items-center p-1 sm:p-2 rounded-lg transition ${isActive('/buy-animals') ? 'text-green-600' : 'text-gray-700 hover:bg-green-50'}`}
+          >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
             </svg>
-            <span className="text-xs mt-1">Buy Animal</span>
-          </button>
+            <span className="text-xs mt-1">{t('home.buyAnimals')}</span>
+          </Link>
 
           <Link
             to="/sell-animal"
@@ -233,17 +223,6 @@ const Layout = ({ showHeaderFooter = true, wishlistCount = 0 }) => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <span className="text-xs mt-1">{t('header.sell')}</span>
-          </Link>
-
-          <Link
-            to="/map"
-            className={`flex flex-col items-center p-1 sm:p-2 rounded-lg transition ${isActive('/map') ? 'text-green-600' : 'text-gray-700 hover:bg-green-50'}`}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <span className="text-xs mt-1">{t('header.map')}</span>
           </Link>
 
           <Link
