@@ -252,15 +252,10 @@ const LoginForm = ({ onLoginSuccess }) => {
                     {t('auth.phoneNumber')}
                   </label>
                   <div className="flex space-x-2">
-                    <select
-                      value={countryCode}
-                      onChange={(e) => setCountryCode(e.target.value)}
-                      className="px-3 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] bg-gray-50"
-                    >
-                      <option value="+91">🇮🇳 +91</option>
-                      <option value="+1">🇺🇸 +1</option>
-                      <option value="+44">🇬🇧 +44</option>
-                    </select>
+                    <div className="px-3 py-3 border-2 border-gray-200 rounded-lg bg-gray-50 flex items-center gap-2">
+                      <span>🇮🇳</span>
+                      <span className="font-medium">+91</span>
+                    </div>
                     
                     <div className="relative flex-1">
                       <input

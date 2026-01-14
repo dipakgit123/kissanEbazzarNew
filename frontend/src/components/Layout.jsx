@@ -44,10 +44,10 @@ const Layout = ({ showHeaderFooter = true, wishlistCount = 0 }) => {
               </div>
 
               {/* Navigation Links - Hidden on mobile, shown on lg+ */}
-              <div className="hidden lg:flex items-center space-x-8">
+              <div className="hidden lg:flex items-center space-x-6 xl:space-x-8">
                 <Link 
                   to="/" 
-                  className={`font-semibold transition-all duration-200 relative group ${
+                  className={`font-semibold transition-all duration-200 relative group whitespace-nowrap ${
                     pathname === '/' 
                       ? 'text-[#15BB73]' 
                       : 'text-gray-600 hover:text-[#15BB73]'
@@ -60,7 +60,7 @@ const Layout = ({ showHeaderFooter = true, wishlistCount = 0 }) => {
                 </Link>
                 <Link 
                   to="/buy-animals" 
-                  className={`font-semibold transition-all duration-200 relative group ${
+                  className={`font-semibold transition-all duration-200 relative group whitespace-nowrap ${
                     pathname.startsWith('/buy-animals') 
                       ? 'text-[#15BB73]' 
                       : 'text-gray-600 hover:text-[#15BB73]'
@@ -71,22 +71,35 @@ const Layout = ({ showHeaderFooter = true, wishlistCount = 0 }) => {
                     pathname.startsWith('/buy-animals') ? 'w-full' : 'w-0 group-hover:w-full'
                   }`}></span>
                 </Link>
-                <Link 
-                  to="/sell-animal" 
-                  className={`font-semibold transition-all duration-200 relative group ${
-                    pathname.startsWith('/sell') 
-                      ? 'text-[#15BB73]' 
+                <Link
+                  to="/pregnancy-calendar"
+                  className={`font-semibold transition-all duration-200 relative group whitespace-nowrap ${
+                    pathname.startsWith('/pregnancy-calendar')
+                      ? 'text-[#15BB73]'
                       : 'text-gray-600 hover:text-[#15BB73]'
                   }`}
                 >
-                  {t('header.sell')}
+                  {t('header.pregnancy')}
                   <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${
-                    pathname.startsWith('/sell') ? 'w-full' : 'w-0 group-hover:w-full'
+                    pathname.startsWith('/pregnancy-calendar') ? 'w-full' : 'w-0 group-hover:w-full'
+                  }`}></span>
+                </Link>
+                <Link
+                  to="/veterinarian"
+                  className={`font-semibold transition-all duration-200 relative group whitespace-nowrap ${
+                    pathname.startsWith('/veterinarian')
+                      ? 'text-[#15BB73]'
+                      : 'text-gray-600 hover:text-[#15BB73]'
+                  }`}
+                >
+                  {t('header.veterinarian')}
+                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${
+                    pathname.startsWith('/veterinarian') ? 'w-full' : 'w-0 group-hover:w-full'
                   }`}></span>
                 </Link>
                 <Link
                   to="/health-check"
-                  className={`font-semibold transition-all duration-200 relative group ${
+                  className={`font-semibold transition-all duration-200 relative group whitespace-nowrap ${
                     pathname.startsWith('/health-check')
                       ? 'text-[#15BB73]'
                       : 'text-gray-600 hover:text-[#15BB73]'
@@ -103,20 +116,6 @@ const Layout = ({ showHeaderFooter = true, wishlistCount = 0 }) => {
               <div className="flex items-center space-x-2 sm:space-x-4">
                 {/* Language Switcher */}
                 <LanguageSwitcher />
-                
-                {/* Sell Now Button - Responsive sizing */}
-                <Link
-                  to="/sell-animal"
-                  className="bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-2.5 py-1.5 sm:px-5 sm:py-2.5 rounded-lg font-semibold hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 hover:scale-105 relative overflow-hidden group whitespace-nowrap"
-                >
-                  <span className="relative z-10 flex items-center gap-1.5">
-                    <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    <span className="text-xs sm:text-sm">{t('header.sell')}</span>
-                  </span>
-                  <div className="absolute inset-0 bg-gradient-to-r from-[#0FA568] to-[#15BB73] opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                </Link>
                 
                 {/* Wishlist Button - Responsive sizing */}
                 <div className="relative group">
@@ -148,12 +147,6 @@ const Layout = ({ showHeaderFooter = true, wishlistCount = 0 }) => {
                       <span className="absolute -top-1 -right-1 h-2 w-2 sm:h-3 sm:w-3 rounded-full bg-white border-2 border-[#15BB73] animate-pulse"></span>
                     )}
                   </Link>
-                  
-                  {/* Tooltip - Hidden on mobile */}
-                  <div className="hidden sm:block absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none whitespace-nowrap z-50">
-                    {wishlistCount === 0 ? 'No items in wishlist' : `${wishlistCount} item${wishlistCount === 1 ? '' : 's'} in wishlist`}
-                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
-                  </div>
                 </div>
                 
                 {/* Profile Button - Responsive sizing */}
@@ -213,16 +206,6 @@ const Layout = ({ showHeaderFooter = true, wishlistCount = 0 }) => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
             </svg>
             <span className="text-xs mt-1">{t('home.buyAnimals')}</span>
-          </Link>
-
-          <Link
-            to="/sell-animal"
-            className={`flex flex-col items-center p-1 sm:p-2 rounded-lg transition ${isActive('/sell-animal') ? 'text-green-600' : 'text-gray-700 hover:bg-green-50'}`}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span className="text-xs mt-1">{t('header.sell')}</span>
           </Link>
 
           <Link

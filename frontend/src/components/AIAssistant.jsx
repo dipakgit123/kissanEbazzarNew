@@ -367,11 +367,6 @@ const AIAssistant = () => {
                 // Language Selection Screen
                 <div className="flex flex-col items-center justify-center h-full py-8">
                   <div className="text-center mb-8">
-                    <div className="w-24 h-24 bg-gradient-to-br from-[#15BB73] via-[#12A665] to-[#0FA568] rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl transform hover:scale-105 transition-transform duration-300">
-                      <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-                      </svg>
-                    </div>
                     <h3 className="text-2xl font-bold text-gray-800 mb-3">Choose Your Language</h3>
                     <p className="text-gray-600 text-sm">अपनी भाषा चुनें | तुमची भाषा निवडा</p>
                   </div>

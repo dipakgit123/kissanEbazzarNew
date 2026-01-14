@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -10,9 +10,15 @@ import { useNavigate } from 'react-router-dom';
   price        : string / number – price text
   location     : string
   datePosted   : string (e.g. "1 day ago")
-  imageSrc     : string – photo URL
+  images       : array – array of photo URLs
+  imageSrc     : string – fallback single photo URL (for backward compatibility)
   sellerName   : string
-  phoneNumber  : string – seller's phone number (optional, defaults to 9922527421)
+  phoneNumber  : string – seller's phone number
+  breed        : string – breed name
+  age          : string – age of animal
+  milkProduction : string – milk production capacity
+  healthCondition : string – health condition
+  pregnancyStatus : string – pregnancy status
   onCallClick  : () => void  (optional)
   onWhatsAppClick : () => void (optional)
   animalType   : string – type of animal (cow, buffalo, etc.)
@@ -23,9 +29,16 @@ const AnimalCard = ({
   price,
   location,
   datePosted,
+  images = [],
   imageSrc,
   sellerName,
-  phoneNumber = "9922527421",
+  sellerPhoto,
+  phoneNumber,
+  breed,
+  age,
+  milkProduction,
+  healthCondition,
+  pregnancyStatus,
   onCallClick,
   onWhatsAppClick,
   isInWishlist = false,
@@ -36,6 +49,19 @@ const AnimalCard = ({
 }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  // Prepare images array - filter out null/undefined values
+  const photoArray = images.length > 0 
+    ? images.filter(img => img && img.trim() !== '')
+    : (imageSrc ? [imageSrc] : []);
+  
+  // Use placeholder if no images
+  const displayImages = photoArray.length > 0 
+    ? photoArray 
+    : ['https://via.placeholder.com/400x300?text=No+Image+Available'];
+
+  const hasMultipleImages = displayImages.length > 1;
   // Handle call action
   const handleCall = async () => {
     // Log the call in backend first

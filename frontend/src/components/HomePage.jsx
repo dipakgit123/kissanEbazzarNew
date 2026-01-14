@@ -579,9 +579,17 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
           {/* Feature Cards Section */}
           <div className="mt-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* AI Assistant Card */}
-            <Link
-              to="/ai-assistant"
-              className="group relative bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105"
+            <button
+              onClick={() => {
+                // Trigger the AI Assistant floating widget to open
+                const aiButton = document.querySelector('button[class*="fixed bottom"]');
+                if (aiButton) {
+                  aiButton.click();
+                  // Smooth scroll to show the button area
+                  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                }
+              }}
+              className="group relative bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105 cursor-pointer"
             >
               <div className="relative h-56 overflow-hidden">
                 <img
@@ -604,7 +612,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
                   </div>
                 </div>
               </div>
-            </Link>
+            </button>
 
             {/* Veterinarian Card */}
             <Link

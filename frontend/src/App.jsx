@@ -40,7 +40,10 @@ function App() {
     // If no token, always show login page
     return 'login';
   });
-  const [wishlist, setWishlist] = useState([]);
+  const [wishlist, setWishlist] = useState(() => {
+    const saved = localStorage.getItem('wishlist');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [hasLocation, setHasLocation] = useState(() => {
     return localStorage.getItem('hasLocation') === 'true';
   });
@@ -107,17 +110,23 @@ function App() {
     window.location.href = '/';
   };
 
-  // Wishlist functions
+  // Wishlist functions with localStorage persistence
   const addToWishlist = (animal) => {
     setWishlist(prev => {
       const exists = prev.find(item => item.id === animal.id);
       if (exists) return prev;
-      return [...prev, { ...animal, addedAt: new Date().toISOString() }];
+      const newWishlist = [...prev, { ...animal, addedAt: new Date().toISOString() }];
+      localStorage.setItem('wishlist', JSON.stringify(newWishlist));
+      return newWishlist;
     });
   };
 
   const removeFromWishlist = (animalId) => {
-    setWishlist(prev => prev.filter(item => item.id !== animalId));
+    setWishlist(prev => {
+      const newWishlist = prev.filter(item => item.id !== animalId);
+      localStorage.setItem('wishlist', JSON.stringify(newWishlist));
+      return newWishlist;
+    });
   };
 
   const isInWishlist = (animalId) => {
@@ -177,13 +186,13 @@ function App() {
             )
           }
         />
-        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/profile" element={<ProfilePage wishlistCount={wishlist.length} />} />
         <Route path="/buy-animals" element={<BuyAnimalsPage wishlist={wishlist} addToWishlist={addToWishlist} removeFromWishlist={removeFromWishlist} isInWishlist={isInWishlist} />} />
         <Route path="/sell-animal" element={<AnimalListingPage />} />
         <Route path="/animal/:animalType/:id" element={<AnimalDetailPage />} />
         <Route path="/veterinarian" element={<VeterinarianPage />} />
         <Route path="/pregnancy-calendar" element={<PregnancyCalendar />} />
-        <Route path="/health-check" element={<AIHealthCheck />} />
+        <Route path="/ai-health-check" element={<AIHealthCheck />} />
         <Route path="/call-history" element={<CallHistory />} />
         <Route path="/wishlist" element={<WishlistPage wishlist={wishlist} removeFromWishlist={removeFromWishlist} isInWishlist={isInWishlist} />} />
         <Route path="/map" element={<MapView wishlist={wishlist} addToWishlist={addToWishlist} removeFromWishlist={removeFromWishlist} isInWishlist={isInWishlist} />} />

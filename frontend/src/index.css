@@ -83,6 +83,16 @@ html[lang="mr"] {
   }
 }
 
+/* AI Health Check Scan Animation */
+@keyframes scan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(400%);
+  }
+}
+
 .animate-slide-left {
   animation: slide-left 20s linear infinite;
 }
@@ -101,6 +111,10 @@ html[lang="mr"] {
 
 .animate-pulse-glow {
   animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-scan {
+  animation: scan 3s ease-in-out infinite;
 }
 
 @tailwind components;

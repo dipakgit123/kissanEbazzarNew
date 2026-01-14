@@ -209,7 +209,7 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
               disabled={uploadingPhoto}
               className="text-sm text-[#15BB73] hover:text-[#0FA568] font-medium disabled:opacity-50"
             >
-              {photoPreview ? 'Change Photo' : 'Add Photo'}
+              {photoPreview ? t('profile.changePhoto') || 'Change Photo' : t('profile.addPhoto') || 'Add Photo'}
             </button>
             {photoPreview && (
               <>
@@ -220,7 +220,7 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
                   disabled={uploadingPhoto}
                   className="text-sm text-red-500 hover:text-red-600 font-medium disabled:opacity-50"
                 >
-                  Remove
+                  {t('profile.removePhoto') || 'Remove'}
                 </button>
               </>
             )}
@@ -239,7 +239,7 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
             className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all ${
               errors.name ? 'border-red-400' : 'border-gray-200'
             }`}
-            placeholder="Enter your full name"
+            placeholder={t('profile.namePlaceholder') || 'Enter your full name'}
           />
           {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
         </div>
@@ -254,7 +254,7 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
             readOnly
             className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-500 cursor-not-allowed"
           />
-          <p className="text-gray-400 text-xs mt-1">Phone number cannot be changed</p>
+          <p className="text-gray-400 text-xs mt-1">{t('profile.phoneCannotChange') || 'Phone number cannot be changed'}</p>
         </div>
 
         {/* Address Field */}
@@ -270,7 +270,7 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
             className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all resize-none ${
               errors.address ? 'border-red-400' : 'border-gray-200'
             }`}
-            placeholder="Enter your complete address"
+            placeholder={t('profile.addressPlaceholder') || 'Enter your complete address'}
           />
           {errors.address && <p className="text-red-500 text-xs mt-1">{errors.address}</p>}
         </div>
@@ -288,7 +288,7 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
             className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all ${
               errors.pincode ? 'border-red-400' : 'border-gray-200'
             }`}
-            placeholder="Enter 6-digit pincode"
+            placeholder={t('profile.pincodePlaceholder') || 'Enter 6-digit pincode'}
           />
           {errors.pincode && <p className="text-red-500 text-xs mt-1">{errors.pincode}</p>}
         </div>
@@ -314,7 +314,7 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Saving...
+                {t('profile.saving') || 'Saving...'}
               </>
             ) : t('profile.updateProfile')}
           </button>
