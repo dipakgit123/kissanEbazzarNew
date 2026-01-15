@@ -2,686 +2,606 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
+  TouchableOpacity,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
-  Image,
+  ActivityIndicator,
   RefreshControl,
+  Image,
   Dimensions,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
 import { useVetAuth } from '../context/VetAuthContext';
+import { veterinarianService } from '../services/api';
 
 const { width } = Dimensions.get('window');
 
 const VetDashboardScreen = ({ navigation }) => {
+  const { t } = useTranslation();
   const { veterinarian, logout } = useVetAuth();
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [stats, setStats] = useState({
+    totalAppointments: 0,
+    todayAppointments: 0,
+    pendingAppointments: 0,
+    totalEarnings: 0,
+  });
+  const [recentAppointments, setRecentAppointments] = useState([]);
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    // Refresh data here
-    setTimeout(() => setRefreshing(false), 1000);
-  };
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
 
-  const formatSpecialization = (spec) => {
-    if (!spec) return '';
-    return spec
-      .split('_')
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  };
-
-  const getVerificationBadge = () => {
-    const status = veterinarian?.verification_status;
-    switch (status) {
-      case 'verified':
-        return { color: '#10B981', bg: '#ECFDF5', text: 'Verified' };
-      case 'pending':
-        return { color: '#F59E0B', bg: '#FFFBEB', text: 'Pending' };
-      case 'rejected':
-        return { color: '#EF4444', bg: '#FEF2F2', text: 'Rejected' };
-      default:
-        return { color: COLORS.gray, bg: '#F1F5F9', text: 'Unknown' };
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    try {
+      const response = await veterinarianService.getDashboard();
+      if (response.success) {
+        setStats(response.stats || stats);
+        setRecentAppointments(response.recentAppointments || []);
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const stats = [
-    {
-      icon: 'people',
-      label: 'Total Patients',
-      value: veterinarian?.total_patients || 0,
-      color: '#3B82F6',
-      bg: '#EFF6FF',
-    },
-    {
-      icon: 'calendar',
-      label: "Today's Appointments",
-      value: 0,
-      color: '#10B981',
-      bg: '#ECFDF5',
-    },
-    {
-      icon: 'star',
-      label: 'Rating',
-      value: parseFloat(veterinarian?.rating || 0).toFixed(1),
-      color: '#F59E0B',
-      bg: '#FFFBEB',
-    },
-    {
-      icon: 'chatbubbles',
-      label: 'Total Reviews',
-      value: veterinarian?.total_reviews || 0,
-      color: '#8B5CF6',
-      bg: '#F5F3FF',
-    },
-  ];
-
-  const menuItems = [
-    { icon: 'grid', label: 'Dashboard', tab: 'dashboard' },
-    { icon: 'person', label: 'Profile', tab: 'profile' },
-    { icon: 'calendar', label: 'Appointments', tab: 'appointments' },
-    { icon: 'settings', label: 'Settings', tab: 'settings' },
-  ];
-
-  const handleLogout = () => {
-    logout();
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchDashboardData();
   };
 
-  const badge = getVerificationBadge();
+  const renderStatCard = (title, value, icon, color, onPress) => (
+    <TouchableOpacity
+      style={[styles.statCard, { borderLeftColor: color }]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View style={[styles.statIconContainer, { backgroundColor: color + '20' }]}>
+        <Ionicons name={icon} size={28} color={color} />
+      </View>
+      <View style={styles.statContent}>
+        <Text style={styles.statValue}>{value}</Text>
+        <Text style={styles.statTitle}>{title}</Text>
+      </View>
+    </TouchableOpacity>
+  );
 
-  const renderDashboard = () => (
-    <View style={styles.tabContent}>
-      {/* Stats Grid */}
-      <View style={styles.statsGrid}>
-        {stats.map((stat, index) => (
-          <View key={index} style={[styles.statCard, { backgroundColor: stat.bg }]}>
-            <View style={[styles.statIcon, { backgroundColor: stat.color }]}>
-              <Ionicons name={stat.icon} size={20} color={COLORS.white} />
-            </View>
-            <Text style={styles.statValue}>{stat.value}</Text>
-            <Text style={styles.statLabel}>{stat.label}</Text>
+  const renderAppointmentCard = (appointment) => (
+    <TouchableOpacity
+      key={appointment.id}
+      style={styles.appointmentCard}
+      onPress={() => navigation.navigate('AppointmentDetail', { appointmentId: appointment.id })}
+      activeOpacity={0.9}
+    >
+      <View style={styles.appointmentHeader}>
+        <View style={styles.appointmentUser}>
+          <View style={styles.appointmentAvatar}>
+            <Ionicons name="person" size={20} color={COLORS.primary} />
           </View>
-        ))}
-      </View>
-
-      {/* Quick Info Cards */}
-      <View style={styles.infoSection}>
-        <Text style={styles.sectionTitle}>Profile Summary</Text>
-        <View style={styles.infoCard}>
-          <InfoRow label="Specialization" value={formatSpecialization(veterinarian?.specialization)} />
-          <InfoRow label="Experience" value={`${veterinarian?.experience_years || 0} years`} />
-          <InfoRow label="Qualification" value={veterinarian?.qualification || 'N/A'} />
-          <InfoRow label="Consultation Fee" value={`Rs. ${veterinarian?.consultation_fee || 0}`} />
-          <InfoRow
-            label="Emergency Available"
-            value={veterinarian?.emergency_available ? 'Yes' : 'No'}
-            valueColor={veterinarian?.emergency_available ? '#10B981' : '#EF4444'}
-          />
+          <View style={styles.appointmentUserInfo}>
+            <Text style={styles.appointmentUserName}>{appointment.userName || 'User'}</Text>
+            <Text style={styles.appointmentPhone}>{appointment.userPhone}</Text>
+          </View>
         </View>
-      </View>
-
-      <View style={styles.infoSection}>
-        <Text style={styles.sectionTitle}>Clinic Information</Text>
-        <View style={styles.infoCard}>
-          <InfoRow label="Clinic Name" value={veterinarian?.clinic_name || 'N/A'} />
-          <InfoRow label="City" value={veterinarian?.city || 'N/A'} />
-          <InfoRow label="State" value={veterinarian?.state || 'N/A'} />
-          <InfoRow label="Pincode" value={veterinarian?.pincode || 'N/A'} />
-          <InfoRow label="Phone" value={veterinarian?.phone_number || 'N/A'} />
-        </View>
-      </View>
-
-      {/* Coming Soon Banner */}
-      <View style={styles.comingSoonBanner}>
-        <Ionicons name="rocket" size={24} color={COLORS.white} />
-        <View style={styles.comingSoonContent}>
-          <Text style={styles.comingSoonTitle}>Coming Soon!</Text>
-          <Text style={styles.comingSoonText}>
-            Appointment booking, patient records, and more features are on the way.
+        <View style={[
+          styles.statusBadge,
+          { backgroundColor: appointment.status === 'pending' ? '#FEF3C7' : '#D1FAE5' }
+        ]}>
+          <Text style={[
+            styles.statusText,
+            { color: appointment.status === 'pending' ? '#92400E' : '#065F46' }
+          ]}>
+            {appointment.status}
           </Text>
         </View>
       </View>
-    </View>
-  );
-
-  const renderProfile = () => (
-    <View style={styles.tabContent}>
-      {/* Profile Header */}
-      <View style={styles.profileHeader}>
-        <View style={styles.profileAvatar}>
-          {veterinarian?.profile_photo ? (
-            <Image source={{ uri: veterinarian.profile_photo }} style={styles.avatarImage} />
-          ) : (
-            <Text style={styles.avatarText}>
-              {veterinarian?.full_name?.charAt(0) || 'V'}
-            </Text>
-          )}
+      
+      <View style={styles.appointmentDetails}>
+        <View style={styles.appointmentDetailRow}>
+          <Ionicons name="calendar" size={16} color="#6B7280" />
+          <Text style={styles.appointmentDetailText}>
+            {new Date(appointment.date).toLocaleDateString()}
+          </Text>
         </View>
-        <Text style={styles.profileName}>Dr. {veterinarian?.full_name}</Text>
-        <Text style={styles.profileEmail}>{veterinarian?.email}</Text>
-        <View style={[styles.badge, { backgroundColor: badge.bg }]}>
-          <Ionicons
-            name={badge.text === 'Verified' ? 'checkmark-circle' : 'time'}
-            size={14}
-            color={badge.color}
-          />
-          <Text style={[styles.badgeText, { color: badge.color }]}>{badge.text}</Text>
+        <View style={styles.appointmentDetailRow}>
+          <Ionicons name="time" size={16} color="#6B7280" />
+          <Text style={styles.appointmentDetailText}>{appointment.time}</Text>
+        </View>
+        <View style={styles.appointmentDetailRow}>
+          <Ionicons name="paw" size={16} color="#6B7280" />
+          <Text style={styles.appointmentDetailText}>{appointment.animalType}</Text>
         </View>
       </View>
-
-      {/* Profile Details */}
-      <View style={styles.profileDetails}>
-        <ProfileField icon="call" label="Phone" value={veterinarian?.phone_number} />
-        <ProfileField icon="mail" label="Email" value={veterinarian?.email} />
-        <ProfileField icon="school" label="Qualification" value={veterinarian?.qualification} />
-        <ProfileField icon="document-text" label="License" value={veterinarian?.license_number} />
-        <ProfileField icon="medical" label="Specialization" value={formatSpecialization(veterinarian?.specialization)} />
-        <ProfileField icon="calendar" label="Experience" value={`${veterinarian?.experience_years} years`} />
-        <ProfileField icon="cash" label="Consultation Fee" value={`Rs. ${veterinarian?.consultation_fee}`} />
-        <ProfileField icon="location" label="Clinic" value={veterinarian?.clinic_name} />
-        <ProfileField
-          icon="navigate"
-          label="Address"
-          value={`${veterinarian?.city}, ${veterinarian?.state} - ${veterinarian?.pincode}`}
-        />
-      </View>
-
-      {/* Services */}
-      {veterinarian?.services && veterinarian.services.length > 0 && (
-        <View style={styles.servicesSection}>
-          <Text style={styles.sectionTitle}>Services Offered</Text>
-          <View style={styles.servicesGrid}>
-            {veterinarian.services.map((service, index) => (
-              <View key={index} style={styles.serviceChip}>
-                <Text style={styles.serviceChipText}>{service}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
-    </View>
-  );
-
-  const renderAppointments = () => (
-    <View style={styles.tabContent}>
-      <View style={styles.emptyState}>
-        <Ionicons name="calendar-outline" size={64} color="#CBD5E1" />
-        <Text style={styles.emptyTitle}>No Appointments Yet</Text>
-        <Text style={styles.emptyText}>
-          Appointment booking feature is coming soon!
+      
+      {appointment.reason && (
+        <Text style={styles.appointmentReason} numberOfLines={2}>
+          {appointment.reason}
         </Text>
-      </View>
-    </View>
+      )}
+    </TouchableOpacity>
   );
 
-  const renderSettings = () => (
-    <View style={styles.tabContent}>
-      <View style={styles.settingsSection}>
-        <TouchableOpacity style={styles.settingsItem}>
-          <View style={styles.settingsItemLeft}>
-            <Ionicons name="notifications-outline" size={22} color="#3B82F6" />
-            <Text style={styles.settingsItemText}>Notifications</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.settingsItem}>
-          <View style={styles.settingsItemLeft}>
-            <Ionicons name="lock-closed-outline" size={22} color="#3B82F6" />
-            <Text style={styles.settingsItemText}>Change Password</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.settingsItem}>
-          <View style={styles.settingsItemLeft}>
-            <Ionicons name="help-circle-outline" size={22} color="#3B82F6" />
-            <Text style={styles.settingsItemText}>Help & Support</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.settingsItem}>
-          <View style={styles.settingsItemLeft}>
-            <Ionicons name="document-text-outline" size={22} color="#3B82F6" />
-            <Text style={styles.settingsItemText}>Terms & Conditions</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={[styles.settingsItem, styles.logoutItem]} onPress={handleLogout}>
-          <View style={styles.settingsItemLeft}>
-            <Ionicons name="log-out-outline" size={22} color="#EF4444" />
-            <Text style={[styles.settingsItemText, { color: '#EF4444' }]}>Logout</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#EF4444" />
-        </TouchableOpacity>
+  if (loading && !refreshing) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
-    </View>
-  );
+    );
+  }
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View style={styles.headerLeft}>
-            <View style={styles.smallAvatar}>
-              {veterinarian?.profile_photo ? (
-                <Image source={{ uri: veterinarian.profile_photo }} style={styles.smallAvatarImage} />
-              ) : (
-                <Text style={styles.smallAvatarText}>
-                  {veterinarian?.full_name?.charAt(0) || 'V'}
-                </Text>
-              )}
-            </View>
-            <View>
-              <Text style={styles.welcomeText}>Welcome back,</Text>
-              <Text style={styles.headerName}>Dr. {veterinarian?.full_name}</Text>
-            </View>
+        <View style={styles.headerLeft}>
+          <Image
+            source={veterinarian?.profilePhoto ? { uri: veterinarian.profilePhoto } : require('../assets/veterinarian.png')}
+            style={styles.profileImage}
+          />
+          <View style={styles.headerInfo}>
+            <Text style={styles.greeting}>{t('vetDashboard.welcomeBack')},</Text>
+            <Text style={styles.doctorName}>Dr. {veterinarian?.fullName || t('vetDashboard.title')}</Text>
           </View>
-          <TouchableOpacity style={styles.notificationBtn}>
-            <Ionicons name="notifications-outline" size={24} color={COLORS.black} />
-            <View style={styles.notificationDot} />
-          </TouchableOpacity>
         </View>
+        <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
+          <View style={styles.notificationIcon}>
+            <Ionicons name="notifications" size={24} color="#1F2937" />
+            <View style={styles.notificationBadge} />
+          </View>
+        </TouchableOpacity>
       </View>
 
-      {/* Tab Bar */}
-      <View style={styles.tabBar}>
-        {menuItems.map((item) => (
-          <TouchableOpacity
-            key={item.tab}
-            style={[styles.tabItem, activeTab === item.tab && styles.tabItemActive]}
-            onPress={() => setActiveTab(item.tab)}
-          >
-            <Ionicons
-              name={item.icon}
-              size={22}
-              color={activeTab === item.tab ? '#3B82F6' : COLORS.gray}
-            />
-            <Text
-              style={[
-                styles.tabLabel,
-                activeTab === item.tab && styles.tabLabelActive,
-              ]}
-            >
-              {item.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Content */}
       <ScrollView
         style={styles.content}
-        contentContainerStyle={styles.contentContainer}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
+        }
       >
-        {activeTab === 'dashboard' && renderDashboard()}
-        {activeTab === 'profile' && renderProfile()}
-        {activeTab === 'appointments' && renderAppointments()}
-        {activeTab === 'settings' && renderSettings()}
+        {/* Quick Actions */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t('vetDashboard.quickActions')}</Text>
+          <View style={styles.quickActionsGrid}>
+            <TouchableOpacity
+              style={styles.quickActionCard}
+              onPress={() => navigation.navigate('Appointments')}
+            >
+              <View style={[styles.quickActionIcon, { backgroundColor: '#DBEAFE' }]}>
+                <Ionicons name="calendar" size={28} color="#1D4ED8" />
+              </View>
+              <Text style={styles.quickActionText}>{t('vetDashboard.appointments')}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickActionCard}
+              onPress={() => navigation.navigate('VetProfile')}
+            >
+              <View style={[styles.quickActionIcon, { backgroundColor: '#D1FAE5' }]}>
+                <Ionicons name="person" size={28} color="#059669" />
+              </View>
+              <Text style={styles.quickActionText}>{t('vetDashboard.myProfile')}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickActionCard}
+              onPress={() => navigation.navigate('CallHistory')}
+            >
+              <View style={[styles.quickActionIcon, { backgroundColor: '#FEE2E2' }]}>
+                <Ionicons name="call" size={28} color="#DC2626" />
+              </View>
+              <Text style={styles.quickActionText}>{t('vetDashboard.callHistory')}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickActionCard}
+              onPress={() => navigation.navigate('Reports')}
+            >
+              <View style={[styles.quickActionIcon, { backgroundColor: '#FEF3C7' }]}>
+                <Ionicons name="document-text" size={28} color="#D97706" />
+              </View>
+              <Text style={styles.quickActionText}>{t('vetDashboard.reports')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Statistics */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t('vetDashboard.statistics')}</Text>
+          <View style={styles.statsGrid}>
+            {renderStatCard(
+              t('vetDashboard.totalAppointments'),
+              stats.totalAppointments,
+              'calendar-outline',
+              '#3B82F6',
+              () => navigation.navigate('Appointments')
+            )}
+            {renderStatCard(
+              t('vetDashboard.todayAppointments'),
+              stats.todayAppointments,
+              'today-outline',
+              '#10B981',
+              () => navigation.navigate('Appointments', { filter: 'today' })
+            )}
+            {renderStatCard(
+              t('vetDashboard.pending'),
+              stats.pendingAppointments,
+              'time-outline',
+              '#F59E0B',
+              () => navigation.navigate('Appointments', { filter: 'pending' })
+            )}
+            {renderStatCard(
+              t('vetDashboard.totalEarnings'),
+              `₹${stats.totalEarnings}`,
+              'cash-outline',
+              '#8B5CF6',
+              () => navigation.navigate('Earnings')
+            )}
+          </View>
+        </View>
+
+        {/* Recent Appointments */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>{t('vetDashboard.recentAppointments')}</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Appointments')}>
+              <Text style={styles.seeAllText}>{t('common.seeAll')}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {recentAppointments.length > 0 ? (
+            recentAppointments.map(renderAppointmentCard)
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="calendar-outline" size={64} color="#D1D5DB" />
+              <Text style={styles.emptyStateText}>{t('vetDashboard.noAppointments')}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Availability Status */}
+        <View style={styles.section}>
+          <View style={styles.availabilityCard}>
+            <View style={styles.availabilityHeader}>
+              <Ionicons name="time" size={24} color={COLORS.primary} />
+              <Text style={styles.availabilityTitle}>{t('vetDashboard.availabilityStatus')}</Text>
+            </View>
+            <View style={styles.availabilityStatus}>
+              <View style={styles.statusIndicator} />
+              <Text style={styles.availabilityText}>
+                {veterinarian?.emergencyAvailable ? t('veterinarian.emergencyAvailable') : t('vetDashboard.regularHours')}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.updateButton}
+              onPress={() => navigation.navigate('VetProfile')}
+            >
+              <Text style={styles.updateButtonText}>{t('vetDashboard.updateAvailability')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Logout */}
+        <TouchableOpacity style={styles.logoutButton} onPress={logout}>
+          <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+          <Text style={styles.logoutText}>{t('common.logout')}</Text>
+        </TouchableOpacity>
+
+        <View style={{ height: 20 }} />
       </ScrollView>
     </View>
   );
 };
 
-// Helper Components
-const InfoRow = ({ label, value, valueColor }) => (
-  <View style={styles.infoRow}>
-    <Text style={styles.infoLabel}>{label}</Text>
-    <Text style={[styles.infoValue, valueColor && { color: valueColor }]}>{value}</Text>
-  </View>
-);
-
-const ProfileField = ({ icon, label, value }) => (
-  <View style={styles.profileField}>
-    <View style={styles.profileFieldIcon}>
-      <Ionicons name={icon} size={20} color="#3B82F6" />
-    </View>
-    <View style={styles.profileFieldContent}>
-      <Text style={styles.profileFieldLabel}>{label}</Text>
-      <Text style={styles.profileFieldValue}>{value || 'N/A'}</Text>
-    </View>
-  </View>
-);
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F9FAFB',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   header: {
-    backgroundColor: COLORS.white,
-    paddingTop: Platform.OS === 'ios' ? 50 : 40,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-  },
-  headerTop: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 50,
+    paddingBottom: 20,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
   },
-  smallAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#3B82F6',
+  profileImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 12,
+  },
+  headerInfo: {
     justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
   },
-  smallAvatarImage: {
-    width: '100%',
-    height: '100%',
+  greeting: {
+    fontSize: 14,
+    color: '#6B7280',
   },
-  smallAvatarText: {
+  doctorName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: COLORS.white,
+    color: '#1F2937',
   },
-  welcomeText: {
-    fontSize: 12,
-    color: COLORS.gray,
-  },
-  headerName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.black,
-  },
-  notificationBtn: {
-    padding: 8,
+  notificationIcon: {
     position: 'relative',
   },
-  notificationDot: {
+  notificationBadge: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    top: 0,
+    right: 0,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: '#EF4444',
-  },
-  tabBar: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.white,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-  },
-  tabItem: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  tabItemActive: {
-    backgroundColor: '#EFF6FF',
-  },
-  tabLabel: {
-    fontSize: 11,
-    color: COLORS.gray,
-    marginTop: 4,
-  },
-  tabLabelActive: {
-    color: '#3B82F6',
-    fontWeight: '600',
+    borderWidth: 2,
+    borderColor: '#fff',
   },
   content: {
     flex: 1,
   },
-  contentContainer: {
-    padding: 20,
-    paddingBottom: 40,
+  section: {
+    paddingHorizontal: 20,
+    marginTop: 24,
   },
-  tabContent: {
-    flex: 1,
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 16,
+  },
+  seeAllText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  quickActionCard: {
+    width: (width - 60) / 2,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  quickActionIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  quickActionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    textAlign: 'center',
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 24,
+    justifyContent: 'space-between',
   },
   statCard: {
-    width: (width - 52) / 2,
+    width: (width - 60) / 2,
+    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 16,
-  },
-  statIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: 'center',
+    marginBottom: 16,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    borderLeftWidth: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  statIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  statContent: {
+    flex: 1,
   },
   statValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: COLORS.black,
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: COLORS.gray,
-  },
-  infoSection: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.black,
-    marginBottom: 12,
-  },
-  infoCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
-    padding: 16,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: COLORS.gray,
-  },
-  infoValue: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: COLORS.black,
-  },
-  comingSoonBanner: {
-    flexDirection: 'row',
-    backgroundColor: 'linear-gradient(135deg, #3B82F6, #6366F1)',
-    backgroundColor: '#3B82F6',
-    borderRadius: 16,
-    padding: 20,
-    alignItems: 'center',
-    gap: 16,
-  },
-  comingSoonContent: {
-    flex: 1,
-  },
-  comingSoonTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.white,
-    marginBottom: 4,
-  },
-  comingSoonText: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
-    lineHeight: 18,
-  },
-  profileHeader: {
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 20,
-  },
-  profileAvatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-    overflow: 'hidden',
-  },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
-  },
-  avatarText: {
-    fontSize: 40,
-    fontWeight: 'bold',
-    color: COLORS.white,
-  },
-  profileName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.black,
-    marginBottom: 4,
-  },
-  profileEmail: {
-    fontSize: 14,
-    color: COLORS.gray,
-    marginBottom: 12,
-  },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    gap: 4,
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  profileDetails: {
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-  },
-  profileField: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  profileFieldIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#EFF6FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  profileFieldContent: {
-    flex: 1,
-  },
-  profileFieldLabel: {
-    fontSize: 12,
-    color: COLORS.gray,
+    color: '#1F2937',
     marginBottom: 2,
   },
-  profileFieldValue: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: COLORS.black,
+  statTitle: {
+    fontSize: 12,
+    color: '#6B7280',
   },
-  servicesSection: {
-    backgroundColor: COLORS.white,
+  appointmentCard: {
+    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  servicesGrid: {
+  appointmentHeader: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 8,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  serviceChip: {
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  appointmentUser: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  appointmentAvatar: {
+    width: 40,
+    height: 40,
     borderRadius: 20,
+    backgroundColor: COLORS.primary + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
   },
-  serviceChipText: {
+  appointmentUserInfo: {
+    flex: 1,
+  },
+  appointmentUserName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  appointmentPhone: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
     fontSize: 12,
-    color: '#3B82F6',
-    fontWeight: '500',
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  appointmentDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  appointmentDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  appointmentDetailText: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginLeft: 4,
+  },
+  appointmentReason: {
+    fontSize: 13,
+    color: '#374151',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 60,
+    justifyContent: 'center',
+    paddingVertical: 40,
   },
-  emptyTitle: {
+  emptyStateText: {
+    fontSize: 16,
+    color: '#9CA3AF',
+    marginTop: 12,
+  },
+  availabilityCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  availabilityHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  availabilityTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: COLORS.black,
-    marginTop: 16,
-    marginBottom: 8,
+    color: '#1F2937',
+    marginLeft: 10,
   },
-  emptyText: {
+  availabilityStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  statusIndicator: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#10B981',
+    marginRight: 8,
+  },
+  availabilityText: {
     fontSize: 14,
-    color: COLORS.gray,
-    textAlign: 'center',
+    color: '#6B7280',
   },
-  settingsSection: {
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
-    overflow: 'hidden',
+  updateButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
   },
-  settingsItem: {
+  updateButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    marginHorizontal: 20,
+    marginTop: 24,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
   },
-  settingsItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  settingsItemText: {
-    fontSize: 15,
-    color: COLORS.black,
-  },
-  logoutItem: {
-    borderBottomWidth: 0,
+  logoutText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#EF4444',
+    marginLeft: 8,
   },
 });
 

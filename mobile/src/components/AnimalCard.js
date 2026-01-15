@@ -9,15 +9,26 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, formatPrice, formatTimeAgo, getAnimalTypeIcon } from '../utils/constants';
+import { useWishlist } from '../context/WishlistContext';
 
 const AnimalCard = ({
   listing,
   onPress,
-  isInWishlist = false,
-  onToggleWishlist,
 }) => {
+  if (!listing) return null;
+
+  const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
+  const inWishlist = isInWishlist(listing.id);
+
+  const handleWishlistToggle = () => {
+    if (inWishlist) {
+      removeFromWishlist(listing.id);
+    } else {
+      addToWishlist(listing);
+    }
+  };
+
   const {
-    id,
     animal_type,
     breed_name,
     expected_price,
@@ -29,8 +40,7 @@ const AnimalCard = ({
     created_at,
     seller,
     milk_capacity,
-    age_years,
-    age_months,
+    age,
     status,
   } = listing;
 
@@ -62,22 +72,12 @@ const AnimalCard = ({
     return loc;
   };
 
-  const getAgeText = () => {
-    if (age_years || age_months) {
-      let text = '';
-      if (age_years) text += `${age_years}yr`;
-      if (age_months) text += ` ${age_months}mo`;
-      return text.trim();
-    }
-    return null;
-  };
-
   const getStatusColor = () => {
     switch (status?.toLowerCase()) {
       case 'sold':
-        return COLORS.red;
+        return '#EF4444';
       case 'reserved':
-        return COLORS.yellow;
+        return '#F59E0B';
       default:
         return COLORS.primary;
     }
@@ -85,7 +85,7 @@ const AnimalCard = ({
 
   return (
     <TouchableOpacity
-      style={styles.container}
+      style={styles.card}
       onPress={onPress}
       activeOpacity={0.9}
     >
@@ -99,81 +99,83 @@ const AnimalCard = ({
           </View>
         )}
 
-        {/* Top Row Badges */}
+        {/* Top Badge Row */}
         <View style={styles.topBadgeRow}>
-          {/* Status Badge */}
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor() + '20' }]}>
-            <View style={[styles.statusDot, { backgroundColor: getStatusColor() }]} />
-            <Text style={[styles.statusText, { color: getStatusColor() }]}>
-              {status || 'Available'}
+          {/* Animal Type Badge */}
+          <View style={styles.typeBadge}>
+            <Text style={styles.typeIcon}>{animalIcon}</Text>
+            <Text style={styles.typeText}>
+              {animal_type?.charAt(0).toUpperCase() + animal_type?.slice(1) || 'Animal'}
             </Text>
           </View>
 
           {/* Price Badge */}
           <View style={styles.priceBadge}>
-            <Text style={styles.priceText}>₹{formatPrice(expected_price)}</Text>
+            <Text style={styles.priceBadgeText}>₹{formatPrice(expected_price)}</Text>
           </View>
         </View>
 
-        {/* Animal Type Badge */}
-        <View style={styles.animalTypeBadge}>
-          <Text style={styles.animalTypeEmoji}>{animalIcon}</Text>
-          <Text style={styles.animalTypeText}>
-            {animal_type?.charAt(0).toUpperCase() + animal_type?.slice(1)}
-          </Text>
-        </View>
+        {/* Wishlist Heart Icon - Top Right Corner */}
+        <TouchableOpacity
+          style={[
+            styles.wishlistButton,
+            inWishlist && styles.wishlistButtonActive
+          ]}
+          onPress={handleWishlistToggle}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name={inWishlist ? "heart" : "heart-outline"}
+            size={24}
+            color={inWishlist ? "#EF4444" : "#FFFFFF"}
+          />
+        </TouchableOpacity>
 
-        {/* Wishlist Button */}
-        {onToggleWishlist && (
-          <TouchableOpacity
-            style={[
-              styles.wishlistButton,
-              isInWishlist && styles.wishlistButtonActive,
-            ]}
-            onPress={() => onToggleWishlist(listing)}
-          >
-            <Ionicons
-              name={isInWishlist ? 'heart' : 'heart-outline'}
-              size={20}
-              color={isInWishlist ? COLORS.white : COLORS.gray}
-            />
-          </TouchableOpacity>
+        {/* Status Badge */}
+        {status && status.toLowerCase() !== 'active' && (
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor() }]}>
+            <Text style={styles.statusText}>{status.toUpperCase()}</Text>
+          </View>
         )}
       </View>
 
       {/* Content Section */}
       <View style={styles.content}>
-        {/* Title Row */}
-        <Text style={styles.title} numberOfLines={2}>
+        {/* Breed Name */}
+        <Text style={styles.breedName} numberOfLines={2}>
           {breed_name || 'Unknown Breed'}
         </Text>
 
-        {/* Info Tags Row */}
-        <View style={styles.tagsRow}>
+        {/* Info Tags */}
+        <View style={styles.infoTags}>
           {milk_capacity && (
-            <View style={styles.tag}>
-              <Ionicons name="water" size={12} color={COLORS.blue} />
-              <Text style={styles.tagText}>{milk_capacity}L milk</Text>
+            <View style={styles.infoTag}>
+              <Ionicons name="water" size={14} color="#3B82F6" />
+              <Text style={styles.infoTagText}>{milk_capacity}L milk</Text>
             </View>
           )}
-          {getAgeText() && (
-            <View style={styles.tag}>
-              <Ionicons name="calendar-outline" size={12} color={COLORS.primary} />
-              <Text style={styles.tagText}>{getAgeText()}</Text>
+          {age && (
+            <View style={styles.infoTag}>
+              <Ionicons name="time-outline" size={14} color="#10B981" />
+              <Text style={styles.infoTagText}>{age}</Text>
             </View>
           )}
         </View>
 
-        {/* Location & Date Row */}
-        <View style={styles.infoRow}>
-          <View style={styles.infoItem}>
+        {/* Location & Time Row */}
+        <View style={styles.metaRow}>
+          <View style={styles.metaItem}>
             <Ionicons name="location-outline" size={14} color={COLORS.primary} />
-            <Text style={styles.infoText} numberOfLines={1}>{getLocationText()}</Text>
+            <Text style={styles.metaText} numberOfLines={1}>
+              {getLocationText()}
+            </Text>
           </View>
-          <View style={styles.infoItem}>
-            <Ionicons name="time-outline" size={14} color={COLORS.gray} />
-            <Text style={styles.infoText}>{formatTimeAgo(created_at)}</Text>
-          </View>
+          {created_at && (
+            <View style={styles.metaItem}>
+              <Ionicons name="time-outline" size={14} color="#9CA3AF" />
+              <Text style={styles.metaText}>{formatTimeAgo(created_at)}</Text>
+            </View>
+          )}
         </View>
 
         {/* Divider */}
@@ -203,12 +205,20 @@ const AnimalCard = ({
 
         {/* Action Buttons */}
         <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.callButton} onPress={handleCall}>
-            <Ionicons name="call" size={16} color={COLORS.white} />
+          <TouchableOpacity
+            style={styles.callButton}
+            onPress={handleCall}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="call" size={18} color="#FFFFFF" />
             <Text style={styles.buttonText}>Call</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.whatsappButton} onPress={handleWhatsApp}>
-            <Ionicons name="logo-whatsapp" size={16} color={COLORS.white} />
+          <TouchableOpacity
+            style={styles.whatsappButton}
+            onPress={handleWhatsApp}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="logo-whatsapp" size={18} color="#FFFFFF" />
             <Text style={styles.buttonText}>WhatsApp</Text>
           </TouchableOpacity>
         </View>
@@ -218,21 +228,21 @@ const AnimalCard = ({
 };
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: COLORS.white,
-    borderRadius: 20,
-    marginHorizontal: 16,
-    marginVertical: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    marginBottom: 16,
   },
   imageContainer: {
     position: 'relative',
-    height: 200,
+    height: 220,
+    backgroundColor: '#F3F4F6',
   },
   image: {
     width: '100%',
@@ -242,13 +252,13 @@ const styles = StyleSheet.create({
   placeholderImage: {
     width: '100%',
     height: '100%',
-    backgroundColor: COLORS.secondary,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#E5E7EB',
   },
   placeholderEmoji: {
     fontSize: 64,
-    opacity: 0.6,
+    opacity: 0.5,
   },
   topBadgeRow: {
     position: 'absolute',
@@ -257,129 +267,130 @@ const styles = StyleSheet.create({
     right: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  statusBadge: {
+  typeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 20,
-    gap: 6,
+    borderRadius: 12,
+    gap: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+  typeIcon: {
+    fontSize: 14,
   },
-  statusText: {
+  typeText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
+    color: '#1F2937',
   },
   priceBadge: {
     backgroundColor: COLORS.primary,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
-    shadowRadius: 4,
+    shadowRadius: 3,
     elevation: 3,
   },
-  priceText: {
-    color: COLORS.white,
-    fontWeight: 'bold',
-    fontSize: 15,
-  },
-  animalTypeBadge: {
-    position: 'absolute',
-    bottom: 12,
-    left: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    gap: 4,
-  },
-  animalTypeEmoji: {
-    fontSize: 14,
-  },
-  animalTypeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.black,
+  priceBadgeText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 16,
   },
   wishlistButton: {
     position: 'absolute',
-    bottom: 12,
-    right: 12,
+    bottom: 8,
+    right: 8,
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.95)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 4,
+    zIndex: 10,
   },
   wishlistButtonActive: {
-    backgroundColor: COLORS.red,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+  },
+  statusBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  statusText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
   content: {
     padding: 16,
   },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.black,
-    marginBottom: 8,
-    lineHeight: 24,
+  breedName: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 10,
+    lineHeight: 26,
   },
-  tagsRow: {
+  infoTags: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 8,
     marginBottom: 12,
+    flexWrap: 'wrap',
   },
-  tag: {
+  infoTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.secondary,
+    backgroundColor: '#F3F4F6',
     paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
     gap: 4,
   },
-  tagText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: COLORS.black,
+  infoTagText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
   },
-  infoRow: {
+  metaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 14,
+    gap: 8,
   },
-  infoItem: {
+  metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     flex: 1,
   },
-  infoText: {
+  metaText: {
     fontSize: 13,
-    color: COLORS.gray,
-    flexShrink: 1,
+    color: '#6B7280',
+    flex: 1,
   },
   divider: {
     height: 1,
-    backgroundColor: COLORS.lightGray,
-    marginBottom: 12,
+    backgroundColor: '#E5E7EB',
+    marginBottom: 14,
   },
   sellerRow: {
     flexDirection: 'row',
@@ -387,9 +398,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sellerAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
@@ -397,23 +408,22 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   avatarImage: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
   },
   avatarText: {
-    color: COLORS.white,
-    fontSize: 18,
-    fontWeight: 'bold',
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '700',
   },
   sellerInfo: {
     flex: 1,
   },
   sellerName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: COLORS.black,
-    marginBottom: 2,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4,
   },
   verifiedRow: {
     flexDirection: 'row',
@@ -421,9 +431,9 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   verifiedText: {
-    fontSize: 12,
+    fontSize: 13,
     color: COLORS.primary,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   actionRow: {
     flexDirection: 'row',
@@ -434,13 +444,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.blue,
+    backgroundColor: '#3B82F6',
     paddingVertical: 14,
-    borderRadius: 14,
+    borderRadius: 12,
     gap: 8,
-    shadowColor: COLORS.blue,
+    shadowColor: '#3B82F6',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 3,
   },
@@ -451,17 +461,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#25D366',
     paddingVertical: 14,
-    borderRadius: 14,
+    borderRadius: 12,
     gap: 8,
     shadowColor: '#25D366',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 3,
   },
   buttonText: {
-    color: COLORS.white,
-    fontWeight: '600',
+    color: '#FFFFFF',
+    fontWeight: '700',
     fontSize: 15,
   },
 });

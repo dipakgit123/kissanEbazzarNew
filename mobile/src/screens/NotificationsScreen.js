@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useNotifications } from '../context/NotificationContext';
 import { COLORS } from '../utils/constants';
 
@@ -159,7 +160,7 @@ const NotificationsScreen = ({ navigation }) => {
       >
         <Ionicons name="arrow-back" size={24} color={COLORS.black} />
       </TouchableOpacity>
-      <Text style={styles.headerTitle}>Notifications</Text>
+      <Text style={styles.headerTitle}>{t('notifications.title')}</Text>
       <View style={styles.headerActions}>
         {unreadCount > 0 && (
           <TouchableOpacity style={styles.headerButton} onPress={markAllAsRead}>
@@ -178,9 +179,9 @@ const NotificationsScreen = ({ navigation }) => {
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
       <Ionicons name="notifications-off-outline" size={80} color={COLORS.lightGray} />
-      <Text style={styles.emptyTitle}>No Notifications</Text>
+      <Text style={styles.emptyTitle}>{t('notifications.noNotifications')}</Text>
       <Text style={styles.emptySubtitle}>
-        You're all caught up! Check back later for updates.
+        {t('notifications.noNotificationsDesc')}
       </Text>
     </View>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,9 @@ import {
   Linking,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { Video } from 'expo-av';
 import { COLORS, formatPrice, formatDate, getAnimalTypeLabel } from '../utils/constants';
 import { listingsService } from '../services/api';
 
@@ -23,10 +25,28 @@ const AnimalDetailScreen = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const videoRef = useRef(null);
 
   useEffect(() => {
     fetchListing();
   }, [animalType, id]);
+
+  // Auto-slide timer for photos - must be before conditional returns
+  useEffect(() => {
+    if (!listing || loading || error) return;
+
+    const images = getImages();
+    if (images.length <= 1) return;
+
+    const timer = setInterval(() => {
+      setActiveImageIndex((prevIndex) => {
+        const nextIndex = prevIndex + 1;
+        return nextIndex >= images.length ? 0 : nextIndex;
+      });
+    }, 2000); // 2 seconds
+
+    return () => clearInterval(timer);
+  }, [listing, loading, error]);
 
   const fetchListing = async () => {
     setLoading(true);
@@ -81,54 +101,114 @@ const AnimalDetailScreen = ({ route, navigation }) => {
     }
   };
 
+  const handlePreviousImage = () => {
+    setActiveImageIndex((prevIndex) => {
+      const images = getImages();
+      return prevIndex === 0 ? images.length - 1 : prevIndex - 1;
+    });
+  };
+
+  const handleNextImage = () => {
+    setActiveImageIndex((prevIndex) => {
+      const images = getImages();
+      return prevIndex >= images.length - 1 ? 0 : prevIndex + 1;
+    });
+  };
+
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <SafeAreaView style={styles.loadingContainer} edges={['top', 'bottom']}>
         <ActivityIndicator size="large" color={COLORS.primary} />
         <Text style={styles.loadingText}>Loading listing...</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (error || !listing) {
     return (
-      <View style={styles.errorContainer}>
+      <SafeAreaView style={styles.errorContainer} edges={['top', 'bottom']}>
         <Text style={styles.errorIcon}>😔</Text>
         <Text style={styles.errorTitle}>Listing Not Found</Text>
         <Text style={styles.errorText}>{error || 'The listing you are looking for does not exist.'}</Text>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Text style={styles.backButtonText}>Go Back</Text>
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
     );
   }
 
   const images = getImages();
+  const hasVideo = listing.video && listing.video.trim() !== '';
 
   return (
     <View style={styles.container}>
+      {/* Fixed Header with Back Button - Outside ScrollView */}
+      <SafeAreaView edges={['top']} style={styles.fixedHeader}>
+        <TouchableOpacity
+          style={styles.headerBackButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color={COLORS.black} />
+        </TouchableOpacity>
+
+        {/* Type Badge */}
+        <View style={styles.typeBadge}>
+          <Text style={styles.typeBadgeText}>{getAnimalTypeLabel(animalType)}</Text>
+        </View>
+      </SafeAreaView>
+
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        {/* Image Gallery */}
-        <View style={styles.imageContainer}>
-          {images.length > 0 ? (
-            <>
+        {/* Spacer for fixed header */}
+        <View style={styles.headerSpacer} />
+
+        {/* Photos Gallery Section - SHOWN FIRST */}
+        {images.length > 0 && (
+          <View style={styles.photosSection}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="images" size={20} color={COLORS.primary} />
+              <Text style={styles.sectionHeaderText}>Photos ({images.length})</Text>
+            </View>
+            <View style={styles.imageGalleryContainer}>
               <ScrollView
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
-                onMomentumScrollEnd={(e) => {
-                  const index = Math.round(e.nativeEvent.contentOffset.x / width);
-                  setActiveImageIndex(index);
+                scrollEnabled={false}
+                ref={(ref) => {
+                  if (ref && images.length > 0) {
+                    ref.scrollTo({ x: activeImageIndex * width, animated: true });
+                  }
                 }}
               >
                 {images.map((img, index) => (
                   <Image
                     key={index}
                     source={{ uri: img.url }}
-                    style={styles.mainImage}
+                    style={styles.galleryImage}
                   />
                 ))}
               </ScrollView>
+
+              {/* Navigation Arrows */}
+              {images.length > 1 && (
+                <>
+                  <TouchableOpacity
+                    style={styles.arrowLeft}
+                    onPress={handlePreviousImage}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="chevron-back" size={30} color="#FFFFFF" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.arrowRight}
+                    onPress={handleNextImage}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="chevron-forward" size={30} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </>
+              )}
 
               {/* Image Indicators */}
               {images.length > 1 && (
@@ -144,27 +224,44 @@ const AnimalDetailScreen = ({ route, navigation }) => {
                   ))}
                 </View>
               )}
-            </>
-          ) : (
-            <View style={styles.placeholderImage}>
-              <Ionicons name="image-outline" size={64} color={COLORS.gray} />
-              <Text style={styles.placeholderText}>No Image Available</Text>
+
+              {/* Image Label */}
+              <View style={styles.imageLabel}>
+                <Text style={styles.imageLabelText}>
+                  {images[activeImageIndex]?.label || `Photo ${activeImageIndex + 1}`}
+                </Text>
+              </View>
             </View>
-          )}
-
-          {/* Back Button */}
-          <TouchableOpacity
-            style={styles.headerBackButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="arrow-back" size={24} color={COLORS.black} />
-          </TouchableOpacity>
-
-          {/* Type Badge */}
-          <View style={styles.typeBadge}>
-            <Text style={styles.typeBadgeText}>{getAnimalTypeLabel(animalType)}</Text>
           </View>
-        </View>
+        )}
+
+        {/* Video Section - SHOWN AFTER PHOTOS */}
+        {hasVideo && (
+          <View style={styles.videoSection}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="videocam" size={20} color={COLORS.primary} />
+              <Text style={styles.sectionHeaderText}>Video</Text>
+            </View>
+            <View style={styles.videoContainer}>
+              <Video
+                ref={videoRef}
+                source={{ uri: listing.video }}
+                style={styles.videoPlayer}
+                useNativeControls
+                resizeMode="contain"
+                isLooping
+              />
+            </View>
+          </View>
+        )}
+
+        {/* No Media Available */}
+        {!hasVideo && images.length === 0 && (
+          <View style={styles.noMediaContainer}>
+            <Ionicons name="image-outline" size={64} color={COLORS.gray} />
+            <Text style={styles.noMediaText}>No Media Available</Text>
+          </View>
+        )}
 
         {/* Title & Price Card */}
         <View style={styles.card}>
@@ -331,23 +428,25 @@ const AnimalDetailScreen = ({ route, navigation }) => {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Bottom Contact Bar */}
-      <View style={styles.bottomBar}>
-        <View style={styles.bottomPriceContainer}>
-          <Text style={styles.bottomPriceLabel}>Listed Price</Text>
-          <Text style={styles.bottomPrice}>₹{formatPrice(listing.expected_price)}</Text>
+      {/* Bottom Contact Bar with Safe Area */}
+      <SafeAreaView edges={['bottom']} style={styles.bottomBarSafeArea}>
+        <View style={styles.bottomBar}>
+          <View style={styles.bottomPriceContainer}>
+            <Text style={styles.bottomPriceLabel}>Listed Price</Text>
+            <Text style={styles.bottomPrice}>₹{formatPrice(listing.expected_price)}</Text>
+          </View>
+          <View style={styles.bottomButtons}>
+            <TouchableOpacity style={styles.callBtn} onPress={handleCall}>
+              <Ionicons name="call" size={20} color={COLORS.white} />
+              <Text style={styles.btnText}>Call</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.whatsappBtn} onPress={handleWhatsApp}>
+              <Ionicons name="logo-whatsapp" size={20} color={COLORS.white} />
+              <Text style={styles.btnText}>WhatsApp</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-        <View style={styles.bottomButtons}>
-          <TouchableOpacity style={styles.callBtn} onPress={handleCall}>
-            <Ionicons name="call" size={20} color={COLORS.white} />
-            <Text style={styles.btnText}>Call</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.whatsappBtn} onPress={handleWhatsApp}>
-            <Ionicons name="logo-whatsapp" size={20} color={COLORS.white} />
-            <Text style={styles.btnText}>WhatsApp</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      </SafeAreaView>
     </View>
   );
 };
@@ -408,25 +507,124 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 16,
   },
-  imageContainer: {
-    position: 'relative',
-    height: 300,
-    backgroundColor: COLORS.secondary,
+  fixedHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    backgroundColor: 'transparent',
   },
-  mainImage: {
+  headerSpacer: {
+    height: 80,
+  },
+  headerBackButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  typeBadge: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  typeBadgeText: {
+    color: COLORS.white,
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  photosSection: {
+    backgroundColor: COLORS.white,
+    paddingBottom: 16,
+  },
+  videoSection: {
+    marginTop: 16,
+    backgroundColor: COLORS.white,
+    paddingBottom: 16,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  sectionHeaderText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.black,
+  },
+  videoContainer: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    backgroundColor: '#000',
+    borderRadius: 0,
+    overflow: 'hidden',
+  },
+  videoPlayer: {
+    width: '100%',
+    height: '100%',
+  },
+  arrowLeft: {
+    position: 'absolute',
+    left: 16,
+    top: '50%',
+    marginTop: -20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  arrowRight: {
+    position: 'absolute',
+    right: 16,
+    top: '50%',
+    marginTop: -20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  imageGalleryContainer: {
+    position: 'relative',
+  },
+  galleryImage: {
     width: width,
     height: 300,
     resizeMode: 'cover',
-  },
-  placeholderImage: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  placeholderText: {
-    marginTop: 8,
-    fontSize: 14,
-    color: COLORS.gray,
   },
   imageIndicators: {
     position: 'absolute',
@@ -445,35 +643,31 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     width: 24,
   },
-  headerBackButton: {
+  imageLabel: {
     position: 'absolute',
-    top: 48,
+    bottom: 16,
     left: 16,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.white,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  typeBadge: {
-    position: 'absolute',
-    top: 48,
-    right: 16,
-    backgroundColor: COLORS.primary,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: 8,
   },
-  typeBadgeText: {
+  imageLabelText: {
     color: COLORS.white,
-    fontWeight: '600',
     fontSize: 12,
+    fontWeight: '600',
+  },
+  noMediaContainer: {
+    height: 200,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.secondary,
+    marginTop: 0,
+  },
+  noMediaText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: COLORS.gray,
   },
   card: {
     backgroundColor: COLORS.white,
@@ -618,17 +812,19 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginTop: 4,
   },
-  bottomBar: {
+  bottomBarSafeArea: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
     backgroundColor: COLORS.white,
+  },
+  bottomBar: {
+    backgroundColor: COLORS.white,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingBottom: 24,
     borderTopWidth: 1,
     borderTopColor: COLORS.lightGray,
     shadowColor: '#000',

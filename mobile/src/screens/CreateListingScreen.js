@@ -13,6 +13,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../utils/constants';
 import { animalListingService } from '../services/api';
@@ -21,6 +22,7 @@ import { useAuth } from '../context/AuthContext';
 const CreateListingScreen = ({ route, navigation }) => {
   const { category } = route.params;
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
   const [images, setImages] = useState([]);
   const [form, setForm] = useState({
@@ -384,7 +386,7 @@ const CreateListingScreen = ({ route, navigation }) => {
       </ScrollView>
 
       {/* Submit Button */}
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) + 65 }]}>
         <TouchableOpacity
           style={[styles.submitButton, loading && styles.submitButtonDisabled]}
           onPress={handleSubmit}

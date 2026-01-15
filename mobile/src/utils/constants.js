@@ -22,6 +22,7 @@ export const ANIMAL_TYPES = [
   { id: 'goat', name: 'Goat', icon: '🐐', endpoint: 'goats' },
   { id: 'dog', name: 'Dog', icon: '🐕', endpoint: 'dogs' },
   { id: 'cat', name: 'Cat', icon: '🐈', endpoint: 'cats' },
+  { id: 'other', name: 'Other Animals', icon: '🐾', endpoint: 'other' },
 ];
 
 // Format price to Indian format

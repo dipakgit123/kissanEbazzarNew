@@ -13,11 +13,13 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import * as Location from 'expo-location';
 import { COLORS } from '../utils/constants';
 import { veterinarianService } from '../services/api';
 
 const VeterinarianScreen = ({ navigation }) => {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedService, setSelectedService] = useState(null);
   const [veterinarians, setVeterinarians] = useState([]);
@@ -242,7 +244,7 @@ const VeterinarianScreen = ({ navigation }) => {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>पशु डॉक्टर</Text>
-        <Text style={styles.titleEn}>Veterinarian Services</Text>
+        <Text style={styles.titleEn}>{t('veterinarian.title')}</Text>
         <Text style={styles.subtitle}>
           Professional veterinary care for your farm animals
         </Text>
@@ -252,7 +254,7 @@ const VeterinarianScreen = ({ navigation }) => {
           <Ionicons name="search" size={20} color={COLORS.gray} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search services or doctors..."
+            placeholder={t('veterinarian.searchPlaceholder')}
             placeholderTextColor={COLORS.gray}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -262,7 +264,7 @@ const VeterinarianScreen = ({ navigation }) => {
 
       {/* Services Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Available Services</Text>
+        <Text style={styles.sectionTitle}>{t('veterinarian.services')}</Text>
         <View style={styles.servicesGrid}>
           {filteredServices.map((service) => (
             <TouchableOpacity
@@ -297,7 +299,7 @@ const VeterinarianScreen = ({ navigation }) => {
                     { color: service.available ? COLORS.green : COLORS.red },
                   ]}
                 >
-                  {service.available ? 'Available' : 'Not Available'}
+                  {service.available ? t('veterinarian.available') : t('veterinarian.unavailable')}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -307,7 +309,7 @@ const VeterinarianScreen = ({ navigation }) => {
 
       {/* Veterinarians Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Our Veterinarians</Text>
+        <Text style={styles.sectionTitle}>{t('veterinarian.title')}</Text>
 
         {loading ? (
           <View style={styles.loadingContainer}>
@@ -354,7 +356,7 @@ const VeterinarianScreen = ({ navigation }) => {
                 </View>
                 <View style={styles.detailRow}>
                   <Ionicons name="time-outline" size={16} color={COLORS.gray} />
-                  <Text style={styles.detailText}>{vet.experience_years || 0}+ years experience</Text>
+                  <Text style={styles.detailText}>{vet.experience_years || 0}+ {t('veterinarian.experience')}</Text>
                 </View>
                 {vet.distance && (
                   <View style={styles.detailRow}>
@@ -369,7 +371,7 @@ const VeterinarianScreen = ({ navigation }) => {
               {vet.emergency_available && (
                 <View style={styles.emergencyBadge}>
                   <Ionicons name="alert-circle" size={14} color={COLORS.white} />
-                  <Text style={styles.emergencyBadgeText}>Emergency Available</Text>
+                  <Text style={styles.emergencyBadgeText}>{t('veterinarian.emergencyAvailable')}</Text>
                 </View>
               )}
 
@@ -382,7 +384,7 @@ const VeterinarianScreen = ({ navigation }) => {
                   }}
                 >
                   <Ionicons name="call" size={18} color={COLORS.white} />
-                  <Text style={styles.btnText}>Call</Text>
+                  <Text style={styles.btnText}>{t('veterinarian.call')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.whatsappBtn}
@@ -410,11 +412,11 @@ const VeterinarianScreen = ({ navigation }) => {
       {/* Emergency Section */}
       <View style={styles.emergencyCard}>
         <Text style={styles.emergencyTitle}>Emergency Veterinary Care</Text>
-        <Text style={styles.emergencySubtitle}>24/7 Emergency Services Available</Text>
+        <Text style={styles.emergencySubtitle}>24/7 {t('veterinarian.emergencyAvailable')}</Text>
         <View style={styles.emergencyButtons}>
           <TouchableOpacity style={styles.emergencyCallBtn} onPress={handleEmergencyCall}>
             <Ionicons name="call" size={20} color={COLORS.red} />
-            <Text style={styles.emergencyCallText}>Call Emergency</Text>
+            <Text style={styles.emergencyCallText}>{t('veterinarian.call')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.emergencyWhatsappBtn}

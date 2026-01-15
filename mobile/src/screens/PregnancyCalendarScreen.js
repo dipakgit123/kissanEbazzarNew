@@ -12,10 +12,12 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
 import { pregnancyService } from '../services/api';
 
 const PregnancyCalendarScreen = ({ navigation }) => {
+  const { t } = useTranslation();
   const [pregnancyRecords, setPregnancyRecords] = useState([]);
   const [myAnimals, setMyAnimals] = useState([]);
   const [pregnancyDurations, setPregnancyDurations] = useState({});
@@ -369,7 +371,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
         <View style={styles.headerIcon}>
           <Ionicons name="calendar" size={28} color={COLORS.white} />
         </View>
-        <Text style={styles.title}>Pregnancy Calendar</Text>
+        <Text style={styles.title}>{t('pregnancy.title')}</Text>
         <Text style={styles.subtitle}>Track pregnant animals with accurate durations</Text>
       </View>
 
@@ -377,7 +379,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
           <Text style={styles.statValue}>{stats.active || 0}</Text>
-          <Text style={styles.statLabel}>Active</Text>
+          <Text style={styles.statLabel}>{t('pregnancy.active')}</Text>
         </View>
         <View style={[styles.statCard, { backgroundColor: '#22C55E' + '20' }]}>
           <Text style={[styles.statValue, { color: '#22C55E' }]}>{stats.delivered || 0}</Text>

@@ -1,977 +1,459 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
-  Image,
-  Platform,
-} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, Image, Dimensions, Platform, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { COLORS } from '../utils/constants';
 import { veterinarianService } from '../services/api';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
-const SPECIALIZATIONS = [
-  { value: 'general', label: 'General Practice' },
-  { value: 'large_animal', label: 'Large Animal (Cows, Buffalos)' },
-  { value: 'small_animal', label: 'Small Animal (Dogs, Cats)' },
-  { value: 'livestock', label: 'Livestock' },
-  { value: 'surgery', label: 'Surgery' },
-  { value: 'emergency', label: 'Emergency Care' },
-  { value: 'reproduction', label: 'Reproduction & Breeding' },
-];
+const { width } = Dimensions.get('window');
 
 const VetRegistrationScreen = ({ navigation }) => {
+  const { t } = useTranslation();
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    full_name: '', phone_number: '', email: '', specialization: 'general', experience_years: '',
+    qualification: 'BVSc', services: [], consultation_fee: '', emergency_available: false,
+    license_number: '', clinic_name: '', clinic_address: '', latitude: '', longitude: '',
+    city: '', state: '', pincode: ''
+  });
+  const [files, setFiles] = useState({ profile_photo: null, license_document: null, degree_certificate: null, aadhar_document: null });
+  const [errors, setErrors] = useState({});
 
-  // Step 1: Personal Info
-  const [fullName, setFullName] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [email, setEmail] = useState('');
-  const [qualification, setQualification] = useState('');
-  const [experienceYears, setExperienceYears] = useState('');
-  const [specialization, setSpecialization] = useState('general');
-  const [showSpecPicker, setShowSpecPicker] = useState(false);
-
-  // Step 2: Professional Info
-  const [licenseNumber, setLicenseNumber] = useState('');
-  const [consultationFee, setConsultationFee] = useState('');
-  const [clinicName, setClinicName] = useState('');
-  const [clinicAddress, setClinicAddress] = useState('');
-  const [emergencyAvailable, setEmergencyAvailable] = useState(false);
-  const [services, setServices] = useState([]);
-
-  // Step 3: Documents
-  const [profilePhoto, setProfilePhoto] = useState(null);
-  const [licenseDocument, setLicenseDocument] = useState(null);
-  const [degreeCertificate, setDegreeCertificate] = useState(null);
-
-  // Step 4: Location
-  const [latitude, setLatitude] = useState(null);
-  const [longitude, setLongitude] = useState(null);
-  const [city, setCity] = useState('');
-  const [state, setState] = useState('');
-  const [pincode, setPincode] = useState('');
-
-  const SERVICE_OPTIONS = [
-    'General Checkup',
-    'Vaccination',
-    'Surgery',
-    'Emergency Care',
-    'Pregnancy Care',
-    'Deworming',
-    'Artificial Insemination',
-    'X-Ray & Diagnosis',
+  const specializations = [
+    { value: 'general', label: t('vetRegistration.specializations.general') || 'General Practice' },
+    { value: 'large_animal', label: t('vetRegistration.specializations.largeAnimal') || 'Large Animal' },
+    { value: 'small_animal', label: t('vetRegistration.specializations.smallAnimal') || 'Small Animal' },
+    { value: 'livestock', label: t('vetRegistration.specializations.livestock') || 'Livestock' },
+    { value: 'surgery', label: t('vetRegistration.specializations.surgery') || 'Surgery' },
+    { value: 'emergency', label: t('vetRegistration.specializations.emergency') || 'Emergency Care' },
+    { value: 'reproduction', label: t('vetRegistration.specializations.reproduction') || 'Reproduction' }
   ];
 
-  const pickImage = async (setter) => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
+  const serviceOptions = [
+    { value: 'checkup', label: t('vetRegistration.services.checkup') || 'Checkup', icon: '🩺' },
+    { value: 'vaccination', label: t('vetRegistration.services.vaccination') || 'Vaccination', icon: '💉' },
+    { value: 'surgery', label: t('vetRegistration.services.surgery') || 'Surgery', icon: '🔬' },
+    { value: 'emergency', label: t('vetRegistration.services.emergency') || 'Emergency', icon: '🚨' },
+    { value: 'pregnancy', label: t('vetRegistration.services.pregnancy') || 'Pregnancy', icon: '🤰' },
+    { value: 'dental', label: t('vetRegistration.services.dental') || 'Dental', icon: '🦷' },
+    { value: 'deworming', label: t('vetRegistration.services.deworming') || 'Deworming', icon: '💊' },
+    { value: 'artificial_insemination', label: t('vetRegistration.services.artificialInsemination') || 'AI', icon: '🧬' }
+  ];
 
-    if (!result.canceled) {
-      setter(result.assets[0]);
+  const qualifications = [
+    { value: 'BVSc', label: 'BVSc' },
+    { value: 'BVSc & AH', label: 'BVSc & AH' },
+    { value: 'MVSc', label: 'MVSc' },
+    { value: 'PhD', label: 'PhD' }
+  ];
+
+  useEffect(() => {
+    (async () => {
+      await Location.requestForegroundPermissionsAsync();
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+    })();
+  }, []);
+
+  const handleInputChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) setErrors(prev => ({ ...prev, [field]: null }));
+  };
+
+  const toggleService = (service) => {
+    setFormData(prev => ({
+      ...prev,
+      services: prev.services.includes(service) ? prev.services.filter(s => s !== service) : [...prev.services, service]
+    }));
+  };
+
+  const pickImage = async (fileType) => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8
+      });
+      if (!result.canceled) setFiles(prev => ({ ...prev, [fileType]: result.assets[0] }));
+    } catch (error) {
+      Alert.alert(t('common.error'), 'Failed to pick image');
     }
   };
 
   const getCurrentLocation = async () => {
-    setLocationLoading(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Please enable location permissions to continue.');
-        return;
-      }
-
+      setLocationLoading(true);
       const location = await Location.getCurrentPositionAsync({});
-      setLatitude(location.coords.latitude);
-      setLongitude(location.coords.longitude);
-
-      // Reverse geocode to get address
-      const [address] = await Location.reverseGeocodeAsync({
+      const address = await Location.reverseGeocodeAsync({
         latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
+        longitude: location.coords.longitude
       });
-
-      if (address) {
-        setCity(address.city || address.subregion || '');
-        setState(address.region || '');
-        setPincode(address.postalCode || '');
-        setClinicAddress(`${address.street || ''}, ${address.city || ''}, ${address.region || ''}`);
+      if (address && address[0]) {
+        handleInputChange('latitude', location.coords.latitude.toString());
+        handleInputChange('longitude', location.coords.longitude.toString());
+        handleInputChange('city', address[0].city || '');
+        handleInputChange('state', address[0].region || '');
+        handleInputChange('pincode', address[0].postalCode || '');
       }
-
-      Alert.alert('Success', 'Location captured successfully!');
     } catch (error) {
-      Alert.alert('Error', 'Failed to get location. Please try again.');
+      Alert.alert(t('common.error'), 'Failed to get location');
     } finally {
       setLocationLoading(false);
     }
   };
 
-  const toggleService = (service) => {
-    setServices((prev) =>
-      prev.includes(service)
-        ? prev.filter((s) => s !== service)
-        : [...prev, service]
-    );
-  };
-
   const validateStep1 = () => {
-    if (!fullName.trim()) {
-      Alert.alert('Error', 'Please enter your full name');
-      return false;
-    }
-    if (!phoneNumber.trim() || phoneNumber.length !== 10) {
-      Alert.alert('Error', 'Please enter a valid 10-digit phone number');
-      return false;
-    }
-    if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
-      return false;
-    }
-    if (!qualification.trim()) {
-      Alert.alert('Error', 'Please enter your qualification');
-      return false;
-    }
-    return true;
+    const newErrors = {};
+    if (!formData.full_name.trim()) newErrors.full_name = t('vetRegistration.errors.nameRequired');
+    if (!formData.phone_number.trim()) newErrors.phone_number = t('vetRegistration.errors.phoneRequired');
+    else if (!/^[6-9]\d{9}$/.test(formData.phone_number)) newErrors.phone_number = t('vetRegistration.errors.phoneInvalid');
+    if (!formData.email.trim()) newErrors.email = t('vetRegistration.errors.emailRequired');
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = t('vetRegistration.errors.emailInvalid');
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const validateStep2 = () => {
-    if (!licenseNumber.trim()) {
-      Alert.alert('Error', 'Please enter your license number');
-      return false;
-    }
-    return true;
+    const newErrors = {};
+    if (!formData.experience_years) newErrors.experience_years = t('vetRegistration.errors.experienceRequired');
+    if (!formData.license_number.trim()) newErrors.license_number = t('vetRegistration.errors.licenseRequired');
+    if (!formData.consultation_fee) newErrors.consultation_fee = t('vetRegistration.errors.feeRequired');
+    if (formData.services.length === 0) newErrors.services = t('vetRegistration.errors.servicesRequired');
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const validateStep3 = () => {
-    if (!licenseDocument) {
-      Alert.alert('Error', 'Please upload your license document');
-      return false;
-    }
-    return true;
-  };
-
-  const validateStep4 = () => {
-    if (!latitude || !longitude) {
-      Alert.alert('Error', 'Please capture your location');
-      return false;
-    }
-    if (!city.trim() || !state.trim() || !pincode.trim()) {
-      Alert.alert('Error', 'Please fill in all location details');
-      return false;
-    }
-    return true;
+    const newErrors = {};
+    if (!formData.clinic_name.trim()) newErrors.clinic_name = t('vetRegistration.errors.clinicNameRequired');
+    if (!formData.clinic_address.trim()) newErrors.clinic_address = t('vetRegistration.errors.addressRequired');
+    if (!formData.latitude || !formData.longitude) newErrors.location = t('vetRegistration.errors.locationRequired');
+    if (!files.profile_photo) newErrors.profile_photo = t('vetRegistration.errors.photoRequired');
+    if (!files.license_document) newErrors.license_document = t('vetRegistration.errors.licenseDocRequired');
+    if (!files.degree_certificate) newErrors.degree_certificate = t('vetRegistration.errors.degreeRequired');
+    if (!files.aadhar_document) newErrors.aadhar_document = t('vetRegistration.errors.aadharRequired');
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleNext = () => {
     if (step === 1 && validateStep1()) setStep(2);
     else if (step === 2 && validateStep2()) setStep(3);
-    else if (step === 3 && validateStep3()) setStep(4);
+  };
+
+  const handleBack = () => {
+    if (step > 1) { setStep(step - 1); setErrors({}); }
   };
 
   const handleSubmit = async () => {
-    if (!validateStep4()) return;
-
+    if (!validateStep3()) return;
     setLoading(true);
     try {
-      const formData = new FormData();
-
-      // Personal info
-      formData.append('full_name', fullName);
-      formData.append('phone_number', `+91${phoneNumber}`);
-      formData.append('email', email.toLowerCase());
-      formData.append('qualification', qualification);
-      formData.append('experience_years', experienceYears || '0');
-      formData.append('specialization', specialization);
-
-      // Professional info
-      formData.append('license_number', licenseNumber);
-      formData.append('consultation_fee', consultationFee || '0');
-      formData.append('clinic_name', clinicName);
-      formData.append('clinic_address', clinicAddress);
-      formData.append('emergency_available', emergencyAvailable.toString());
-      formData.append('services', JSON.stringify(services));
-
-      // Location
-      formData.append('latitude', latitude.toString());
-      formData.append('longitude', longitude.toString());
-      formData.append('city', city);
-      formData.append('state', state);
-      formData.append('pincode', pincode);
-
-      // Documents
-      if (profilePhoto) {
-        formData.append('profile_photo', {
-          uri: profilePhoto.uri,
-          type: 'image/jpeg',
-          name: 'profile_photo.jpg',
-        });
-      }
-
-      formData.append('license_document', {
-        uri: licenseDocument.uri,
-        type: 'image/jpeg',
-        name: 'license_document.jpg',
+      const registrationData = new FormData();
+      Object.keys(formData).forEach(key => {
+        if (key === 'services') registrationData.append(key, JSON.stringify(formData[key]));
+        else if (key === 'emergency_available') registrationData.append(key, formData[key] ? 'true' : 'false');
+        else registrationData.append(key, formData[key]);
       });
-
-      if (degreeCertificate) {
-        formData.append('degree_certificate', {
-          uri: degreeCertificate.uri,
-          type: 'image/jpeg',
-          name: 'degree_certificate.jpg',
-        });
-      }
-
-      const response = await veterinarianService.register(formData);
-
+      Object.keys(files).forEach(key => {
+        if (files[key]) {
+          registrationData.append(key, {
+            uri: files[key].uri,
+            type: 'image/jpeg',
+            name: `${key}.jpg`
+          });
+        }
+      });
+      const response = await veterinarianService.register(registrationData);
       if (response.success) {
-        Alert.alert(
-          'Registration Successful!',
-          'Your registration is pending verification. You will receive your login credentials via email once verified.',
-          [
-            {
-              text: 'OK',
-              onPress: () => navigation.navigate('VetLogin'),
-            },
-          ]
-        );
+        Alert.alert(t('common.success'), t('vetRegistration.registrationSuccess'), 
+          [{ text: t('common.ok'), onPress: () => navigation.navigate('VetLogin') }]);
       } else {
-        Alert.alert('Error', response.message || 'Registration failed');
+        Alert.alert(t('common.error'), response.message || t('vetRegistration.registrationFailed'));
       }
     } catch (error) {
-      Alert.alert('Error', error.message || 'Registration failed. Please try again.');
+      Alert.alert(t('common.error'), error.response?.data?.message || t('vetRegistration.registrationFailed'));
     } finally {
       setLoading(false);
     }
   };
 
-  const renderStep1 = () => (
-    <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Personal Information</Text>
-      <Text style={styles.stepSubtitle}>Tell us about yourself</Text>
-
-      <View style={styles.inputContainer}>
-        <Ionicons name="person-outline" size={20} color={COLORS.gray} />
-        <TextInput
-          style={styles.input}
-          placeholder="Full Name (Dr.)"
-          placeholderTextColor={COLORS.gray}
-          value={fullName}
-          onChangeText={setFullName}
-        />
-      </View>
-
-      <View style={styles.phoneInputContainer}>
-        <Text style={styles.countryCode}>+91</Text>
-        <TextInput
-          style={styles.phoneInput}
-          placeholder="Phone Number"
-          placeholderTextColor={COLORS.gray}
-          keyboardType="phone-pad"
-          maxLength={10}
-          value={phoneNumber}
-          onChangeText={setPhoneNumber}
-        />
-      </View>
-
-      <View style={styles.inputContainer}>
-        <Ionicons name="mail-outline" size={20} color={COLORS.gray} />
-        <TextInput
-          style={styles.input}
-          placeholder="Email Address"
-          placeholderTextColor={COLORS.gray}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          value={email}
-          onChangeText={setEmail}
-        />
-      </View>
-
-      <View style={styles.inputContainer}>
-        <Ionicons name="school-outline" size={20} color={COLORS.gray} />
-        <TextInput
-          style={styles.input}
-          placeholder="Qualification (e.g., BVSc, MVSc)"
-          placeholderTextColor={COLORS.gray}
-          value={qualification}
-          onChangeText={setQualification}
-        />
-      </View>
-
-      <View style={styles.inputContainer}>
-        <Ionicons name="calendar-outline" size={20} color={COLORS.gray} />
-        <TextInput
-          style={styles.input}
-          placeholder="Years of Experience"
-          placeholderTextColor={COLORS.gray}
-          keyboardType="numeric"
-          maxLength={2}
-          value={experienceYears}
-          onChangeText={setExperienceYears}
-        />
-      </View>
-
-      <TouchableOpacity
-        style={styles.pickerButton}
-        onPress={() => setShowSpecPicker(!showSpecPicker)}
-      >
-        <Ionicons name="medical-outline" size={20} color={COLORS.gray} />
-        <Text style={styles.pickerText}>
-          {SPECIALIZATIONS.find((s) => s.value === specialization)?.label || 'Select Specialization'}
-        </Text>
-        <Ionicons name="chevron-down" size={20} color={COLORS.gray} />
-      </TouchableOpacity>
-
-      {showSpecPicker && (
-        <View style={styles.pickerOptions}>
-          {SPECIALIZATIONS.map((spec) => (
-            <TouchableOpacity
-              key={spec.value}
-              style={[
-                styles.pickerOption,
-                specialization === spec.value && styles.pickerOptionActive,
-              ]}
-              onPress={() => {
-                setSpecialization(spec.value);
-                setShowSpecPicker(false);
-              }}
-            >
-              <Text
-                style={[
-                  styles.pickerOptionText,
-                  specialization === spec.value && styles.pickerOptionTextActive,
-                ]}
-              >
-                {spec.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-    </View>
-  );
-
-  const renderStep2 = () => (
-    <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Professional Details</Text>
-      <Text style={styles.stepSubtitle}>Your practice information</Text>
-
-      <View style={styles.inputContainer}>
-        <Ionicons name="document-text-outline" size={20} color={COLORS.gray} />
-        <TextInput
-          style={styles.input}
-          placeholder="License Number (VCI Registration)"
-          placeholderTextColor={COLORS.gray}
-          value={licenseNumber}
-          onChangeText={setLicenseNumber}
-        />
-      </View>
-
-      <View style={styles.inputContainer}>
-        <Ionicons name="cash-outline" size={20} color={COLORS.gray} />
-        <TextInput
-          style={styles.input}
-          placeholder="Consultation Fee (Rs.)"
-          placeholderTextColor={COLORS.gray}
-          keyboardType="numeric"
-          value={consultationFee}
-          onChangeText={setConsultationFee}
-        />
-      </View>
-
-      <View style={styles.inputContainer}>
-        <Ionicons name="business-outline" size={20} color={COLORS.gray} />
-        <TextInput
-          style={styles.input}
-          placeholder="Clinic/Hospital Name"
-          placeholderTextColor={COLORS.gray}
-          value={clinicName}
-          onChangeText={setClinicName}
-        />
-      </View>
-
-      <TouchableOpacity
-        style={styles.toggleRow}
-        onPress={() => setEmergencyAvailable(!emergencyAvailable)}
-      >
-        <View style={styles.toggleInfo}>
-          <Ionicons name="alert-circle-outline" size={24} color="#EF4444" />
-          <Text style={styles.toggleLabel}>Available for Emergency Calls</Text>
-        </View>
-        <View style={[styles.toggle, emergencyAvailable && styles.toggleActive]}>
-          <View style={[styles.toggleKnob, emergencyAvailable && styles.toggleKnobActive]} />
-        </View>
-      </TouchableOpacity>
-
-      <Text style={styles.sectionLabel}>Services Offered</Text>
-      <View style={styles.servicesGrid}>
-        {SERVICE_OPTIONS.map((service) => (
-          <TouchableOpacity
-            key={service}
-            style={[
-              styles.serviceChip,
-              services.includes(service) && styles.serviceChipActive,
-            ]}
-            onPress={() => toggleService(service)}
-          >
-            <Text
-              style={[
-                styles.serviceChipText,
-                services.includes(service) && styles.serviceChipTextActive,
-              ]}
-            >
-              {service}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-
-  const renderStep3 = () => (
-    <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Upload Documents</Text>
-      <Text style={styles.stepSubtitle}>Required for verification</Text>
-
-      <TouchableOpacity
-        style={styles.uploadCard}
-        onPress={() => pickImage(setProfilePhoto)}
-      >
-        {profilePhoto ? (
-          <Image source={{ uri: profilePhoto.uri }} style={styles.uploadedImage} />
-        ) : (
-          <>
-            <Ionicons name="camera-outline" size={40} color="#3B82F6" />
-            <Text style={styles.uploadTitle}>Profile Photo</Text>
-            <Text style={styles.uploadSubtitle}>Optional</Text>
-          </>
-        )}
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.uploadCard, !licenseDocument && styles.uploadCardRequired]}
-        onPress={() => pickImage(setLicenseDocument)}
-      >
-        {licenseDocument ? (
-          <Image source={{ uri: licenseDocument.uri }} style={styles.uploadedImage} />
-        ) : (
-          <>
-            <Ionicons name="document-outline" size={40} color="#3B82F6" />
-            <Text style={styles.uploadTitle}>License Document *</Text>
-            <Text style={styles.uploadSubtitle}>VCI Registration Certificate</Text>
-          </>
-        )}
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.uploadCard}
-        onPress={() => pickImage(setDegreeCertificate)}
-      >
-        {degreeCertificate ? (
-          <Image source={{ uri: degreeCertificate.uri }} style={styles.uploadedImage} />
-        ) : (
-          <>
-            <Ionicons name="ribbon-outline" size={40} color="#3B82F6" />
-            <Text style={styles.uploadTitle}>Degree Certificate</Text>
-            <Text style={styles.uploadSubtitle}>Optional</Text>
-          </>
-        )}
-      </TouchableOpacity>
-    </View>
-  );
-
-  const renderStep4 = () => (
-    <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Clinic Location</Text>
-      <Text style={styles.stepSubtitle}>Help farmers find you nearby</Text>
-
-      <TouchableOpacity
-        style={styles.locationButton}
-        onPress={getCurrentLocation}
-        disabled={locationLoading}
-      >
-        {locationLoading ? (
-          <ActivityIndicator color={COLORS.white} />
-        ) : (
-          <>
-            <Ionicons name="location" size={24} color={COLORS.white} />
-            <Text style={styles.locationButtonText}>
-              {latitude ? 'Update Location' : 'Get Current Location'}
-            </Text>
-          </>
-        )}
-      </TouchableOpacity>
-
-      {latitude && longitude && (
-        <View style={styles.locationConfirm}>
-          <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-          <Text style={styles.locationConfirmText}>Location captured successfully</Text>
-        </View>
-      )}
-
-      <View style={styles.inputContainer}>
-        <Ionicons name="business-outline" size={20} color={COLORS.gray} />
-        <TextInput
-          style={styles.input}
-          placeholder="Clinic Address"
-          placeholderTextColor={COLORS.gray}
-          value={clinicAddress}
-          onChangeText={setClinicAddress}
-          multiline
-        />
-      </View>
-
-      <View style={styles.row}>
-        <View style={[styles.inputContainer, styles.halfInput]}>
-          <TextInput
-            style={styles.input}
-            placeholder="City"
-            placeholderTextColor={COLORS.gray}
-            value={city}
-            onChangeText={setCity}
-          />
-        </View>
-        <View style={[styles.inputContainer, styles.halfInput]}>
-          <TextInput
-            style={styles.input}
-            placeholder="State"
-            placeholderTextColor={COLORS.gray}
-            value={state}
-            onChangeText={setState}
-          />
-        </View>
-      </View>
-
-      <View style={styles.inputContainer}>
-        <Ionicons name="pin-outline" size={20} color={COLORS.gray} />
-        <TextInput
-          style={styles.input}
-          placeholder="Pincode"
-          placeholderTextColor={COLORS.gray}
-          keyboardType="numeric"
-          maxLength={6}
-          value={pincode}
-          onChangeText={setPincode}
-        />
-      </View>
-    </View>
-  );
-
   return (
-    <View style={styles.container}>
-      {/* Header */}
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => (step > 1 ? setStep(step - 1) : navigation.goBack())}
-        >
-          <Ionicons name="arrow-back" size={24} color={COLORS.black} />
+        <TouchableOpacity onPress={() => step === 1 ? navigation.goBack() : handleBack()}>
+          <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Veterinarian Registration</Text>
-        <View style={{ width: 40 }} />
+        <Text style={styles.headerTitle}>{t('vetAuth.registrationTitle')}</Text>
+        <TouchableOpacity onPress={() => setLanguageModalVisible(true)}>
+          <Ionicons name="language" size={24} color={COLORS.primary} />
+        </TouchableOpacity>
       </View>
-
-      {/* Progress Steps */}
       <View style={styles.progressContainer}>
-        {[1, 2, 3, 4].map((s) => (
-          <View key={s} style={styles.progressStep}>
-            <View
-              style={[
-                styles.progressDot,
-                step >= s && styles.progressDotActive,
-                step > s && styles.progressDotCompleted,
-              ]}
-            >
-              {step > s ? (
-                <Ionicons name="checkmark" size={14} color={COLORS.white} />
-              ) : (
-                <Text style={[styles.progressNumber, step >= s && styles.progressNumberActive]}>
-                  {s}
-                </Text>
-              )}
+        {[1, 2, 3].map((stepNum) => (
+          <View key={stepNum} style={styles.progressStep}>
+            <View style={[styles.progressCircle, step >= stepNum && styles.progressCircleActive]}>
+              {step > stepNum ? <Ionicons name="checkmark" size={16} color="#fff" /> : 
+                <Text style={[styles.progressNumber, step >= stepNum && styles.progressNumberActive]}>{stepNum}</Text>}
             </View>
-            {s < 4 && (
-              <View style={[styles.progressLine, step > s && styles.progressLineActive]} />
-            )}
+            {stepNum < 3 && <View style={[styles.progressLine, step > stepNum && styles.progressLineActive]} />}
           </View>
         ))}
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
-        {step === 1 && renderStep1()}
-        {step === 2 && renderStep2()}
-        {step === 3 && renderStep3()}
-        {step === 4 && renderStep4()}
-      </ScrollView>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <View style={styles.stepContainer}>
+          {step === 1 && (
+            <>
+              <Text style={styles.stepTitle}>{t('vetRegistration.step1Title')}</Text>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>{t('vetRegistration.fullName')} *</Text>
+                <View style={[styles.inputWrapper, errors.full_name && styles.inputError]}>
+                  <Ionicons name="person-outline" size={20} color="#6B7280" style={{marginRight: 12}} />
+                  <TextInput style={styles.input} placeholder={t('vetRegistration.fullNamePlaceholder')} value={formData.full_name}
+                    onChangeText={(text) => handleInputChange('full_name', text)} />
+                </View>
+                {errors.full_name && <Text style={styles.errorText}>{errors.full_name}</Text>}
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>{t('vetRegistration.phoneNumber')} *</Text>
+                <View style={[styles.inputWrapper, errors.phone_number && styles.inputError]}>
+                  <Ionicons name="call-outline" size={20} color="#6B7280" style={{marginRight: 12}} />
+                  <TextInput style={styles.input} placeholder={t('vetRegistration.phoneNumberPlaceholder')} value={formData.phone_number}
+                    onChangeText={(text) => handleInputChange('phone_number', text)} keyboardType="phone-pad" maxLength={10} />
+                </View>
+                {errors.phone_number && <Text style={styles.errorText}>{errors.phone_number}</Text>}
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>{t('vetRegistration.email')} *</Text>
+                <View style={[styles.inputWrapper, errors.email && styles.inputError]}>
+                  <Ionicons name="mail-outline" size={20} color="#6B7280" style={{marginRight: 12}} />
+                  <TextInput style={styles.input} placeholder={t('vetRegistration.emailPlaceholder')} value={formData.email}
+                    onChangeText={(text) => handleInputChange('email', text.toLowerCase())} keyboardType="email-address" autoCapitalize="none" />
+                </View>
+                {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+              </View>
+            </>
+          )}
 
-      {/* Bottom Button */}
-      <View style={styles.bottomContainer}>
+          {step === 2 && (
+            <>
+              <Text style={styles.stepTitle}>{t('vetRegistration.step2Title')}</Text>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>{t('vetRegistration.qualification')} *</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {qualifications.map((qual) => (
+                    <TouchableOpacity key={qual.value} style={[styles.optionChip, formData.qualification === qual.value && styles.optionChipActive]}
+                      onPress={() => handleInputChange('qualification', qual.value)}>
+                      <Text style={[styles.optionChipText, formData.qualification === qual.value && styles.optionChipTextActive]}>{qual.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>{t('vetRegistration.experienceYears')} *</Text>
+                <View style={[styles.inputWrapper, errors.experience_years && styles.inputError]}>
+                  <Ionicons name="time-outline" size={20} color="#6B7280" style={{marginRight: 12}} />
+                  <TextInput style={styles.input} placeholder={t('vetRegistration.experienceYearsPlaceholder')} value={formData.experience_years}
+                    onChangeText={(text) => handleInputChange('experience_years', text)} keyboardType="numeric" />
+                </View>
+                {errors.experience_years && <Text style={styles.errorText}>{errors.experience_years}</Text>}
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>{t('vetRegistration.licenseNumber')} *</Text>
+                <View style={[styles.inputWrapper, errors.license_number && styles.inputError]}>
+                  <Ionicons name="card-outline" size={20} color="#6B7280" style={{marginRight: 12}} />
+                  <TextInput style={styles.input} placeholder={t('vetRegistration.licenseNumberPlaceholder')} value={formData.license_number}
+                    onChangeText={(text) => handleInputChange('license_number', text)} />
+                </View>
+                {errors.license_number && <Text style={styles.errorText}>{errors.license_number}</Text>}
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>{t('vetRegistration.consultationFee')} *</Text>
+                <View style={[styles.inputWrapper, errors.consultation_fee && styles.inputError]}>
+                  <Ionicons name="cash-outline" size={20} color="#6B7280" style={{marginRight: 12}} />
+                  <TextInput style={styles.input} placeholder={t('vetRegistration.consultationFeePlaceholder')} value={formData.consultation_fee}
+                    onChangeText={(text) => handleInputChange('consultation_fee', text)} keyboardType="numeric" />
+                </View>
+                {errors.consultation_fee && <Text style={styles.errorText}>{errors.consultation_fee}</Text>}
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>{t('vetRegistration.services')} *</Text>
+                <View style={styles.servicesGrid}>
+                  {serviceOptions.map((service) => (
+                    <TouchableOpacity key={service.value} style={[styles.serviceCard, formData.services.includes(service.value) && styles.serviceCardActive]}
+                      onPress={() => toggleService(service.value)}>
+                      <Text style={styles.serviceIcon}>{service.icon}</Text>
+                      <Text style={[styles.serviceLabel, formData.services.includes(service.value) && styles.serviceLabelActive]}>{service.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {errors.services && <Text style={styles.errorText}>{errors.services}</Text>}
+              </View>
+            </>
+          )}
+
+          {step === 3 && (
+            <>
+              <Text style={styles.stepTitle}>{t('vetRegistration.step3Title')}</Text>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>{t('vetRegistration.clinicName')} *</Text>
+                <View style={[styles.inputWrapper, errors.clinic_name && styles.inputError]}>
+                  <Ionicons name="business-outline" size={20} color="#6B7280" style={{marginRight: 12}} />
+                  <TextInput style={styles.input} placeholder={t('vetRegistration.clinicNamePlaceholder')} value={formData.clinic_name}
+                    onChangeText={(text) => handleInputChange('clinic_name', text)} />
+                </View>
+                {errors.clinic_name && <Text style={styles.errorText}>{errors.clinic_name}</Text>}
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>{t('vetRegistration.clinicAddress')} *</Text>
+                <View style={[styles.inputWrapper, errors.clinic_address && styles.inputError]}>
+                  <TextInput style={[styles.input, {minHeight: 80, textAlignVertical: 'top'}]} placeholder={t('vetRegistration.clinicAddressPlaceholder')} 
+                    value={formData.clinic_address} onChangeText={(text) => handleInputChange('clinic_address', text)} multiline numberOfLines={3} />
+                </View>
+                {errors.clinic_address && <Text style={styles.errorText}>{errors.clinic_address}</Text>}
+              </View>
+              <TouchableOpacity style={styles.locationButton} onPress={getCurrentLocation} disabled={locationLoading}>
+                {locationLoading ? <ActivityIndicator color={COLORS.primary} /> : 
+                  <><Ionicons name="navigate" size={20} color={COLORS.primary} /><Text style={styles.locationButtonText}>{t('vetRegistration.getCurrentLocation')}</Text></>}
+              </TouchableOpacity>
+              {formData.latitude && <Text style={{color: COLORS.primary, marginBottom: 16}}>✓ {t('vetRegistration.locationSet')}</Text>}
+              {errors.location && <Text style={styles.errorText}>{errors.location}</Text>}
+              
+              <Text style={styles.sectionTitle}>{t('vetRegistration.documents')}</Text>
+              
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>{t('vetRegistration.profilePhoto')} *</Text>
+                <TouchableOpacity style={[styles.fileButton, errors.profile_photo && styles.inputError]} onPress={() => pickImage('profile_photo')}>
+                  {files.profile_photo ? (
+                    <><Image source={{ uri: files.profile_photo.uri }} style={{width: 50, height: 50, borderRadius: 8}} />
+                    <Text style={{color: COLORS.primary, marginLeft: 12}}>✓ {t('vetRegistration.photoSelected')}</Text></>
+                  ) : (
+                    <><Ionicons name="camera-outline" size={24} color="#6B7280" />
+                    <Text style={{fontSize: 14, color: '#6B7280', marginTop: 8}}>{t('vetRegistration.uploadPhoto')}</Text></>
+                  )}
+                </TouchableOpacity>
+                {errors.profile_photo && <Text style={styles.errorText}>{errors.profile_photo}</Text>}
+              </View>
+              
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>{t('vetRegistration.licenseDocument')} *</Text>
+                <TouchableOpacity style={[styles.fileButton, errors.license_document && styles.inputError]} onPress={() => pickImage('license_document')}>
+                  {files.license_document ? (
+                    <><Image source={{ uri: files.license_document.uri }} style={{width: 50, height: 50, borderRadius: 8}} />
+                    <Text style={{color: COLORS.primary, marginLeft: 12}}>✓ {t('vetRegistration.licenseUploaded')}</Text></>
+                  ) : (
+                    <><Ionicons name="document-outline" size={24} color="#6B7280" />
+                    <Text style={{fontSize: 14, color: '#6B7280', marginTop: 8}}>{t('vetRegistration.uploadLicense')}</Text></>
+                  )}
+                </TouchableOpacity>
+                {errors.license_document && <Text style={styles.errorText}>{errors.license_document}</Text>}
+              </View>
+              
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>{t('vetRegistration.degreeCertificate')} *</Text>
+                <TouchableOpacity style={[styles.fileButton, errors.degree_certificate && styles.inputError]} onPress={() => pickImage('degree_certificate')}>
+                  {files.degree_certificate ? (
+                    <><Image source={{ uri: files.degree_certificate.uri }} style={{width: 50, height: 50, borderRadius: 8}} />
+                    <Text style={{color: COLORS.primary, marginLeft: 12}}>✓ {t('vetRegistration.degreeUploaded')}</Text></>
+                  ) : (
+                    <><Ionicons name="school-outline" size={24} color="#6B7280" />
+                    <Text style={{fontSize: 14, color: '#6B7280', marginTop: 8}}>{t('vetRegistration.uploadDegree')}</Text></>
+                  )}
+                </TouchableOpacity>
+                {errors.degree_certificate && <Text style={styles.errorText}>{errors.degree_certificate}</Text>}
+              </View>
+              
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>{t('vetRegistration.aadharDocument')} *</Text>
+                <TouchableOpacity style={[styles.fileButton, errors.aadhar_document && styles.inputError]} onPress={() => pickImage('aadhar_document')}>
+                  {files.aadhar_document ? (
+                    <><Image source={{ uri: files.aadhar_document.uri }} style={{width: 50, height: 50, borderRadius: 8}} />
+                    <Text style={{color: COLORS.primary, marginLeft: 12}}>✓ {t('vetRegistration.aadharUploaded')}</Text></>
+                  ) : (
+                    <><Ionicons name="id-card-outline" size={24} color="#6B7280" />
+                    <Text style={{fontSize: 14, color: '#6B7280', marginTop: 8}}>{t('vetRegistration.uploadAadhar')}</Text></>
+                  )}
+                </TouchableOpacity>
+                {errors.aadhar_document && <Text style={styles.errorText}>{errors.aadhar_document}</Text>}
+              </View>
+            </>
+          )}
+        </View>
+
+        <View style={{padding: 20}}>
+          {step < 3 ? (
+            <TouchableOpacity style={styles.nextButton} onPress={handleNext} disabled={loading}>
+              <Text style={{fontSize: 16, fontWeight: '600', color: '#fff'}}>{t('common.next')}</Text>
+              <Ionicons name="arrow-forward" size={20} color="#fff" />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={loading}>
+              {loading ? <ActivityIndicator color="#fff" /> : 
+                <><Text style={{fontSize: 16, fontWeight: '600', color: '#fff'}}>{t('common.submit')}</Text>
+                <Ionicons name="checkmark-circle" size={20} color="#fff" /></>}
+            </TouchableOpacity>
+          )}
+        </View>
+        
         <TouchableOpacity
-          style={[styles.nextButton, loading && styles.buttonDisabled]}
-          onPress={step === 4 ? handleSubmit : handleNext}
+          style={{flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 20, gap: 4}}
+          onPress={() => navigation.navigate('VetLogin')}
           disabled={loading}
         >
-          {loading ? (
-            <ActivityIndicator color={COLORS.white} />
-          ) : (
-            <Text style={styles.nextButtonText}>
-              {step === 4 ? 'Submit Registration' : 'Next'}
-            </Text>
-          )}
+          <Text style={{fontSize: 14, color: '#6B7280'}}>{t('vetAuth.alreadyHaveAccount')}</Text>
+          <Text style={{fontSize: 14, fontWeight: '600', color: COLORS.primary}}>{t('vetAuth.loginNow')}</Text>
         </TouchableOpacity>
-      </View>
-    </View>
+      </ScrollView>
+      <LanguageSwitcher visible={languageModalVisible} onClose={() => setLanguageModalVisible(false)} />
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 50 : 40,
-    paddingBottom: 16,
-    backgroundColor: COLORS.white,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.black,
-  },
-  progressContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 20,
-    backgroundColor: COLORS.white,
-  },
-  progressStep: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  progressDot: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#E2E8F0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  progressDotActive: {
-    backgroundColor: '#3B82F6',
-  },
-  progressDotCompleted: {
-    backgroundColor: '#10B981',
-  },
-  progressNumber: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#94A3B8',
-  },
-  progressNumberActive: {
-    color: COLORS.white,
-  },
-  progressLine: {
-    width: 40,
-    height: 3,
-    backgroundColor: '#E2E8F0',
-    marginHorizontal: 4,
-  },
-  progressLineActive: {
-    backgroundColor: '#10B981',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 100,
-  },
-  stepContent: {
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
-    padding: 20,
-  },
-  stepTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.black,
-    marginBottom: 4,
-  },
-  stepSubtitle: {
-    fontSize: 14,
-    color: COLORS.gray,
-    marginBottom: 24,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  input: {
-    flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 10,
-    fontSize: 16,
-    color: COLORS.black,
-  },
-  phoneInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  countryCode: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.black,
-    borderRightWidth: 1,
-    borderRightColor: '#E2E8F0',
-  },
-  phoneInput: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: COLORS.black,
-  },
-  pickerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 14,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  pickerText: {
-    flex: 1,
-    fontSize: 16,
-    color: COLORS.black,
-    marginLeft: 10,
-  },
-  pickerOptions: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    overflow: 'hidden',
-  },
-  pickerOption: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-  },
-  pickerOptionActive: {
-    backgroundColor: '#EFF6FF',
-  },
-  pickerOptionText: {
-    fontSize: 14,
-    color: COLORS.black,
-  },
-  pickerOptionTextActive: {
-    color: '#3B82F6',
-    fontWeight: '600',
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FEF2F2',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-  },
-  toggleInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  toggleLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: COLORS.black,
-  },
-  toggle: {
-    width: 50,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#E2E8F0',
-    padding: 2,
-  },
-  toggleActive: {
-    backgroundColor: '#10B981',
-  },
-  toggleKnob: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: COLORS.white,
-  },
-  toggleKnobActive: {
-    transform: [{ translateX: 22 }],
-  },
-  sectionLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.black,
-    marginBottom: 12,
-  },
-  servicesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  serviceChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  serviceChipActive: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#3B82F6',
-  },
-  serviceChipText: {
-    fontSize: 13,
-    color: COLORS.gray,
-  },
-  serviceChipTextActive: {
-    color: '#3B82F6',
-    fontWeight: '500',
-  },
-  uploadCard: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 24,
-    alignItems: 'center',
-    marginBottom: 16,
-    borderWidth: 2,
-    borderColor: '#E2E8F0',
-    borderStyle: 'dashed',
-  },
-  uploadCardRequired: {
-    borderColor: '#3B82F6',
-  },
-  uploadedImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 12,
-  },
-  uploadTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.black,
-    marginTop: 12,
-  },
-  uploadSubtitle: {
-    fontSize: 12,
-    color: COLORS.gray,
-    marginTop: 4,
-  },
-  locationButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#3B82F6',
-    borderRadius: 12,
-    paddingVertical: 16,
-    marginBottom: 16,
-    gap: 8,
-  },
-  locationButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.white,
-  },
-  locationConfirm: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#ECFDF5',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 16,
-    gap: 6,
-  },
-  locationConfirmText: {
-    fontSize: 14,
-    color: '#10B981',
-    fontWeight: '500',
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  halfInput: {
-    flex: 1,
-  },
-  bottomContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: COLORS.white,
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-  },
-  nextButton: {
-    backgroundColor: '#3B82F6',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-  nextButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.white,
-  },
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+  headerTitle: { fontSize: 18, fontWeight: '600', color: '#1F2937', flex: 1, textAlign: 'center' },
+  progressContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 20, backgroundColor: '#fff' },
+  progressStep: { flexDirection: 'row', alignItems: 'center' },
+  progressCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' },
+  progressCircleActive: { backgroundColor: COLORS.primary },
+  progressNumber: { fontSize: 14, fontWeight: '600', color: '#6B7280' },
+  progressNumberActive: { color: '#fff' },
+  progressLine: { width: 60, height: 2, backgroundColor: '#E5E7EB' },
+  progressLineActive: { backgroundColor: COLORS.primary },
+  scrollView: { flex: 1 },
+  stepContainer: { padding: 20 },
+  stepTitle: { fontSize: 22, fontWeight: 'bold', color: '#1F2937', marginBottom: 20 },
+  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#1F2937', marginTop: 24, marginBottom: 16 },
+  inputGroup: { marginBottom: 20 },
+  label: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 8 },
+  inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 16, minHeight: 56 },
+  inputError: { borderColor: '#DC2626' },
+  input: { flex: 1, fontSize: 16, color: '#1F2937' },
+  errorText: { fontSize: 12, color: '#DC2626', marginTop: 4 },
+  optionChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', marginRight: 8 },
+  optionChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  optionChipText: { fontSize: 14, color: '#6B7280', fontWeight: '500' },
+  optionChipTextActive: { color: '#fff' },
+  servicesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  serviceCard: { width: (width - 64) / 2, padding: 16, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center' },
+  serviceCardActive: { backgroundColor: COLORS.primary + '15', borderColor: COLORS.primary },
+  serviceIcon: { fontSize: 32, marginBottom: 8 },
+  serviceLabel: { fontSize: 13, color: '#6B7280', textAlign: 'center', fontWeight: '500' },
+  serviceLabelActive: { color: COLORS.primary, fontWeight: '600' },
+  locationButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: COLORS.primary, borderRadius: 12, paddingVertical: 12, marginBottom: 16, gap: 8 },
+  locationButtonText: { fontSize: 14, fontWeight: '600', color: COLORS.primary },
+  fileButton: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, padding: 16, alignItems: 'center', justifyContent: 'center', minHeight: 80, borderStyle: 'dashed', flexDirection: 'row' },
+  nextButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.primary, borderRadius: 12, paddingVertical: 16, gap: 8 },
+  submitButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.primary, borderRadius: 12, paddingVertical: 16, gap: 8 }
 });
 
 export default VetRegistrationScreen;

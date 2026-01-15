@@ -5,491 +5,421 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
   Alert,
+  Image,
   ScrollView,
+  Dimensions,
+  StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
-import { veterinarianService } from '../services/api';
 import { useVetAuth } from '../context/VetAuthContext';
+import { veterinarianService } from '../services/api';
+import LanguageSwitcher from '../components/LanguageSwitcher';
+
+const { width, height } = Dimensions.get('window');
 
 const VetLoginScreen = ({ navigation }) => {
+  const { t } = useTranslation();
   const { login } = useVetAuth();
-  const [loginMethod, setLoginMethod] = useState('email'); // 'email' or 'phone'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
 
   const validateEmail = (email) => {
-    const emailRegex = /\S+@\S+\.\S+/;
-    return emailRegex.test(email);
+    const re = /\S+@\S+\.\S+/;
+    return re.test(email);
   };
 
-  const validatePhone = (phone) => {
-    const phoneRegex = /^[6-9]\d{9}$/;
-    return phoneRegex.test(phone);
-  };
+  const handleLogin = async () => {
+    setError('');
 
-  const handleEmailLogin = async () => {
+    // Validation
     if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email');
+      setError(t('vetLogin.emailRequired') || 'Email is required');
       return;
     }
 
-    if (!validateEmail(email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
+    if (!validateEmail(email.trim())) {
+      setError(t('vetLogin.emailInvalid') || 'Please enter a valid email');
       return;
     }
 
-    if (!password.trim()) {
-      Alert.alert('Error', 'Please enter your password');
+    if (!password) {
+      setError(t('vetLogin.passwordRequired') || 'Password is required');
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      setError(t('vetLogin.passwordMinLength') || 'Password must be at least 6 characters');
       return;
     }
 
     setLoading(true);
-    try {
-      const response = await veterinarianService.login(email.toLowerCase(), password);
 
-      if (response.success) {
+    try {
+      const response = await veterinarianService.login({
+        email: email.trim().toLowerCase(),
+        password: password,
+      });
+
+      if (response.success && response.token) {
         await login(response.token, response.veterinarian);
-        // Navigation will happen automatically via context
+        Alert.alert(
+          t('common.success'),
+          t('vetLogin.loginSuccess') || 'Login successful!'
+        );
       } else {
-        Alert.alert('Error', response.message || 'Login failed');
+        setError(response.message || t('vetLogin.loginFailed'));
       }
-    } catch (error) {
-      Alert.alert('Error', error.message || 'Login failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePhoneLogin = async () => {
-    if (!phoneNumber.trim()) {
-      Alert.alert('Error', 'Please enter your phone number');
-      return;
-    }
-
-    if (!validatePhone(phoneNumber)) {
-      Alert.alert('Error', 'Please enter a valid 10-digit Indian phone number');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const fullPhoneNumber = `+91${phoneNumber}`;
-      const response = await veterinarianService.sendOTP(fullPhoneNumber);
-
-      if (response.success) {
-        navigation.navigate('VetOTPVerification', { phoneNumber: fullPhoneNumber });
+    } catch (err) {
+      console.error('Login error:', err);
+      if (err.response?.status === 403) {
+        setError(err.response?.data?.message || t('vetLogin.accountPending'));
       } else {
-        Alert.alert('Error', response.message || 'Failed to send OTP');
+        setError(err.response?.data?.message || t('vetLogin.loginFailed'));
       }
-    } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to send OTP. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <ScrollView
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.content}>
-          {/* Back Button */}
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
+        {/* Header Image Section */}
+        <View style={styles.imageContainer}>
+          <Image
+            source={require('../assets/login2.png')}
+            style={styles.heroImage}
+            resizeMode="cover"
+          />
+          <View style={styles.imageOverlay} />
+          
+          {/* Language Switcher Button */}
+          <TouchableOpacity 
+            style={styles.languageButton}
+            onPress={() => setLanguageModalVisible(true)}
           >
-            <Ionicons name="arrow-back" size={24} color={COLORS.black} />
+            <Ionicons name="language" size={20} color="#fff" />
+            <Text style={styles.languageButtonText}>{t('profile.language')}</Text>
           </TouchableOpacity>
-
-          {/* Logo Section */}
-          <View style={styles.logoContainer}>
-            <View style={styles.logoCircle}>
-              <Ionicons name="medical" size={48} color={COLORS.white} />
+          
+          <View style={styles.headerTextContainer}>
+            <View style={styles.iconBadge}>
+              <Ionicons name="medical" size={32} color="#fff" />
             </View>
-            <Text style={styles.appName}>Veterinarian Portal</Text>
-            <Text style={styles.tagline}>Kissan E-Bazzar</Text>
+            <Text style={styles.appTitle}>{t('vetAuth.loginTitle')}</Text>
+            <Text style={styles.appSubtitle}>{t('vetAuth.loginSubtitle')}</Text>
           </View>
+        </View>
 
-          {/* Login Form */}
-          <View style={styles.formContainer}>
-            <Text style={styles.title}>Welcome Back!</Text>
-            <Text style={styles.subtitle}>
-              Login to access your dashboard
-            </Text>
+        {/* Login Form */}
+        <View style={styles.formContainer}>
+          <View style={styles.formContent}>
+            <Text style={styles.welcomeText}>{t('vetAuth.welcome')}</Text>
+            <Text style={styles.subtitle}>{t('vetAuth.loginToContinue')}</Text>
 
-            {/* Login Method Toggle */}
-            <View style={styles.toggleContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.toggleButton,
-                  loginMethod === 'email' && styles.toggleButtonActive,
-                ]}
-                onPress={() => setLoginMethod('email')}
-              >
-                <Ionicons
-                  name="mail"
-                  size={18}
-                  color={loginMethod === 'email' ? COLORS.white : COLORS.gray}
+            {/* Error Message */}
+            {error ? (
+              <View style={styles.errorContainer}>
+                <Ionicons name="alert-circle" size={20} color="#DC2626" />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
+
+            {/* Email Input */}
+            <View style={styles.inputContainer}>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="mail-outline" size={20} color="#6B7280" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder={t('vetAuth.emailPlaceholder') || 'Email Address'}
+                  placeholderTextColor="#9CA3AF"
+                  value={email}
+                  onChangeText={(text) => {
+                    setEmail(text);
+                    setError('');
+                  }}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!loading}
                 />
-                <Text
-                  style={[
-                    styles.toggleText,
-                    loginMethod === 'email' && styles.toggleTextActive,
-                  ]}
-                >
-                  Email
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.toggleButton,
-                  loginMethod === 'phone' && styles.toggleButtonActive,
-                ]}
-                onPress={() => setLoginMethod('phone')}
-              >
-                <Ionicons
-                  name="call"
-                  size={18}
-                  color={loginMethod === 'phone' ? COLORS.white : COLORS.gray}
-                />
-                <Text
-                  style={[
-                    styles.toggleText,
-                    loginMethod === 'phone' && styles.toggleTextActive,
-                  ]}
-                >
-                  Phone
-                </Text>
-              </TouchableOpacity>
+              </View>
             </View>
 
-            {loginMethod === 'email' ? (
-              <>
-                {/* Email Input */}
-                <View style={styles.inputContainer}>
-                  <Ionicons name="mail-outline" size={20} color={COLORS.gray} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Enter your email"
-                    placeholderTextColor={COLORS.gray}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    value={email}
-                    onChangeText={setEmail}
-                  />
-                </View>
-
-                {/* Password Input */}
-                <View style={styles.inputContainer}>
-                  <Ionicons name="lock-closed-outline" size={20} color={COLORS.gray} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Enter your password"
-                    placeholderTextColor={COLORS.gray}
-                    secureTextEntry={!showPassword}
-                    value={password}
-                    onChangeText={setPassword}
-                  />
-                  <TouchableOpacity
-                    onPress={() => setShowPassword(!showPassword)}
-                    style={styles.eyeIcon}
-                  >
-                    <Ionicons
-                      name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                      size={20}
-                      color={COLORS.gray}
-                    />
-                  </TouchableOpacity>
-                </View>
-
+            {/* Password Input */}
+            <View style={styles.inputContainer}>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="lock-closed-outline" size={20} color="#6B7280" style={styles.inputIcon} />
+                <TextInput
+                  style={[styles.input, styles.passwordInput]}
+                  placeholder={t('vetAuth.passwordPlaceholder') || 'Password'}
+                  placeholderTextColor="#9CA3AF"
+                  value={password}
+                  onChangeText={(text) => {
+                    setPassword(text);
+                    setError('');
+                  }}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  editable={!loading}
+                />
                 <TouchableOpacity
-                  style={[styles.button, loading && styles.buttonDisabled]}
-                  onPress={handleEmailLogin}
-                  disabled={loading}
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={styles.eyeIcon}
                 >
-                  {loading ? (
-                    <ActivityIndicator color={COLORS.white} />
-                  ) : (
-                    <Text style={styles.buttonText}>Login</Text>
-                  )}
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                {/* Phone Input */}
-                <View style={styles.phoneInputContainer}>
-                  <Text style={styles.countryCode}>+91</Text>
-                  <TextInput
-                    style={styles.phoneInput}
-                    placeholder="Enter phone number"
-                    placeholderTextColor={COLORS.gray}
-                    keyboardType="phone-pad"
-                    maxLength={10}
-                    value={phoneNumber}
-                    onChangeText={setPhoneNumber}
+                  <Ionicons
+                    name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                    size={20}
+                    color="#6B7280"
                   />
-                </View>
-
-                <TouchableOpacity
-                  style={[styles.button, loading && styles.buttonDisabled]}
-                  onPress={handlePhoneLogin}
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <ActivityIndicator color={COLORS.white} />
-                  ) : (
-                    <Text style={styles.buttonText}>Send OTP</Text>
-                  )}
                 </TouchableOpacity>
-              </>
-            )}
-
-            {/* Info Box */}
-            <View style={styles.infoBox}>
-              <Ionicons name="information-circle" size={20} color="#3B82F6" />
-              <Text style={styles.infoText}>
-                Login credentials are sent to your email after your registration is verified by admin.
-              </Text>
+              </View>
             </View>
+
+            {/* Login Button */}
+            <TouchableOpacity
+              style={[styles.loginButton, loading && styles.loginButtonDisabled]}
+              onPress={handleLogin}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Text style={styles.loginButtonText}>{t('vetAuth.loginButton')}</Text>
+                  <Ionicons name="arrow-forward" size={20} color="#fff" />
+                </>
+              )}
+            </TouchableOpacity>
 
             {/* Register Link */}
             <View style={styles.registerContainer}>
-              <Text style={styles.registerText}>Don't have an account? </Text>
-              <TouchableOpacity onPress={() => navigation.navigate('VetRegistration')}>
-                <Text style={styles.registerLink}>Register here</Text>
+              <Text style={styles.registerText}>{t('vetAuth.dontHaveAccount')}</Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('VetRegistration')}
+                disabled={loading}
+              >
+                <Text style={styles.registerLink}>{t('vetAuth.registerNow')}</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Back to User Login */}
+            {/* Back to Farmer Login */}
             <TouchableOpacity
-              style={styles.backToUserLogin}
+              style={styles.backButton}
               onPress={() => navigation.navigate('Login')}
+              disabled={loading}
             >
-              <Ionicons name="arrow-back" size={18} color={COLORS.gray} />
-              <Text style={styles.backToUserLoginText}>Back to User Login</Text>
+              <Ionicons name="arrow-back" size={20} color={COLORS.primary} />
+              <Text style={styles.backButtonText}>{t('vetAuth.backToFarmerLogin')}</Text>
             </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+      
+      <LanguageSwitcher 
+        visible={languageModalVisible} 
+        onClose={() => setLanguageModalVisible(false)} 
+      />
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#fff',
   },
   scrollContent: {
     flexGrow: 1,
   },
-  content: {
-    flex: 1,
-    padding: 24,
-    justifyContent: 'center',
+  imageContainer: {
+    width: '100%',
+    height: height * 0.35,
+    position: 'relative',
   },
-  backButton: {
+  heroImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imageOverlay: {
     position: 'absolute',
-    top: 50,
-    left: 24,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(59, 130, 246, 0.5)',
+  },
+  languageButton: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
     zIndex: 10,
-    padding: 8,
   },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 32,
-    marginTop: 60,
-  },
-  logoCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-    shadowColor: '#3B82F6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  appName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.black,
-    marginBottom: 4,
-  },
-  tagline: {
+  languageButtonText: {
+    color: '#fff',
     fontSize: 14,
-    color: COLORS.gray,
+    fontWeight: '600',
+  },
+  headerTextContainer: {
+    position: 'absolute',
+    bottom: 30,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  iconBadge: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  appTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  appSubtitle: {
+    fontSize: 16,
+    color: '#fff',
+    textAlign: 'center',
+    opacity: 0.9,
   },
   formContainer: {
-    backgroundColor: COLORS.white,
-    borderRadius: 24,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    marginTop: -30,
+    paddingTop: 30,
   },
-  title: {
+  formContent: {
+    paddingHorizontal: 24,
+  },
+  welcomeText: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: COLORS.black,
+    color: '#1F2937',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: COLORS.gray,
-    marginBottom: 20,
+    color: '#6B7280',
+    marginBottom: 24,
   },
-  toggleContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#F1F5F9',
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 20,
-  },
-  toggleButton: {
-    flex: 1,
+  errorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 10,
-    gap: 6,
+    backgroundColor: '#FEE2E2',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    gap: 8,
   },
-  toggleButtonActive: {
-    backgroundColor: '#3B82F6',
-  },
-  toggleText: {
+  errorText: {
+    flex: 1,
+    color: '#DC2626',
     fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.gray,
-  },
-  toggleTextActive: {
-    color: COLORS.white,
   },
   inputContainer: {
+    marginBottom: 16,
+  },
+  inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#fff',
     borderRadius: 12,
-    marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingHorizontal: 12,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 16,
+    height: 56,
   },
   inputIcon: {
-    marginRight: 8,
+    marginRight: 12,
   },
   input: {
     flex: 1,
-    paddingVertical: 16,
     fontSize: 16,
-    color: COLORS.black,
+    color: '#1F2937',
+  },
+  passwordInput: {
+    paddingRight: 40,
   },
   eyeIcon: {
+    position: 'absolute',
+    right: 16,
     padding: 4,
   },
-  phoneInputContainer: {
+  loginButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  countryCode: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.black,
-    borderRightWidth: 1,
-    borderRightColor: '#E2E8F0',
-  },
-  phoneInput: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    fontSize: 16,
-    color: COLORS.black,
-  },
-  button: {
-    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
     borderRadius: 12,
     paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-  buttonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  infoBox: {
-    flexDirection: 'row',
-    backgroundColor: '#EFF6FF',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 20,
-    alignItems: 'flex-start',
+    marginTop: 8,
     gap: 8,
   },
-  infoText: {
-    flex: 1,
-    fontSize: 12,
-    color: '#3B82F6',
-    lineHeight: 18,
+  loginButtonDisabled: {
+    opacity: 0.6,
+  },
+  loginButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
   registerContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 16,
+    alignItems: 'center',
+    marginTop: 24,
+    gap: 4,
   },
   registerText: {
     fontSize: 14,
-    color: COLORS.gray,
+    color: '#6B7280',
   },
   registerLink: {
     fontSize: 14,
-    color: '#3B82F6',
     fontWeight: '600',
+    color: COLORS.primary,
   },
-  backToUserLogin: {
+  backButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    marginTop: 20,
+    marginBottom: 30,
+    gap: 8,
   },
-  backToUserLoginText: {
+  backButtonText: {
     fontSize: 14,
-    color: COLORS.gray,
+    color: COLORS.primary,
+    fontWeight: '500',
   },
 });
 

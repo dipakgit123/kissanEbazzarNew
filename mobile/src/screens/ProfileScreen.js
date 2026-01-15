@@ -2,61 +2,59 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  Image,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  ActivityIndicator,
-  Alert,
+  Image,
   TextInput,
-  Modal,
+  Alert,
+  ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../utils/constants';
-import { userService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { userService } from '../services/api';
+
+const { width } = Dimensions.get('window');
 
 const ProfileScreen = ({ navigation }) => {
+  const { t } = useTranslation();
   const { user, updateUser, logout } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState(null);
-  const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editForm, setEditForm] = useState({
-    fullName: '',
-    address: '',
-    pincode: '',
-  });
-  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  
+  const [formData, setFormData] = useState({
+    fullName: user?.fullName || '',
+    email: user?.email || '',
+    address: user?.address || '',
+    city: user?.city || '',
+    state: user?.state || '',
+    pincode: user?.pincode || '',
+    profilePhoto: user?.profilePhoto || null,
+  });
 
   useEffect(() => {
-    fetchProfile();
-  }, []);
-
-  const fetchProfile = async () => {
-    setLoading(true);
-    try {
-      const response = await userService.getProfile();
-      if (response.success && response.user) {
-        setProfile(response.user);
-        setEditForm({
-          fullName: response.user.full_name || '',
-          address: response.user.address || '',
-          pincode: response.user.pincode || '',
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-    } finally {
-      setLoading(false);
+    if (user) {
+      setFormData({
+        fullName: user.fullName || '',
+        email: user.email || '',
+        address: user.address || '',
+        city: user.city || '',
+        state: user.state || '',
+        pincode: user.pincode || '',
+        profilePhoto: user.profilePhoto || null,
+      });
     }
-  };
+  }, [user]);
 
-  const handlePickImage = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissionResult.granted) {
-      Alert.alert('Permission Required', 'Please allow access to your photos.');
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please allow access to your photo library');
       return;
     }
 
@@ -67,472 +65,503 @@ const ProfileScreen = ({ navigation }) => {
       quality: 0.8,
     });
 
-    if (!result.canceled && result.assets[0]) {
-      uploadPhoto(result.assets[0].uri);
+    if (!result.canceled) {
+      uploadProfilePhoto(result.assets[0]);
     }
   };
 
-  const uploadPhoto = async (uri) => {
+  const takePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please allow camera access');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      uploadProfilePhoto(result.assets[0]);
+    }
+  };
+
+  const uploadProfilePhoto = async (photo) => {
     setUploadingPhoto(true);
     try {
-      const response = await userService.uploadProfilePhoto(uri);
+      const formData = new FormData();
+      formData.append('profilePhoto', {
+        uri: photo.uri,
+        type: 'image/jpeg',
+        name: 'profile.jpg',
+      });
+
+      const response = await userService.updateProfile(formData);
       if (response.success) {
-        setProfile({ ...profile, profile_photo: response.profile_photo });
-        await updateUser({ ...user, profile_photo: response.profile_photo });
-        Alert.alert('Success', 'Profile photo updated successfully');
+        await updateUser(response.user);
+        setFormData(prev => ({ ...prev, profilePhoto: response.user.profilePhoto }));
+        Alert.alert(t('common.success'), t('profile.photoUpdated'));
       }
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to upload photo');
+      Alert.alert(t('common.error'), t('errors.uploadFailed'));
     } finally {
       setUploadingPhoto(false);
     }
   };
 
-  const handleSaveProfile = async () => {
-    if (!editForm.fullName.trim()) {
-      Alert.alert('Error', 'Please enter your full name');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const response = await userService.updateProfile({
-        full_name: editForm.fullName,
-        address: editForm.address,
-        pincode: editForm.pincode,
-      });
-
-      if (response.success) {
-        setProfile(response.user);
-        await updateUser(response.user);
-        setEditModalVisible(false);
-        Alert.alert('Success', 'Profile updated successfully');
-      }
-    } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to update profile');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleLogout = () => {
+  const showPhotoOptions = () => {
     Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
+      t('profile.changePhoto'),
+      t('common.select'),
       [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            await logout();
-            navigation.replace('Login');
-          },
-        },
+        { text: t('profile.takePhoto'), onPress: takePhoto },
+        { text: t('profile.chooseLibrary'), onPress: pickImage },
+        { text: t('common.cancel'), style: 'cancel' },
       ]
     );
   };
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      const response = await userService.updateProfile(formData);
+      if (response.success) {
+        await updateUser(response.user);
+        setEditing(false);
+        Alert.alert(t('common.success'), t('profile.profileUpdated'));
+      }
+    } catch (error) {
+      Alert.alert(t('common.error'), error.message || t('errors.somethingWentWrong'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setFormData({
+      fullName: user?.fullName || '',
+      email: user?.email || '',
+      address: user?.address || '',
+      city: user?.city || '',
+      state: user?.state || '',
+      pincode: user?.pincode || '',
+      profilePhoto: user?.profilePhoto || null,
+    });
+    setEditing(false);
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      t('common.logout'),
+      t('profile.logoutConfirm'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('common.logout'), style: 'destructive', onPress: logout },
+      ]
     );
-  }
+  };
+
+  const renderMenuItem = (icon, title, subtitle, onPress, rightIcon = 'chevron-forward') => (
+    <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={0.7}>
+      <View style={styles.menuIconContainer}>
+        <Ionicons name={icon} size={22} color={COLORS.primary} />
+      </View>
+      <View style={styles.menuContent}>
+        <Text style={styles.menuTitle}>{title}</Text>
+        {subtitle && <Text style={styles.menuSubtitle}>{subtitle}</Text>}
+      </View>
+      <Ionicons name={rightIcon} size={20} color="#9CA3AF" />
+    </TouchableOpacity>
+  );
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Profile Header */}
+    <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage}>
-          {uploadingPhoto ? (
-            <ActivityIndicator size="small" color={COLORS.white} />
-          ) : profile?.profile_photo ? (
-            <Image source={{ uri: profile.profile_photo }} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarText}>
-                {profile?.full_name?.charAt(0) || 'U'}
-              </Text>
-            </View>
-          )}
-          <View style={styles.editBadge}>
-            <Ionicons name="camera" size={14} color={COLORS.white} />
-          </View>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
-        <Text style={styles.userName}>{profile?.full_name || 'User'}</Text>
-        <Text style={styles.userPhone}>+91 {profile?.phone_number}</Text>
-      </View>
-
-      {/* Profile Info Card */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>Profile Information</Text>
-          <TouchableOpacity onPress={() => setEditModalVisible(true)}>
-            <Ionicons name="pencil" size={20} color={COLORS.primary} />
+        <Text style={styles.headerTitle}>{t('profile.title')}</Text>
+        {!editing ? (
+          <TouchableOpacity onPress={() => setEditing(true)}>
+            <Ionicons name="create" size={24} color={COLORS.primary} />
           </TouchableOpacity>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Ionicons name="person-outline" size={20} color={COLORS.gray} />
-          <View style={styles.infoContent}>
-            <Text style={styles.infoLabel}>Full Name</Text>
-            <Text style={styles.infoValue}>{profile?.full_name || 'Not set'}</Text>
-          </View>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Ionicons name="call-outline" size={20} color={COLORS.gray} />
-          <View style={styles.infoContent}>
-            <Text style={styles.infoLabel}>Phone Number</Text>
-            <Text style={styles.infoValue}>+91 {profile?.phone_number}</Text>
-          </View>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Ionicons name="location-outline" size={20} color={COLORS.gray} />
-          <View style={styles.infoContent}>
-            <Text style={styles.infoLabel}>Address</Text>
-            <Text style={styles.infoValue}>{profile?.address || 'Not set'}</Text>
-          </View>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Ionicons name="navigate-outline" size={20} color={COLORS.gray} />
-          <View style={styles.infoContent}>
-            <Text style={styles.infoLabel}>Pincode</Text>
-            <Text style={styles.infoValue}>{profile?.pincode || 'Not set'}</Text>
-          </View>
-        </View>
-
-        {(profile?.city || profile?.state) && (
-          <View style={styles.infoRow}>
-            <Ionicons name="map-outline" size={20} color={COLORS.gray} />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Location</Text>
-              <Text style={styles.infoValue}>
-                {[profile?.city, profile?.state].filter(Boolean).join(', ')}
-              </Text>
-            </View>
-          </View>
+        ) : (
+          <View style={{ width: 24 }} />
         )}
       </View>
 
-      {/* Menu Options */}
-      <View style={styles.card}>
-        <TouchableOpacity style={styles.menuItem}>
-          <Ionicons name="list-outline" size={22} color={COLORS.black} />
-          <Text style={styles.menuText}>My Listings</Text>
-          <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
-        </TouchableOpacity>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Profile Header */}
+        <View style={styles.profileHeader}>
+          <View style={styles.profileImageContainer}>
+            {uploadingPhoto ? (
+              <View style={styles.profileImagePlaceholder}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+              </View>
+            ) : formData.profilePhoto ? (
+              <Image source={{ uri: formData.profilePhoto }} style={styles.profileImage} />
+            ) : (
+              <View style={styles.profileImagePlaceholder}>
+                <Ionicons name="person" size={50} color="#9CA3AF" />
+              </View>
+            )}
+            <TouchableOpacity style={styles.cameraButton} onPress={showPhotoOptions}>
+              <Ionicons name="camera" size={18} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.userName}>{user?.fullName || 'User'}</Text>
+          <Text style={styles.userPhone}>{user?.phoneNumber}</Text>
+        </View>
 
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => navigation.navigate('Wishlist')}
-        >
-          <Ionicons name="heart-outline" size={22} color={COLORS.black} />
-          <Text style={styles.menuText}>Wishlist</Text>
-          <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.menuItem}>
-          <Ionicons name="help-circle-outline" size={22} color={COLORS.black} />
-          <Text style={styles.menuText}>Help & Support</Text>
-          <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.menuItem}>
-          <Ionicons name="document-text-outline" size={22} color={COLORS.black} />
-          <Text style={styles.menuText}>Terms & Conditions</Text>
-          <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.menuItem}>
-          <Ionicons name="shield-checkmark-outline" size={22} color={COLORS.black} />
-          <Text style={styles.menuText}>Privacy Policy</Text>
-          <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Logout Button */}
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Ionicons name="log-out-outline" size={22} color={COLORS.red} />
-        <Text style={styles.logoutText}>Logout</Text>
-      </TouchableOpacity>
-
-      {/* Edit Modal */}
-      <Modal
-        visible={editModalVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setEditModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Profile</Text>
-              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
-                <Ionicons name="close" size={24} color={COLORS.black} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Full Name</Text>
+        {editing ? (
+          /* Edit Form */
+          <View style={styles.editSection}>
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Full Name *</Text>
               <TextInput
                 style={styles.input}
-                value={editForm.fullName}
-                onChangeText={(text) => setEditForm({ ...editForm, fullName: text })}
+                value={formData.fullName}
+                onChangeText={(text) => setFormData({ ...formData, fullName: text })}
                 placeholder="Enter your full name"
+                placeholderTextColor="#9CA3AF"
               />
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Address</Text>
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                style={styles.input}
+                value={formData.email}
+                onChangeText={(text) => setFormData({ ...formData, email: text })}
+                placeholder="Enter your email"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Address</Text>
               <TextInput
                 style={[styles.input, styles.textArea]}
-                value={editForm.address}
-                onChangeText={(text) => setEditForm({ ...editForm, address: text })}
+                value={formData.address}
+                onChangeText={(text) => setFormData({ ...formData, address: text })}
                 placeholder="Enter your address"
+                placeholderTextColor="#9CA3AF"
                 multiline
                 numberOfLines={3}
               />
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Pincode</Text>
+            <View style={styles.row}>
+              <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                <Text style={styles.label}>City</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.city}
+                  onChangeText={(text) => setFormData({ ...formData, city: text })}
+                  placeholder="City"
+                  placeholderTextColor="#9CA3AF"
+                />
+              </View>
+
+              <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
+                <Text style={styles.label}>State</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.state}
+                  onChangeText={(text) => setFormData({ ...formData, state: text })}
+                  placeholder="State"
+                  placeholderTextColor="#9CA3AF"
+                />
+              </View>
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Pincode</Text>
               <TextInput
                 style={styles.input}
-                value={editForm.pincode}
-                onChangeText={(text) => setEditForm({ ...editForm, pincode: text })}
-                placeholder="Enter 6-digit pincode"
-                keyboardType="number-pad"
+                value={formData.pincode}
+                onChangeText={(text) => setFormData({ ...formData, pincode: text })}
+                placeholder="Enter pincode"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="numeric"
                 maxLength={6}
               />
             </View>
 
-            <TouchableOpacity
-              style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-              onPress={handleSaveProfile}
-              disabled={saving}
-            >
-              {saving ? (
-                <ActivityIndicator color={COLORS.white} />
-              ) : (
-                <Text style={styles.saveButtonText}>Save Changes</Text>
-              )}
-            </TouchableOpacity>
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={[styles.button, styles.cancelButton]}
+                onPress={handleCancel}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.button, styles.saveButton, loading && styles.buttonDisabled]}
+                onPress={handleSave}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Save Changes</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </Modal>
-    </ScrollView>
+        ) : (
+          /* Profile Menu */
+          <>
+            {/* My Activity */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>{t('profile.myActivity')}</Text>
+              <View style={styles.menuContainer}>
+                {renderMenuItem('list', t('profile.myListings'), t('profile.myListingsDesc'), () => navigation.navigate('MyListings'))}
+                {renderMenuItem('heart', t('profile.wishlist'), t('profile.wishlistDesc'), () => navigation.navigate('Wishlist'))}
+                {renderMenuItem('calendar', t('profile.appointments'), t('profile.appointmentsDesc'), () => navigation.navigate('MyAppointments'))}
+                {renderMenuItem('call', t('profile.callHistory'), t('profile.callHistoryDesc'), () => navigation.navigate('CallHistory'))}
+              </View>
+            </View>
+
+            {/* Settings */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>{t('profile.settings')}</Text>
+              <View style={styles.menuContainer}>
+                {renderMenuItem('location', t('profile.locationSetup'), t('profile.locationSetupDesc'), () => navigation.navigate('LocationSetup'))}
+                {renderMenuItem('notifications', t('profile.notifications'), t('profile.notificationsDesc'), () => navigation.navigate('NotificationSettings'))}
+                {renderMenuItem('language', t('profile.language'), 'English', () => {})}
+                {renderMenuItem('shield-checkmark', t('profile.privacyPolicy'), '', () => {})}
+                {renderMenuItem('document-text', t('profile.termsConditions'), '', () => {})}
+              </View>
+            </View>
+
+            {/* Support */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>{t('profile.support')}</Text>
+              <View style={styles.menuContainer}>
+                {renderMenuItem('help-circle', t('profile.helpSupport'), t('profile.helpSupportDesc'), () => {})}
+                {renderMenuItem('star', t('profile.rateUs'), t('profile.rateUsDesc'), () => {})}
+                {renderMenuItem('share-social', t('profile.shareApp'), t('profile.shareAppDesc'), () => {})}
+                {renderMenuItem('information-circle', t('profile.about'), t('profile.aboutDesc'), () => {})}
+              </View>
+            </View>
+
+            {/* Logout */}
+            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+              <Ionicons name="log-out" size={22} color="#EF4444" />
+              <Text style={styles.logoutText}>{t('common.logout')}</Text>
+            </TouchableOpacity>
+
+            <View style={{ height: 40 }} />
+          </>
+        )}
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  content: {
-    paddingBottom: 32,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.background,
+    backgroundColor: '#F9FAFB',
   },
   header: {
-    backgroundColor: COLORS.primary,
-    paddingTop: 60,
-    paddingBottom: 32,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 50,
+    paddingBottom: 15,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
-  avatarContainer: {
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  content: {
+    flex: 1,
+  },
+  profileHeader: {
+    alignItems: 'center',
+    paddingVertical: 30,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  profileImageContainer: {
     position: 'relative',
-    marginBottom: 12,
+    marginBottom: 16,
   },
-  avatar: {
+  profileImage: {
     width: 100,
     height: 100,
     borderRadius: 50,
     borderWidth: 3,
-    borderColor: COLORS.white,
+    borderColor: COLORS.primary,
   },
-  avatarPlaceholder: {
+  profileImagePlaceholder: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: COLORS.white + '30',
-    justifyContent: 'center',
+    backgroundColor: '#E5E7EB',
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 3,
-    borderColor: COLORS.white,
+    borderColor: COLORS.primary,
   },
-  avatarText: {
-    fontSize: 40,
-    fontWeight: 'bold',
-    color: COLORS.white,
-  },
-  editBadge: {
+  cameraButton: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: COLORS.primaryDark,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.primary,
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: COLORS.white,
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: '#fff',
   },
   userName: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: COLORS.white,
+    color: '#1F2937',
     marginBottom: 4,
   },
   userPhone: {
-    fontSize: 16,
-    color: COLORS.white + 'CC',
+    fontSize: 15,
+    color: '#6B7280',
   },
-  card: {
-    backgroundColor: COLORS.white,
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+  section: {
+    marginTop: 24,
+    paddingHorizontal: 16,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.lightGray,
-  },
-  cardTitle: {
+  sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.black,
+    color: '#1F2937',
+    marginBottom: 12,
   },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.lightGray,
-  },
-  infoContent: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  infoLabel: {
-    fontSize: 12,
-    color: COLORS.gray,
-    marginBottom: 2,
-  },
-  infoValue: {
-    fontSize: 15,
-    color: COLORS.black,
-    fontWeight: '500',
+  menuContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    overflow: 'hidden',
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
+    padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.lightGray,
+    borderBottomColor: '#F3F4F6',
   },
-  menuText: {
+  menuIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.primary + '15',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  menuContent: {
     flex: 1,
-    marginLeft: 12,
+  },
+  menuTitle: {
     fontSize: 15,
-    color: COLORS.black,
+    fontWeight: '500',
+    color: '#1F2937',
+  },
+  menuSubtitle: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginTop: 2,
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#fff',
     marginHorizontal: 16,
     marginTop: 24,
-    paddingVertical: 14,
-    backgroundColor: COLORS.red + '10',
-    borderRadius: 12,
-    gap: 8,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
   },
   logoutText: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.red,
+    color: '#EF4444',
+    marginLeft: 10,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
+  editSection: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
   },
-  modalContent: {
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    paddingBottom: 40,
+  formGroup: {
+    marginBottom: 20,
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.black,
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  inputLabel: {
+  label: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.black,
+    color: '#374151',
     marginBottom: 8,
   },
   input: {
-    backgroundColor: COLORS.secondary,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     borderRadius: 12,
     padding: 14,
-    fontSize: 16,
-    color: COLORS.black,
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
+    fontSize: 15,
+    color: '#1F2937',
   },
   textArea: {
-    height: 80,
+    height: 90,
     textAlignVertical: 'top',
+  },
+  row: {
+    flexDirection: 'row',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    marginBottom: 30,
+  },
+  button: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#F3F4F6',
+    marginRight: 8,
   },
   saveButton: {
     backgroundColor: COLORS.primary,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 8,
+    marginLeft: 8,
   },
-  saveButtonDisabled: {
-    opacity: 0.7,
+  buttonDisabled: {
+    backgroundColor: '#D1D5DB',
   },
-  saveButtonText: {
-    color: COLORS.white,
+  cancelButtonText: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#6B7280',
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
 });
 

@@ -2,10 +2,10 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // API Configuration
-// For development: Use your computer's IP address with port 80 (Nginx)
+// For development: Use your computer's IP address with port 5000
 // For production: Use your domain name or server IP
-const DEV_API_URL = 'http://192.168.119.146'; // Nginx on port 80 (no port needed)
-const PROD_API_URL = 'http://192.168.119.146'; // Replace with your production URL/domain
+const DEV_API_URL = 'http://192.168.119.146:5000'; // Backend server on port 5000
+const PROD_API_URL = 'http://192.168.119.146:5000'; // Replace with your production URL/domain
 
 // Set to true for production build
 const IS_PRODUCTION = false;
@@ -368,6 +368,16 @@ export const pregnancyService = {
 
 // Animal Listing Service (for creating listings)
 export const animalListingService = {
+  // Get all animal listings
+  getAllListings: async (params = {}) => {
+    try {
+      const response = await api.get('/api/listings/featured', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
   createListing: async (endpoint, listingData) => {
     try {
       const response = await api.post(`/api/${endpoint}/listings`, listingData);
@@ -447,9 +457,9 @@ export const veterinarianService = {
   },
 
   // Login with email and password
-  login: async (email, password) => {
+  login: async (credentials) => {
     try {
-      const response = await api.post('/api/veterinarians/login', { email, password });
+      const response = await api.post('/api/veterinarians/login', credentials);
       return response.data;
     } catch (error) {
       throw error.response?.data || error;
@@ -598,6 +608,22 @@ export const vetReportService = {
     } catch (error) {
       throw error.response?.data || error;
     }
+  },
+};
+
+// Call Log Service
+export const callLogService = {
+  getCallLogs: async (filter = 'all') => {
+    const response = await api.get(`/call-logs?filter=${filter}`);
+    return response.data;
+  },
+  logCall: async (callData) => {
+    const response = await api.post('/call-logs', callData);
+    return response.data;
+  },
+  deleteCallLog: async (logId) => {
+    const response = await api.delete(`/call-logs/${logId}`);
+    return response.data;
   },
 };
 

@@ -11,6 +11,7 @@ import {
   TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../utils/constants';
 import { healthCheckService } from '../services/api';
@@ -205,8 +206,8 @@ const AIHealthCheckScreen = ({ navigation }) => {
           <Ionicons name="arrow-back" size={24} color={COLORS.white} />
         </TouchableOpacity>
         <View style={styles.headerTextContainer}>
-          <Text style={styles.headerTitle}>AI आरोग्य तपासणी</Text>
-          <Text style={styles.headerSubtitle}>प्राण्यांच्या आरोग्याचे AI विश्लेषण</Text>
+          <Text style={styles.headerTitle}>{t('aiHealthCheck.title')}</Text>
+          <Text style={styles.headerSubtitle}>{t('aiHealthCheck.uploadPhotoDesc')}</Text>
         </View>
       </View>
 
@@ -535,7 +536,23 @@ const AIHealthCheckScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#F9FAFB',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 50,
+    paddingBottom: 15,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
   },
   header: {
     backgroundColor: COLORS.primary,

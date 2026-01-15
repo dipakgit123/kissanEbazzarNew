@@ -3,7 +3,8 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, View, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '../context/AuthContext';
 import { useVetAuth } from '../context/VetAuthContext';
@@ -31,16 +32,22 @@ import VetDetailScreen from '../screens/VetDetailScreen';
 import PregnancyCalendarScreen from '../screens/PregnancyCalendarScreen';
 import WishlistScreen from '../screens/WishlistScreen';
 import AIHealthCheckScreen from '../screens/AIHealthCheckScreen';
+import AIAssistantScreen from '../screens/AIAssistantScreen';
 import ServicesScreen from '../screens/ServicesScreen';
 import CategoryListingsScreen from '../screens/CategoryListingsScreen';
 import CreateListingScreen from '../screens/CreateListingScreen';
+import BuyAnimalsScreen from '../screens/BuyAnimalsScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
+import CallHistoryScreen from '../screens/CallHistoryScreen';
+import LocationSetupScreen from '../screens/LocationSetupScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 // Bottom Tab Navigator
 const MainTabs = () => {
+  const insets = useSafeAreaInsets();
+  
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -49,8 +56,8 @@ const MainTabs = () => {
 
           if (route.name === 'Home') {
             iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'Map') {
-            iconName = focused ? 'map' : 'map-outline';
+          } else if (route.name === 'BuyAnimals') {
+            iconName = focused ? 'cart' : 'cart-outline';
           } else if (route.name === 'SellAnimal') {
             iconName = focused ? 'add-circle' : 'add-circle-outline';
           } else if (route.name === 'Services') {
@@ -64,9 +71,9 @@ const MainTabs = () => {
         tabBarActiveTintColor: COLORS.primary,
         tabBarInactiveTintColor: COLORS.gray,
         tabBarStyle: {
-          paddingBottom: 8,
+          paddingBottom: Math.max(insets.bottom, 8),
           paddingTop: 8,
-          height: 65,
+          height: 65 + Math.max(insets.bottom, 0),
           borderTopWidth: 1,
           borderTopColor: COLORS.lightGray,
           backgroundColor: COLORS.white,
@@ -84,9 +91,9 @@ const MainTabs = () => {
         options={{ tabBarLabel: 'Home' }}
       />
       <Tab.Screen
-        name="Map"
-        component={MapScreen}
-        options={{ tabBarLabel: 'Map' }}
+        name="BuyAnimals"
+        component={BuyAnimalsScreen}
+        options={{ tabBarLabel: 'Buy' }}
       />
       <Tab.Screen
         name="SellAnimal"
@@ -195,6 +202,34 @@ const MainStack = () => {
       <Stack.Screen
         name="Notifications"
         component={NotificationsScreen}
+        options={{
+          animation: 'slide_from_right',
+        }}
+      />
+      <Stack.Screen
+        name="AIAssistant"
+        component={AIAssistantScreen}
+        options={{
+          animation: 'slide_from_right',
+        }}
+      />
+      <Stack.Screen
+        name="BuyAnimals"
+        component={BuyAnimalsScreen}
+        options={{
+          animation: 'slide_from_right',
+        }}
+      />
+      <Stack.Screen
+        name="CallHistory"
+        component={CallHistoryScreen}
+        options={{
+          animation: 'slide_from_right',
+        }}
+      />
+      <Stack.Screen
+        name="LocationSetup"
+        component={LocationSetupScreen}
         options={{
           animation: 'slide_from_right',
         }}

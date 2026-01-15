@@ -10,14 +10,23 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  ScrollView,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
 import { otpService } from '../services/api';
+import LanguageSwitcher from '../components/LanguageSwitcher';
+
+const { width, height } = Dimensions.get('window');
 
 const LoginScreen = ({ navigation }) => {
+  const { t } = useTranslation();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
 
   const validatePhone = (phone) => {
     const phoneRegex = /^[6-9]\d{9}$/;
@@ -25,274 +34,450 @@ const LoginScreen = ({ navigation }) => {
   };
 
   const handleSendOTP = async () => {
+    setError('');
+    
     if (!phoneNumber.trim()) {
-      Alert.alert('Error', 'Please enter your phone number');
+      setError(t('validation.required'));
       return;
     }
 
     if (!validatePhone(phoneNumber)) {
-      Alert.alert('Error', 'Please enter a valid 10-digit Indian phone number');
+      setError(t('validation.invalidPhone'));
       return;
     }
 
     setLoading(true);
     try {
-      // Send phone number with country code in E.164 format
       const fullPhoneNumber = `+91${phoneNumber}`;
       const response = await otpService.sendOTP(fullPhoneNumber);
       if (response.success) {
-        navigation.navigate('OTPVerification', { phoneNumber: fullPhoneNumber });
+        Alert.alert(
+          t('auth.otpSent'),
+          t('auth.otpSentMessage'),
+          [{ text: t('common.ok'), onPress: () => navigation.navigate('OTPVerification', { phoneNumber: fullPhoneNumber }) }]
+        );
       } else {
-        Alert.alert('Error', response.message || 'Failed to send OTP');
+        setError(response.message || t('errors.somethingWentWrong'));
       }
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to send OTP. Please try again.');
+      setError(error.message || t('errors.somethingWentWrong'));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <View style={styles.content}>
-        {/* Logo Section */}
-        <View style={styles.logoContainer}>
-          <View style={styles.logoCircle}>
-            <Text style={styles.logoIcon}>🐄</Text>
+    <View style={styles.container}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        bounces={false}
+      >
+        {/* Hero Image Section with Gradient Overlay */}
+        <View style={styles.imageContainer}>
+          <Image
+            source={require('../assets/login1.png')}
+            style={styles.heroImage}
+            resizeMode="cover"
+          />
+          <View style={styles.imageOverlay} />
+          
+          {/* Language Switcher Button */}
+          <TouchableOpacity 
+            style={styles.languageButton}
+            onPress={() => setLanguageModalVisible(true)}
+          >
+            <Ionicons name="language" size={20} color="#fff" />
+            <Text style={styles.languageButtonText}>{t('profile.language')}</Text>
+          </TouchableOpacity>
+          
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.appTitle}>🐄 {t('common.appName')}</Text>
+            <Text style={styles.appSubtitle}>{t('home.heroSubtitle')}</Text>
           </View>
-          <Text style={styles.appName}>Kissan E-Bazzar</Text>
-          <Text style={styles.tagline}>Farmers Marketplace</Text>
         </View>
 
-        {/* Login Form */}
-        <View style={styles.formContainer}>
-          <Text style={styles.title}>Welcome!</Text>
-          <Text style={styles.subtitle}>
-            Enter your phone number to continue
-          </Text>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.countryCode}>+91</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter phone number"
-              placeholderTextColor={COLORS.gray}
-              keyboardType="phone-pad"
-              maxLength={10}
-              value={phoneNumber}
-              onChangeText={setPhoneNumber}
-            />
+        {/* Content Section */}
+        <View style={styles.contentContainer}>
+          {/* Welcome Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>{t('auth.loginTitle')}</Text>
+            <Text style={styles.subtitle}>{t('auth.loginSubtitle')}</Text>
           </View>
 
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleSendOTP}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color={COLORS.white} />
-            ) : (
-              <Text style={styles.buttonText}>Send OTP</Text>
-            )}
-          </TouchableOpacity>
+          {/* Form */}
+          <View style={styles.form}>
+            <View style={styles.inputWrapper}>
+              <Text style={styles.label}>{t('auth.phoneNumber')}</Text>
+              <View style={styles.inputContainer}>
+                <View style={styles.countryCodeContainer}>
+                  <Text style={styles.countryCode}>+91</Text>
+                </View>
+                <TextInput
+                  style={styles.input}
+                  placeholder={t('auth.phoneNumberPlaceholder')}
+                  placeholderTextColor="#9CA3AF"
+                  value={phoneNumber}
+                  onChangeText={(text) => {
+                    setPhoneNumber(text.replace(/[^0-9]/g, ''));
+                    setError('');
+                  }}
+                  keyboardType="phone-pad"
+                  maxLength={10}
+                />
+                {phoneNumber.length === 10 && validatePhone(phoneNumber) && (
+                  <Ionicons name="checkmark-circle" size={22} color="#10B981" style={styles.validIcon} />
+                )}
+              </View>
+            </View>
 
-          <Text style={styles.termsText}>
-            By continuing, you agree to our{' '}
-            <Text style={styles.linkText}>Terms of Service</Text> and{' '}
-            <Text style={styles.linkText}>Privacy Policy</Text>
-          </Text>
+            {error ? (
+              <View style={styles.errorContainer}>
+                <Ionicons name="alert-circle" size={18} color="#EF4444" />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
 
-          {/* Veterinarian Links */}
-          <View style={styles.vetSection}>
+            <TouchableOpacity
+              style={[styles.button, (loading || !phoneNumber) && styles.buttonDisabled]}
+              onPress={handleSendOTP}
+              disabled={loading || !phoneNumber}
+              activeOpacity={0.8}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <View style={styles.buttonContent}>
+                  <Text style={styles.buttonText}>{t('auth.sendOTP')}</Text>
+                  <Ionicons name="arrow-forward-circle" size={24} color="#fff" />
+                </View>
+              )}
+            </TouchableOpacity>
+
             <View style={styles.divider}>
               <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or</Text>
+              <Text style={styles.dividerText}>{t('common.or')}</Text>
               <View style={styles.dividerLine} />
             </View>
 
+            {/* Veterinarian Login Card */}
             <TouchableOpacity
-              style={styles.vetButton}
+              style={styles.vetLoginCard}
               onPress={() => navigation.navigate('VetLogin')}
+              activeOpacity={0.9}
             >
-              <Ionicons name="medical" size={20} color="#3B82F6" />
-              <Text style={styles.vetButtonText}>Veterinarian Login</Text>
+              <View style={styles.vetLoginIconContainer}>
+                <Ionicons name="medical" size={24} color="#fff" />
+              </View>
+              <View style={styles.vetLoginTextContainer}>
+                <Text style={styles.vetLoginText}>{t('auth.loginAsVet')}</Text>
+                <Text style={styles.vetLoginSubtext}>{t('vetAuth.loginSubtitle')}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={24} color={COLORS.primary} />
             </TouchableOpacity>
 
+            {/* Register Links */}
+            <View style={styles.footerLinks}>
+              <Text style={styles.footerText}>{t('auth.newUser')}</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('OTPVerification', {
+                phoneNumber: '',
+                type: 'register'
+              })}>
+                <Text style={styles.linkText}> {t('auth.registerNow')}</Text>
+              </TouchableOpacity>
+            </View>
+
             <TouchableOpacity
-              style={styles.vetRegisterLink}
+              style={styles.vetRegisterButton}
               onPress={() => navigation.navigate('VetRegistration')}
+              activeOpacity={0.8}
             >
+              <Ionicons name="person-add" size={18} color={COLORS.primary} />
               <Text style={styles.vetRegisterText}>
-                Are you a veterinarian?{' '}
-                <Text style={styles.vetRegisterLinkText}>Register here</Text>
+                {t('auth.vetRegister')}
               </Text>
             </TouchableOpacity>
+
+            <Text style={styles.termsText}>
+              {t('auth.termsAgree')}{'\n'}
+              <Text style={styles.linkText}>{t('auth.termsOfService')}</Text> {t('auth.and')}{' '}
+              <Text style={styles.linkText}>{t('auth.privacyPolicy')}</Text>
+            </Text>
           </View>
         </View>
-      </View>
-    </KeyboardAvoidingView>
+      </ScrollView>
+      
+      <LanguageSwitcher 
+        visible={languageModalVisible} 
+        onClose={() => setLanguageModalVisible(false)} 
+      />
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#fff',
   },
-  content: {
-    flex: 1,
-    padding: 24,
-    justifyContent: 'center',
+  scrollContainer: {
+    flexGrow: 1,
   },
-  logoContainer: {
+  imageContainer: {
+    height: height * 0.35,
+    width: width,
+    position: 'relative',
+  },
+  heroImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imageOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  languageButton: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 48,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+    zIndex: 10,
   },
-  logoCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+  languageButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
-  logoIcon: {
-    fontSize: 48,
+  headerTextContainer: {
+    position: 'absolute',
+    bottom: 30,
+    left: 20,
+    right: 20,
   },
-  appName: {
-    fontSize: 28,
+  appTitle: {
+    fontSize: 32,
     fontWeight: 'bold',
-    color: COLORS.black,
-    marginBottom: 4,
+    color: '#fff',
+    marginBottom: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
-  tagline: {
+  appSubtitle: {
     fontSize: 16,
-    color: COLORS.gray,
+    color: '#fff',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
-  formContainer: {
-    backgroundColor: COLORS.white,
-    borderRadius: 24,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+  contentContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    marginTop: -30,
+    paddingHorizontal: 20,
+    paddingTop: 30,
+    paddingBottom: 40,
+  },
+  header: {
+    marginBottom: 30,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: COLORS.black,
+    color: '#1F2937',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: COLORS.gray,
-    marginBottom: 24,
+    color: '#6B7280',
+  },
+  form: {
+    width: '100%',
+  },
+  inputWrapper: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.secondary,
+    backgroundColor: '#F9FAFB',
     borderRadius: 12,
-    marginBottom: 24,
     borderWidth: 1,
-    borderColor: COLORS.lightGray,
+    borderColor: '#E5E7EB',
+    paddingRight: 12,
   },
-  countryCode: {
+  countryCodeContainer: {
     paddingHorizontal: 16,
     paddingVertical: 16,
+    borderRightWidth: 1,
+    borderRightColor: '#E5E7EB',
+  },
+  countryCode: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.black,
-    borderRightWidth: 1,
-    borderRightColor: COLORS.lightGray,
+    color: '#1F2937',
   },
   input: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
     fontSize: 16,
-    color: COLORS.black,
+    color: '#1F2937',
+    paddingHorizontal: 12,
+    paddingVertical: 16,
+  },
+  validIcon: {
+    marginLeft: 8,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEE2E2',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 14,
+    marginLeft: 8,
+    flex: 1,
   },
   button: {
     backgroundColor: COLORS.primary,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
-    marginBottom: 16,
+    justifyContent: 'center',
+    marginBottom: 20,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   buttonDisabled: {
-    opacity: 0.7,
+    backgroundColor: '#D1D5DB',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   buttonText: {
-    color: COLORS.white,
-    fontSize: 16,
+    color: '#fff',
+    fontSize: 18,
     fontWeight: '600',
-  },
-  termsText: {
-    textAlign: 'center',
-    fontSize: 12,
-    color: COLORS.gray,
-    lineHeight: 18,
-  },
-  linkText: {
-    color: COLORS.primary,
-    fontWeight: '500',
-  },
-  vetSection: {
-    marginTop: 20,
+    marginRight: 8,
   },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginVertical: 24,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: COLORS.lightGray,
+    backgroundColor: '#E5E7EB',
   },
   dividerText: {
-    marginHorizontal: 12,
-    fontSize: 12,
-    color: COLORS.gray,
+    color: '#9CA3AF',
+    fontSize: 14,
+    marginHorizontal: 16,
+    fontWeight: '500',
   },
-  vetButton: {
+  vetLoginCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 2,
+    borderColor: COLORS.primary + '30',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  vetLoginIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  vetLoginTextContainer: {
+    flex: 1,
+  },
+  vetLoginText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 2,
+  },
+  vetLoginSubtext: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  footerLinks: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  footerText: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  linkText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+  vetRegisterButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#3B82F6',
-    gap: 8,
-    marginBottom: 12,
-  },
-  vetButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#3B82F6',
-  },
-  vetRegisterLink: {
-    alignItems: 'center',
+    backgroundColor: COLORS.primary + '10',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 20,
   },
   vetRegisterText: {
-    fontSize: 13,
-    color: COLORS.gray,
-  },
-  vetRegisterLinkText: {
-    color: '#3B82F6',
+    fontSize: 14,
     fontWeight: '600',
+    color: COLORS.primary,
+    marginLeft: 8,
+  },
+  termsText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });
 
