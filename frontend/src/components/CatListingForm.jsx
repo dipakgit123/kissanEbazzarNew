@@ -12,6 +12,7 @@ import {
   InfoBanner,
   SubmitButton
 } from './common';
+import './AnimalListingPage.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -30,7 +31,7 @@ const CatListingForm = () => {
     behavior: 'friendly',
     description: '',
     expectedPrice: '',
-    isNegotiable: true,
+    isNegotiable: 'true',
     detailsConfirmed: false,
     termsAccepted: false
   });
@@ -90,8 +91,11 @@ const CatListingForm = () => {
         throw new Error('Please login to create a listing');
       }
 
+      const endpoint = `${API_URL}/api/cats/listings`;
+      console.log('🐱 [CAT] Submitting to API endpoint:', endpoint);
+      
       const response = await axios.post(
-        `${API_URL}/api/cats/listings`,
+        endpoint,
         formDataToSend,
         {
           headers: {
@@ -100,6 +104,9 @@ const CatListingForm = () => {
           }
         }
       );
+
+      console.log('✅ [CAT] API Response:', response.data);
+      console.log('✅ [CAT] Listing created successfully at:', endpoint);
 
       if (response.data.success) {
         setSuccess(true);
@@ -116,7 +123,7 @@ const CatListingForm = () => {
           behavior: 'friendly',
           description: '',
           expectedPrice: '',
-          isNegotiable: true,
+          isNegotiable: 'true',
           detailsConfirmed: false,
           termsAccepted: false
         });
@@ -360,12 +367,12 @@ const CatListingForm = () => {
           <FormRadioGroup
             label="Negotiable?"
             name="isNegotiable"
+            value={formData.isNegotiable}
+            onChange={handleChange}
             options={[
-              { id: 'cat-negotiable-yes', value: true, label: 'Yes' },
-              { id: 'cat-negotiable-no', value: false, label: 'No' }
+              { value: 'true', label: 'Yes' },
+              { value: 'false', label: 'No' }
             ]}
-            selectedValue={formData.isNegotiable}
-            onChange={(value) => setFormData(prev => ({ ...prev, isNegotiable: value }))}
           />
         </div>
       </FormSection>

@@ -52,7 +52,7 @@ exports.createReview = async (req, res) => {
       include: [{
         model: User,
         as: 'user',
-        attributes: ['id', 'fullname', 'profile_photo']
+        attributes: ['id', 'full_name', 'profile_photo']
       }]
     });
 
@@ -98,7 +98,7 @@ exports.getVetReviews = async (req, res) => {
       include: [{
         model: User,
         as: 'user',
-        attributes: ['id', 'fullname', 'profile_photo']
+        attributes: ['id', 'full_name', 'profile_photo']
       }],
       order,
       limit: parseInt(limit),
@@ -177,7 +177,7 @@ exports.updateReview = async (req, res) => {
       include: [{
         model: User,
         as: 'user',
-        attributes: ['id', 'fullname', 'profile_photo']
+        attributes: ['id', 'full_name', 'profile_photo']
       }]
     });
 

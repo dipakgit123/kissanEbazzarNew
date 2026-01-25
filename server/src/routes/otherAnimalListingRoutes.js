@@ -38,16 +38,22 @@ const otherAnimalValidationRules = [
     .isFloat({ min: 0 }).withMessage('Price must be a positive number'),
 
   body('isNegotiable')
-    .notEmpty().withMessage('Negotiable status is required')
-    .isBoolean().withMessage('Negotiable must be true or false'),
+    .custom(value => {
+      return value === true || value === false || value === 'true' || value === 'false';
+    })
+    .withMessage('Negotiable must be true or false'),
 
   body('isTrainedForWork')
-    .notEmpty().withMessage('Training status is required')
-    .isBoolean().withMessage('Training status must be true or false'),
+    .custom(value => {
+      return value === true || value === false || value === 'true' || value === 'false';
+    })
+    .withMessage('Training status must be true or false'),
 
   body('deliveryAvailable')
-    .notEmpty().withMessage('Delivery availability is required')
-    .isBoolean().withMessage('Delivery available must be true or false')
+    .custom(value => {
+      return value === true || value === false || value === 'true' || value === 'false';
+    })
+    .withMessage('Delivery available must be true or false')
 ];
 
 // Multer configuration for file uploads
@@ -60,29 +66,7 @@ const fileUploadConfig = upload.fields([
   { name: 'video', maxCount: 1 }
 ]);
 
-// Public routes - no authentication required
-/**
- * @route   GET /api/other-animals/listings
- * @desc    Get all other animal listings with filters and pagination
- * @access  Public
- */
-router.get('/listings', otherAnimalListingController.getAllOtherAnimalListings);
-
-/**
- * @route   GET /api/other-animals/listings/nearby
- * @desc    Get nearby other animal listings based on location
- * @access  Public
- */
-router.get('/listings/nearby', otherAnimalListingController.getNearbyOtherAnimalListings);
-
-/**
- * @route   GET /api/other-animals/listings/:id
- * @desc    Get single other animal listing by ID
- * @access  Public
- */
-router.get('/listings/:id', otherAnimalListingController.getOtherAnimalListingById);
-
-// Protected routes - authentication required
+// Protected routes - authentication required (POST routes should come before parameterized routes)
 /**
  * @route   POST /api/other-animals/listings
  * @desc    Create a new other animal listing
@@ -95,6 +79,28 @@ router.post(
   otherAnimalValidationRules,
   otherAnimalListingController.createOtherAnimalListing
 );
+
+// Public routes - no authentication required
+/**
+ * @route   GET /api/other-animals/listings/nearby
+ * @desc    Get nearby other animal listings based on location
+ * @access  Public
+ */
+router.get('/listings/nearby', otherAnimalListingController.getNearbyOtherAnimalListings);
+
+/**
+ * @route   GET /api/other-animals/listings
+ * @desc    Get all other animal listings with filters and pagination
+ * @access  Public
+ */
+router.get('/listings', otherAnimalListingController.getAllOtherAnimalListings);
+
+/**
+ * @route   GET /api/other-animals/listings/:id
+ * @desc    Get single other animal listing by ID
+ * @access  Public
+ */
+router.get('/listings/:id', otherAnimalListingController.getOtherAnimalListingById);
 
 /**
  * @route   GET /api/other-animals/my-listings

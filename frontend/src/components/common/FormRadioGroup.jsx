@@ -20,9 +20,9 @@ const FormRadioGroup = ({
               id={`${name}-${option.value}`}
               name={name}
               value={option.value}
-              checked={value === option.value}
+              checked={String(value) === String(option.value)}
               onChange={onChange}
-              className="w-4 h-4 text-green-600 focus:ring-green-500 border-gray-300"
+              className="w-4 h-4 text-green-600 focus:ring-green-500 border-gray-300 cursor-pointer"
             />
             <label htmlFor={`${name}-${option.value}`} className="ml-2 text-gray-700 cursor-pointer">
               {option.label}

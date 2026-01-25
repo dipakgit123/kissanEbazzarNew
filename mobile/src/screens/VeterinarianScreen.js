@@ -19,13 +19,22 @@ import { COLORS } from '../utils/constants';
 import { veterinarianService } from '../services/api';
 
 const VeterinarianScreen = ({ navigation }) => {
-  const { t } = useTranslation();
+  const { t, ready } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedService, setSelectedService] = useState(null);
   const [veterinarians, setVeterinarians] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
+
+  // Show loading while translations are loading
+  if (!ready) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
 
   const services = [
     {
@@ -343,7 +352,7 @@ const VeterinarianScreen = ({ navigation }) => {
                   <View style={styles.ratingRow}>
                     {renderStars(vet.rating)}
                     <Text style={styles.ratingText}>
-                      {vet.rating?.toFixed(1) || '0.0'} ({vet.total_reviews || 0} reviews)
+                      {vet.rating ? Number(vet.rating).toFixed(1) : '0.0'} ({vet.total_reviews || 0} reviews)
                     </Text>
                   </View>
                 </View>

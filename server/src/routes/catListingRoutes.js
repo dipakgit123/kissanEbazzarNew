@@ -20,48 +20,44 @@ const catValidationRules = [
     .notEmpty().withMessage('Age is required'),
 
   body('color')
-    .trim()
-    .notEmpty().withMessage('Color is required'),
+    .optional()
+    .trim(),
 
   body('weight')
-    .notEmpty().withMessage('Weight is required')
+    .optional()
     .isFloat({ min: 0, max: 50 }).withMessage('Weight must be between 0 and 50 kg'),
 
   body('eyeColor')
-    .trim()
-    .notEmpty().withMessage('Eye color is required'),
+    .optional()
+    .trim(),
 
   body('furType')
-    .isIn(['short', 'long', 'curly'])
-    .withMessage('Fur type must be short, long, or curly'),
+    .optional()
+    .isIn(['short', 'long', 'medium', 'curly'])
+    .withMessage('Fur type must be short, long, medium, or curly'),
 
   body('vaccinationStatus')
-    .isIn(['yes', 'no'])
-    .withMessage('Vaccination status must be yes or no'),
+    .optional()
+    .isIn(['yes', 'no', 'partial'])
+    .withMessage('Vaccination status must be yes, no, or partial'),
 
   body('healthCondition')
-    .isIn(['healthy', 'under_treatment'])
-    .withMessage('Health condition must be healthy or under_treatment'),
+    .optional()
+    .isIn(['healthy', 'under_treatment', 'needs_attention'])
+    .withMessage('Health condition must be healthy, under_treatment, or needs_attention'),
 
   body('behavior')
-    .isIn(['friendly', 'aggressive', 'calm'])
-    .withMessage('Behavior must be friendly, aggressive, or calm'),
+    .optional()
+    .isIn(['friendly', 'aggressive', 'calm', 'shy'])
+    .withMessage('Behavior must be friendly, aggressive, calm, or shy'),
 
   body('expectedPrice')
     .notEmpty().withMessage('Expected price is required')
     .isFloat({ min: 0 }).withMessage('Price must be a positive number'),
 
   body('isNegotiable')
-    .notEmpty().withMessage('Negotiable status is required')
-    .isBoolean().withMessage('Negotiable must be true or false'),
-
-  body('detailsConfirmed')
-    .notEmpty().withMessage('Details confirmation is required')
-    .isBoolean().withMessage('Details confirmed must be true or false'),
-
-  body('termsAccepted')
-    .notEmpty().withMessage('Terms acceptance is required')
-    .isBoolean().withMessage('Terms accepted must be true or false')
+    .optional()
+    .isBoolean().withMessage('Negotiable must be true or false')
 ];
 
 // Multer configuration for file uploads
@@ -76,29 +72,7 @@ const fileUploadConfig = upload.fields([
   { name: 'video', maxCount: 1 }
 ]);
 
-// Public routes - no authentication required
-/**
- * @route   GET /api/cats/listings
- * @desc    Get all cat listings with filters and pagination
- * @access  Public
- */
-router.get('/listings', catListingController.getAllCatListings);
-
-/**
- * @route   GET /api/cats/listings/nearby
- * @desc    Get nearby cat listings based on location
- * @access  Public
- */
-router.get('/listings/nearby', catListingController.getNearbyCatListings);
-
-/**
- * @route   GET /api/cats/listings/:id
- * @desc    Get single cat listing by ID
- * @access  Public
- */
-router.get('/listings/:id', catListingController.getCatListingById);
-
-// Protected routes - authentication required
+// Protected routes - authentication required (POST routes first)
 /**
  * @route   POST /api/cats/listings
  * @desc    Create a new cat listing
@@ -111,6 +85,28 @@ router.post(
   catValidationRules,
   catListingController.createCatListing
 );
+
+// Public routes - no authentication required
+/**
+ * @route   GET /api/cats/listings/nearby
+ * @desc    Get nearby cat listings based on location
+ * @access  Public
+ */
+router.get('/listings/nearby', catListingController.getNearbyCatListings);
+
+/**
+ * @route   GET /api/cats/listings
+ * @desc    Get all cat listings with filters and pagination
+ * @access  Public
+ */
+router.get('/listings', catListingController.getAllCatListings);
+
+/**
+ * @route   GET /api/cats/listings/:id
+ * @desc    Get single cat listing by ID
+ * @access  Public
+ */
+router.get('/listings/:id', catListingController.getCatListingById);
 
 /**
  * @route   GET /api/cats/my-listings

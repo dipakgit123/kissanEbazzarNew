@@ -46,8 +46,13 @@ export const NotificationProvider = ({ children, navigation }) => {
 
       if (token) {
         setPushToken(token);
-        // Register token with backend
-        await notificationService.registerTokenWithBackend(token);
+        // Register token with backend - wrap in try/catch to prevent network errors from crashing
+        try {
+          await notificationService.registerTokenWithBackend(token);
+        } catch (backendError) {
+          console.log('Could not register token with backend (offline or server issue):', backendError.message);
+          // Continue anyway - app should work without backend token registration
+        }
       }
 
       // Set up notification listeners
@@ -67,10 +72,15 @@ export const NotificationProvider = ({ children, navigation }) => {
         }
       );
 
-      // Fetch initial notifications
-      await fetchNotifications();
+      // Fetch initial notifications - wrap in try/catch
+      try {
+        await fetchNotifications();
+      } catch (fetchError) {
+        console.log('Could not fetch notifications (offline or server issue):', fetchError.message);
+      }
     } catch (error) {
-      console.error('Error setting up notifications:', error);
+      console.log('Error setting up notifications (non-fatal):', error.message);
+      // Don't crash the app - notifications are optional
     }
   };
 

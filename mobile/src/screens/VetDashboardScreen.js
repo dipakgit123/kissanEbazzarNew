@@ -19,9 +19,9 @@ import { veterinarianService } from '../services/api';
 const { width } = Dimensions.get('window');
 
 const VetDashboardScreen = ({ navigation }) => {
-  const { t } = useTranslation();
+  const { t, ready } = useTranslation();
   const { veterinarian, logout } = useVetAuth();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({
     totalAppointments: 0,
@@ -30,6 +30,15 @@ const VetDashboardScreen = ({ navigation }) => {
     totalEarnings: 0,
   });
   const [recentAppointments, setRecentAppointments] = useState([]);
+
+  // Show loading while translations are loading
+  if (!ready) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
 
   useEffect(() => {
     fetchDashboardData();
@@ -45,6 +54,10 @@ const VetDashboardScreen = ({ navigation }) => {
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      // Check if it's a network error
+      if (error.message === 'Network Error' || error.code === 'ERR_NETWORK') {
+        console.log('Network error: Please check if the backend server is running and accessible');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -56,21 +69,26 @@ const VetDashboardScreen = ({ navigation }) => {
     fetchDashboardData();
   };
 
-  const renderStatCard = (title, value, icon, color, onPress) => (
-    <TouchableOpacity
-      style={[styles.statCard, { borderLeftColor: color }]}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.statIconContainer, { backgroundColor: color + '20' }]}>
-        <Ionicons name={icon} size={28} color={color} />
-      </View>
-      <View style={styles.statContent}>
-        <Text style={styles.statValue}>{value}</Text>
-        <Text style={styles.statTitle}>{title}</Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const renderStatCard = (title, value, icon, color, onPress) => {
+    // Safety check for title
+    const displayTitle = typeof title === 'string' ? title : String(title);
+    
+    return (
+      <TouchableOpacity
+        style={[styles.statCard, { borderLeftColor: color }]}
+        onPress={onPress}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.statIconContainer, { backgroundColor: color + '20' }]}>
+          <Ionicons name={icon} size={28} color={color} />
+        </View>
+        <View style={styles.statContent}>
+          <Text style={styles.statValue}>{value}</Text>
+          <Text style={styles.statTitle}>{displayTitle}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   const renderAppointmentCard = (appointment) => (
     <TouchableOpacity
@@ -145,8 +163,8 @@ const VetDashboardScreen = ({ navigation }) => {
             style={styles.profileImage}
           />
           <View style={styles.headerInfo}>
-            <Text style={styles.greeting}>{t('vetDashboard.welcomeBack')},</Text>
-            <Text style={styles.doctorName}>Dr. {veterinarian?.fullName || t('vetDashboard.title')}</Text>
+            <Text style={styles.greeting}>{t ? t('vetDashboard.welcomeBack') : 'Welcome back'},</Text>
+            <Text style={styles.doctorName}>Dr. {veterinarian?.fullName || veterinarian?.full_name || (t ? t('vetDashboard.title') : 'Doctor')}</Text>
           </View>
         </View>
         <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
@@ -166,26 +184,26 @@ const VetDashboardScreen = ({ navigation }) => {
       >
         {/* Quick Actions */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('vetDashboard.quickActions')}</Text>
+          <Text style={styles.sectionTitle}>{ready ? t('vetDashboard.quickActions') : 'Quick Actions'}</Text>
           <View style={styles.quickActionsGrid}>
             <TouchableOpacity
               style={styles.quickActionCard}
-              onPress={() => navigation.navigate('Appointments')}
+              onPress={() => navigation.navigate('VetAppointments')}
             >
               <View style={[styles.quickActionIcon, { backgroundColor: '#DBEAFE' }]}>
                 <Ionicons name="calendar" size={28} color="#1D4ED8" />
               </View>
-              <Text style={styles.quickActionText}>{t('vetDashboard.appointments')}</Text>
+              <Text style={styles.quickActionText}>{ready ? t('vetDashboard.appointments') : 'Appointments'}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.quickActionCard}
-              onPress={() => navigation.navigate('VetProfile')}
+              onPress={() => navigation.navigate('EditVetProfile')}
             >
               <View style={[styles.quickActionIcon, { backgroundColor: '#D1FAE5' }]}>
                 <Ionicons name="person" size={28} color="#059669" />
               </View>
-              <Text style={styles.quickActionText}>{t('vetDashboard.myProfile')}</Text>
+              <Text style={styles.quickActionText}>{ready ? t('vetDashboard.myProfile') : 'My Profile'}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -195,48 +213,48 @@ const VetDashboardScreen = ({ navigation }) => {
               <View style={[styles.quickActionIcon, { backgroundColor: '#FEE2E2' }]}>
                 <Ionicons name="call" size={28} color="#DC2626" />
               </View>
-              <Text style={styles.quickActionText}>{t('vetDashboard.callHistory')}</Text>
+              <Text style={styles.quickActionText}>{ready ? t('vetDashboard.callHistory') : 'Call History'}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.quickActionCard}
-              onPress={() => navigation.navigate('Reports')}
+              onPress={() => navigation.navigate('Notifications')}
             >
               <View style={[styles.quickActionIcon, { backgroundColor: '#FEF3C7' }]}>
-                <Ionicons name="document-text" size={28} color="#D97706" />
+                <Ionicons name="notifications" size={28} color="#D97706" />
               </View>
-              <Text style={styles.quickActionText}>{t('vetDashboard.reports')}</Text>
+              <Text style={styles.quickActionText}>Notifications</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Statistics */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('vetDashboard.statistics')}</Text>
+          <Text style={styles.sectionTitle}>{ready ? t('vetDashboard.statistics') : 'Statistics'}</Text>
           <View style={styles.statsGrid}>
             {renderStatCard(
-              t('vetDashboard.totalAppointments'),
+              ready ? t('vetDashboard.totalAppointments') : 'Total Appointments',
               stats.totalAppointments,
               'calendar-outline',
               '#3B82F6',
-              () => navigation.navigate('Appointments')
+              () => navigation.navigate('VetAppointments')
             )}
             {renderStatCard(
-              t('vetDashboard.todayAppointments'),
+              ready ? t('vetDashboard.todayAppointments') : 'Today',
               stats.todayAppointments,
               'today-outline',
               '#10B981',
-              () => navigation.navigate('Appointments', { filter: 'today' })
+              () => navigation.navigate('VetAppointments', { filter: 'confirmed' })
             )}
             {renderStatCard(
-              t('vetDashboard.pending'),
+              ready ? t('vetDashboard.pending') : 'Pending',
               stats.pendingAppointments,
               'time-outline',
               '#F59E0B',
-              () => navigation.navigate('Appointments', { filter: 'pending' })
+              () => navigation.navigate('VetAppointments', { filter: 'pending' })
             )}
             {renderStatCard(
-              t('vetDashboard.totalEarnings'),
+              ready ? t('vetDashboard.totalEarnings') : 'Total Earnings',
               `₹${stats.totalEarnings}`,
               'cash-outline',
               '#8B5CF6',
@@ -248,9 +266,9 @@ const VetDashboardScreen = ({ navigation }) => {
         {/* Recent Appointments */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{t('vetDashboard.recentAppointments')}</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Appointments')}>
-              <Text style={styles.seeAllText}>{t('common.seeAll')}</Text>
+            <Text style={styles.sectionTitle}>{ready ? t('vetDashboard.recentAppointments') : 'Recent Appointments'}</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('VetAppointments')}>
+              <Text style={styles.seeAllText}>{ready ? t('common.seeAll') : 'See All'}</Text>
             </TouchableOpacity>
           </View>
 
@@ -259,7 +277,7 @@ const VetDashboardScreen = ({ navigation }) => {
           ) : (
             <View style={styles.emptyState}>
               <Ionicons name="calendar-outline" size={64} color="#D1D5DB" />
-              <Text style={styles.emptyStateText}>{t('vetDashboard.noAppointments')}</Text>
+              <Text style={styles.emptyStateText}>{ready ? t('vetDashboard.noAppointments') : 'No appointments yet'}</Text>
             </View>
           )}
         </View>
@@ -269,19 +287,19 @@ const VetDashboardScreen = ({ navigation }) => {
           <View style={styles.availabilityCard}>
             <View style={styles.availabilityHeader}>
               <Ionicons name="time" size={24} color={COLORS.primary} />
-              <Text style={styles.availabilityTitle}>{t('vetDashboard.availabilityStatus')}</Text>
+              <Text style={styles.availabilityTitle}>{ready ? t('vetDashboard.availabilityStatus') : 'Availability Status'}</Text>
             </View>
             <View style={styles.availabilityStatus}>
               <View style={styles.statusIndicator} />
               <Text style={styles.availabilityText}>
-                {veterinarian?.emergencyAvailable ? t('veterinarian.emergencyAvailable') : t('vetDashboard.regularHours')}
+                {veterinarian?.emergencyAvailable ? (ready ? t('veterinarian.emergencyAvailable') : 'Emergency Available') : (ready ? t('vetDashboard.regularHours') : 'Regular Hours')}
               </Text>
             </View>
             <TouchableOpacity
               style={styles.updateButton}
-              onPress={() => navigation.navigate('VetProfile')}
+              onPress={() => navigation.navigate('EditVetProfile')}
             >
-              <Text style={styles.updateButtonText}>{t('vetDashboard.updateAvailability')}</Text>
+              <Text style={styles.updateButtonText}>{ready ? t('vetDashboard.updateAvailability') : 'Update Availability'}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -289,7 +307,7 @@ const VetDashboardScreen = ({ navigation }) => {
         {/* Logout */}
         <TouchableOpacity style={styles.logoutButton} onPress={logout}>
           <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-          <Text style={styles.logoutText}>{t('common.logout')}</Text>
+          <Text style={styles.logoutText}>{ready ? t('common.logout') : 'Logout'}</Text>
         </TouchableOpacity>
 
         <View style={{ height: 20 }} />

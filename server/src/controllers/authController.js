@@ -281,7 +281,9 @@ class AuthController {
     try {
       const { User } = db;
       const userId = req.user?.userId; // From JWT middleware
-      const { full_name, address, postal_code } = req.body;
+      const { full_name, email, address, postal_code, city, state } = req.body;
+
+      console.log('Update profile request:', { userId, full_name, email, address, postal_code, city, state });
 
       if (!userId) {
         return res.status(401).json({
@@ -307,7 +309,33 @@ class AuthController {
         });
       }
 
-      if (postal_code && postal_code.trim().length !== 6) {
+      if (email && email.trim()) {
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email.trim())) {
+          return res.status(400).json({
+            success: false,
+            message: 'Please provide a valid email address'
+          });
+        }
+
+        // Check if email is already taken by another user
+        const existingUser = await User.findOne({ 
+          where: { 
+            email: email.trim(),
+            id: { [require('sequelize').Op.ne]: userId }
+          } 
+        });
+        
+        if (existingUser) {
+          return res.status(400).json({
+            success: false,
+            message: 'Email is already registered to another user'
+          });
+        }
+      }
+
+      if (postal_code && postal_code.trim() && postal_code.trim().length !== 6) {
         return res.status(400).json({
           success: false,
           message: 'Please provide a valid 6-digit pincode'
@@ -317,16 +345,28 @@ class AuthController {
       // Build update object
       const updateData = {};
 
-      if (full_name) {
+      if (full_name !== undefined) {
         updateData.full_name = full_name.trim();
       }
 
-      if (address) {
-        updateData.address = address.trim();
+      if (email !== undefined) {
+        updateData.email = email.trim() || null;
+      }
+
+      if (address !== undefined) {
+        updateData.address = address.trim() || null;
+      }
+
+      if (city !== undefined) {
+        updateData.city = city.trim() || null;
+      }
+
+      if (state !== undefined) {
+        updateData.state = state.trim() || null;
       }
 
       // If postal code is being updated, fetch location data
-      if (postal_code && postal_code !== user.postal_code) {
+      if (postal_code && postal_code.trim() && postal_code.trim() !== user.postal_code) {
         updateData.postal_code = postal_code.trim();
 
         try {
@@ -341,13 +381,20 @@ class AuthController {
           if (locationData.city) updateData.city = locationData.city;
           if (locationData.state) updateData.state = locationData.state;
           if (locationData.country) updateData.country = locationData.country || 'India';
-          updateData.location_type = 'manual';
+          updateData.location_type = 'manual'; // Use 'manual' instead of 'geocoded'
           updateData.location_set_at = new Date();
         } catch (error) {
           console.error('Geocoding error:', error.message);
           // Continue without location data if geocoding fails
+          // Keep the manually entered city and state
+          if (postal_code.trim()) {
+            updateData.location_type = 'manual';
+            updateData.location_set_at = new Date();
+          }
         }
       }
+
+      console.log('Update data:', updateData);
 
       // Update user profile
       if (Object.keys(updateData).length > 0) {
@@ -357,6 +404,15 @@ class AuthController {
       // Reload user to get updated data
       await user.reload();
 
+      console.log('Updated user:', {
+        full_name: user.full_name,
+        email: user.email,
+        address: user.address,
+        postal_code: user.postal_code,
+        city: user.city,
+        state: user.state
+      });
+
       res.status(200).json({
         success: true,
         message: 'Profile updated successfully',
@@ -364,13 +420,16 @@ class AuthController {
           id: user.id,
           phone_number: user.phone_number,
           full_name: user.full_name,
+          email: user.email,
           address: user.address,
           postal_code: user.postal_code,
           city: user.city,
           state: user.state,
           country: user.country,
           latitude: user.latitude,
-          longitude: user.longitude
+          longitude: user.longitude,
+          profile_photo: user.profile_photo,
+          is_verified: user.is_verified
         }
       });
     } catch (error) {
@@ -431,10 +490,27 @@ class AuthController {
         profile_photo_public_id: result.public_id
       });
 
+      // Reload user to get complete data
+      await user.reload();
+
       res.status(200).json({
         success: true,
         message: 'Profile photo uploaded successfully',
-        profile_photo: result.secure_url
+        user: {
+          id: user.id,
+          phone_number: user.phone_number,
+          full_name: user.full_name,
+          email: user.email,
+          address: user.address,
+          postal_code: user.postal_code,
+          city: user.city,
+          state: user.state,
+          country: user.country,
+          latitude: user.latitude,
+          longitude: user.longitude,
+          profile_photo: user.profile_photo,
+          is_verified: user.is_verified
+        }
       });
     } catch (error) {
       console.error('Upload profile photo error:', error);
@@ -482,9 +558,27 @@ class AuthController {
         profile_photo_public_id: null
       });
 
+      // Reload user to get complete data
+      await user.reload();
+
       res.status(200).json({
         success: true,
-        message: 'Profile photo deleted successfully'
+        message: 'Profile photo deleted successfully',
+        user: {
+          id: user.id,
+          phone_number: user.phone_number,
+          full_name: user.full_name,
+          email: user.email,
+          address: user.address,
+          postal_code: user.postal_code,
+          city: user.city,
+          state: user.state,
+          country: user.country,
+          latitude: user.latitude,
+          longitude: user.longitude,
+          profile_photo: user.profile_photo,
+          is_verified: user.is_verified
+        }
       });
     } catch (error) {
       console.error('Delete profile photo error:', error);

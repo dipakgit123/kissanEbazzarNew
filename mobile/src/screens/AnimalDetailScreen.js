@@ -15,7 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Video } from 'expo-av';
 import { COLORS, formatPrice, formatDate, getAnimalTypeLabel } from '../utils/constants';
-import { listingsService } from '../services/api';
+import { listingsService, callLogService } from '../services/api';
+import { useWishlist } from '../context/WishlistContext';
 
 const { width } = Dimensions.get('window');
 
@@ -26,6 +27,9 @@ const AnimalDetailScreen = ({ route, navigation }) => {
   const [error, setError] = useState(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const videoRef = useRef(null);
+  
+  const { addToWishlist, removeFromWishlist, isInWishlist: checkIsInWishlist } = useWishlist();
+  const isInWishlist = checkIsInWishlist(id);
 
   useEffect(() => {
     fetchListing();
@@ -66,6 +70,28 @@ const AnimalDetailScreen = ({ route, navigation }) => {
     }
   };
 
+  const toggleWishlist = async () => {
+    try {
+      if (isInWishlist) {
+        // Remove from wishlist
+        await removeFromWishlist(id, animalType);
+        Alert.alert('Removed', 'Removed from wishlist');
+      } else {
+        // Add to wishlist
+        if (!listing) return;
+        await addToWishlist({
+          ...listing,
+          id: listing.id,
+          animal_type: animalType,
+        });
+        Alert.alert('Added', 'Added to wishlist');
+      }
+    } catch (error) {
+      console.error('Error toggling wishlist:', error);
+      Alert.alert('Error', 'Failed to update wishlist');
+    }
+  };
+
   const getImages = () => {
     if (!listing) return [];
     const images = [];
@@ -81,21 +107,58 @@ const AnimalDetailScreen = ({ route, navigation }) => {
     return images;
   };
 
-  const handleCall = () => {
+  const handleCall = async () => {
     if (listing?.seller?.phone) {
-      Linking.openURL(`tel:${listing.seller.phone}`);
+      try {
+        // Log the call before making it
+        await callLogService.logCall({
+          receiverId: listing.seller.id || listing.user_id,
+          receiverPhoneNumber: listing.seller.phone,
+          callType: 'direct',
+          listingId: id,
+          listingType: animalType,
+        });
+        
+        // Open phone dialer
+        Linking.openURL(`tel:${listing.seller.phone}`);
+      } catch (error) {
+        console.error('Error logging call:', error);
+        // Still make the call even if logging fails
+        Linking.openURL(`tel:${listing.seller.phone}`);
+      }
     } else {
       Alert.alert('Error', 'Seller phone number not available');
     }
   };
 
-  const handleWhatsApp = () => {
+  const handleWhatsApp = async () => {
     if (listing?.seller?.phone) {
-      const message = `Hi! I'm interested in your ${animalType} listing: "${listing.breed_name}" - ₹${formatPrice(listing.expected_price)}`;
-      const url = `whatsapp://send?phone=91${listing.seller.phone}&text=${encodeURIComponent(message)}`;
-      Linking.openURL(url).catch(() => {
-        Linking.openURL(`https://wa.me/91${listing.seller.phone}?text=${encodeURIComponent(message)}`);
-      });
+      try {
+        // Log the call before making it
+        await callLogService.logCall({
+          receiverId: listing.seller.id || listing.user_id,
+          receiverPhoneNumber: listing.seller.phone,
+          callType: 'direct',
+          listingId: id,
+          listingType: animalType,
+        });
+        
+        const message = `Hi! I'm interested in your ${animalType} listing: "${listing.breed_name}" - ₹${formatPrice(listing.expected_price)}`;
+        // Remove duplicate 91 - phone already has country code
+        const url = `whatsapp://send?phone=${listing.seller.phone}&text=${encodeURIComponent(message)}`;
+        Linking.openURL(url).catch(() => {
+          Linking.openURL(`https://wa.me/${listing.seller.phone}?text=${encodeURIComponent(message)}`);
+        });
+      } catch (error) {
+        console.error('Error logging WhatsApp call:', error);
+        // Still make the call even if logging fails
+        const message = `Hi! I'm interested in your ${animalType} listing: "${listing.breed_name}" - ₹${formatPrice(listing.expected_price)}`;
+        // Remove duplicate 91 - phone already has country code
+        const url = `whatsapp://send?phone=${listing.seller.phone}&text=${encodeURIComponent(message)}`;
+        Linking.openURL(url).catch(() => {
+          Linking.openURL(`https://wa.me/${listing.seller.phone}?text=${encodeURIComponent(message)}`);
+        });
+      }
     } else {
       Alert.alert('Error', 'Seller phone number not available');
     }
@@ -151,9 +214,23 @@ const AnimalDetailScreen = ({ route, navigation }) => {
           <Ionicons name="arrow-back" size={24} color={COLORS.black} />
         </TouchableOpacity>
 
-        {/* Type Badge */}
-        <View style={styles.typeBadge}>
-          <Text style={styles.typeBadgeText}>{getAnimalTypeLabel(animalType)}</Text>
+        <View style={styles.headerRight}>
+          {/* Wishlist Button */}
+          <TouchableOpacity
+            style={styles.wishlistButton}
+            onPress={toggleWishlist}
+          >
+            <Ionicons 
+              name={isInWishlist ? "heart" : "heart-outline"} 
+              size={24} 
+              color={isInWishlist ? COLORS.red : COLORS.black} 
+            />
+          </TouchableOpacity>
+
+          {/* Type Badge */}
+          <View style={styles.typeBadge}>
+            <Text style={styles.typeBadgeText}>{getAnimalTypeLabel(animalType)}</Text>
+          </View>
         </View>
       </SafeAreaView>
 
@@ -182,7 +259,7 @@ const AnimalDetailScreen = ({ route, navigation }) => {
               >
                 {images.map((img, index) => (
                   <Image
-                    key={index}
+                    key={`${img.url}-${index}`}
                     source={{ uri: img.url }}
                     style={styles.galleryImage}
                   />
@@ -213,9 +290,9 @@ const AnimalDetailScreen = ({ route, navigation }) => {
               {/* Image Indicators */}
               {images.length > 1 && (
                 <View style={styles.imageIndicators}>
-                  {images.map((_, index) => (
+                  {images.map((img, index) => (
                     <View
-                      key={index}
+                      key={`indicator-${img.url}-${index}`}
                       style={[
                         styles.indicator,
                         activeImageIndex === index && styles.activeIndicator,
@@ -519,6 +596,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 8,
     backgroundColor: 'transparent',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  wishlistButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   headerSpacer: {
     height: 80,

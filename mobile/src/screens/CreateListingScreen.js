@@ -112,32 +112,128 @@ const CreateListingScreen = ({ route, navigation }) => {
     return true;
   };
 
+  // Get the correct endpoint based on animal category
+  const getAnimalEndpoint = (categoryId) => {
+    const endpoints = {
+      'cow': 'animals',
+      'buffalo': 'buffalos',
+      'goat': 'goats',
+      'horse': 'horses',
+      'dog': 'dogs',
+      'cat': 'cats',
+      'bull': 'animals',
+      'other': 'other-animals'
+    };
+    return endpoints[categoryId?.toLowerCase()] || 'animals';
+  };
+
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
     setLoading(true);
     try {
-      const listingData = {
-        animal_type: category.id,
-        breed_name: form.breedName,
-        age: form.age,
-        price: Number(form.price),
-        description: form.description,
-        health_status: form.healthStatus,
-        gender: form.gender,
-        weight: form.weight ? Number(form.weight) : null,
-        milk_capacity: form.milkCapacity ? Number(form.milkCapacity) : null,
-        is_pregnant: form.isPregnant,
-        lactation_status: form.lactationStatus || null,
-        photos: images,
-        latitude: user?.latitude,
-        longitude: user?.longitude,
-        city: user?.city,
-        state: user?.state,
-        pincode: user?.pincode,
-      };
+      // Get the correct endpoint
+      const endpoint = getAnimalEndpoint(category.id);
+      
+      // Prepare form data for multipart upload
+      const formData = new FormData();
+      
+      // Add basic fields based on animal type
+      if (endpoint === 'buffalos' || endpoint === 'animals') {
+        // Buffalo/Cow fields
+        formData.append('breedName', form.breedName);
+        formData.append('age', form.age);
+        formData.append('milkCapacity', form.milkCapacity || '0');
+        formData.append('pregnancyStatus', form.isPregnant ? 'pregnant' : 'not_pregnant');
+        formData.append('hasHorns', 'false');
+        formData.append('healthCondition', form.healthStatus.toLowerCase());
+        formData.append('expectedPrice', form.price);
+        formData.append('isNegotiable', 'true');
+        formData.append('vaccinationDetails', form.description || '');
+        formData.append('deliveryAvailable', 'false');
+        formData.append('additionalNotes', form.description || '');
+      } else if (endpoint === 'horses') {
+        // Horse fields
+        formData.append('breedName', form.breedName);
+        formData.append('age', form.age);
+        formData.append('gender', form.gender.toLowerCase());
+        formData.append('purpose', 'riding');
+        formData.append('healthCondition', form.healthStatus.toLowerCase());
+        formData.append('expectedPrice', form.price);
+        formData.append('isNegotiable', 'true');
+        formData.append('vaccinationDetails', form.description || '');
+        formData.append('deliveryAvailable', 'false');
+        formData.append('additionalNotes', form.description || '');
+      } else if (endpoint === 'goats') {
+        // Goat fields
+        formData.append('goatType', form.gender.toLowerCase());
+        formData.append('breedName', form.breedName);
+        formData.append('age', form.age);
+        formData.append('weight', form.weight || '50');
+        formData.append('color', 'white');
+        formData.append('hornType', 'with_horns');
+        formData.append('healthStatus', form.healthStatus.toLowerCase());
+        formData.append('purpose', 'milk');
+        formData.append('expectedPrice', form.price);
+        formData.append('isNegotiable', 'true');
+        formData.append('detailsConfirmed', 'true');
+        formData.append('termsAccepted', 'true');
+        formData.append('additionalNotes', form.description || '');
+      } else if (endpoint === 'dogs' || endpoint === 'cats') {
+        // Dog/Cat fields
+        const typeField = endpoint === 'dogs' ? 'dogType' : 'catType';
+        formData.append(typeField, form.gender.toLowerCase());
+        formData.append('breedName', form.breedName);
+        formData.append('age', form.age);
+        formData.append('color', 'brown');
+        formData.append('weight', form.weight || '10');
+        
+        if (endpoint === 'dogs') {
+          formData.append('height', '50');
+          formData.append('trained', 'no');
+          formData.append('behavior', 'friendly');
+          formData.append('purpose', 'pet');
+        } else {
+          formData.append('eyeColor', 'brown');
+          formData.append('furType', 'short');
+          formData.append('behavior', 'friendly');
+        }
+        
+        formData.append('vaccinationStatus', 'yes');
+        formData.append('healthCondition', form.healthStatus.toLowerCase());
+        formData.append('expectedPrice', form.price);
+        formData.append('isNegotiable', 'true');
+        formData.append('detailsConfirmed', 'true');
+        formData.append('termsAccepted', 'true');
+        formData.append('additionalNotes', form.description || '');
+      } else {
+        // Other animals
+        formData.append('animalType', category.name || 'Other');
+        formData.append('breedName', form.breedName || 'Local');
+        formData.append('age', form.age);
+        formData.append('gender', form.gender.toLowerCase());
+        formData.append('healthCondition', form.healthStatus.toLowerCase());
+        formData.append('expectedPrice', form.price);
+        formData.append('isNegotiable', 'true');
+        formData.append('vaccinationDetails', form.description || '');
+        formData.append('deliveryAvailable', 'false');
+        formData.append('additionalNotes', form.description || '');
+      }
+      
+      // Add photos
+      images.forEach((image, index) => {
+        const photoField = (endpoint === 'goats' || endpoint === 'dogs' || endpoint === 'cats') 
+          ? `photo${index + 1}` 
+          : index === 0 ? 'frontPhoto' : 'sidePhoto';
+        
+        formData.append(photoField, {
+          uri: image.uri,
+          type: 'image/jpeg',
+          name: `photo_${index + 1}.jpg`,
+        });
+      });
 
-      const response = await animalListingService.createListing(listingData);
+      const response = await animalListingService.createListing(endpoint, formData);
 
       if (response.success) {
         Alert.alert('Success', 'Your listing has been created successfully!', [
@@ -150,6 +246,7 @@ const CreateListingScreen = ({ route, navigation }) => {
         Alert.alert('Error', response.message || 'Failed to create listing');
       }
     } catch (error) {
+      console.error('Error creating listing:', error);
       Alert.alert('Error', error.message || 'Something went wrong');
     } finally {
       setLoading(false);

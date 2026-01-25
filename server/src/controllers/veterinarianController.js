@@ -114,6 +114,15 @@ class VeterinarianController {
    */
   async register(req, res) {
     try {
+      console.log('=== VET REGISTRATION REQUEST ===');
+      console.log('Body keys:', Object.keys(req.body));
+      console.log('Files:', req.files ? Object.keys(req.files) : 'No files');
+      console.log('Full Name:', req.body.full_name);
+      console.log('Phone:', req.body.phone_number);
+      console.log('License:', req.body.license_number);
+      console.log('Location:', req.body.latitude, req.body.longitude);
+      console.log('====================');
+
       const {
         full_name,
         phone_number,
@@ -136,6 +145,10 @@ class VeterinarianController {
 
       // Validate required fields
       if (!full_name || !phone_number || !license_number || !latitude || !longitude) {
+        console.log('=== VALIDATION FAILED ===');
+        console.log('Missing:', { full_name: !!full_name, phone_number: !!phone_number, license_number: !!license_number, latitude: !!latitude, longitude: !!longitude });
+        console.log('====================');
+        
         return res.status(400).json({
           success: false,
           message: 'Required fields: full_name, phone_number, license_number, latitude, longitude'
@@ -687,6 +700,96 @@ class VeterinarianController {
       res.status(500).json({
         success: false,
         message: 'Failed to fetch profile',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Get dashboard data for veterinarian
+   * GET /api/veterinarians/dashboard
+   */
+  async getDashboard(req, res) {
+    try {
+      const vetId = req.vet.id;
+
+      // Get veterinarian profile
+      const veterinarian = await db.Veterinarian.findByPk(vetId);
+      if (!veterinarian) {
+        return res.status(404).json({
+          success: false,
+          message: 'Profile not found'
+        });
+      }
+
+      // Get appointment statistics
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const [totalAppointments, todayAppointments, pendingAppointments, recentAppointments] = await Promise.all([
+        // Total appointments
+        db.Appointment.count({
+          where: { veterinarian_id: vetId }
+        }),
+        // Today's appointments
+        db.Appointment.count({
+          where: {
+            veterinarian_id: vetId,
+            appointment_date: {
+              [Op.gte]: today,
+              [Op.lt]: tomorrow
+            }
+          }
+        }),
+        // Pending appointments
+        db.Appointment.count({
+          where: {
+            veterinarian_id: vetId,
+            status: 'pending'
+          }
+        }),
+        // Recent appointments
+        db.Appointment.findAll({
+          where: { veterinarian_id: vetId },
+          include: [{
+            model: db.User,
+            as: 'user',
+            attributes: ['id', 'full_name', 'phone_number']
+          }],
+          order: [['appointment_date', 'DESC'], ['appointment_time', 'DESC']],
+          limit: 5
+        })
+      ]);
+
+      // Format recent appointments
+      const formattedAppointments = recentAppointments.map(apt => ({
+        id: apt.id,
+        userName: apt.user?.full_name || 'User',
+        userPhone: apt.user?.phone_number || '',
+        date: apt.appointment_date,
+        time: apt.appointment_time,
+        animalType: apt.animal_type,
+        reason: apt.reason,
+        status: apt.status
+      }));
+
+      res.json({
+        success: true,
+        stats: {
+          totalAppointments,
+          todayAppointments,
+          pendingAppointments,
+          totalEarnings: 0 // TODO: Calculate from completed appointments
+        },
+        recentAppointments: formattedAppointments
+      });
+    } catch (error) {
+      console.error('Get dashboard error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch dashboard data',
         error: error.message
       });
     }

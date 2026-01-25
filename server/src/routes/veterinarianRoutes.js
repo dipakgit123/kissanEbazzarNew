@@ -87,21 +87,8 @@ router.post('/login', veterinarianController.login.bind(veterinarianController))
  */
 router.get('/nearby', veterinarianController.getNearbyVeterinarians.bind(veterinarianController));
 
-/**
- * @route   GET /api/veterinarians
- * @desc    Get all verified veterinarians
- * @access  Public
- */
-router.get('/', veterinarianController.getAllVeterinarians.bind(veterinarianController));
-
-/**
- * @route   GET /api/veterinarians/:id
- * @desc    Get veterinarian by ID
- * @access  Public
- */
-router.get('/:id', veterinarianController.getVeterinarianById.bind(veterinarianController));
-
 // ============ PROTECTED ROUTES (Vet's own profile) ============
+// NOTE: These must come BEFORE the /:id route to avoid conflicts
 
 /**
  * @route   GET /api/veterinarians/profile/me
@@ -116,5 +103,26 @@ router.get('/profile/me', vetAuthMiddleware, veterinarianController.getProfile.b
  * @access  Protected (Veterinarian)
  */
 router.put('/profile/me', vetAuthMiddleware, fileUploadConfig, veterinarianController.updateProfile.bind(veterinarianController));
+
+/**
+ * @route   GET /api/veterinarians/dashboard
+ * @desc    Get dashboard data for veterinarian
+ * @access  Protected (Veterinarian)
+ */
+router.get('/dashboard', vetAuthMiddleware, veterinarianController.getDashboard.bind(veterinarianController));
+
+/**
+ * @route   GET /api/veterinarians
+ * @desc    Get all verified veterinarians
+ * @access  Public
+ */
+router.get('/', veterinarianController.getAllVeterinarians.bind(veterinarianController));
+
+/**
+ * @route   GET /api/veterinarians/:id
+ * @desc    Get veterinarian by ID
+ * @access  Public
+ */
+router.get('/:id', veterinarianController.getVeterinarianById.bind(veterinarianController));
 
 module.exports = router;

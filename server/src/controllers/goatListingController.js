@@ -97,7 +97,7 @@ exports.createGoatListing = async (req, res) => {
       breedName,
       age,
       weight: parseFloat(weight),
-      color,
+      color: color || 'Not specified',
       hornType,
       healthStatus,
       purpose,

@@ -11,6 +11,7 @@ import {
   FormAlert,
   SubmitButton
 } from './common';
+import './AnimalListingPage.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -21,10 +22,10 @@ const AnimalListingForm = () => {
     age: '',
     milkCapacity: '',
     pregnancyStatus: '',
-    hasHorns: true,
+    hasHorns: 'true',
     healthCondition: '',
     expectedPrice: '',
-    isNegotiable: false,
+    isNegotiable: 'false',
     vaccinationDetails: '',
     deliveryAvailable: false,
     additionalNotes: '',
@@ -88,8 +89,11 @@ const AnimalListingForm = () => {
         throw new Error('Please login to create a listing');
       }
 
+      const endpoint = `${API_URL}/api/animals/listings`;
+      console.log('🐄 [COW] Submitting to API endpoint:', endpoint);
+      
       const response = await axios.post(
-        `${API_URL}/api/animals/listings`,
+        endpoint,
         formDataToSend,
         {
           headers: {
@@ -99,6 +103,9 @@ const AnimalListingForm = () => {
         }
       );
 
+      console.log('✅ [COW] API Response:', response.data);
+      console.log('✅ [COW] Listing created successfully at:', endpoint);
+
       if (response.data.success) {
         setSuccess(true);
         setFormData({
@@ -106,10 +113,10 @@ const AnimalListingForm = () => {
           age: '',
           milkCapacity: '',
           pregnancyStatus: '',
-          hasHorns: true,
+          hasHorns: 'true',
           healthCondition: '',
           expectedPrice: '',
-          isNegotiable: false,
+          isNegotiable: 'false',
           vaccinationDetails: '',
           deliveryAvailable: false,
           additionalNotes: '',
@@ -200,12 +207,12 @@ const AnimalListingForm = () => {
           <FormRadioGroup
             label="Has Horns?"
             name="hasHorns"
+            value={formData.hasHorns}
+            onChange={handleChange}
             options={[
-              { id: 'horns-yes', value: true, label: t('common.yes') },
-              { id: 'horns-no', value: false, label: t('common.no') }
+              { value: 'true', label: t('common.yes') },
+              { value: 'false', label: t('common.no') }
             ]}
-            selectedValue={formData.hasHorns}
-            onChange={(value) => setFormData(prev => ({ ...prev, hasHorns: value }))}
           />
 
           <FormSelect

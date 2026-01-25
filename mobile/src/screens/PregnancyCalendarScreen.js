@@ -10,21 +10,33 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
 import { pregnancyService } from '../services/api';
 
 const PregnancyCalendarScreen = ({ navigation }) => {
-  const { t } = useTranslation();
+  const { t, ready } = useTranslation();
   const [pregnancyRecords, setPregnancyRecords] = useState([]);
   const [myAnimals, setMyAnimals] = useState([]);
   const [pregnancyDurations, setPregnancyDurations] = useState({});
   const [stats, setStats] = useState({ active: 0, delivered: 0, dueSoon: 0, total: 0 });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+
+  // Show loading while translations are loading
+  if (!ready) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -37,7 +49,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
   const [matingType, setMatingType] = useState('natural');
   const [bullSireDetails, setBullSireDetails] = useState('');
   const [notes, setNotes] = useState('');
-  const [manualEntry, setManualEntry] = useState(false);
+  const [manualEntry, setManualEntry] = useState(true); // Default to manual entry for mobile
   const [manualAnimalName, setManualAnimalName] = useState('');
   const [manualAnimalType, setManualAnimalType] = useState('cow');
   const [manualBreedName, setManualBreedName] = useState('');
@@ -72,21 +84,70 @@ const PregnancyCalendarScreen = ({ navigation }) => {
         pregnancyService.getStats(),
       ]);
 
-      if (durationsRes.success) {
-        setPregnancyDurations(durationsRes.data.durations);
+      // Process durations response - backend returns array, convert to object
+      if (durationsRes?.success && durationsRes?.data) {
+        const durationsObj = {};
+        if (Array.isArray(durationsRes.data)) {
+          durationsRes.data.forEach(item => {
+            durationsObj[item.animal_type] = item.duration_days;
+          });
+          setPregnancyDurations(durationsObj);
+        } else {
+          // Fallback to default
+          setPregnancyDurations({
+            cow: 280,
+            buffalo: 310,
+            goat: 150,
+            sheep: 150,
+            horse: 340,
+            dog: 63,
+            cat: 65,
+            pig: 114,
+          });
+        }
+      } else {
+        // Set default pregnancy durations if API fails
+        setPregnancyDurations({
+          cow: 280,
+          buffalo: 310,
+          goat: 150,
+          sheep: 150,
+          horse: 340,
+          dog: 63,
+          cat: 65,
+          pig: 114,
+        });
       }
-      if (animalsRes.success) {
-        setMyAnimals(animalsRes.data.animals || []);
+      
+      if (animalsRes?.success && animalsRes?.data) {
+        setMyAnimals(Array.isArray(animalsRes.data) ? animalsRes.data : []);
       }
-      if (recordsRes.success) {
-        setPregnancyRecords(recordsRes.data.records || []);
+      
+      if (recordsRes?.success && recordsRes?.data) {
+        setPregnancyRecords(Array.isArray(recordsRes.data) ? recordsRes.data : []);
       }
-      if (statsRes.success) {
-        setStats(statsRes.data);
+      
+      if (statsRes?.success && statsRes?.data) {
+        setStats({
+          active: statsRes.data.active_pregnancies || 0,
+          delivered: statsRes.data.successful_deliveries || 0,
+          dueSoon: statsRes.data.upcoming_deliveries?.length || 0,
+          total: statsRes.data.total_records || 0
+        });
       }
     } catch (error) {
-      console.log('Error loading data:', error);
-      Alert.alert('Error', 'Failed to load pregnancy data. Please try again.');
+      console.error('Error loading data:', error);
+      // Set default durations even on error
+      setPregnancyDurations({
+        cow: 280,
+        buffalo: 310,
+        goat: 150,
+        sheep: 150,
+        horse: 340,
+        dog: 63,
+        cat: 65,
+        pig: 114,
+      });
     } finally {
       setLoading(false);
     }
@@ -166,47 +227,48 @@ const PregnancyCalendarScreen = ({ navigation }) => {
 
   const handleCreateRecord = async () => {
     try {
+      // Validate manual entry (always manual for mobile)
+      if (!manualAnimalName.trim()) {
+        Alert.alert('Error', 'Please enter animal name');
+        return;
+      }
+
+      // Validate date format
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(matingDate)) {
+        Alert.alert('Error', 'Please enter date in YYYY-MM-DD format');
+        return;
+      }
+
+      setSubmitting(true);
+
       let recordData = {
         mating_date: matingDate,
         mating_type: matingType,
         bull_sire_details: bullSireDetails || null,
         notes: notes || null,
+        animal_name: manualAnimalName.trim(),
+        animal_type: manualAnimalType,
+        breed_name: manualBreedName?.trim() || null,
       };
 
-      if (manualEntry) {
-        if (!manualAnimalName.trim()) {
-          Alert.alert('Error', 'Please enter animal name');
-          return;
-        }
-        recordData.animal_name = manualAnimalName;
-        recordData.animal_type = manualAnimalType;
-        recordData.breed_name = manualBreedName || null;
-      } else {
-        if (!selectedAnimal) {
-          Alert.alert('Error', 'Please select an animal');
-          return;
-        }
-        recordData.listing_id = selectedAnimal.id;
-        recordData.listing_type = selectedAnimal.type;
-        recordData.animal_name = selectedAnimal.name || selectedAnimal.breed;
-        recordData.animal_type = selectedAnimal.animal_type || selectedAnimal.type;
-        recordData.breed_name = selectedAnimal.breed || selectedAnimal.breed_name;
-        recordData.animal_photo = selectedAnimal.photo1 || selectedAnimal.photos?.[0];
-      }
-
+      console.log('Creating pregnancy record:', recordData);
       const response = await pregnancyService.createRecord(recordData);
+      console.log('Create record response:', response);
 
-      if (response.success) {
+      if (response?.success) {
         Alert.alert('Success', 'Pregnancy record created successfully!');
         setShowAddModal(false);
         resetForm();
-        loadData();
+        await loadData();
       } else {
-        Alert.alert('Error', response.message || 'Failed to create record');
+        Alert.alert('Error', response?.message || 'Failed to create record');
       }
     } catch (error) {
-      console.log('Error creating record:', error);
-      Alert.alert('Error', error.message || 'Failed to create pregnancy record');
+      console.error('Error creating record:', error);
+      Alert.alert('Error', error?.message || 'Failed to create pregnancy record. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -223,14 +285,14 @@ const PregnancyCalendarScreen = ({ navigation }) => {
 
       const response = await pregnancyService.markDelivered(selectedRecord.id, deliveryData);
 
-      if (response.success) {
+      if (response?.success) {
         Alert.alert('Congratulations!', 'Delivery recorded successfully!');
         setShowDeliveryModal(false);
         setSelectedRecord(null);
         resetDeliveryForm();
         loadData();
       } else {
-        Alert.alert('Error', response.message || 'Failed to record delivery');
+        Alert.alert('Error', response?.message || 'Failed to record delivery');
       }
     } catch (error) {
       console.log('Error marking delivered:', error);
@@ -269,7 +331,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
     setMatingType('natural');
     setBullSireDetails('');
     setNotes('');
-    setManualEntry(false);
+    setManualEntry(true); // Default to manual entry for mobile
     setManualAnimalName('');
     setManualAnimalType('cow');
     setManualBreedName('');
@@ -309,7 +371,6 @@ const PregnancyCalendarScreen = ({ navigation }) => {
             styles.calendarCell,
             isToday && styles.todayCell,
             isSelected && styles.selectedCell,
-            recordsForDate.length > 0 && styles.hasAnimalsCell,
             isDeliveryDate && styles.deliveryDateCell,
           ]}
           onPress={() => setSelectedDate(date)}
@@ -319,13 +380,18 @@ const PregnancyCalendarScreen = ({ navigation }) => {
               styles.dayText,
               isToday && styles.todayText,
               isSelected && styles.selectedText,
+              isDeliveryDate && styles.deliveryDateText,
             ]}
           >
             {day}
           </Text>
           {recordsForDate.length > 0 && (
-            <View style={[styles.animalDot, isDeliveryDate && styles.deliveryDot]}>
-              <Text style={styles.animalCount}>{recordsForDate.length}</Text>
+            <View style={styles.animalIndicator}>
+              {recordsForDate.slice(0, 3).map((record, idx) => (
+                <Text key={record.id} style={styles.animalMiniEmoji}>
+                  {getAnimalEmoji(record.animal_type)}
+                </Text>
+              ))}
             </View>
           )}
         </TouchableOpacity>
@@ -351,21 +417,30 @@ const PregnancyCalendarScreen = ({ navigation }) => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Loading pregnancy calendar...</Text>
-      </View>
+      <SafeAreaView style={styles.loadingContainer} edges={['top']}>
+        <StatusBar barStyle="light-content" />
+        <View style={styles.loadingContent}>
+          <View style={styles.loadingIconContainer}>
+            <Ionicons name="calendar" size={48} color={COLORS.primary} />
+          </View>
+          <ActivityIndicator size="large" color={COLORS.primary} style={styles.loadingSpinner} />
+          <Text style={styles.loadingText}>Loading pregnancy calendar...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.white} />
-      }
-    >
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <StatusBar barStyle="light-content" />
+      <ScrollView
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.white} />
+        }
+      >
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerIcon}>
@@ -375,21 +450,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
         <Text style={styles.subtitle}>Track pregnant animals with accurate durations</Text>
       </View>
 
-      {/* Stats */}
-      <View style={styles.statsRow}>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{stats.active || 0}</Text>
-          <Text style={styles.statLabel}>{t('pregnancy.active')}</Text>
-        </View>
-        <View style={[styles.statCard, { backgroundColor: '#22C55E' + '20' }]}>
-          <Text style={[styles.statValue, { color: '#22C55E' }]}>{stats.delivered || 0}</Text>
-          <Text style={styles.statLabel}>Delivered</Text>
-        </View>
-        <View style={[styles.statCard, { backgroundColor: '#F97316' + '20' }]}>
-          <Text style={[styles.statValue, { color: '#F97316' }]}>{stats.dueSoon || 0}</Text>
-          <Text style={styles.statLabel}>Due Soon</Text>
-        </View>
-      </View>
+      {/* Stats - Removed for mobile */}
 
       {/* Calendar */}
       <View style={styles.calendarCard}>
@@ -427,13 +488,19 @@ const PregnancyCalendarScreen = ({ navigation }) => {
         </View>
       </View>
 
+      {/* Add Pregnancy Button - Prominent */}
+      <View style={styles.addButtonContainer}>
+        <TouchableOpacity style={styles.addPregnancyButton} onPress={() => setShowAddModal(true)}>
+          <Ionicons name="add-circle" size={24} color={COLORS.white} />
+          <Text style={styles.addPregnancyButtonText}>Add Pregnancy Record</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Selected Date Info */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
+          <Ionicons name="calendar-outline" size={20} color={COLORS.primary} />
           <Text style={styles.sectionTitle}>{formatDate(selectedDate.toISOString())}</Text>
-          <TouchableOpacity style={styles.addBtn} onPress={() => setShowAddModal(true)}>
-            <Ionicons name="add" size={24} color={COLORS.white} />
-          </TouchableOpacity>
         </View>
 
         {selectedDateRecords.length > 0 ? (
@@ -557,7 +624,8 @@ const PregnancyCalendarScreen = ({ navigation }) => {
         )}
       </View>
 
-      <View style={{ height: 100 }} />
+      {/* Bottom Spacer for Tab Bar */}
+      <View style={{ height: 80 }} />
 
       {/* Add Pregnancy Modal */}
       <Modal visible={showAddModal} animationType="slide" transparent>
@@ -572,119 +640,66 @@ const PregnancyCalendarScreen = ({ navigation }) => {
 
             <ScrollView showsVerticalScrollIndicator={false}>
               {/* Toggle between listing selection and manual entry */}
-              <View style={styles.toggleContainer}>
-                <TouchableOpacity
-                  style={[styles.toggleBtn, !manualEntry && styles.toggleBtnActive]}
-                  onPress={() => setManualEntry(false)}
-                >
-                  <Text style={[styles.toggleText, !manualEntry && styles.toggleTextActive]}>
-                    My Animals
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.toggleBtn, manualEntry && styles.toggleBtnActive]}
-                  onPress={() => setManualEntry(true)}
-                >
-                  <Text style={[styles.toggleText, manualEntry && styles.toggleTextActive]}>
-                    Manual Entry
-                  </Text>
-                </TouchableOpacity>
+              {/* Manual Entry Fields - Always shown for mobile */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Animal Name *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={manualAnimalName}
+                  onChangeText={setManualAnimalName}
+                  placeholder="Enter animal name"
+                  placeholderTextColor="#9CA3AF"
+                />
               </View>
 
-              {!manualEntry ? (
-                // Animal Selection from Listings
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Select Animal</Text>
-                  {myAnimals.length > 0 ? (
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.animalSelector}>
-                      {myAnimals.map((animal) => (
-                        <TouchableOpacity
-                          key={`${animal.type}-${animal.id}`}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Animal Type *</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={styles.typeSelector}>
+                    {animalTypes.map((type) => (
+                      <TouchableOpacity
+                        key={type.key}
+                        style={[
+                          styles.typeBtn,
+                          manualAnimalType === type.key && styles.typeBtnActive,
+                        ]}
+                        onPress={() => setManualAnimalType(type.key)}
+                      >
+                        <Text style={styles.typeEmoji}>{type.emoji}</Text>
+                        <Text
                           style={[
-                            styles.animalSelectCard,
-                            selectedAnimal?.id === animal.id && selectedAnimal?.type === animal.type && styles.animalSelectCardActive,
+                            styles.typeText,
+                            manualAnimalType === type.key && styles.typeTextActive,
                           ]}
-                          onPress={() => setSelectedAnimal(animal)}
                         >
-                          <Text style={styles.animalSelectEmoji}>
-                            {getAnimalEmoji(animal.animal_type || animal.type)}
-                          </Text>
-                          <Text style={styles.animalSelectName} numberOfLines={1}>
-                            {animal.name || animal.breed}
-                          </Text>
-                          <Text style={styles.animalSelectType}>{animal.type}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  ) : (
-                    <View style={styles.noAnimalsMsg}>
-                      <Text style={styles.noAnimalsMsgText}>
-                        No animals found. Add listings first or use manual entry.
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              ) : (
-                // Manual Entry Fields
-                <>
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Animal Name</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={manualAnimalName}
-                      onChangeText={setManualAnimalName}
-                      placeholder="Enter animal name"
-                    />
+                          {type.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
                   </View>
+                </ScrollView>
+              </View>
 
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Animal Type</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                      <View style={styles.typeSelector}>
-                        {animalTypes.map((type) => (
-                          <TouchableOpacity
-                            key={type.key}
-                            style={[
-                              styles.typeBtn,
-                              manualAnimalType === type.key && styles.typeBtnActive,
-                            ]}
-                            onPress={() => setManualAnimalType(type.key)}
-                          >
-                            <Text style={styles.typeEmoji}>{type.emoji}</Text>
-                            <Text
-                              style={[
-                                styles.typeText,
-                                manualAnimalType === type.key && styles.typeTextActive,
-                              ]}
-                            >
-                              {type.label}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    </ScrollView>
-                  </View>
-
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Breed (Optional)</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={manualBreedName}
-                      onChangeText={setManualBreedName}
-                      placeholder="Enter breed name"
-                    />
-                  </View>
-                </>
-              )}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Breed (Optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={manualBreedName}
+                  onChangeText={setManualBreedName}
+                  placeholder="Enter breed name"
+                  placeholderTextColor="#9CA3AF"
+                />
+              </View>
 
               {/* Common Fields */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Mating Date</Text>
+                <Text style={styles.inputLabel}>Mating Date *</Text>
                 <TextInput
                   style={styles.input}
                   value={matingDate}
                   onChangeText={setMatingDate}
                   placeholder="YYYY-MM-DD"
+                  placeholderTextColor="#9CA3AF"
                 />
                 <Text style={styles.inputHint}>Format: 2025-01-15</Text>
               </View>
@@ -718,6 +733,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
                   value={bullSireDetails}
                   onChangeText={setBullSireDetails}
                   placeholder="Enter bull/sire information"
+                  placeholderTextColor="#9CA3AF"
                 />
               </View>
 
@@ -728,6 +744,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
                   value={notes}
                   onChangeText={setNotes}
                   placeholder="Any additional notes..."
+                  placeholderTextColor="#9CA3AF"
                   multiline
                   numberOfLines={3}
                 />
@@ -737,16 +754,23 @@ const PregnancyCalendarScreen = ({ navigation }) => {
               <View style={styles.durationInfo}>
                 <Ionicons name="information-circle" size={20} color={COLORS.primary} />
                 <Text style={styles.durationInfoText}>
-                  {manualEntry
-                    ? `${animalTypes.find(a => a.key === manualAnimalType)?.label || 'Animal'}: ~${pregnancyDurations[manualAnimalType] || 150} days`
-                    : selectedAnimal
-                    ? `${selectedAnimal.type}: ~${pregnancyDurations[selectedAnimal.animal_type?.toLowerCase() || selectedAnimal.type?.toLowerCase()] || 150} days`
-                    : 'Select an animal to see pregnancy duration'}
+                  {`${animalTypes.find(a => a.key === manualAnimalType)?.label || 'Animal'}: ~${pregnancyDurations[manualAnimalType] || 150} days pregnancy duration`}
                 </Text>
               </View>
 
-              <TouchableOpacity style={styles.submitBtn} onPress={handleCreateRecord}>
-                <Text style={styles.submitBtnText}>Create Record</Text>
+              <TouchableOpacity 
+                style={[styles.submitBtn, submitting && styles.submitBtnDisabled]} 
+                onPress={handleCreateRecord}
+                disabled={submitting}
+              >
+                {submitting ? (
+                  <>
+                    <ActivityIndicator size="small" color={COLORS.white} />
+                    <Text style={[styles.submitBtnText, { marginLeft: 8 }]}>Creating...</Text>
+                  </>
+                ) : (
+                  <Text style={styles.submitBtnText}>Create Record</Text>
+                )}
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -816,29 +840,55 @@ const PregnancyCalendarScreen = ({ navigation }) => {
           </View>
         </View>
       </Modal>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: COLORS.primary,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#1E293B',
+    backgroundColor: '#F9FAFB',
+  },
+  scrollContent: {
+    paddingBottom: 20,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#1E293B',
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
   },
+  loadingContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.primary + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  loadingSpinner: {
+    marginVertical: 16,
+  },
   loadingText: {
-    color: COLORS.white,
+    color: '#1F2937',
     marginTop: 12,
     fontSize: 16,
+    fontWeight: '500',
   },
   header: {
+    backgroundColor: COLORS.primary,
     alignItems: 'center',
-    paddingTop: 60,
+    paddingTop: 20,
     paddingBottom: 24,
     paddingHorizontal: 16,
   },
@@ -888,8 +938,13 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     marginHorizontal: 16,
     borderRadius: 20,
-    padding: 16,
+    padding: 20,
     marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
   },
   monthNav: {
     flexDirection: 'row',
@@ -922,28 +977,38 @@ const styles = StyleSheet.create({
   },
   calendarCell: {
     width: '14.28%',
-    aspectRatio: 1,
-    justifyContent: 'center',
+    aspectRatio: 1.2,
+    justifyContent: 'flex-start',
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: 12,
     position: 'relative',
+    marginBottom: 4,
+    paddingTop: 6,
+    backgroundColor: '#F8FAFC',
   },
   todayCell: {
     backgroundColor: COLORS.primary,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   selectedCell: {
-    borderWidth: 2,
+    borderWidth: 2.5,
     borderColor: COLORS.primary,
-  },
-  hasAnimalsCell: {
-    backgroundColor: COLORS.primary + '10',
+    backgroundColor: COLORS.primary + '15',
   },
   deliveryDateCell: {
     backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
   },
   dayText: {
-    fontSize: 14,
-    color: COLORS.black,
+    fontSize: 15,
+    color: '#1F2937',
+    fontWeight: '600',
+    marginBottom: 2,
   },
   todayText: {
     color: COLORS.white,
@@ -953,23 +1018,21 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontWeight: 'bold',
   },
-  animalDot: {
-    position: 'absolute',
-    bottom: 4,
-    backgroundColor: COLORS.primary,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  deliveryDot: {
-    backgroundColor: '#EF4444',
-  },
-  animalCount: {
-    fontSize: 10,
-    color: COLORS.white,
+  deliveryDateText: {
+    color: '#DC2626',
     fontWeight: 'bold',
+  },
+  animalIndicator: {
+    position: 'absolute',
+    bottom: 2,
+    flexDirection: 'row',
+    gap: -4,
+  },
+  animalMiniEmoji: {
+    fontSize: 12,
+    textShadowColor: 'rgba(0, 0, 0, 0.1)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   legendRow: {
     flexDirection: 'row',
@@ -994,31 +1057,64 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.gray,
   },
+  addButtonContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#F9FAFB',
+  },
+  addPregnancyButton: {
+    backgroundColor: COLORS.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    gap: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  addPregnancyButtonText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '600',
+  },
   section: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
+    marginTop: 8,
     marginBottom: 16,
   },
   sectionHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
+    gap: 8,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    marginBottom: 12,
-  },
-  addBtn: {
-    backgroundColor: COLORS.primary,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    fontSize: 19,
+    fontWeight: '800',
+    color: '#1F2937',
+    letterSpacing: 0.3,
   },
   animalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderLeftWidth: 5,
+    borderLeftColor: COLORS.primary,
+  },
+  animalCardOld: {
     backgroundColor: '#334155',
     borderRadius: 16,
     padding: 16,
@@ -1027,9 +1123,25 @@ const styles = StyleSheet.create({
   animalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 20,
+  },
+  animalHeaderOld: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
   },
   animalEmoji: {
+    fontSize: 56,
+    marginRight: 16,
+    backgroundColor: COLORS.primary + '10',
+    width: 72,
+    height: 72,
+    textAlign: 'center',
+    lineHeight: 72,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  animalEmojiOld: {
     fontSize: 32,
     marginRight: 12,
   },
@@ -1037,42 +1149,67 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   animalName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.white,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 6,
   },
   animalBreed: {
-    fontSize: 13,
-    color: '#94A3B8',
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
   },
   progressBadge: {
-    backgroundColor: COLORS.white + '20',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    backgroundColor: COLORS.primary + '15',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 24,
+    minWidth: 70,
+    alignItems: 'center',
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 2,
   },
   progressText: {
-    fontSize: 14,
-    fontWeight: 'bold',
+    color: COLORS.primary,
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   animalDetails: {
-    marginBottom: 12,
+    backgroundColor: '#F9FAFB',
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 8,
   },
   detailText: {
-    fontSize: 13,
-    color: '#94A3B8',
-    marginBottom: 2,
+    fontSize: 14,
+    color: '#475569',
+    fontWeight: '500',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   progressBarContainer: {
-    height: 6,
-    backgroundColor: COLORS.white + '20',
-    borderRadius: 3,
+    height: 10,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 10,
     overflow: 'hidden',
-    marginBottom: 12,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
   },
   progressBar: {
     height: '100%',
-    borderRadius: 3,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   cardActions: {
     flexDirection: 'row',
@@ -1082,87 +1219,129 @@ const styles = StyleSheet.create({
   deliverBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#22C55E20',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 6,
+    backgroundColor: '#22C55E',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    gap: 8,
+    flex: 1,
+    justifyContent: 'center',
+    shadowColor: '#22C55E',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   deliverBtnText: {
-    color: '#22C55E',
-    fontWeight: '600',
-    fontSize: 13,
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 14,
   },
   deleteBtn: {
-    padding: 8,
+    backgroundColor: '#FEE2E2',
+    padding: 12,
+    borderRadius: 12,
+    marginLeft: 12,
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 32,
-    backgroundColor: '#334155',
-    borderRadius: 16,
+    justifyContent: 'center',
+    padding: 48,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 20,
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    borderStyle: 'dashed',
   },
   emptyText: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#94A3B8',
-    marginTop: 12,
+    marginTop: 16,
+    fontWeight: '500',
+    textAlign: 'center',
   },
   tabContainer: {
     flexDirection: 'row',
     marginHorizontal: 16,
-    backgroundColor: '#334155',
-    borderRadius: 12,
-    padding: 4,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 16,
+    padding: 5,
     marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   tab: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 12,
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: 12,
   },
   activeTab: {
     backgroundColor: COLORS.primary,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   tabText: {
-    color: '#94A3B8',
+    color: '#64748B',
     fontWeight: '600',
     fontSize: 14,
   },
   activeTabText: {
     color: COLORS.white,
+    fontWeight: '700',
   },
   miniAnimalCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#334155',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.primary,
   },
   miniAnimalInfo: {
     flex: 1,
-    marginLeft: 10,
+    marginLeft: 12,
   },
   miniAnimalName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 4,
   },
   miniAnimalDate: {
-    fontSize: 12,
-    color: '#94A3B8',
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
   },
   miniBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-    minWidth: 40,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    minWidth: 50,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
   },
   miniBadgeText: {
-    fontSize: 12,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '800',
   },
   modalOverlay: {
     flex: 1,
@@ -1361,6 +1540,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     marginTop: 8,
+  },
+  submitBtnDisabled: {
+    backgroundColor: COLORS.gray,
+    opacity: 0.7,
   },
   submitBtnText: {
     color: COLORS.white,

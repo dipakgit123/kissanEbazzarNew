@@ -209,7 +209,7 @@ const BuyAnimalsScreen = ({ navigation }) => {
             <View style={styles.animalsList}>
               {filteredAnimals.map((animal) => (
                 <AnimalCard
-                  key={animal.id}
+                  key={`${animal.animal_type}-${animal.id}`}
                   listing={animal}
                   onPress={() => navigation.navigate('AnimalDetail', {
                     animalType: animal.animal_type,

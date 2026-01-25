@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import './AnimalListingPage.css';
 import AnimalListingForm from './AnimalListingForm';
 import BuffaloListingForm from './BuffaloListingForm';
 import CatListingForm from './CatListingForm';
@@ -12,69 +13,91 @@ const AnimalListingPage = () => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('animal');
 
+  // Import animal images
+  const cowImg = '/src/assets/images/cow1.png';
+  const buffaloImg = '/src/assets/images/buffelo1.png';
+  const goatImg = '/src/assets/images/goat1.png';
+  const horseImg = '/src/assets/images/horse1.png';
+  const dogImg = '/src/assets/images/Dog1.png';
+  const catImg = '/src/assets/images/cat1.png';
+
   const tabs = [
     { 
       id: 'animal', 
       label: t('animalTypes.cow'), 
-      emoji: '🐄',
+      image: cowImg,
+      icon: '🐄',
       color: 'from-amber-500 to-amber-600',
       bgColor: 'bg-amber-50',
       textColor: 'text-amber-600',
-      borderColor: 'border-amber-500'
+      borderColor: 'border-amber-500',
+      iconBg: 'bg-amber-100'
     },
     { 
       id: 'buffalo', 
       label: t('animalTypes.buffalo'), 
-      emoji: '🐃',
+      image: buffaloImg,
+      icon: '🐃',
       color: 'from-gray-600 to-gray-700',
       bgColor: 'bg-gray-50',
       textColor: 'text-gray-600',
-      borderColor: 'border-gray-500'
+      borderColor: 'border-gray-500',
+      iconBg: 'bg-gray-100'
     },
     { 
       id: 'goat', 
       label: t('animalTypes.goat'), 
-      emoji: '🐐',
+      image: goatImg,
+      icon: '🐐',
       color: 'from-green-500 to-green-600',
       bgColor: 'bg-green-50',
       textColor: 'text-green-600',
-      borderColor: 'border-green-500'
+      borderColor: 'border-green-500',
+      iconBg: 'bg-green-100'
     },
     { 
       id: 'horse', 
       label: t('animalTypes.horse'), 
-      emoji: '🐴',
+      image: horseImg,
+      icon: '🐴',
       color: 'from-purple-500 to-purple-600',
       bgColor: 'bg-purple-50',
       textColor: 'text-purple-600',
-      borderColor: 'border-purple-500'
+      borderColor: 'border-purple-500',
+      iconBg: 'bg-purple-100'
     },
     { 
       id: 'dog', 
       label: t('animalTypes.dog'), 
-      emoji: '🐕',
+      image: dogImg,
+      icon: '🐕',
       color: 'from-orange-500 to-orange-600',
       bgColor: 'bg-orange-50',
       textColor: 'text-orange-600',
-      borderColor: 'border-orange-500'
+      borderColor: 'border-orange-500',
+      iconBg: 'bg-orange-100'
     },
     { 
       id: 'cat', 
       label: t('animalTypes.cat'), 
-      emoji: '🐱',
+      image: catImg,
+      icon: '🐱',
       color: 'from-pink-500 to-pink-600',
       bgColor: 'bg-pink-50',
       textColor: 'text-pink-600',
-      borderColor: 'border-pink-500'
+      borderColor: 'border-pink-500',
+      iconBg: 'bg-pink-100'
     },
     { 
       id: 'other', 
       label: t('animalTypes.other') || 'Other', 
-      emoji: '🐾',
+      image: null,
+      icon: '🐾',
       color: 'from-blue-500 to-blue-600',
       bgColor: 'bg-blue-50',
       textColor: 'text-blue-600',
-      borderColor: 'border-blue-500'
+      borderColor: 'border-blue-500',
+      iconBg: 'bg-blue-100'
     }
   ];
 
@@ -143,75 +166,130 @@ const AnimalListingPage = () => {
         </div>
 
         {/* Animal Type Selector */}
-        <div className="mb-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-4">
-            {t('listing.selectAnimalType') || 'Select Animal Type'}
-          </h2>
+        <div className="mb-8">
+          <div className="mb-5">
+            <h2 className="text-xl font-bold text-gray-900 mb-2">
+              {t('listing.selectAnimalType') || 'Select Animal Type'}
+            </h2>
+            <p className="text-sm text-gray-600">
+              Choose the type of animal you want to list for sale
+            </p>
+          </div>
           
-          {/* Desktop Grid View */}
-          <div className="hidden md:grid grid-cols-7 gap-3">
+          {/* Desktop Grid View - Enhanced with Images */}
+          <div className="hidden md:grid grid-cols-7 gap-4">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`relative p-4 rounded-xl border-2 transition-all duration-200 group ${
+                className={`relative group overflow-hidden rounded-2xl border-3 transition-all duration-300 transform hover:-translate-y-2 ${
                   activeTab === tab.id
-                    ? `${tab.bgColor} ${tab.borderColor} shadow-md`
-                    : 'bg-white border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                    ? `${tab.borderColor} shadow-2xl scale-105`
+                    : 'border-gray-200 hover:border-gray-300 hover:shadow-xl bg-white'
                 }`}
+                style={{
+                  boxShadow: activeTab === tab.id ? `0 12px 35px -10px ${tab.color.includes('amber') ? '#f59e0b' : tab.color.includes('gray') ? '#6b7280' : tab.color.includes('green') ? '#10b981' : tab.color.includes('purple') ? '#8b5cf6' : tab.color.includes('orange') ? '#f97316' : tab.color.includes('pink') ? '#ec4899' : '#3b82f6'}50` : 'none'
+                }}
               >
-                <div className="flex flex-col items-center gap-2">
-                  <div className={`text-4xl transform transition-transform duration-200 ${
-                    activeTab === tab.id ? 'scale-110' : 'group-hover:scale-105'
-                  }`}>
-                    {tab.emoji}
+                {/* Gradient Background */}
+                <div className={`absolute inset-0 bg-gradient-to-br ${tab.color} ${activeTab === tab.id ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`} />
+                
+                {/* Content */}
+                <div className="relative p-5">
+                  <div className="flex flex-col items-center gap-3">
+                    {/* Image Container with circular background */}
+                    <div className={`relative w-20 h-20 ${activeTab === tab.id ? '' : 'group-hover:scale-110'} transition-transform duration-300`}>
+                      {/* Glow effect */}
+                      <div className={`absolute inset-0 rounded-full blur-2xl ${activeTab === tab.id ? 'bg-white/40' : 'bg-transparent'} transition-all duration-300`} />
+                      
+                      {/* Circular background */}
+                      <div className={`relative w-full h-full rounded-full ${activeTab === tab.id ? 'bg-white/20' : tab.iconBg} flex items-center justify-center transition-all duration-300 ${activeTab === tab.id ? 'animate-pulse' : ''}`}>
+                        {tab.image ? (
+                          <img 
+                            src={tab.image} 
+                            alt={tab.label}
+                            className="w-16 h-16 object-contain"
+                          />
+                        ) : (
+                          <span className="text-5xl">{tab.icon}</span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Label */}
+                    <span className={`text-sm font-bold text-center transition-colors duration-300 ${
+                      activeTab === tab.id ? 'text-white' : 'text-gray-700 group-hover:text-gray-900'
+                    }`}>
+                      {tab.label}
+                    </span>
                   </div>
-                  <span className={`text-xs font-semibold text-center ${
-                    activeTab === tab.id ? tab.textColor : 'text-gray-700'
-                  }`}>
-                    {tab.label}
-                  </span>
                 </div>
+
+                {/* Active indicator checkmark */}
                 {activeTab === tab.id && (
-                  <div className="absolute -top-1 -right-1">
-                    <div className={`w-6 h-6 bg-gradient-to-r ${tab.color} rounded-full flex items-center justify-center shadow-md`}>
-                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <div className="absolute -top-2 -right-2 z-20">
+                    <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-lg border-2 border-gray-100 animate-bounce">
+                      <svg className={`w-5 h-5 ${tab.textColor}`} fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                       </svg>
                     </div>
                   </div>
                 )}
+
+                {/* Hover glow effect */}
+                <div className={`absolute inset-0 rounded-2xl transition-opacity duration-300 ${
+                  activeTab === tab.id ? 'opacity-0' : 'opacity-0 group-hover:opacity-100'
+                }`} style={{
+                  background: `linear-gradient(135deg, ${tab.color.includes('amber') ? '#fef3c7' : tab.color.includes('gray') ? '#f3f4f6' : tab.color.includes('green') ? '#d1fae5' : tab.color.includes('purple') ? '#ede9fe' : tab.color.includes('orange') ? '#fed7aa' : tab.color.includes('pink') ? '#fce7f3' : '#dbeafe'} 0%, transparent 100%)`
+                }} />
               </button>
             ))}
           </div>
 
-          {/* Mobile Horizontal Scroll */}
-          <div className="md:hidden overflow-x-auto pb-2">
-            <div className="flex gap-3 min-w-max px-1">
+          {/* Mobile Horizontal Scroll - Enhanced with Images */}
+          <div className="md:hidden overflow-x-auto pb-3 -mx-4 px-4">
+            <div className="flex gap-4 min-w-max">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`relative flex-shrink-0 w-24 p-3 rounded-xl border-2 transition-all duration-200 ${
+                  className={`relative flex-shrink-0 w-28 overflow-hidden rounded-2xl border-3 transition-all duration-300 ${
                     activeTab === tab.id
-                      ? `${tab.bgColor} ${tab.borderColor} shadow-md`
-                      : 'bg-white border-gray-200'
+                      ? `${tab.borderColor} shadow-xl`
+                      : 'border-gray-200 bg-white'
                   }`}
+                  style={{
+                    boxShadow: activeTab === tab.id ? `0 8px 25px -8px ${tab.color.includes('amber') ? '#f59e0b' : tab.color.includes('gray') ? '#6b7280' : tab.color.includes('green') ? '#10b981' : tab.color.includes('purple') ? '#8b5cf6' : tab.color.includes('orange') ? '#f97316' : tab.color.includes('pink') ? '#ec4899' : '#3b82f6'}50` : 'none'
+                  }}
                 >
-                  <div className="flex flex-col items-center gap-2">
-                    <div className={`text-3xl ${activeTab === tab.id ? 'scale-110' : ''}`}>
-                      {tab.emoji}
+                  <div className={`absolute inset-0 bg-gradient-to-br ${tab.color} ${activeTab === tab.id ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`} />
+                  
+                  <div className="relative p-4">
+                    <div className="flex flex-col items-center gap-2">
+                      {/* Image container */}
+                      <div className={`w-16 h-16 rounded-full ${activeTab === tab.id ? 'bg-white/20' : tab.iconBg} flex items-center justify-center ${activeTab === tab.id ? 'scale-110' : ''} transition-all duration-300`}>
+                        {tab.image ? (
+                          <img 
+                            src={tab.image} 
+                            alt={tab.label}
+                            className="w-12 h-12 object-contain"
+                          />
+                        ) : (
+                          <span className="text-3xl">{tab.icon}</span>
+                        )}
+                      </div>
+                      <span className={`text-xs font-bold text-center ${
+                        activeTab === tab.id ? 'text-white' : 'text-gray-700'
+                      }`}>
+                        {tab.label}
+                      </span>
                     </div>
-                    <span className={`text-xs font-semibold text-center ${
-                      activeTab === tab.id ? tab.textColor : 'text-gray-700'
-                    }`}>
-                      {tab.label}
-                    </span>
                   </div>
+
                   {activeTab === tab.id && (
-                    <div className="absolute -top-1 -right-1">
-                      <div className={`w-5 h-5 bg-gradient-to-r ${tab.color} rounded-full flex items-center justify-center shadow-md`}>
-                        <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <div className="absolute -top-1 -right-1 z-20">
+                      <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-lg border border-gray-100">
+                        <svg className={`w-4 h-4 ${tab.textColor}`} fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
                       </div>
@@ -228,7 +306,18 @@ const AnimalListingPage = () => {
           {/* Form Header */}
           <div className={`px-6 py-4 border-b border-gray-200 bg-gradient-to-r ${activeTabData?.color}`}>
             <div className="flex items-center gap-3">
-              <div className="text-3xl">{activeTabData?.emoji}</div>
+              {/* Animal image in header */}
+              <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                {activeTabData?.image ? (
+                  <img 
+                    src={activeTabData.image} 
+                    alt={activeTabData.label}
+                    className="w-10 h-10 object-contain"
+                  />
+                ) : (
+                  <span className="text-3xl">{activeTabData?.icon}</span>
+                )}
+              </div>
               <div>
                 <h3 className="text-lg font-bold text-white">
                   {activeTabData?.label} {t('listing.details') || 'Details'}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,13 +10,16 @@ import {
   Alert,
   ActivityIndicator,
   Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  Share,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../utils/constants';
 import { useAuth } from '../context/AuthContext';
-import { userService } from '../services/api';
+import { userService, listingsService } from '../services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -26,30 +29,117 @@ const ProfileScreen = ({ navigation }) => {
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [myListings, setMyListings] = useState([]);
+  const [showListings, setShowListings] = useState(false);
+  const [loadingListings, setLoadingListings] = useState(false);
+  const scrollViewRef = useRef(null);
+  const pincodeInputRef = useRef(null);
   
   const [formData, setFormData] = useState({
-    fullName: user?.fullName || '',
+    fullName: user?.full_name || '',
     email: user?.email || '',
     address: user?.address || '',
     city: user?.city || '',
     state: user?.state || '',
-    pincode: user?.pincode || '',
-    profilePhoto: user?.profilePhoto || null,
+    pincode: user?.postal_code || '',
+    profilePhoto: user?.profile_photo || null,
   });
 
   useEffect(() => {
     if (user) {
       setFormData({
-        fullName: user.fullName || '',
+        fullName: user.full_name || '',
         email: user.email || '',
         address: user.address || '',
         city: user.city || '',
         state: user.state || '',
-        pincode: user.pincode || '',
-        profilePhoto: user.profilePhoto || null,
+        pincode: user.postal_code || '',
+        profilePhoto: user.profile_photo || null,
       });
     }
   }, [user]);
+
+  // Refresh profile data on screen focus
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', async () => {
+      try {
+        const response = await userService.getProfile();
+        if (response.success && response.user) {
+          await updateUser(response.user);
+        }
+        // Load listings
+        loadMyListings();
+      } catch (error) {
+        console.error('Error refreshing profile:', error);
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+  // Load user's listings
+  const loadMyListings = async () => {
+    // Only load if user is authenticated
+    if (!user) {
+      setLoadingListings(false);
+      return;
+    }
+    
+    setLoadingListings(true);
+    try {
+      const response = await userService.getMyListings();
+      if (response.success && response.listings) {
+        setMyListings(response.listings);
+      }
+    } catch (error) {
+      console.error('Error loading listings:', error);
+      // Don't show error if it's just authentication issue
+      if (error.message !== 'No token provided. Authorization header required.') {
+        // Handle other errors if needed
+      }
+    } finally {
+      setLoadingListings(false);
+    }
+  };
+
+  // Load listings on mount
+  useEffect(() => {
+    loadMyListings();
+  }, []);
+
+  const handleMarkAsSold = async (listing) => {
+    Alert.alert(
+      'Mark as Sold',
+      `Are you sure you want to mark "${listing.breed_name || listing.breed}" as sold?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Mark as Sold',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const animalType = listing.animal_type || listing.type;
+              const response = await listingsService.markListingAsSold(animalType, listing.id);
+              
+              if (response.success) {
+                Alert.alert('Success', 'Listing marked as sold successfully!');
+                // Reload listings to show updated status
+                await loadMyListings();
+              } else {
+                Alert.alert('Error', response.message || 'Failed to mark listing as sold');
+              }
+            } catch (error) {
+              console.error('Error marking as sold:', error);
+              Alert.alert('Error', error.message || 'Failed to mark listing as sold');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -91,49 +181,166 @@ const ProfileScreen = ({ navigation }) => {
   const uploadProfilePhoto = async (photo) => {
     setUploadingPhoto(true);
     try {
-      const formData = new FormData();
-      formData.append('profilePhoto', {
-        uri: photo.uri,
-        type: 'image/jpeg',
-        name: 'profile.jpg',
-      });
-
-      const response = await userService.updateProfile(formData);
-      if (response.success) {
+      console.log('Uploading photo:', photo.uri);
+      const response = await userService.uploadProfilePhoto(photo.uri);
+      console.log('Upload response:', response);
+      
+      if (response.success && response.user) {
+        // Update context with new user data
         await updateUser(response.user);
-        setFormData(prev => ({ ...prev, profilePhoto: response.user.profilePhoto }));
-        Alert.alert(t('common.success'), t('profile.photoUpdated'));
+        
+        // Update form data
+        setFormData(prev => ({ 
+          ...prev, 
+          profilePhoto: response.user.profile_photo 
+        }));
+        
+        Alert.alert('Success', 'Profile photo updated successfully!');
+      } else {
+        Alert.alert('Error', response.message || 'Failed to upload photo');
       }
     } catch (error) {
-      Alert.alert(t('common.error'), t('errors.uploadFailed'));
+      console.error('Photo upload error:', error);
+      let errorMessage = 'Failed to upload photo';
+      
+      if (error.message === 'Network Error') {
+        errorMessage = 'Network error. Please check:\n• WiFi/mobile data is on\n• Server is running\n• Correct IP address in settings';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Upload Failed', errorMessage);
     } finally {
       setUploadingPhoto(false);
     }
   };
 
-  const showPhotoOptions = () => {
+  const deleteProfilePhoto = async () => {
     Alert.alert(
-      t('profile.changePhoto'),
-      t('common.select'),
+      'Remove Photo',
+      'Are you sure you want to remove your profile photo?',
       [
-        { text: t('profile.takePhoto'), onPress: takePhoto },
-        { text: t('profile.chooseLibrary'), onPress: pickImage },
-        { text: t('common.cancel'), style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            setUploadingPhoto(true);
+            try {
+              console.log('Deleting photo...');
+              const response = await userService.deleteProfilePhoto();
+              console.log('Delete response:', response);
+              
+              if (response.success && response.user) {
+                // Update context with new user data
+                await updateUser(response.user);
+                
+                // Update form data
+                setFormData(prev => ({ 
+                  ...prev, 
+                  profilePhoto: null 
+                }));
+                
+                Alert.alert('Success', 'Profile photo removed successfully!');
+              } else {
+                Alert.alert('Error', response.message || 'Failed to remove photo');
+              }
+            } catch (error) {
+              console.error('Delete photo error:', error);
+              Alert.alert('Error', error.message || 'Failed to remove photo');
+            } finally {
+              setUploadingPhoto(false);
+            }
+          },
+        },
       ]
     );
   };
 
+  const showPhotoOptions = () => {
+    const options = [
+      { text: 'Take Photo', onPress: takePhoto },
+      { text: 'Choose from Library', onPress: pickImage },
+    ];
+
+    if (formData.profilePhoto) {
+      options.push({ text: 'Remove Photo', onPress: deleteProfilePhoto, style: 'destructive' });
+    }
+
+    options.push({ text: 'Cancel', style: 'cancel' });
+
+    Alert.alert('Profile Photo', 'Choose an option', options);
+  };
+
   const handleSave = async () => {
+    // Validate required fields
+    if (!formData.fullName.trim()) {
+      Alert.alert('Error', 'Please enter your name');
+      return;
+    }
+
+    // Validate email if provided
+    if (formData.email && formData.email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email.trim())) {
+        Alert.alert('Error', 'Please enter a valid email address');
+        return;
+      }
+    }
+
+    // Validate pincode if provided
+    if (formData.pincode && formData.pincode.trim() && formData.pincode.trim().length !== 6) {
+      Alert.alert('Error', 'Please enter a valid 6-digit pincode');
+      return;
+    }
+
     setLoading(true);
     try {
-      const response = await userService.updateProfile(formData);
-      if (response.success) {
+      const updateData = {
+        full_name: formData.fullName.trim(),
+        email: formData.email?.trim() || '',
+        address: formData.address?.trim() || '',
+        city: formData.city?.trim() || '',
+        state: formData.state?.trim() || '',
+        postal_code: formData.pincode?.trim() || '',
+      };
+
+      console.log('Updating profile with:', updateData);
+      const response = await userService.updateProfile(updateData);
+      console.log('Update response:', response);
+      
+      if (response.success && response.user) {
+        // Update context with new user data
         await updateUser(response.user);
+        
+        // Update form data with returned values
+        setFormData({
+          fullName: response.user.full_name || '',
+          email: response.user.email || '',
+          address: response.user.address || '',
+          city: response.user.city || '',
+          state: response.user.state || '',
+          pincode: response.user.postal_code || '',
+          profilePhoto: response.user.profile_photo || null,
+        });
+        
         setEditing(false);
-        Alert.alert(t('common.success'), t('profile.profileUpdated'));
+        
+        // Show success message with location update if pincode changed
+        if (response.user.city && response.user.state) {
+          Alert.alert(
+            'Success', 
+            `Profile updated successfully!\nLocation: ${response.user.city}, ${response.user.state}`
+          );
+        } else {
+          Alert.alert('Success', 'Profile updated successfully!');
+        }
+      } else {
+        Alert.alert('Error', response.message || 'Failed to update profile');
       }
     } catch (error) {
-      Alert.alert(t('common.error'), error.message || t('errors.somethingWentWrong'));
+      console.error('Profile update error:', error);
+      Alert.alert('Error', error.message || 'Failed to update profile');
     } finally {
       setLoading(false);
     }
@@ -141,13 +348,13 @@ const ProfileScreen = ({ navigation }) => {
 
   const handleCancel = () => {
     setFormData({
-      fullName: user?.fullName || '',
+      fullName: user?.full_name || '',
       email: user?.email || '',
       address: user?.address || '',
       city: user?.city || '',
       state: user?.state || '',
-      pincode: user?.pincode || '',
-      profilePhoto: user?.profilePhoto || null,
+      pincode: user?.postal_code || '',
+      profilePhoto: user?.profile_photo || null,
     });
     setEditing(false);
   };
@@ -161,6 +368,47 @@ const ProfileScreen = ({ navigation }) => {
         { text: t('common.logout'), style: 'destructive', onPress: logout },
       ]
     );
+  };
+
+  const handleShareApp = async () => {
+    try {
+      const message = 'Check out Kissan eBazaar - Buy and Sell Animals Online!\n\n' +
+                     'Download the app now:\n' +
+                     'Android: https://play.google.com/store/apps/details?id=com.kissanebazaar\n' +
+                     'iOS: https://apps.apple.com/app/kissan-ebazaar/id123456789';
+      
+      const result = await Share.share({
+        message: message,
+        title: 'Kissan eBazaar App',
+      });
+
+      if (result.action === Share.sharedAction) {
+        if (result.activityType) {
+          console.log('Shared via:', result.activityType);
+        } else {
+          console.log('App shared successfully');
+        }
+      } else if (result.action === Share.dismissedAction) {
+        console.log('Share dismissed');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to share the app');
+      console.error('Error sharing app:', error);
+    }
+  };
+
+  const getAnimalEmoji = (type) => {
+    const emojiMap = {
+      cow: '🐄',
+      buffalo: '🐃',
+      goat: '🐐',
+      sheep: '🐑',
+      horse: '🐴',
+      dog: '🐕',
+      cat: '🐱',
+      pig: '🐷',
+    };
+    return emojiMap[type?.toLowerCase()] || '🐾';
   };
 
   const renderMenuItem = (icon, title, subtitle, onPress, rightIcon = 'chevron-forward') => (
@@ -193,7 +441,17 @@ const ProfileScreen = ({ navigation }) => {
         )}
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+      >
+        <ScrollView 
+          ref={scrollViewRef}
+          style={styles.content} 
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
         {/* Profile Header */}
         <View style={styles.profileHeader}>
           <View style={styles.profileImageContainer}>
@@ -212,8 +470,8 @@ const ProfileScreen = ({ navigation }) => {
               <Ionicons name="camera" size={18} color="#fff" />
             </TouchableOpacity>
           </View>
-          <Text style={styles.userName}>{user?.fullName || 'User'}</Text>
-          <Text style={styles.userPhone}>{user?.phoneNumber}</Text>
+          <Text style={styles.userName}>{user?.full_name || 'User'}</Text>
+          <Text style={styles.userPhone}>{user?.phone_number}</Text>
         </View>
 
         {editing ? (
@@ -283,6 +541,7 @@ const ProfileScreen = ({ navigation }) => {
             <View style={styles.formGroup}>
               <Text style={styles.label}>Pincode</Text>
               <TextInput
+                ref={pincodeInputRef}
                 style={styles.input}
                 value={formData.pincode}
                 onChangeText={(text) => setFormData({ ...formData, pincode: text })}
@@ -290,6 +549,12 @@ const ProfileScreen = ({ navigation }) => {
                 placeholderTextColor="#9CA3AF"
                 keyboardType="numeric"
                 maxLength={6}
+                returnKeyType="done"
+                onFocus={() => {
+                  setTimeout(() => {
+                    scrollViewRef.current?.scrollToEnd({ animated: true });
+                  }, 300);
+                }}
               />
             </View>
 
@@ -316,13 +581,172 @@ const ProfileScreen = ({ navigation }) => {
         ) : (
           /* Profile Menu */
           <>
+            {/* My Listings Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>{t('profile.myListings') || 'My Listings'}</Text>
+              <View style={styles.menuContainer}>
+                <TouchableOpacity 
+                  style={styles.menuItem}
+                  onPress={() => setShowListings(!showListings)}
+                >
+                  <View style={styles.menuIconContainer}>
+                    <Ionicons name="pricetags" size={20} color={COLORS.primary} />
+                  </View>
+                  <View style={styles.menuContent}>
+                    <Text style={styles.menuTitle}>My Listings</Text>
+                    <Text style={styles.menuSubtitle}>
+                      {loadingListings ? 'Loading...' : `${myListings.length} animals listed`}
+                    </Text>
+                  </View>
+                  <Ionicons 
+                    name={showListings ? "chevron-up" : "chevron-forward"} 
+                    size={20} 
+                    color="#9CA3AF" 
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {/* Expanded Listings View */}
+              {showListings && (
+                <View style={styles.expandedListingsContainer}>
+                  {loadingListings ? (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="large" color={COLORS.primary} />
+                      <Text style={styles.loadingText}>Loading your listings...</Text>
+                    </View>
+                  ) : myListings.length > 0 ? (
+                    <View style={styles.listingsContainer}>
+                      {myListings.map((listing) => {
+                        const imageUrl = listing.front_photo || listing.frontPhoto || listing.photo1 || listing.photos?.[0];
+                        const breedName = listing.breed_name || listing.breedName || listing.breed || listing.name || 'Unknown Breed';
+                        const price = listing.expected_price || listing.expectedPrice || listing.price || 0;
+                        const animalType = listing.animal_type || listing.type || 'animal';
+                        const milkCapacity = listing.milk_capacity || listing.milkCapacity;
+                        const age = listing.age;
+                        const city = listing.city;
+                        const state = listing.state;
+
+                        return (
+                          <TouchableOpacity
+                            key={`${listing.type}-${listing.id}`}
+                            style={styles.myListingCard}
+                            onPress={() => navigation.navigate('AnimalDetail', { 
+                              animalType: animalType,
+                              id: listing.id
+                            })}
+                            activeOpacity={0.8}
+                          >
+                            {/* Image Section */}
+                            <View style={styles.myListingImageContainer}>
+                              {imageUrl ? (
+                                <Image source={{ uri: imageUrl }} style={styles.myListingImage} />
+                              ) : (
+                                <View style={styles.myListingPlaceholder}>
+                                  <Text style={styles.myListingPlaceholderEmoji}>
+                                    {getAnimalEmoji(animalType)}
+                                  </Text>
+                                </View>
+                              )}
+                              
+                              {/* Status Badge */}
+                              {listing.status && (
+                                <View style={[styles.statusBadge, { 
+                                  backgroundColor: listing.status === 'active' ? '#10B981' : 
+                                                  listing.status === 'sold' ? '#EF4444' : '#F59E0B' 
+                                }]}>
+                                  <Text style={styles.statusText}>
+                                    {listing.status?.toUpperCase()}
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+
+                            {/* Content Section */}
+                            <View style={styles.myListingContent}>
+                              {/* Top Row: Type & Price */}
+                              <View style={styles.myListingTopRow}>
+                                <View style={styles.myListingTypeBadge}>
+                                  <Text style={styles.myListingTypeText}>
+                                    {animalType.charAt(0).toUpperCase() + animalType.slice(1)}
+                                  </Text>
+                                </View>
+                                <Text style={styles.myListingPrice}>₹{price?.toLocaleString()}</Text>
+                              </View>
+
+                              {/* Breed Name */}
+                              <Text style={styles.myListingBreedName} numberOfLines={2}>
+                                {breedName}
+                              </Text>
+
+                              {/* Info Row */}
+                              <View style={styles.myListingInfoRow}>
+                                {milkCapacity && (
+                                  <View style={styles.myListingInfoItem}>
+                                    <Ionicons name="water" size={14} color="#3B82F6" />
+                                    <Text style={styles.myListingInfoText}>{milkCapacity}L/day</Text>
+                                  </View>
+                                )}
+                                {age && (
+                                  <View style={styles.myListingInfoItem}>
+                                    <Ionicons name="time-outline" size={14} color="#10B981" />
+                                    <Text style={styles.myListingInfoText}>{age}</Text>
+                                  </View>
+                                )}
+                              </View>
+
+                              {/* Location */}
+                              <View style={styles.myListingLocation}>
+                                <Ionicons name="location-outline" size={14} color="#6B7280" />
+                                <Text style={styles.myListingLocationText} numberOfLines={1}>
+                                  {[city, state].filter(Boolean).join(', ') || 'Location not specified'}
+                                </Text>
+                              </View>
+
+                              {/* Mark as Sold Button */}
+                              {listing.status === 'active' && (
+                                <TouchableOpacity
+                                  style={styles.markSoldButton}
+                                  onPress={(e) => {
+                                    e.stopPropagation();
+                                    handleMarkAsSold(listing);
+                                  }}
+                                  activeOpacity={0.7}
+                                >
+                                  <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
+                                  <Text style={styles.markSoldButtonText}>Mark as Sold</Text>
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  ) : (
+                    <View style={styles.emptyListings}>
+                      <Ionicons name="list" size={48} color="#D1D5DB" />
+                      <Text style={styles.emptyText}>No listings yet</Text>
+                      <Text style={styles.emptySubtext}>Start selling animals to see them here</Text>
+                      <TouchableOpacity 
+                        style={styles.addListingButton}
+                        onPress={() => navigation.navigate('SellAnimal')}
+                      >
+                        <Ionicons name="add-circle" size={20} color="#fff" />
+                        <Text style={styles.addListingText}>Add Listing</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
+
             {/* My Activity */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>{t('profile.myActivity')}</Text>
               <View style={styles.menuContainer}>
-                {renderMenuItem('list', t('profile.myListings'), t('profile.myListingsDesc'), () => navigation.navigate('MyListings'))}
                 {renderMenuItem('heart', t('profile.wishlist'), t('profile.wishlistDesc'), () => navigation.navigate('Wishlist'))}
-                {renderMenuItem('calendar', t('profile.appointments'), t('profile.appointmentsDesc'), () => navigation.navigate('MyAppointments'))}
+                {renderMenuItem('calendar', 'My Appointments', 'View and manage your appointments', () => navigation.navigate('MyAppointments'))}
+                {/* Appointments feature - Coming soon */}
+                {/* {renderMenuItem('calendar', t('profile.appointments'), t('profile.appointmentsDesc'), () => navigation.navigate('MyAppointments'))} */}
                 {renderMenuItem('call', t('profile.callHistory'), t('profile.callHistoryDesc'), () => navigation.navigate('CallHistory'))}
               </View>
             </View>
@@ -345,7 +769,7 @@ const ProfileScreen = ({ navigation }) => {
               <View style={styles.menuContainer}>
                 {renderMenuItem('help-circle', t('profile.helpSupport'), t('profile.helpSupportDesc'), () => {})}
                 {renderMenuItem('star', t('profile.rateUs'), t('profile.rateUsDesc'), () => {})}
-                {renderMenuItem('share-social', t('profile.shareApp'), t('profile.shareAppDesc'), () => {})}
+                {renderMenuItem('share-social', t('profile.shareApp'), t('profile.shareAppDesc'), handleShareApp)}
                 {renderMenuItem('information-circle', t('profile.about'), t('profile.aboutDesc'), () => {})}
               </View>
             </View>
@@ -359,7 +783,8 @@ const ProfileScreen = ({ navigation }) => {
             <View style={{ height: 40 }} />
           </>
         )}
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 };
@@ -443,11 +868,21 @@ const styles = StyleSheet.create({
     marginTop: 24,
     paddingHorizontal: 16,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 12,
+  },
+  listingsCount: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.primary,
   },
   menuContainer: {
     backgroundColor: '#fff',
@@ -562,6 +997,191 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  // My Listings - Full Width Card Styles (matches Wishlist)
+  expandedListingsContainer: {
+    marginTop: 16,
+  },
+  listingsContainer: {
+    marginTop: 0,
+  },
+  myListingCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    marginBottom: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  myListingImageContainer: {
+    width: '100%',
+    height: 220,
+    position: 'relative',
+    backgroundColor: '#F3F4F6',
+  },
+  myListingImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  myListingPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  myListingPlaceholderEmoji: {
+    fontSize: 64,
+    opacity: 0.5,
+  },
+  statusBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  statusText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  myListingContent: {
+    padding: 16,
+  },
+  myListingTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  myListingTypeBadge: {
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  myListingTypeText: {
+    fontSize: 12,
+    color: COLORS.primary,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  myListingPrice: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: COLORS.primary,
+  },
+  myListingBreedName: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 12,
+    lineHeight: 24,
+  },
+  myListingInfoRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+    flexWrap: 'wrap',
+  },
+  myListingInfoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    gap: 5,
+  },
+  myListingInfoText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  myListingLocation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  myListingLocationText: {
+    fontSize: 14,
+    color: '#6B7280',
+    flex: 1,
+  },
+  emptyListings: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 40,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginTop: 12,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  addListingButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 20,
+  },
+  addListingText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+    marginLeft: 8,
+  },
+  markSoldButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  markSoldButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginLeft: 6,
   },
 });
 

@@ -5,24 +5,36 @@ import {
   TouchableOpacity,
   StyleSheet,
   FlatList,
+  ScrollView,
   ActivityIndicator,
   RefreshControl,
   Linking,
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
 import { useAuth } from '../context/AuthContext';
 import { callLogService } from '../services/api';
 
 const CallHistoryScreen = ({ navigation }) => {
-  const { t } = useTranslation();
+  const { t, ready } = useTranslation();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [callLogs, setCallLogs] = useState([]);
-  const [filter, setFilter] = useState('all'); // all, incoming, outgoing, missed
+  const [filter, setFilter] = useState('all'); // all, made, received
+
+  // Show loading while translations are loading
+  if (!ready) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
 
   useEffect(() => {
     fetchCallHistory();
@@ -30,12 +42,36 @@ const CallHistoryScreen = ({ navigation }) => {
 
   const fetchCallHistory = async () => {
     try {
+      // Check if user is authenticated
+      if (!user) {
+        setCallLogs([]);
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
       const response = await callLogService.getCallLogs(filter);
       if (response.success) {
-        setCallLogs(response.callLogs || []);
+        setCallLogs(response.data || response.callLogs || []);
       }
     } catch (error) {
       console.error('Error fetching call history:', error);
+      
+      // Handle authentication errors
+      if (error.message === 'User not found' || error.status === 401) {
+        Alert.alert(
+          'Authentication Error',
+          'Please login again to view call history.',
+          [
+            {
+              text: 'OK',
+              onPress: () => navigation.navigate('Login')
+            }
+          ]
+        );
+      }
+      
+      setCallLogs([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -47,22 +83,21 @@ const CallHistoryScreen = ({ navigation }) => {
     fetchCallHistory();
   };
 
-  const makeCall = async (phoneNumber, contactName, contactType) => {
+  const makeCall = async (phoneNumber, receiverName, callType) => {
     try {
-      // Log the call
-      await callLogService.logCall({
-        phoneNumber,
-        contactName,
-        contactType,
-        duration: 0,
-        status: 'outgoing',
-      });
-      
-      // Make the call
+      if (!phoneNumber) {
+        Alert.alert(t('common.error'), 'Phone number not available');
+        return;
+      }
+
+      // Make the call first
       const url = `tel:${phoneNumber}`;
       const supported = await Linking.canOpenURL(url);
       if (supported) {
         await Linking.openURL(url);
+        
+        // Note: Call logging should happen when user actually initiates call from animal detail
+        // This is just re-calling from history
       } else {
         Alert.alert(t('common.error'), t('errors.permissionDenied'));
       }
@@ -96,14 +131,14 @@ const CallHistoryScreen = ({ navigation }) => {
 
   const getCallIcon = (type) => {
     switch (type) {
-      case 'incoming':
-        return { name: 'call-received', color: '#10B981' };
+      case 'made':
       case 'outgoing':
-        return { name: 'call-made', color: '#3B82F6' };
-      case 'missed':
-        return { name: 'call-missed', color: '#EF4444' };
+        return { name: 'call-outline', color: '#3B82F6', label: 'Called' };
+      case 'received':
+      case 'incoming':
+        return { name: 'arrow-down-circle', color: '#10B981', label: 'Received' };
       default:
-        return { name: 'call', color: '#6B7280' };
+        return { name: 'call', color: '#6B7280', label: 'Call' };
     }
   };
 
@@ -130,7 +165,24 @@ const CallHistoryScreen = ({ navigation }) => {
   };
 
   const renderCallLog = ({ item }) => {
-    const icon = getCallIcon(item.callType);
+    // Determine if this is a call made by me or received by me
+    const isCallMade = item.caller_id === user?.id || item.callerId === user?.id;
+    const callType = isCallMade ? 'made' : 'received';
+    const icon = getCallIcon(callType);
+    
+    // Get listing information (what animal was the inquiry about)
+    const animalType = item.listing_type || item.listingType || 'Animal';
+    const listingId = item.listing_id || item.listingId;
+    
+    // For calls made: Show seller's information
+    // For calls received: Show buyer's information
+    const contactName = isCallMade 
+      ? (item.seller?.full_name || item.seller?.name || item.sellerName || 'Seller')
+      : (item.caller?.full_name || item.caller?.name || item.callerName || 'Buyer');
+    
+    const phoneNumber = isCallMade 
+      ? (item.seller_phone || item.sellerPhone)
+      : (item.caller?.phone_number || item.caller?.phoneNumber || item.callerPhone);
     
     return (
       <TouchableOpacity
@@ -138,29 +190,44 @@ const CallHistoryScreen = ({ navigation }) => {
         onLongPress={() => deleteCallLog(item.id)}
         activeOpacity={0.7}
       >
+        {/* Call Type Icon */}
         <View style={[styles.callIconContainer, { backgroundColor: icon.color + '20' }]}>
           <Ionicons name={icon.name} size={24} color={icon.color} />
         </View>
         
         <View style={styles.callInfo}>
+          {/* Contact Name and Call Type */}
           <View style={styles.callHeader}>
-            <Text style={styles.contactName}>{item.contactName || 'Unknown'}</Text>
-            {item.contactType && (
-              <View style={styles.typeBadge}>
-                <Text style={styles.typeText}>{item.contactType}</Text>
-              </View>
-            )}
+            <Text style={styles.contactName}>{contactName}</Text>
+            <View style={[styles.typeBadge, { backgroundColor: icon.color + '15' }]}>
+              <Text style={[styles.typeText, { color: icon.color }]}>{icon.label}</Text>
+            </View>
           </View>
-          <Text style={styles.phoneNumber}>{item.phoneNumber}</Text>
+          
+          {/* Phone Number */}
+          <Text style={styles.phoneNumber}>{phoneNumber || 'No number'}</Text>
+          
+          {/* Animal Type (what the inquiry was about) */}
+          {animalType && (
+            <View style={styles.animalInfo}>
+              <Ionicons name="paw" size={14} color="#6B7280" />
+              <Text style={styles.animalText}>
+                {isCallMade ? `Inquiry about ${animalType}` : `Inquiry about your ${animalType}`}
+              </Text>
+            </View>
+          )}
+          
+          {/* Date and Duration */}
           <View style={styles.callDetails}>
-            <Text style={styles.callDate}>{formatDate(item.createdAt)}</Text>
-            <Text style={styles.callDuration}> • {formatDuration(item.duration)}</Text>
+            <Ionicons name="time-outline" size={14} color="#9CA3AF" />
+            <Text style={styles.callDate}>{formatDate(item.created_at || item.createdAt)}</Text>
           </View>
         </View>
 
+        {/* Call Button */}
         <TouchableOpacity
           style={styles.callButton}
-          onPress={() => makeCall(item.phoneNumber, item.contactName, item.contactType)}
+          onPress={() => makeCall(phoneNumber, contactName, animalType)}
         >
           <Ionicons name="call" size={20} color={COLORS.primary} />
         </TouchableOpacity>
@@ -208,10 +275,9 @@ const CallHistoryScreen = ({ navigation }) => {
       {/* Filters */}
       <View style={styles.filtersContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {renderFilterButton('all', t('callHistory.all'), 'list')}
-          {renderFilterButton('outgoing', t('callHistory.outgoing'), 'call-made')}
-          {renderFilterButton('incoming', t('callHistory.incoming'), 'call-received')}
-          {renderFilterButton('missed', t('callHistory.missed'), 'call-missed')}
+          {renderFilterButton('all', t('callHistory.all') || 'All Calls', 'list')}
+          {renderFilterButton('made', t('callHistory.made') || 'Calls Made', 'call-outline')}
+          {renderFilterButton('received', t('callHistory.received') || 'Calls Received', 'arrow-down-circle')}
         </ScrollView>
       </View>
 
@@ -221,7 +287,7 @@ const CallHistoryScreen = ({ navigation }) => {
           data={callLogs}
           keyExtractor={(item) => item.id.toString()}
           renderItem={renderCallLog}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: 160 }]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -357,17 +423,25 @@ const styles = StyleSheet.create({
   phoneNumber: {
     fontSize: 14,
     color: '#6B7280',
-    marginBottom: 4,
+    marginBottom: 6,
+  },
+  animalInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    gap: 4,
+  },
+  animalText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontStyle: 'italic',
   },
   callDetails: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
   },
   callDate: {
-    fontSize: 13,
-    color: '#9CA3AF',
-  },
-  callDuration: {
     fontSize: 13,
     color: '#9CA3AF',
   },

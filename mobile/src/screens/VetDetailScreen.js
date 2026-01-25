@@ -379,7 +379,7 @@ const VetDetailScreen = ({ route, navigation }) => {
           <View style={styles.ratingContainer}>
             {renderStars(Math.round(vet.rating || 0), 20)}
             <Text style={styles.ratingText}>
-              {vet.rating?.toFixed(1) || '0.0'} ({vet.total_reviews || 0} reviews)
+              {vet.rating ? Number(vet.rating).toFixed(1) : '0.0'} ({vet.total_reviews || 0} reviews)
             </Text>
           </View>
 
@@ -404,6 +404,13 @@ const VetDetailScreen = ({ route, navigation }) => {
           <TouchableOpacity style={styles.whatsappBtn} onPress={handleWhatsApp}>
             <Ionicons name="logo-whatsapp" size={20} color={COLORS.white} />
             <Text style={styles.contactBtnText}>WhatsApp</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.bookBtn} 
+            onPress={() => navigation.navigate('AppointmentBooking', { veterinarian: vet })}
+          >
+            <Ionicons name="calendar" size={20} color={COLORS.white} />
+            <Text style={styles.contactBtnText}>Book</Text>
           </TouchableOpacity>
         </View>
 
@@ -477,7 +484,7 @@ const VetDetailScreen = ({ route, navigation }) => {
           {/* Rating Distribution */}
           <View style={styles.ratingDistribution}>
             <View style={styles.overallRating}>
-              <Text style={styles.overallRatingNumber}>{vet.rating?.toFixed(1) || '0.0'}</Text>
+              <Text style={styles.overallRatingNumber}>{vet.rating ? Number(vet.rating).toFixed(1) : '0.0'}</Text>
               {renderStars(Math.round(vet.rating || 0), 18)}
               <Text style={styles.totalReviewsText}>{totalReviews} reviews</Text>
             </View>
@@ -768,7 +775,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 20,
     marginTop: 20,
-    gap: 12,
+    gap: 8,
   },
   callBtn: {
     flex: 1,
@@ -778,7 +785,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#3B82F6',
     paddingVertical: 14,
     borderRadius: 12,
-    gap: 8,
+    gap: 6,
   },
   whatsappBtn: {
     flex: 1,
@@ -788,7 +795,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#25D366',
     paddingVertical: 14,
     borderRadius: 12,
-    gap: 8,
+    gap: 6,
+  },
+  bookBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 6,
   },
   contactBtnText: {
     color: COLORS.white,

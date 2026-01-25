@@ -20,6 +20,8 @@ import VetLoginScreen from '../screens/VetLoginScreen';
 import VetRegistrationScreen from '../screens/VetRegistrationScreen';
 import VetOTPVerificationScreen from '../screens/VetOTPVerificationScreen';
 import VetDashboardScreen from '../screens/VetDashboardScreen';
+import VetAppointmentsScreen from '../screens/VetAppointmentsScreen';
+import EditVetProfileScreen from '../screens/EditVetProfileScreen';
 
 // Main Screens
 import HomeScreen from '../screens/HomeScreen';
@@ -33,13 +35,15 @@ import PregnancyCalendarScreen from '../screens/PregnancyCalendarScreen';
 import WishlistScreen from '../screens/WishlistScreen';
 import AIHealthCheckScreen from '../screens/AIHealthCheckScreen';
 import AIAssistantScreen from '../screens/AIAssistantScreen';
-import ServicesScreen from '../screens/ServicesScreen';
 import CategoryListingsScreen from '../screens/CategoryListingsScreen';
 import CreateListingScreen from '../screens/CreateListingScreen';
 import BuyAnimalsScreen from '../screens/BuyAnimalsScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import CallHistoryScreen from '../screens/CallHistoryScreen';
 import LocationSetupScreen from '../screens/LocationSetupScreen';
+import ServicesScreen from '../screens/ServicesScreen';
+import AppointmentBookingScreen from '../screens/AppointmentBookingScreen';
+import MyAppointmentsScreen from '../screens/MyAppointmentsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -60,8 +64,8 @@ const MainTabs = () => {
             iconName = focused ? 'cart' : 'cart-outline';
           } else if (route.name === 'SellAnimal') {
             iconName = focused ? 'add-circle' : 'add-circle-outline';
-          } else if (route.name === 'Services') {
-            iconName = focused ? 'grid' : 'grid-outline';
+          } else if (route.name === 'Veterinarian') {
+            iconName = focused ? 'medkit' : 'medkit-outline';
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person' : 'person-outline';
           }
@@ -101,9 +105,9 @@ const MainTabs = () => {
         options={{ tabBarLabel: 'Sell' }}
       />
       <Tab.Screen
-        name="Services"
-        component={ServicesScreen}
-        options={{ tabBarLabel: 'Services' }}
+        name="Veterinarian"
+        component={VeterinarianScreen}
+        options={{ tabBarLabel: 'Veterinarian' }}
       />
       <Tab.Screen
         name="Profile"
@@ -134,6 +138,31 @@ const VetStack = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="VetDashboard" component={VetDashboardScreen} />
+      <Stack.Screen 
+        name="VetAppointments" 
+        component={VetAppointmentsScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen 
+        name="EditVetProfile" 
+        component={EditVetProfileScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen 
+        name="VetDetail" 
+        component={VetDetailScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen 
+        name="CallHistory" 
+        component={CallHistoryScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen 
+        name="Notifications" 
+        component={NotificationsScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
     </Stack.Navigator>
   );
 };
@@ -230,6 +259,20 @@ const MainStack = () => {
       <Stack.Screen
         name="LocationSetup"
         component={LocationSetupScreen}
+        options={{
+          animation: 'slide_from_right',
+        }}
+      />
+      <Stack.Screen
+        name="AppointmentBooking"
+        component={AppointmentBookingScreen}
+        options={{
+          animation: 'slide_from_right',
+        }}
+      />
+      <Stack.Screen
+        name="MyAppointments"
+        component={MyAppointmentsScreen}
         options={{
           animation: 'slide_from_right',
         }}

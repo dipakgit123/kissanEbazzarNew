@@ -350,7 +350,13 @@ module.exports = (sequelize, DataTypes) => {
         AND is_active = true
         AND latitude IS NOT NULL
         AND longitude IS NOT NULL
-      HAVING distance < :radius
+        AND (6371 * acos(
+          LEAST(1.0,
+            cos(radians(:lat)) * cos(radians(latitude)) *
+            cos(radians(longitude) - radians(:lon)) +
+            sin(radians(:lat)) * sin(radians(latitude))
+          )
+        )) < :radius
       ORDER BY distance
       LIMIT 50;
     `;

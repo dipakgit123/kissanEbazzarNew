@@ -6,7 +6,8 @@ const FormFileInput = ({
   accept,
   onChange,
   helperText,
-  required = false
+  required = false,
+  file
 }) => {
   const [fileName, setFileName] = React.useState('');
 
@@ -14,7 +15,12 @@ const FormFileInput = ({
     const selectedFile = e.target.files[0];
     if (selectedFile) {
       setFileName(selectedFile.name);
-      onChange(e);
+      // Check if onChange expects a file or an event
+      if (onChange.length === 1) {
+        onChange(selectedFile);
+      } else {
+        onChange(e);
+      }
     }
   };
 

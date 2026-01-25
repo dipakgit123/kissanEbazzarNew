@@ -55,29 +55,7 @@ const fileUploadConfig = upload.fields([
   { name: 'video', maxCount: 1 }
 ]);
 
-// Public routes - no authentication required
-/**
- * @route   GET /api/buffalos/listings
- * @desc    Get all buffalo listings with filters and pagination
- * @access  Public
- */
-router.get('/listings', buffaloListingController.getAllBuffaloListings);
-
-/**
- * @route   GET /api/buffalos/listings/nearby
- * @desc    Get nearby buffalo listings based on location
- * @access  Public
- */
-router.get('/listings/nearby', buffaloListingController.getNearbyBuffaloListings);
-
-/**
- * @route   GET /api/buffalos/listings/:id
- * @desc    Get single buffalo listing by ID
- * @access  Public
- */
-router.get('/listings/:id', buffaloListingController.getBuffaloListingById);
-
-// Protected routes - authentication required
+// Protected routes - authentication required (POST routes first)
 /**
  * @route   POST /api/buffalos/listings
  * @desc    Create a new buffalo listing
@@ -90,6 +68,28 @@ router.post(
   buffaloValidationRules,
   buffaloListingController.createBuffaloListing
 );
+
+// Public routes - no authentication required
+/**
+ * @route   GET /api/buffalos/listings/nearby
+ * @desc    Get nearby buffalo listings based on location
+ * @access  Public
+ */
+router.get('/listings/nearby', buffaloListingController.getNearbyBuffaloListings);
+
+/**
+ * @route   GET /api/buffalos/listings
+ * @desc    Get all buffalo listings with filters and pagination
+ * @access  Public
+ */
+router.get('/listings', buffaloListingController.getAllBuffaloListings);
+
+/**
+ * @route   GET /api/buffalos/listings/:id
+ * @desc    Get single buffalo listing by ID
+ * @access  Public
+ */
+router.get('/listings/:id', buffaloListingController.getBuffaloListingById);
 
 /**
  * @route   GET /api/buffalos/my-listings

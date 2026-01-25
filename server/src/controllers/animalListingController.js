@@ -163,7 +163,7 @@ class AnimalListingController {
         include: [{
           model: db.User,
           as: 'seller',
-          attributes: ['id', 'name', 'phone', 'created_at']
+          attributes: ['id', 'full_name', 'phone_number', 'created_at']
         }],
         limit: parseInt(limit),
         offset: offset,
@@ -199,7 +199,7 @@ class AnimalListingController {
         include: [{
           model: db.User,
           as: 'seller',
-          attributes: ['id', 'name', 'phone', 'created_at']
+          attributes: ['id', 'full_name', 'phone_number', 'created_at']
         }]
       });
 

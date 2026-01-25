@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,44 +8,20 @@ import {
   Image,
   Alert,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, formatPrice } from '../utils/constants';
-
-const WISHLIST_STORAGE_KEY = '@kissan_ebazzar_wishlist';
+import { useWishlist } from '../context/WishlistContext';
 
 const WishlistScreen = ({ navigation }) => {
-  const [wishlistItems, setWishlistItems] = useState([]);
+  const { wishlist, removeFromWishlist: removeFromWishlistContext, clearWishlist: clearWishlistContext, loading } = useWishlist();
   const [refreshing, setRefreshing] = useState(false);
+  const insets = useSafeAreaInsets();
 
-  useFocusEffect(
-    useCallback(() => {
-      loadWishlist();
-    }, [])
-  );
-
-  const loadWishlist = async () => {
-    try {
-      const stored = await AsyncStorage.getItem(WISHLIST_STORAGE_KEY);
-      if (stored) {
-        setWishlistItems(JSON.parse(stored));
-      }
-    } catch (error) {
-      console.error('Error loading wishlist:', error);
-    }
-  };
-
-  const saveWishlist = async (items) => {
-    try {
-      await AsyncStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(items));
-    } catch (error) {
-      console.error('Error saving wishlist:', error);
-    }
-  };
-
-  const removeFromWishlist = (item) => {
+  const handleRemoveFromWishlist = (item) => {
     Alert.alert(
       'Remove from Wishlist',
       'Are you sure you want to remove this item from your wishlist?',
@@ -54,20 +30,16 @@ const WishlistScreen = ({ navigation }) => {
         {
           text: 'Remove',
           style: 'destructive',
-          onPress: () => {
-            const updated = wishlistItems.filter(
-              (w) => !(w.id === item.id && w.animal_type === item.animal_type)
-            );
-            setWishlistItems(updated);
-            saveWishlist(updated);
+          onPress: async () => {
+            await removeFromWishlistContext(item.id || item.animal_id, item.animal_type);
           },
         },
       ]
     );
   };
 
-  const clearWishlist = () => {
-    if (wishlistItems.length === 0) return;
+  const handleClearWishlist = () => {
+    if (wishlist.length === 0) return;
 
     Alert.alert(
       'Clear Wishlist',
@@ -77,9 +49,8 @@ const WishlistScreen = ({ navigation }) => {
         {
           text: 'Clear All',
           style: 'destructive',
-          onPress: () => {
-            setWishlistItems([]);
-            saveWishlist([]);
+          onPress: async () => {
+            await clearWishlistContext();
           },
         },
       ]
@@ -88,42 +59,58 @@ const WishlistScreen = ({ navigation }) => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadWishlist();
+    // The wishlist will automatically reload when the component refocuses
     setRefreshing(false);
   };
 
   const handleItemPress = (item) => {
     navigation.navigate('AnimalDetail', {
       animalType: item.animal_type,
-      id: item.id,
+      id: item.animal_id || item.id, // Use animal_id if available, fallback to id
     });
   };
 
   const getImageUrl = (item) => {
-    if (item.photos && item.photos.length > 0) {
-      return item.photos[0];
-    }
-    if (item.photo_url) {
-      return item.photo_url;
-    }
+    // Handle different image field names from backend
+    if (item.front_photo) return item.front_photo;
+    if (item.frontPhoto) return item.frontPhoto;
+    if (item.side_photo) return item.side_photo;
+    if (item.sidePhoto) return item.sidePhoto;
+    if (item.photo_1) return item.photo_1;
+    if (item.photo1) return item.photo1;
+    if (item.photos && item.photos.length > 0) return item.photos[0];
+    if (item.photo_url) return item.photo_url;
+    if (item.photoUrl) return item.photoUrl;
     return null;
   };
 
   const renderWishlistItem = ({ item }) => {
+    // Debug: Log the item to see what data we're receiving
+    console.log('Wishlist item data:', JSON.stringify(item, null, 2));
+    
     const imageUrl = getImageUrl(item);
+    
+    // Extract data with multiple field name variations
+    const breedName = item.breed_name || item.breedName || item.breed || 'Unknown Breed';
+    const price = item.expected_price || item.expectedPrice || item.price || 0;
+    const milkCapacity = item.milk_capacity || item.milkCapacity;
+    const age = item.age;
+    const city = item.city;
+    const state = item.state;
 
     return (
       <TouchableOpacity
-        style={styles.itemCard}
+        style={styles.listCard}
         onPress={() => handleItemPress(item)}
-        activeOpacity={0.7}
+        activeOpacity={0.8}
       >
-        <View style={styles.imageContainer}>
+        {/* Image Section */}
+        <View style={styles.cardImageContainer}>
           {imageUrl ? (
-            <Image source={{ uri: imageUrl }} style={styles.itemImage} />
+            <Image source={{ uri: imageUrl }} style={styles.cardImage} />
           ) : (
-            <View style={styles.placeholderImage}>
-              <Text style={styles.placeholderEmoji}>
+            <View style={styles.cardPlaceholder}>
+              <Text style={styles.cardPlaceholderEmoji}>
                 {item.animal_type === 'cow' ? '🐄' :
                  item.animal_type === 'buffalo' ? '🐃' :
                  item.animal_type === 'goat' ? '🐐' :
@@ -134,39 +121,60 @@ const WishlistScreen = ({ navigation }) => {
               </Text>
             </View>
           )}
+          
+          {/* Heart Button */}
+          <TouchableOpacity
+            style={styles.cardHeartButton}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleRemoveFromWishlist(item);
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="heart" size={22} color="#EF4444" />
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.itemDetails}>
-          <View style={styles.itemHeader}>
-            <Text style={styles.animalType}>
-              {item.animal_type?.charAt(0).toUpperCase() + item.animal_type?.slice(1)}
-            </Text>
-            <TouchableOpacity
-              style={styles.removeButton}
-              onPress={() => removeFromWishlist(item)}
-            >
-              <Ionicons name="heart" size={24} color={COLORS.red} />
-            </TouchableOpacity>
+        {/* Content Section */}
+        <View style={styles.cardContent}>
+          {/* Top Row: Type & Price */}
+          <View style={styles.cardTopRow}>
+            <View style={styles.cardTypeBadge}>
+              <Text style={styles.cardTypeText}>
+                {item.animal_type?.charAt(0).toUpperCase() + item.animal_type?.slice(1)}
+              </Text>
+            </View>
+            <Text style={styles.cardPrice}>₹{formatPrice(price)}</Text>
           </View>
 
-          <Text style={styles.breedName} numberOfLines={1}>
-            {item.breed_name || item.breed || 'Unknown Breed'}
+          {/* Breed Name */}
+          <Text style={styles.cardBreedName} numberOfLines={2}>
+            {breedName}
           </Text>
 
-          <Text style={styles.price}>{formatPrice(item.price)}</Text>
-
-          <View style={styles.locationRow}>
-            <Ionicons name="location-outline" size={14} color={COLORS.gray} />
-            <Text style={styles.locationText} numberOfLines={1}>
-              {[item.city, item.state].filter(Boolean).join(', ') || 'Location not specified'}
-            </Text>
+          {/* Info Row */}
+          <View style={styles.cardInfoRow}>
+            {milkCapacity && (
+              <View style={styles.cardInfoItem}>
+                <Ionicons name="water" size={14} color="#3B82F6" />
+                <Text style={styles.cardInfoText}>{milkCapacity}L/day</Text>
+              </View>
+            )}
+            {age && (
+              <View style={styles.cardInfoItem}>
+                <Ionicons name="time-outline" size={14} color="#10B981" />
+                <Text style={styles.cardInfoText}>{age}</Text>
+              </View>
+            )}
           </View>
 
-          {item.age && (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoText}>Age: {item.age}</Text>
-            </View>
-          )}
+          {/* Location */}
+          <View style={styles.cardLocation}>
+            <Ionicons name="location-outline" size={14} color="#6B7280" />
+            <Text style={styles.cardLocationText} numberOfLines={1}>
+              {[city, state].filter(Boolean).join(', ') || 'Location not specified'}
+            </Text>
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -183,7 +191,7 @@ const WishlistScreen = ({ navigation }) => {
       </Text>
       <TouchableOpacity
         style={styles.browseButton}
-        onPress={() => navigation.navigate('Home')}
+        onPress={() => navigation.navigate('MainTabs', { screen: 'Home' })}
       >
         <Text style={styles.browseButtonText}>Browse Animals</Text>
       </TouchableOpacity>
@@ -194,55 +202,45 @@ const WishlistScreen = ({ navigation }) => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color={COLORS.black} />
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>My Wishlist</Text>
-        {wishlistItems.length > 0 && (
-          <TouchableOpacity onPress={clearWishlist}>
+        {wishlist.length > 0 && (
+          <TouchableOpacity onPress={handleClearWishlist}>
             <Text style={styles.clearText}>Clear All</Text>
           </TouchableOpacity>
         )}
       </View>
 
-      {/* Stats */}
-      {wishlistItems.length > 0 && (
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Ionicons name="heart" size={20} color={COLORS.red} />
-            <Text style={styles.statNumber}>{wishlistItems.length}</Text>
-            <Text style={styles.statLabel}>Saved Items</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Ionicons name="pricetag" size={20} color={COLORS.primary} />
-            <Text style={styles.statNumber}>
-              {formatPrice(
-                wishlistItems.reduce((sum, item) => sum + (item.price || 0), 0)
-              )}
-            </Text>
-            <Text style={styles.statLabel}>Total Value</Text>
-          </View>
-        </View>
-      )}
-
       {/* Wishlist Items */}
-      <FlatList
-        data={wishlistItems}
-        keyExtractor={(item) => `${item.animal_type}-${item.id}`}
-        renderItem={renderWishlistItem}
-        ListEmptyComponent={renderEmpty}
-        contentContainerStyle={[
-          styles.listContent,
-          wishlistItems.length === 0 && styles.emptyListContent,
-        ]}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={[COLORS.primary]}
-            tintColor={COLORS.primary}
-          />
-        }
-        showsVerticalScrollIndicator={false}
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Loading wishlist...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={wishlist}
+          keyExtractor={(item) => `${item.animal_type}-${item.id || item.animal_id}`}
+          renderItem={renderWishlistItem}
+          ListEmptyComponent={renderEmpty}
+          contentContainerStyle={[
+            styles.listContent,
+            wishlist.length === 0 && styles.emptyListContent,
+            { paddingBottom: 160 }
+          ]}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[COLORS.primary]}
+              tintColor={COLORS.primary}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+        />
+      )}
     </View>
   );
 };
@@ -261,6 +259,10 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     backgroundColor: COLORS.white,
   },
+  backButton: {
+    padding: 4,
+    marginRight: 12,
+  },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -271,122 +273,125 @@ const styles = StyleSheet.create({
     color: COLORS.red,
     fontWeight: '500',
   },
-  statsContainer: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.white,
-    marginHorizontal: 16,
-    marginTop: 12,
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: COLORS.lightGray,
-    marginHorizontal: 16,
-  },
-  statNumber: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.black,
-    marginTop: 8,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: COLORS.gray,
-    marginTop: 4,
-  },
   listContent: {
     padding: 16,
   },
   emptyListContent: {
     flex: 1,
   },
-  itemCard: {
-    flexDirection: 'row',
+  // New List Card Styles
+  listCard: {
     backgroundColor: COLORS.white,
     borderRadius: 16,
-    marginBottom: 12,
+    marginBottom: 16,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  imageContainer: {
-    width: 120,
-    height: 120,
+  cardImageContainer: {
+    width: '100%',
+    height: 220,
+    position: 'relative',
+    backgroundColor: '#F3F4F6',
   },
-  itemImage: {
+  cardImage: {
     width: '100%',
     height: '100%',
+    resizeMode: 'cover',
   },
-  placeholderImage: {
+  cardPlaceholder: {
     width: '100%',
     height: '100%',
-    backgroundColor: COLORS.secondary,
+    backgroundColor: '#E5E7EB',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  placeholderEmoji: {
-    fontSize: 40,
+  cardPlaceholderEmoji: {
+    fontSize: 64,
+    opacity: 0.5,
   },
-  itemDetails: {
-    flex: 1,
-    padding: 12,
+  cardHeartButton: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
-  itemHeader: {
+  cardContent: {
+    padding: 16,
+  },
+  cardTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    marginBottom: 10,
   },
-  animalType: {
+  cardTypeBadge: {
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  cardTypeText: {
     fontSize: 12,
     color: COLORS.primary,
-    fontWeight: '600',
+    fontWeight: '700',
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  removeButton: {
-    padding: 4,
-  },
-  breedName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.black,
-    marginTop: 4,
-  },
-  price: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  cardPrice: {
+    fontSize: 22,
+    fontWeight: '800',
     color: COLORS.primary,
-    marginTop: 6,
   },
-  locationRow: {
+  cardBreedName: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 12,
+    lineHeight: 24,
+  },
+  cardInfoRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+    flexWrap: 'wrap',
+  },
+  cardInfoItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 6,
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    gap: 5,
   },
-  locationText: {
-    fontSize: 12,
-    color: COLORS.gray,
-    marginLeft: 4,
+  cardInfoText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  cardLocation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  cardLocationText: {
+    fontSize: 14,
+    color: '#6B7280',
     flex: 1,
-  },
-  infoRow: {
-    marginTop: 4,
-  },
-  infoText: {
-    fontSize: 12,
-    color: COLORS.gray,
   },
   emptyContainer: {
     flex: 1,
@@ -426,6 +431,17 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 16,
     fontWeight: '600',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: COLORS.gray,
   },
 });
 

@@ -20,34 +20,39 @@ const dogValidationRules = [
     .notEmpty().withMessage('Age is required'),
 
   body('color')
-    .trim()
-    .notEmpty().withMessage('Color is required'),
+    .optional()
+    .trim(),
 
   body('weight')
-    .notEmpty().withMessage('Weight is required')
+    .optional()
     .isFloat({ min: 0, max: 150 }).withMessage('Weight must be between 0 and 150 kg'),
 
   body('height')
-    .notEmpty().withMessage('Height is required')
+    .optional()
     .isFloat({ min: 0, max: 200 }).withMessage('Height must be between 0 and 200 cm'),
 
   body('vaccinationStatus')
-    .isIn(['yes', 'no'])
-    .withMessage('Vaccination status must be yes or no'),
+    .optional()
+    .isIn(['yes', 'no', 'partial'])
+    .withMessage('Vaccination status must be yes, no, or partial'),
 
   body('healthCondition')
-    .isIn(['healthy', 'under_treatment'])
-    .withMessage('Health condition must be healthy or under_treatment'),
+    .optional()
+    .isIn(['healthy', 'under_treatment', 'needs_attention'])
+    .withMessage('Health condition must be healthy, under_treatment, or needs_attention'),
 
   body('trained')
+    .optional()
     .isIn(['yes', 'no'])
     .withMessage('Trained status must be yes or no'),
 
   body('behavior')
-    .isIn(['friendly', 'aggressive', 'calm'])
-    .withMessage('Behavior must be friendly, aggressive, or calm'),
+    .optional()
+    .isIn(['friendly', 'aggressive', 'calm', 'shy', 'playful'])
+    .withMessage('Behavior must be friendly, aggressive, calm, shy, or playful'),
 
   body('purpose')
+    .optional()
     .isIn(['guard', 'pet', 'breeding', 'show'])
     .withMessage('Purpose must be guard, pet, breeding, or show'),
 
@@ -56,16 +61,8 @@ const dogValidationRules = [
     .isFloat({ min: 0 }).withMessage('Price must be a positive number'),
 
   body('isNegotiable')
-    .notEmpty().withMessage('Negotiable status is required')
-    .isBoolean().withMessage('Negotiable must be true or false'),
-
-  body('detailsConfirmed')
-    .notEmpty().withMessage('Details confirmation is required')
-    .isBoolean().withMessage('Details confirmed must be true or false'),
-
-  body('termsAccepted')
-    .notEmpty().withMessage('Terms acceptance is required')
-    .isBoolean().withMessage('Terms accepted must be true or false')
+    .optional()
+    .isBoolean().withMessage('Negotiable must be true or false')
 ];
 
 // Multer configuration for file uploads
@@ -80,29 +77,7 @@ const fileUploadConfig = upload.fields([
   { name: 'video', maxCount: 1 }
 ]);
 
-// Public routes - no authentication required
-/**
- * @route   GET /api/dogs/listings
- * @desc    Get all dog listings with filters and pagination
- * @access  Public
- */
-router.get('/listings', dogListingController.getAllDogListings);
-
-/**
- * @route   GET /api/dogs/listings/nearby
- * @desc    Get nearby dog listings based on location
- * @access  Public
- */
-router.get('/listings/nearby', dogListingController.getNearbyDogListings);
-
-/**
- * @route   GET /api/dogs/listings/:id
- * @desc    Get single dog listing by ID
- * @access  Public
- */
-router.get('/listings/:id', dogListingController.getDogListingById);
-
-// Protected routes - authentication required
+// Protected routes - authentication required (POST routes first)
 /**
  * @route   POST /api/dogs/listings
  * @desc    Create a new dog listing
@@ -115,6 +90,28 @@ router.post(
   dogValidationRules,
   dogListingController.createDogListing
 );
+
+// Public routes - no authentication required
+/**
+ * @route   GET /api/dogs/listings/nearby
+ * @desc    Get nearby dog listings based on location
+ * @access  Public
+ */
+router.get('/listings/nearby', dogListingController.getNearbyDogListings);
+
+/**
+ * @route   GET /api/dogs/listings
+ * @desc    Get all dog listings with filters and pagination
+ * @access  Public
+ */
+router.get('/listings', dogListingController.getAllDogListings);
+
+/**
+ * @route   GET /api/dogs/listings/:id
+ * @desc    Get single dog listing by ID
+ * @access  Public
+ */
+router.get('/listings/:id', dogListingController.getDogListingById);
 
 /**
  * @route   GET /api/dogs/my-listings

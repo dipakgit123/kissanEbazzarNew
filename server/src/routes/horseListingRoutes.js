@@ -50,29 +50,7 @@ const fileUploadConfig = upload.fields([
   { name: 'video', maxCount: 1 }
 ]);
 
-// Public routes - no authentication required
-/**
- * @route   GET /api/horses/listings
- * @desc    Get all horse listings with filters and pagination
- * @access  Public
- */
-router.get('/listings', horseListingController.getAllHorseListings);
-
-/**
- * @route   GET /api/horses/listings/nearby
- * @desc    Get nearby horse listings based on location
- * @access  Public
- */
-router.get('/listings/nearby', horseListingController.getNearbyHorseListings);
-
-/**
- * @route   GET /api/horses/listings/:id
- * @desc    Get single horse listing by ID
- * @access  Public
- */
-router.get('/listings/:id', horseListingController.getHorseListingById);
-
-// Protected routes - authentication required
+// Protected routes - authentication required (POST routes first)
 /**
  * @route   POST /api/horses/listings
  * @desc    Create a new horse listing
@@ -85,6 +63,28 @@ router.post(
   horseValidationRules,
   horseListingController.createHorseListing
 );
+
+// Public routes - no authentication required
+/**
+ * @route   GET /api/horses/listings/nearby
+ * @desc    Get nearby horse listings based on location
+ * @access  Public
+ */
+router.get('/listings/nearby', horseListingController.getNearbyHorseListings);
+
+/**
+ * @route   GET /api/horses/listings
+ * @desc    Get all horse listings with filters and pagination
+ * @access  Public
+ */
+router.get('/listings', horseListingController.getAllHorseListings);
+
+/**
+ * @route   GET /api/horses/listings/:id
+ * @desc    Get single horse listing by ID
+ * @access  Public
+ */
+router.get('/listings/:id', horseListingController.getHorseListingById);
 
 /**
  * @route   GET /api/horses/my-listings

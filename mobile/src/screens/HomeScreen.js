@@ -9,6 +9,7 @@ import {
   Dimensions,
   ActivityIndicator,
   StatusBar,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,6 +26,7 @@ const HomeScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [animals, setAnimals] = useState([]);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     fetchAnimals();
@@ -35,7 +37,7 @@ const HomeScreen = ({ navigation }) => {
     try {
       const response = await animalListingService.getAllListings();
       if (response.success && response.data) {
-        setAnimals(response.data.slice(0, 4)); // First 4 for preview
+        setAnimals(response.data.slice(0, 4)); // Show only first 4
       } else {
         setAnimals([]);
       }
@@ -44,16 +46,30 @@ const HomeScreen = ({ navigation }) => {
       setAnimals([]);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchAnimals();
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="dark-content" />
 
-      {/* Header with Language Button */}
+      {/* Header with Logo and Language Button */}
       <View style={styles.header}>
-        <Text style={styles.headerLogo}>🐄 {t('common.appName')}</Text>
+        <View style={styles.logoWrapper}>
+          <View style={styles.logoShadow}>
+            <Image
+              source={require('../assets/animal_bazar_logo.jpeg')}
+              style={styles.headerLogoImage}
+              resizeMode="cover"
+            />
+          </View>
+        </View>
         <TouchableOpacity
           style={styles.languageButton}
           onPress={() => setLanguageModalVisible(true)}
@@ -62,7 +78,12 @@ const HomeScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
+        }
+      >
 
         {/* Hero Section */}
         <View style={styles.heroSection}>
@@ -139,87 +160,86 @@ const HomeScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Feature Cards */}
+        {/* Feature Cards - 4 Services with Images */}
         <View style={styles.featuresSection}>
-          <View style={styles.featuresRow}>
+          <Text style={styles.sectionTitle}>{t('home.ourServices')}</Text>
+          <View style={styles.featuresGrid}>
             {/* AI Assistant Card */}
             <TouchableOpacity
-              style={[styles.featureCard, { backgroundColor: '#3B82F6' }]}
+              style={styles.featureCardWithImage}
               onPress={() => navigation.navigate('AIAssistant')}
+              activeOpacity={0.9}
             >
               <Image
                 source={require('../assets/ai_assistant.png')}
                 style={styles.featureImage}
-                resizeMode="cover"
+                resizeMode="contain"
               />
-              <View style={styles.featureOverlay} />
               <View style={styles.featureContent}>
-                <Text style={styles.featureTitle}>{t('services.aiAssistant')}</Text>
-                <Text style={styles.featureSubtitle}>{t('services.aiAssistantDesc')}</Text>
+                <Text style={styles.featureCardTitle}>{t('services.aiAssistant')}</Text>
+                <Text style={styles.featureCardSubtitle}>Instant AI support</Text>
                 <View style={styles.featureArrow}>
-                  <Ionicons name="arrow-forward" size={20} color="#fff" />
+                  <Ionicons name="arrow-forward" size={20} color="#3B82F6" />
                 </View>
               </View>
             </TouchableOpacity>
 
             {/* Veterinarian Card */}
             <TouchableOpacity
-              style={[styles.featureCard, { backgroundColor: '#10B981' }]}
+              style={styles.featureCardWithImage}
               onPress={() => navigation.navigate('Veterinarian')}
+              activeOpacity={0.9}
             >
               <Image
                 source={require('../assets/veterinarian.png')}
                 style={styles.featureImage}
-                resizeMode="cover"
+                resizeMode="contain"
               />
-              <View style={styles.featureOverlay} />
               <View style={styles.featureContent}>
-                <Text style={styles.featureTitle}>{t('services.veterinarian')}</Text>
-                <Text style={styles.featureSubtitle}>{t('services.veterinarianDesc')}</Text>
+                <Text style={styles.featureCardTitle}>{t('services.veterinarian')}</Text>
+                <Text style={styles.featureCardSubtitle}>Expert vet care</Text>
                 <View style={styles.featureArrow}>
-                  <Ionicons name="arrow-forward" size={20} color="#fff" />
+                  <Ionicons name="arrow-forward" size={20} color="#10B981" />
                 </View>
               </View>
             </TouchableOpacity>
-          </View>
 
-          <View style={styles.featuresRow}>
             {/* AI Health Card */}
             <TouchableOpacity
-              style={[styles.featureCard, { backgroundColor: '#8B5CF6' }]}
+              style={styles.featureCardWithImage}
               onPress={() => navigation.navigate('AIHealthCheck')}
+              activeOpacity={0.9}
             >
               <Image
                 source={require('../assets/ai_health.png')}
                 style={styles.featureImage}
-                resizeMode="cover"
+                resizeMode="contain"
               />
-              <View style={styles.featureOverlay} />
               <View style={styles.featureContent}>
-                <Text style={styles.featureTitle}>{t('services.aiHealthCheck')}</Text>
-                <Text style={styles.featureSubtitle}>{t('services.aiHealthCheckDesc')}</Text>
+                <Text style={styles.featureCardTitle}>{t('services.aiHealthCheck')}</Text>
+                <Text style={styles.featureCardSubtitle}>Health monitoring</Text>
                 <View style={styles.featureArrow}>
-                  <Ionicons name="arrow-forward" size={20} color="#fff" />
+                  <Ionicons name="arrow-forward" size={20} color="#8B5CF6" />
                 </View>
               </View>
             </TouchableOpacity>
 
             {/* Pregnancy Calendar Card */}
             <TouchableOpacity
-              style={[styles.featureCard, { backgroundColor: '#EC4899' }]}
+              style={styles.featureCardWithImage}
               onPress={() => navigation.navigate('PregnancyCalendar')}
+              activeOpacity={0.9}
             >
               <Image
                 source={require('../assets/pregnancy_calendar.png')}
                 style={styles.featureImage}
-                resizeMode="cover"
+                resizeMode="contain"
               />
-              <View style={styles.featureOverlay} />
               <View style={styles.featureContent}>
-                <Text style={styles.featureTitle}>{t('services.pregnancy')}</Text>
-                <Text style={styles.featureSubtitle}>{t('services.pregnancyDesc')}</Text>
+                <Text style={styles.featureCardTitle}>{t('services.pregnancy')}</Text>
+                <Text style={styles.featureCardSubtitle}>Track pregnancy</Text>
                 <View style={styles.featureArrow}>
-                  <Ionicons name="arrow-forward" size={20} color="#fff" />
+                  <Ionicons name="arrow-forward" size={20} color="#EC4899" />
                 </View>
               </View>
             </TouchableOpacity>
@@ -244,7 +264,7 @@ const HomeScreen = ({ navigation }) => {
             <View style={styles.animalsSection}>
               {animals.map((animal) => (
                 <AnimalCard
-                  key={animal.id}
+                  key={`${animal.animal_type}-${animal.id}`}
                   listing={animal}
                   onPress={() => navigation.navigate('AnimalDetail', {
                     animalType: animal.animal_type,
@@ -283,11 +303,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
+    height: 64,
+  },
+  logoWrapper: {
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  logoShadow: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 3,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+  },
+  headerLogoImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+  },
+  headerLogoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerLogoText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.primary,
   },
   headerLogo: {
     fontSize: 20,
@@ -400,59 +449,53 @@ const styles = StyleSheet.create({
   },
   featuresSection: {
     paddingHorizontal: 20,
-    paddingTop: 24,
+    marginTop: 24,
   },
-  featuresRow: {
+  featuresGrid: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
-  featureCard: {
-    flex: 1,
-    height: 180,
+  featureCardWithImage: {
+    width: (width - 48) / 2,
+    height: 200,
     borderRadius: 16,
+    marginBottom: 16,
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
     overflow: 'hidden',
-    position: 'relative',
   },
   featureImage: {
     width: '100%',
-    height: '100%',
-    opacity: 0.8,
-  },
-  featureOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    height: 140,
   },
   featureContent: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 16,
+    padding: 12,
+    backgroundColor: '#fff',
+    position: 'relative',
   },
-  featureTitle: {
-    fontSize: 18,
+  featureCardTitle: {
+    fontSize: 14,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#1F2937',
+    marginBottom: 2,
   },
-  featureSubtitle: {
-    fontSize: 12,
-    color: '#fff',
-    opacity: 0.9,
-    marginTop: 4,
+  featureCardSubtitle: {
+    fontSize: 11,
+    color: '#6B7280',
   },
   featureArrow: {
     position: 'absolute',
-    right: 16,
-    bottom: 16,
+    right: 8,
+    bottom: 8,
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
   },

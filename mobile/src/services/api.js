@@ -4,8 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // API Configuration
 // For development: Use your computer's IP address with port 5000
 // For production: Use your domain name or server IP
-const DEV_API_URL = 'http://192.168.119.146:5000'; // Backend server on port 5000
-const PROD_API_URL = 'http://192.168.119.146:5000'; // Replace with your production URL/domain
+const DEV_API_URL = 'http://192.168.15.146:5000'; // Backend server on port 5000
+const PROD_API_URL = 'http://192.168.15.146:5000'; // Replace with your production URL/domain
 
 // Set to true for production build
 const IS_PRODUCTION = false;
@@ -18,13 +18,20 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 10000,
+  timeout: 60000, // 60 seconds timeout for large file uploads
 });
 
 // Add token to requests
 api.interceptors.request.use(
   async (config) => {
-    const token = await AsyncStorage.getItem('token');
+    // Check for both user token and vet token
+    let token = await AsyncStorage.getItem('token');
+    
+    // If no user token, check for vet token
+    if (!token) {
+      token = await AsyncStorage.getItem('vetToken');
+    }
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -40,8 +47,11 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 401) {
+      // Clear both user and vet tokens on 401
       await AsyncStorage.removeItem('token');
       await AsyncStorage.removeItem('userData');
+      await AsyncStorage.removeItem('vetToken');
+      await AsyncStorage.removeItem('veterinarianData');
     }
     return Promise.reject(error);
   }
@@ -130,6 +140,15 @@ export const listingsService = {
     } catch (error) {
       throw error.response?.data || error;
     }
+  },
+
+  markListingAsSold: async (animalType, id) => {
+    try {
+      const response = await api.patch(`/api/listings/${animalType}/${id}/sold`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
   }
 };
 
@@ -138,6 +157,15 @@ export const userService = {
   getProfile: async () => {
     try {
       const response = await api.get('/api/auth/profile');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  getMyListings: async () => {
+    try {
+      const response = await api.get('/api/combined/my-listings');
       return response.data;
     } catch (error) {
       throw error.response?.data || error;
@@ -164,21 +192,46 @@ export const userService = {
 
   uploadProfilePhoto: async (photoUri) => {
     try {
+      // Get file extension from URI
+      const fileExtension = photoUri.split('.').pop().toLowerCase();
+      const mimeType = fileExtension === 'png' ? 'image/png' : 'image/jpeg';
+
       const formData = new FormData();
       formData.append('photo', {
         uri: photoUri,
-        type: 'image/jpeg',
-        name: 'profile_photo.jpg',
+        type: mimeType,
+        name: `profile_photo.${fileExtension}`,
       });
 
+      console.log('FormData prepared:', {
+        uri: photoUri,
+        type: mimeType,
+        name: `profile_photo.${fileExtension}`,
+      });
+
+      const token = await AsyncStorage.getItem('token');
+      
       const response = await api.post('/api/auth/upload-photo', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`,
+        },
+        timeout: 60000, // 60 seconds for image upload
+        transformRequest: (data, headers) => {
+          // Don't transform FormData
+          return data;
         },
       });
+      
+      console.log('Upload successful:', response.data);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      console.error('Upload API error:', error);
+      if (error.response) {
+        console.error('Error response:', error.response.data);
+        throw error.response.data;
+      }
+      throw error;
     }
   },
 
@@ -380,7 +433,12 @@ export const animalListingService = {
 
   createListing: async (endpoint, listingData) => {
     try {
-      const response = await api.post(`/api/${endpoint}/listings`, listingData);
+      const response = await api.post(`/api/${endpoint}/listings`, listingData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        timeout: 60000, // 60 seconds for file upload
+      });
       return response.data;
     } catch (error) {
       throw error.response?.data || error;
@@ -519,6 +577,16 @@ export const veterinarianService = {
       throw error.response?.data || error;
     }
   },
+
+  // Get dashboard data for veterinarian
+  getDashboard: async () => {
+    try {
+      const response = await api.get('/api/veterinarians/dashboard');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
 };
 
 // Vet Review Service
@@ -613,17 +681,200 @@ export const vetReportService = {
 
 // Call Log Service
 export const callLogService = {
+  // Get call history (all, made, or received)
   getCallLogs: async (filter = 'all') => {
-    const response = await api.get(`/call-logs?filter=${filter}`);
-    return response.data;
+    try {
+      let endpoint = '/api/call-logs/history';
+      if (filter === 'received') {
+        endpoint = '/api/call-logs/received';
+      } else if (filter === 'made') {
+        endpoint = '/api/call-logs/made';
+      }
+      const response = await api.get(endpoint);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
   },
+  
+  // Log a new call
   logCall: async (callData) => {
-    const response = await api.post('/call-logs', callData);
+    try {
+      const response = await api.post('/api/call-logs', callData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+  
+  // Delete a call log
+  deleteCallLog: async (logId) => {
+    try {
+      const response = await api.delete(`/api/call-logs/${logId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+  
+  // Get call statistics
+  getCallStats: async () => {
+    try {
+      const response = await api.get('/api/call-logs/stats');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+  
+  // Get calls for a specific listing
+  getListingCalls: async (listingType, listingId) => {
+    try {
+      const response = await api.get(`/api/call-logs/listing/${listingType}/${listingId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+};
+
+// Wishlist Service
+export const wishlistService = {
+  getWishlist: async () => {
+    const response = await api.get('/api/wishlist');
     return response.data;
   },
-  deleteCallLog: async (logId) => {
-    const response = await api.delete(`/call-logs/${logId}`);
+  addToWishlist: async (animalType, animalId) => {
+    const response = await api.post('/api/wishlist/add', {
+      animal_type: animalType,
+      animal_id: animalId,
+    });
     return response.data;
+  },
+  removeFromWishlist: async (animalType, animalId) => {
+    const response = await api.post('/api/wishlist/remove', {
+      animal_type: animalType,
+      animal_id: animalId,
+    });
+    return response.data;
+  },
+  checkWishlist: async (animalType, animalId) => {
+    const response = await api.get('/api/wishlist/check', {
+      params: {
+        animal_type: animalType,
+        animal_id: animalId,
+      },
+    });
+    return response.data;
+  },
+  clearWishlist: async () => {
+    const response = await api.delete('/api/wishlist/clear');
+    return response.data;
+  },
+};
+
+// Appointment Service
+export const appointmentService = {
+  // Create new appointment (for users)
+  createAppointment: async (appointmentData) => {
+    try {
+      const response = await api.post('/api/appointments', appointmentData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Get user's appointments
+  getMyAppointments: async (filter = 'all') => {
+    try {
+      const response = await api.get('/api/appointments/my-appointments', {
+        params: { filter }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Get veterinarian's appointments
+  getVetAppointments: async (filter = 'all') => {
+    try {
+      const response = await api.get('/api/appointments/vet-appointments', {
+        params: { filter }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Get appointment by ID
+  getAppointmentById: async (appointmentId) => {
+    try {
+      const response = await api.get(`/api/appointments/${appointmentId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Update appointment status (for vets)
+  updateAppointmentStatus: async (appointmentId, status, notes = null) => {
+    try {
+      const response = await api.patch(`/api/appointments/${appointmentId}/status`, {
+        status,
+        notes
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Cancel appointment (for users)
+  cancelAppointment: async (appointmentId) => {
+    try {
+      const response = await api.patch(`/api/appointments/${appointmentId}/cancel`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Reschedule appointment
+  rescheduleAppointment: async (appointmentId, newDate, newTime) => {
+    try {
+      const response = await api.patch(`/api/appointments/${appointmentId}/reschedule`, {
+        appointment_date: newDate,
+        appointment_time: newTime
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Get appointment statistics (for vets)
+  getAppointmentStats: async () => {
+    try {
+      const response = await api.get('/api/appointments/stats');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // Get available time slots for a vet
+  getAvailableSlots: async (vetId, date) => {
+    try {
+      const response = await api.get(`/api/appointments/available-slots/${vetId}`, {
+        params: { date }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
   },
 };
 

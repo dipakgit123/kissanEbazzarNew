@@ -1,16 +1,20 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import axios from 'axios';
 
-const animalOptions = ['Cow', 'Buffalo'];
-const lactationOptions = ['Not Delivered', 'First', 'Second', 'Other'];
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 const SellAnimalForm = ({ onCancel, onSubmit }) => {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     animalType: '',
     lactation: '',
     milkToday: '',
     rate: '',
     sellDays: '',
-    sellKind: '',
     photos: { side: null, udder: null, video: null },
     addInfoOpen: false,
     milkCapacity: '',
@@ -35,20 +39,92 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
     setForm(prev => ({ ...prev, photos: { ...prev.photos, [field]: null } }));
   };
 
-  const handleSubmit = e => {
-    e.preventDefault();
-    if (onSubmit) onSubmit(form);
+  const getAnimalEndpoint = (animalType) => {
+    const endpoints = {
+      'Cow': 'animals',
+      'Buffalo': 'buffalos',
+      'Goat': 'goats',
+      'Horse': 'horses',
+      'Dog': 'dogs',
+      'Cat': 'cats',
+      'Bull': 'animals',
+      'Other': 'other-animals'
+    };
+    return endpoints[animalType] || 'animals';
   };
 
-  // Reusable styled components
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Validation
+    if (!form.animalType || !form.lactation || !form.milkToday || !form.rate) {
+      alert(t('validation.fillRequired') || 'Please fill all required fields');
+      return;
+    }
+
+    if (!form.photos.side && !form.photos.udder) {
+      alert(t('validation.required') || 'Please upload at least one photo');
+      return;
+    }
+
+    setLoading(true);
+    
+    try {
+      const formData = new FormData();
+      const endpoint = getAnimalEndpoint(form.animalType);
+      
+      // Map form fields to backend API fields
+      if (endpoint === 'buffalos' || endpoint === 'animals') {
+        formData.append('breedName', form.animalType);
+        formData.append('age', form.lactation);
+        formData.append('milkCapacity', form.milkToday || '0');
+        formData.append('pregnancyStatus', form.pregnant === 'Yes' ? 'pregnant' : 'not_pregnant');
+        formData.append('hasHorns', 'false');
+        formData.append('healthCondition', 'good');
+        formData.append('expectedPrice', form.rate);
+        formData.append('isNegotiable', form.negotiation ? 'true' : 'false');
+        formData.append('vaccinationDetails', form.details || '');
+        formData.append('deliveryAvailable', 'false');
+        formData.append('additionalNotes', form.details || '');
+        
+        if (form.photos.side) formData.append('frontPhoto', form.photos.side);
+        if (form.photos.udder) formData.append('sidePhoto', form.photos.udder);
+        if (form.photos.video) formData.append('video', form.photos.video);
+      }
+
+      const token = localStorage.getItem('token');
+      
+      const response = await axios.post(`${API_URL}/${endpoint}/listings`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.data.success) {
+        alert(t('sellAnimal.listingSuccess') || 'Listing created successfully!');
+        if (onSubmit) {
+          onSubmit(response.data.data);
+        } else {
+          navigate('/profile');
+        }
+      }
+    } catch (error) {
+      console.error('Error creating listing:', error);
+      alert(t('listing.createError') || error.response?.data?.message || 'Failed to create listing. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const TokenBtn = ({ active, children, onClick }) => (
     <button
       type="button"
       onClick={onClick}
-      className={`px-6 py-3 rounded-xl border-2 text-sm font-semibold transition-all duration-300 transform hover:scale-105 ${
+      className={`px-6 py-3 rounded-xl border-2 text-sm font-semibold transition-all duration-300 ${
         active 
-          ? 'bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white border-[#15BB73] shadow-lg shadow-[#15BB73]/30' 
-          : 'text-gray-700 border-gray-200 hover:border-[#15BB73] hover:bg-[#15BB73]/5 hover:text-[#15BB73]'
+          ? 'bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white border-[#15BB73] shadow-lg' 
+          : 'text-gray-700 border-gray-200 hover:border-[#15BB73] hover:bg-[#15BB73]/5'
       }`}
     >
       {children}
@@ -56,26 +132,29 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
   );
 
   const SectionHeader = ({ icon, title, required }) => (
-    <h2 className="text-2xl font-bold mb-4 flex items-center gap-3 text-[#000600]">
-      <span className="text-3xl" role="img" aria-hidden="true">{icon}</span> 
+    <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-800">
+      <span className="text-2xl">{icon}</span> 
       {title}
-      {required && <span className="text-red-500 ml-2 text-xl">*</span>}
+      {required && <span className="text-red-500 text-lg">*</span>}
     </h2>
   );
 
-  const InputWithUnit = ({ label, value, onChange, placeholder, unit, type = "number" }) => (
-    <div className="space-y-3">
-      <label className="block text-lg font-semibold text-[#000600]">{label}</label>
+  const InputWithUnit = ({ label, value, onChange, placeholder, unit, type = "number", required }) => (
+    <div className="space-y-2">
+      <label className="block text-sm font-semibold text-gray-700">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
       <div className="relative">
         <input
           type={type}
           value={value}
           onChange={e => onChange(e.target.value)}
           placeholder={placeholder}
-          className="w-full px-6 py-4 text-lg border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all duration-300 bg-white/50 backdrop-blur-sm"
+          className="w-full px-4 py-3 text-base border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all"
+          required={required}
         />
         {unit && (
-          <span className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 text-lg font-medium">
+          <span className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">
             {unit}
           </span>
         )}
@@ -84,24 +163,22 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#E9F0F8] to-[#F0F8FF] py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header Section */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-[#000600] mb-4">
-            Sell Your Animal
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-6">
+      <div className="max-w-4xl mx-auto px-4">
+        {/* Header */}
+        <div className="text-center mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            {t('sellAnimal.title')}
           </h1>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            List your animal for sale and connect with potential buyers. Fill out the details below to create your listing.
-          </p>
+          <p className="text-gray-600">{t('sellAnimal.subtitle')}</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Which Animal */}
-          <section className="bg-white/80 backdrop-blur-sm p-8 shadow-xl rounded-2xl space-y-6 border border-white/20">
-            <SectionHeader icon="🐄" title="Which Animal" required />
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Animal Type */}
+          <section className="bg-white p-6 shadow-md rounded-xl space-y-4">
+            <SectionHeader icon="🐄" title={t('sellAnimal.selectAnimalType')} required />
             <div className="flex flex-wrap gap-3">
-              {animalOptions.map(opt => (
+              {['Cow', 'Buffalo', 'Goat', 'Horse', 'Dog', 'Cat', 'Other'].map(opt => (
                 <TokenBtn
                   key={opt}
                   active={form.animalType === opt}
@@ -110,26 +187,14 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
                   {opt}
                 </TokenBtn>
               ))}
-              <select
-                value={form.animalType.startsWith('Other') ? form.animalType : ''}
-                onChange={e => handleChange('animalType', e.target.value)}
-                className="px-6 py-3 border-2 border-gray-200 rounded-xl text-sm font-medium bg-white hover:border-[#15BB73] hover:bg-[#15BB73]/5 transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-[#15BB73]/20"
-              >
-                <option value="">Other</option>
-                <option value="Dog">Dog</option>
-                <option value="Goat">Goat</option>
-                <option value="Bull">Bull</option>
-                <option value="Cow">Cow</option>
-                <option value="Buffalo">Buffalo</option>
-              </select>
             </div>
           </section>
 
           {/* Lactation */}
-          <section className="bg-white/80 backdrop-blur-sm p-8 shadow-xl rounded-2xl space-y-6 border border-white/20">
-            <SectionHeader icon="🥛" title="Which Lactation" required />
+          <section className="bg-white p-6 shadow-md rounded-xl space-y-4">
+            <SectionHeader icon="🥛" title={t('sellAnimal.lactation')} required />
             <div className="flex flex-wrap gap-3">
-              {lactationOptions.map(opt => (
+              {['Not Delivered', 'First', 'Second', 'Third', 'Other'].map(opt => (
                 <TokenBtn
                   key={opt}
                   active={form.lactation === opt}
@@ -142,28 +207,28 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
           </section>
 
           {/* Milk & Rate */}
-          <section className="bg-white/80 backdrop-blur-sm p-8 shadow-xl rounded-2xl grid gap-8 md:grid-cols-2 border border-white/20">
+          <section className="bg-white p-6 shadow-md rounded-xl grid gap-6 md:grid-cols-2">
             <InputWithUnit
-              label="Current Milk per day"
+              label={t('sellAnimal.milkPerDay')}
               value={form.milkToday}
               onChange={value => handleChange('milkToday', value)}
-              placeholder="For ex: 10"
-              unit="Liters"
+              placeholder="10"
+              unit={t('healthCheck.units.liters') || 'Liters'}
               required
             />
             <InputWithUnit
-              label="Rate"
+              label={t('sellAnimal.price')}
               value={form.rate}
               onChange={value => handleChange('rate', value)}
-              placeholder="For ex: 40000"
+              placeholder="40000"
               unit="₹"
               required
             />
           </section>
 
           {/* Days to sell */}
-          <section className="bg-white/80 backdrop-blur-sm p-8 shadow-xl rounded-2xl space-y-6 border border-white/20">
-            <SectionHeader icon="📅" title="In how many days do you want to sell?" />
+          <section className="bg-white p-6 shadow-md rounded-xl space-y-4">
+            <SectionHeader icon="📅" title={t('sellAnimal.daysToSell')} />
             <div className="flex flex-wrap gap-3">
               {['1 to 3 days', '4 to 7 days', 'More than a week'].map(opt => (
                 <TokenBtn 
@@ -176,57 +241,56 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
               ))}
             </div>
           </section>
-      // ... (previous imports and code remain the same until photo upload section)
 
           {/* Photo upload */}
-          <section className="bg-white/80 backdrop-blur-sm p-8 shadow-xl rounded-2xl space-y-6 border border-white/20">
-            <SectionHeader icon="📷" title="Upload photo (at least one)" required />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {['side', 'udder'].map(field => (
+          <section className="bg-white p-6 shadow-md rounded-xl space-y-4">
+            <SectionHeader icon="📷" title={t('sellAnimal.uploadPhotos')} required />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {[
+                { key: 'side', label: t('sellAnimal.uploadSidePhoto') },
+                { key: 'udder', label: t('sellAnimal.uploadUdderPhoto') }
+              ].map(({ key, label }) => (
                 <label
-                  key={field}
-                  className={`group relative border-2 border-dashed rounded-2xl flex flex-col items-center justify-center h-64 cursor-pointer transition-all duration-300 transform hover:scale-105 ${
-                    form.photos[field] 
-                      ? 'border-[#15BB73] bg-gradient-to-br from-[#15BB73]/10 to-[#0FA568]/10' 
-                      : 'border-gray-300 hover:border-[#15BB73] hover:bg-gradient-to-br hover:from-[#15BB73]/5 hover:to-[#0FA568]/5'
+                  key={key}
+                  className={`relative border-2 border-dashed rounded-xl flex flex-col items-center justify-center h-48 cursor-pointer transition-all ${
+                    form.photos[key] 
+                      ? 'border-[#15BB73] bg-[#15BB73]/5' 
+                      : 'border-gray-300 hover:border-[#15BB73] hover:bg-gray-50'
                   }`}
                 >
-                  {form.photos[field] ? (
+                  {form.photos[key] ? (
                     <>
                       <img 
-                        src={URL.createObjectURL(form.photos[field])} 
-                        alt={field} 
-                        className="h-full w-full object-cover rounded-xl"
+                        src={URL.createObjectURL(form.photos[key])} 
+                        alt={label} 
+                        className="h-full w-full object-cover rounded-lg"
                       />
                       <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); handleRemovePhoto(field); }}
-                        className="absolute top-3 right-3 bg-white/90 hover:bg-white text-gray-600 hover:text-red-600 rounded-full p-2 shadow-lg transition-all duration-300 transform hover:scale-110"
+                        onClick={(e) => { e.stopPropagation(); handleRemovePhoto(key); }}
+                        className="absolute top-2 right-2 bg-white hover:bg-red-50 text-red-600 rounded-full p-2 shadow-md"
                       >
-                        <svg className="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                       </button>
-                      <div className="absolute inset-0 bg-black bg-opacity-30 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
-                        <span className="text-white font-semibold text-lg">Change Photo</span>
-                      </div>
                     </>
                   ) : (
-                    <div className="text-center p-6">
-                      <div className="mx-auto bg-gradient-to-br from-[#15BB73] to-[#0FA568] rounded-full p-4 w-16 h-16 flex items-center justify-center mb-4 shadow-lg">
-                        <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="text-center p-4">
+                      <div className="mx-auto bg-[#15BB73] rounded-full p-3 w-12 h-12 flex items-center justify-center mb-3">
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                         </svg>
                       </div>
-                      <span className="block text-lg font-semibold text-gray-700 mb-2">Select {field} photo</span>
-                      <span className="text-sm text-gray-500">JPEG, PNG (max 5MB)</span>
+                      <span className="block text-sm font-semibold text-gray-700">{label}</span>
+                      <span className="text-xs text-gray-500">JPEG, PNG (max 5MB)</span>
                     </div>
                   )}
                   <input 
                     type="file" 
                     accept="image/*" 
                     className="hidden" 
-                    onChange={e => handleFile(field, e.target.files[0])} 
+                    onChange={e => handleFile(key, e.target.files[0])} 
                   />
                 </label>
               ))}
@@ -234,44 +298,41 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
           </section>
 
           {/* Video upload */}
-          <section className="bg-white/80 backdrop-blur-sm p-8 shadow-xl rounded-2xl space-y-6 border border-white/20">
-            <SectionHeader icon="🎥" title="Upload video (optional)" />
+          <section className="bg-white p-6 shadow-md rounded-xl space-y-4">
+            <SectionHeader icon="🎥" title={t('sellAnimal.uploadVideo')} />
             <label
-              className={`group relative border-2 border-dashed rounded-2xl flex flex-col items-center justify-center h-64 cursor-pointer transition-all duration-300 transform hover:scale-105 ${
+              className={`relative border-2 border-dashed rounded-xl flex flex-col items-center justify-center h-48 cursor-pointer transition-all ${
                 form.photos.video 
-                  ? 'border-[#15BB73] bg-gradient-to-br from-[#15BB73]/10 to-[#0FA568]/10' 
-                  : 'border-gray-300 hover:border-[#15BB73] hover:bg-gradient-to-br hover:from-[#15BB73]/5 hover:to-[#0FA568]/5'
+                  ? 'border-[#15BB73] bg-[#15BB73]/5' 
+                  : 'border-gray-300 hover:border-[#15BB73] hover:bg-gray-50'
               }`}
             >
               {form.photos.video ? (
                 <>
                   <video 
                     src={URL.createObjectURL(form.photos.video)} 
-                    className="h-full w-full object-contain rounded-xl"
+                    className="h-full w-full object-contain rounded-lg"
                     controls
                   />
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); handleRemovePhoto('video'); }}
-                    className="absolute top-3 right-3 bg-white/90 hover:bg-white text-gray-600 hover:text-red-600 rounded-full p-2 shadow-lg transition-all duration-300 transform hover:scale-110"
+                    className="absolute top-2 right-2 bg-white hover:bg-red-50 text-red-600 rounded-full p-2 shadow-md"
                   >
-                    <svg className="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
-                  <div className="absolute inset-0 bg-black bg-opacity-30 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
-                    <span className="text-white font-semibold text-lg">Change Video</span>
-                  </div>
                 </>
               ) : (
-                <div className="text-center p-6">
-                  <div className="mx-auto bg-gradient-to-br from-blue-500 to-blue-600 rounded-full p-4 w-16 h-16 flex items-center justify-center mb-4 shadow-lg">
-                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="text-center p-4">
+                  <div className="mx-auto bg-blue-500 rounded-full p-3 w-12 h-12 flex items-center justify-center mb-3">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
                   </div>
-                  <span className="block text-lg font-semibold text-gray-700 mb-2">Select video</span>
-                  <span className="text-sm text-gray-500">MP4, MOV (max 25MB)</span>
+                  <span className="block text-sm font-semibold text-gray-700">Select video</span>
+                  <span className="text-xs text-gray-500">MP4, MOV (max 25MB)</span>
                 </div>
               )}
               <input 
@@ -284,44 +345,43 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
           </section>
 
           {/* Additional Info Toggle */}
-          <section className="bg-white/80 backdrop-blur-sm p-8 shadow-xl rounded-2xl border border-white/20">
+          <section className="bg-white p-6 shadow-md rounded-xl">
             <button
               type="button"
               onClick={() => handleChange('addInfoOpen', !form.addInfoOpen)}
-              className="w-full flex justify-between items-center text-left font-semibold text-[#000600] hover:text-[#15BB73] transition-all duration-300 p-4 rounded-xl hover:bg-[#15BB73]/5"
+              className="w-full flex justify-between items-center text-left font-semibold text-gray-800 hover:text-[#15BB73] transition-all p-3 rounded-lg hover:bg-gray-50"
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <svg 
-                  className={`w-6 h-6 transition-transform duration-300 ${form.addInfoOpen ? 'rotate-90' : ''}`} 
+                  className={`w-5 h-5 transition-transform ${form.addInfoOpen ? 'rotate-90' : ''}`} 
                   fill="none" 
                   stroke="currentColor" 
                   viewBox="0 0 24 24"
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
                 </svg>
-                <span className="text-xl">Add more information</span>
+                <span>{t('sellAnimal.additionalInfo')}</span>
               </div>
-              <span className="text-gray-400 font-medium">{form.addInfoOpen ? 'Hide' : 'Show'}</span>
+              <span className="text-gray-400 text-sm">{form.addInfoOpen ? 'Hide' : 'Show'}</span>
             </button>
         
             {form.addInfoOpen && (
-              <div className="mt-6 space-y-8 pt-6 border-t border-gray-200">
+              <div className="mt-4 space-y-6 pt-4 border-t">
                 <InputWithUnit
-                  label="Milk Capacity per day"
+                  label={t('sellAnimal.milkCapacity')}
                   value={form.milkCapacity}
                   onChange={value => handleChange('milkCapacity', value)}
-                  placeholder="For ex: 12"
+                  placeholder="12"
                   unit="Liters"
                 />
 
-                {/* delivered / pregnant yes-no toggles */}
                 {[
-                  { key: 'delivered', label: 'Has it delivered?', icon: '🐣' },
-                  { key: 'pregnant', label: 'Is it pregnant?', icon: '🤰' },
+                  { key: 'delivered', label: t('sellAnimal.hasDelivered'), icon: '🐣' },
+                  { key: 'pregnant', label: t('sellAnimal.isPregnant'), icon: '🤰' },
                 ].map(({ key, label, icon }) => (
-                  <div key={key} className="space-y-4">
-                    <p className="text-lg font-semibold text-[#000600] flex items-center gap-3">
-                      <span role="img" aria-hidden="true" className="text-2xl">{icon}</span>
+                  <div key={key} className="space-y-3">
+                    <p className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                      <span className="text-xl">{icon}</span>
                       {label}
                     </p>
                     <div className="flex flex-wrap gap-3">
@@ -334,26 +394,28 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
                   </div>
                 ))}
 
-                {/* Calf */}
-                <div className="space-y-4">
-                  <p className="text-lg font-semibold text-[#000600] flex items-center gap-3">
-                    <span role="img" aria-hidden="true" className="text-2xl">🐄</span>
-                    Does the animal have a calf?
+                <div className="space-y-3">
+                  <p className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <span className="text-xl">🐄</span>
+                    {t('sellAnimal.hasCalf')}
                   </p>
                   <div className="flex flex-wrap gap-3">
-                    {['Female Calf', 'Male Calf', 'No Calf'].map(v => (
-                      <TokenBtn key={v} active={form.calf === v} onClick={() => handleChange('calf', v)}>
-                        {v}
+                    {[
+                      { value: 'Female Calf', label: t('sellAnimal.femaleCalf') },
+                      { value: 'Male Calf', label: t('sellAnimal.maleCalf') },
+                      { value: 'No Calf', label: t('sellAnimal.noCalf') }
+                    ].map(({ value, label }) => (
+                      <TokenBtn key={value} active={form.calf === value} onClick={() => handleChange('calf', value)}>
+                        {label}
                       </TokenBtn>
                     ))}
                   </div>
                 </div>
 
-                {/* Negotiation switch */}
-                <div className="flex items-center justify-between p-6 bg-gradient-to-r from-[#15BB73]/5 to-[#0FA568]/5 rounded-xl border border-[#15BB73]/20">
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div>
-                    <p className="text-lg font-semibold text-[#000600]">Negotiation on the animal rate</p>
-                    <p className="text-sm text-gray-600">Negotiating attracts more buyer calls</p>
+                    <p className="text-sm font-semibold text-gray-800">{t('sellAnimal.negotiable')}</p>
+                    <p className="text-xs text-gray-600">{t('sellAnimal.negotiableDesc')}</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input
@@ -362,18 +424,17 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
                       checked={form.negotiation}
                       onChange={e => handleChange('negotiation', e.target.checked)}
                     />
-                    <div className="w-14 h-7 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-[#15BB73] peer-checked:to-[#0FA568]" />
+                    <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#15BB73]" />
                   </label>
                 </div>
 
-                {/* More details */}
-                <div className="space-y-3">
-                  <label className="block text-lg font-semibold text-[#000600]">More Details</label>
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-700">{t('sellAnimal.moreDetails')}</label>
                   <textarea
-                    rows="4"
+                    rows="3"
                     value={form.details}
                     onChange={e => handleChange('details', e.target.value)}
-                    className="w-full px-6 py-4 text-lg border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all duration-300 bg-white/50 backdrop-blur-sm"
+                    className="w-full px-4 py-3 text-base border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all"
                     placeholder="More details about the animal.."
                   />
                 </div>
@@ -381,22 +442,34 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
             )}
           </section>
 
-          {/* Submit / cancel */}
-          <div className="flex flex-col sm:flex-row justify-end gap-4 sticky bottom-0 bg-white/90 backdrop-blur-md p-6 -mx-4 border-t border-gray-200 shadow-lg">
+          {/* Submit Button */}
+          <div className="flex gap-4 sticky bottom-0 bg-white/95 backdrop-blur-sm p-4 -mx-4 border-t shadow-lg">
             {onCancel && (
               <button 
                 type="button" 
-                onClick={onCancel} 
-                className="px-8 py-4 rounded-xl border-2 border-gray-300 font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-300 transform hover:scale-105"
+                onClick={onCancel}
+                disabled={loading}
+                className="px-6 py-3 rounded-lg border-2 border-gray-300 font-semibold text-gray-700 hover:bg-gray-50 transition-all disabled:opacity-50"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
             )}
             <button 
-              type="submit" 
-              className="px-8 py-4 rounded-xl bg-gradient-to-r from-[#15BB73] to-[#0FA568] font-semibold text-white hover:from-[#0FA568] hover:to-[#15BB73] transition-all duration-300 shadow-lg shadow-[#15BB73]/30 transform hover:scale-105 hover:shadow-xl hover:shadow-[#15BB73]/40"
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-6 py-3 rounded-lg bg-gradient-to-r from-[#15BB73] to-[#0FA568] font-semibold text-white hover:from-[#0FA568] hover:to-[#15BB73] transition-all shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              Post Listing
+              {loading ? (
+                <>
+                  <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  {t('listing.submitting')}
+                </>
+              ) : (
+                t('sellAnimal.submitListing')
+              )}
             </button>
           </div>
         </form>

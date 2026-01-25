@@ -13,6 +13,7 @@ const catListingRoutes = require('./src/routes/catListingRoutes'); // NEW
 const dogListingRoutes = require('./src/routes/dogListingRoutes'); // NEW
 const otherAnimalListingRoutes = require('./src/routes/otherAnimalListingRoutes'); // NEW - Other animals
 const combinedListingsRoutes = require('./src/routes/combinedListingsRoutes'); // Combined listings
+const combinedRoutes = require('./src/routes/combinedListingsRoutes'); // Alias for /api/combined
 const callLogRoutes = require('./src/routes/callLogRoutes'); // Call tracking
 const notificationRoutes = require('./src/routes/notificationRoutes'); // Notifications
 const aiHealthRoutes = require('./src/routes/aiHealthRoutes'); // AI Health Check
@@ -22,6 +23,7 @@ const veterinarianRoutes = require('./src/routes/veterinarianRoutes'); // Veteri
 const vetReviewRoutes = require('./src/routes/vetReviewRoutes'); // Veterinarian review routes
 const vetReportRoutes = require('./src/routes/vetReportRoutes'); // Veterinarian report routes
 const appointmentRoutes = require('./src/routes/appointmentRoutes'); // Appointment booking routes
+const wishlistRoutes = require('./src/routes/wishlistRoutes'); // Wishlist routes
 const otpService = require('./src/services/otpService');
 require('dotenv').config();
 
@@ -33,8 +35,8 @@ app.use(cors());
 app.use(morgan('combined'));
 
 // Body parsing middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Trust proxy for IP address
 app.set('trust proxy', true);
@@ -50,6 +52,7 @@ app.use('/api/cats', catListingRoutes);  // NEW - Cat listing routes
 app.use('/api/dogs', dogListingRoutes);  // NEW - Dog listing routes
 app.use('/api/other-animals', otherAnimalListingRoutes);  // NEW - Other animal listing routes
 app.use('/api/listings', combinedListingsRoutes);  // Combined listings from all categories
+app.use('/api/combined', combinedRoutes);  // Alias route for mobile app compatibility
 app.use('/api/call-logs', callLogRoutes);  // Call tracking routes
 app.use('/api/notifications', notificationRoutes);  // Notification routes
 app.use('/api/health-check', aiHealthRoutes);  // AI Health Check routes
@@ -59,6 +62,7 @@ app.use('/api/veterinarians', veterinarianRoutes);  // Veterinarian routes
 app.use('/api/vet-reviews', vetReviewRoutes);  // Veterinarian review routes
 app.use('/api/vet-reports', vetReportRoutes);  // Veterinarian report routes
 app.use('/api/appointments', appointmentRoutes);  // Appointment booking routes
+app.use('/api/wishlist', wishlistRoutes);  // Wishlist routes
 
 // Serve static files for web frontend
 app.use(express.static('public'));

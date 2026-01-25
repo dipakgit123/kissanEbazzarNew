@@ -54,12 +54,12 @@ const uploadFields = multer({
 ]);
 
 // Process and upload files to Cloudinary
-const uploadToCloudinary = async (file, resourceType = 'image') => {
+const uploadToCloudinary = async (file, folder = 'animal-listings/images', resourceType = 'image') => {
   return new Promise((resolve, reject) => {
     try {
       const uploadOptions = {
         resource_type: resourceType,
-        folder: resourceType === 'video' ? 'animal-listings/videos' : 'animal-listings/images'
+        folder: folder
       };
 
       if (resourceType === 'image') {

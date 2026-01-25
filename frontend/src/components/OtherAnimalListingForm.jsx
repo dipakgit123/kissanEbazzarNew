@@ -14,6 +14,7 @@ import {
   SubmitButton,
   InfoBanner
 } from './common';
+import './AnimalListingPage.css';
 
 const OtherAnimalListingForm = () => {
   const { t } = useTranslation();
@@ -86,7 +87,12 @@ const OtherAnimalListingForm = () => {
   const fetchAddressFromCoords = async (lat, lng) => {
     try {
       const response = await axios.get(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
+        {
+          headers: {
+            'User-Agent': 'AnimalEBazzar/1.0'
+          }
+        }
       );
       
       if (response.data && response.data.address) {
@@ -100,28 +106,53 @@ const OtherAnimalListingForm = () => {
       }
     } catch (error) {
       console.error('Error fetching address:', error);
+      // Don't show error to user, just log it
     }
   };
 
   const handleInputChange = (e) => {
-    const { name, value, type, checked, files } = e.target;
-    
-    if (type === 'file') {
-      setFormData(prev => ({
-        ...prev,
-        [name]: files[0]
-      }));
-    } else if (type === 'checkbox') {
-      setFormData(prev => ({
-        ...prev,
-        [name]: checked
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value
-      }));
+    // Handle direct value (for radio buttons and custom onChange)
+    if (typeof e === 'string' || typeof e === 'number') {
+      // This is called from a component that passes value directly
+      return;
     }
+    
+    // Handle event object
+    if (e && e.target) {
+      const { name, value, type, checked, files } = e.target;
+      
+      if (type === 'file') {
+        setFormData(prev => ({
+          ...prev,
+          [name]: files[0]
+        }));
+      } else if (type === 'checkbox') {
+        setFormData(prev => ({
+          ...prev,
+          [name]: checked
+        }));
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          [name]: value
+        }));
+      }
+      
+      // Clear error for this field
+      if (errors[name]) {
+        setErrors(prev => ({
+          ...prev,
+          [name]: null
+        }));
+      }
+    }
+  };
+
+  const handleFileChange = (name, file) => {
+    setFormData(prev => ({
+      ...prev,
+      [name]: file
+    }));
     
     // Clear error for this field
     if (errors[name]) {
@@ -197,8 +228,12 @@ const OtherAnimalListingForm = () => {
         formDataToSend.append('video', formData.video);
       }
 
+      const endpoint = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/other-animals/listings`;
+      console.log('🐾 [OTHER ANIMAL] Submitting to API endpoint:', endpoint);
+      console.log('🐾 [OTHER ANIMAL] Animal Type:', formData.animalType);
+      
       const response = await axios.post(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/other-animals/listings`,
+        endpoint,
         formDataToSend,
         {
           headers: {
@@ -207,6 +242,9 @@ const OtherAnimalListingForm = () => {
           }
         }
       );
+
+      console.log('✅ [OTHER ANIMAL] API Response:', response.data);
+      console.log('✅ [OTHER ANIMAL] Listing created successfully at:', endpoint);
 
       if (response.data.success) {
         toast.success(t('listing.createSuccess') || 'Other animal listing created successfully!');
@@ -416,7 +454,7 @@ const OtherAnimalListingForm = () => {
               label={t('animal.frontPhoto') || 'Front Photo'}
               name="frontPhoto"
               accept="image/*"
-              onChange={handleInputChange}
+              onChange={(file) => handleFileChange('frontPhoto', file)}
               helperText={t('animal.photoHelper') || 'Clear front view of the animal'}
             />
 
@@ -424,7 +462,7 @@ const OtherAnimalListingForm = () => {
               label={t('animal.sidePhoto') || 'Side Photo'}
               name="sidePhoto"
               accept="image/*"
-              onChange={handleInputChange}
+              onChange={(file) => handleFileChange('sidePhoto', file)}
               helperText={t('animal.photoHelper') || 'Side view of the animal'}
             />
 
@@ -432,7 +470,7 @@ const OtherAnimalListingForm = () => {
               label={t('otherAnimal.additionalPhoto') || 'Additional Photo'}
               name="additionalPhoto"
               accept="image/*"
-              onChange={handleInputChange}
+              onChange={(file) => handleFileChange('additionalPhoto', file)}
               helperText={t('otherAnimal.additionalPhotoHelper') || 'Any other relevant photo'}
             />
 
@@ -440,7 +478,7 @@ const OtherAnimalListingForm = () => {
               label={t('animal.video') || 'Video (Optional)'}
               name="video"
               accept="video/*"
-              onChange={handleInputChange}
+              onChange={(file) => handleFileChange('video', file)}
               helperText={t('animal.videoHelper') || 'Short video showing the animal'}
             />
           </FormSection>
@@ -478,9 +516,9 @@ const OtherAnimalListingForm = () => {
 
           {/* Submit Button */}
           <SubmitButton
-            isSubmitting={isSubmitting}
-            text={t('listing.submit') || 'Submit Listing'}
+            loading={isSubmitting}
             loadingText={t('listing.submitting') || 'Creating Listing...'}
+            submitText={t('listing.submit') || 'Submit Listing'}
           />
         </form>
       </div>

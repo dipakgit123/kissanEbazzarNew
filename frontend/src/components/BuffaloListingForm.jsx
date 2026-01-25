@@ -12,6 +12,7 @@ import {
   InfoBanner,
   SubmitButton
 } from './common';
+import './AnimalListingPage.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -22,10 +23,10 @@ const BuffaloListingForm = () => {
     age: '',
     milkCapacity: '',
     pregnancyStatus: 'unknown',
-    hasHorns: true,
+    hasHorns: 'true',
     healthCondition: 'good',
     expectedPrice: '',
-    isNegotiable: true,
+    isNegotiable: 'true',
     vaccinationDetails: '',
     deliveryAvailable: false,
     additionalNotes: ''
@@ -84,8 +85,11 @@ const BuffaloListingForm = () => {
         throw new Error('Please login to create a listing');
       }
 
+      const endpoint = `${API_URL}/api/buffalos/listings`;
+      console.log('🐃 [BUFFALO] Submitting to API endpoint:', endpoint);
+      
       const response = await axios.post(
-        `${API_URL}/api/buffalos/listings`,
+        endpoint,
         formDataToSend,
         {
           headers: {
@@ -95,6 +99,9 @@ const BuffaloListingForm = () => {
         }
       );
 
+      console.log('✅ [BUFFALO] API Response:', response.data);
+      console.log('✅ [BUFFALO] Listing created successfully at:', endpoint);
+
       if (response.data.success) {
         setSuccess(true);
         setFormData({
@@ -102,10 +109,10 @@ const BuffaloListingForm = () => {
           age: '',
           milkCapacity: '',
           pregnancyStatus: 'unknown',
-          hasHorns: true,
+          hasHorns: 'true',
           healthCondition: 'good',
           expectedPrice: '',
-          isNegotiable: true,
+          isNegotiable: 'true',
           vaccinationDetails: '',
           deliveryAvailable: false,
           additionalNotes: ''
@@ -191,12 +198,12 @@ const BuffaloListingForm = () => {
           <FormRadioGroup
             label="Has Horns?"
             name="hasHorns"
+            value={formData.hasHorns}
+            onChange={handleChange}
             options={[
-              { id: 'buffalo-horns-yes', value: true, label: 'Yes' },
-              { id: 'buffalo-horns-no', value: false, label: 'No' }
+              { value: 'true', label: 'Yes' },
+              { value: 'false', label: 'No' }
             ]}
-            selectedValue={formData.hasHorns}
-            onChange={(value) => setFormData(prev => ({ ...prev, hasHorns: value }))}
           />
 
           <FormSelect

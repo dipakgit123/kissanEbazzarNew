@@ -23,7 +23,7 @@ import LanguageSwitcher from '../components/LanguageSwitcher';
 const { width, height } = Dimensions.get('window');
 
 const VetLoginScreen = ({ navigation }) => {
-  const { t } = useTranslation();
+  const { t, ready } = useTranslation();
   const { login } = useVetAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -31,6 +31,15 @@ const VetLoginScreen = ({ navigation }) => {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
+
+  // Show loading while translations are loading
+  if (!ready) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
 
   const validateEmail = (email) => {
     const re = /\S+@\S+\.\S+/;

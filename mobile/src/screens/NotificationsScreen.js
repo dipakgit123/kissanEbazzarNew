@@ -81,6 +81,7 @@ const getTimeAgo = (dateString) => {
 };
 
 const NotificationsScreen = ({ navigation }) => {
+  const { t, ready } = useTranslation();
   const {
     notifications,
     unreadCount,
@@ -91,6 +92,15 @@ const NotificationsScreen = ({ navigation }) => {
     deleteNotification,
     clearAll,
   } = useNotifications();
+
+  // Show loading while translations are loading
+  if (!ready) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
 
   const handleNotificationPress = async (notification) => {
     if (!notification.is_read) {

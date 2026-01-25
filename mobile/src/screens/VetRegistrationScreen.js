@@ -12,7 +12,7 @@ import LanguageSwitcher from '../components/LanguageSwitcher';
 const { width } = Dimensions.get('window');
 
 const VetRegistrationScreen = ({ navigation }) => {
-  const { t } = useTranslation();
+  const { t, ready } = useTranslation();
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -25,6 +25,15 @@ const VetRegistrationScreen = ({ navigation }) => {
   });
   const [files, setFiles] = useState({ profile_photo: null, license_document: null, degree_certificate: null, aadhar_document: null });
   const [errors, setErrors] = useState({});
+
+  // Show loading while translations are loading
+  if (!ready) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
 
   const specializations = [
     { value: 'general', label: t('vetRegistration.specializations.general') || 'General Practice' },
@@ -155,11 +164,32 @@ const VetRegistrationScreen = ({ navigation }) => {
     if (!validateStep3()) return;
     setLoading(true);
     try {
+      console.log('=== VET REGISTRATION DEBUG ===');
+      console.log('Form Data:', formData);
+      console.log('Files:', files);
+      console.log('License Document:', files.license_document ? 'EXISTS' : 'MISSING');
+      console.log('====================');
+
       const registrationData = new FormData();
       Object.keys(formData).forEach(key => {
-        if (key === 'services') registrationData.append(key, JSON.stringify(formData[key]));
-        else if (key === 'emergency_available') registrationData.append(key, formData[key] ? 'true' : 'false');
-        else registrationData.append(key, formData[key]);
+        if (key === 'services') {
+          registrationData.append(key, JSON.stringify(formData[key]));
+        } else if (key === 'emergency_available') {
+          registrationData.append(key, formData[key] ? 'true' : 'false');
+        } else if (key === 'phone_number') {
+          // Convert phone number to E.164 format (+91xxxxxxxxxx)
+          let phone = formData[key].toString().replace(/\D/g, ''); // Remove non-digits
+          if (phone.length === 10) {
+            phone = '+91' + phone; // Add India country code
+          } else if (phone.length === 12 && phone.startsWith('91')) {
+            phone = '+' + phone; // Add + if missing
+          } else if (!phone.startsWith('+')) {
+            phone = '+' + phone; // Add + if missing
+          }
+          registrationData.append(key, phone);
+        } else {
+          registrationData.append(key, formData[key]);
+        }
       });
       Object.keys(files).forEach(key => {
         if (files[key]) {
@@ -170,7 +200,11 @@ const VetRegistrationScreen = ({ navigation }) => {
           });
         }
       });
+      
+      console.log('Sending registration request...');
       const response = await veterinarianService.register(registrationData);
+      console.log('Registration response:', response);
+      
       if (response.success) {
         Alert.alert(t('common.success'), t('vetRegistration.registrationSuccess'), 
           [{ text: t('common.ok'), onPress: () => navigation.navigate('VetLogin') }]);
@@ -178,7 +212,17 @@ const VetRegistrationScreen = ({ navigation }) => {
         Alert.alert(t('common.error'), response.message || t('vetRegistration.registrationFailed'));
       }
     } catch (error) {
-      Alert.alert(t('common.error'), error.response?.data?.message || t('vetRegistration.registrationFailed'));
+      console.error('=== VET REGISTRATION ERROR ===');
+      console.error('Error:', error);
+      console.error('Response:', error.response?.data);
+      console.error('Status:', error.response?.status);
+      console.error('Message:', error.response?.data?.message || error.message);
+      console.error('====================');
+      
+      Alert.alert(
+        t('common.error'), 
+        error.response?.data?.message || error.message || t('vetRegistration.registrationFailed')
+      );
     } finally {
       setLoading(false);
     }

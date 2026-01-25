@@ -24,18 +24,21 @@ const goatValidationRules = [
     .isFloat({ min: 0, max: 200 }).withMessage('Weight must be between 0 and 200 kg'),
 
   body('color')
-    .trim()
-    .notEmpty().withMessage('Color is required'),
+    .optional()
+    .trim(),
 
   body('hornType')
-    .isIn(['with_horns', 'without_horns'])
-    .withMessage('Horn type must be with_horns or without_horns'),
+    .optional()
+    .isIn(['with_horns', 'without_horns', 'dehorned'])
+    .withMessage('Horn type must be with_horns, without_horns, or dehorned'),
 
   body('healthStatus')
-    .isIn(['healthy', 'under_treatment', 'vaccinated'])
+    .optional()
+    .isIn(['healthy', 'sick', 'recovering', 'under_treatment', 'vaccinated'])
     .withMessage('Invalid health status'),
 
   body('purpose')
+    .optional()
     .isIn(['milk', 'meat', 'breeding', 'pet'])
     .withMessage('Purpose must be milk, meat, breeding, or pet'),
 
@@ -44,16 +47,8 @@ const goatValidationRules = [
     .isFloat({ min: 0 }).withMessage('Price must be a positive number'),
 
   body('isNegotiable')
-    .notEmpty().withMessage('Negotiable status is required')
-    .isBoolean().withMessage('Negotiable must be true or false'),
-
-  body('detailsConfirmed')
-    .notEmpty().withMessage('Details confirmation is required')
-    .isBoolean().withMessage('Details confirmed must be true or false'),
-
-  body('termsAccepted')
-    .notEmpty().withMessage('Terms acceptance is required')
-    .isBoolean().withMessage('Terms accepted must be true or false')
+    .optional()
+    .isBoolean().withMessage('Negotiable must be true or false')
 ];
 
 // Multer configuration for file uploads
@@ -68,29 +63,7 @@ const fileUploadConfig = upload.fields([
   { name: 'video', maxCount: 1 }
 ]);
 
-// Public routes - no authentication required
-/**
- * @route   GET /api/goats/listings
- * @desc    Get all goat listings with filters and pagination
- * @access  Public
- */
-router.get('/listings', goatListingController.getAllGoatListings);
-
-/**
- * @route   GET /api/goats/listings/nearby
- * @desc    Get nearby goat listings based on location
- * @access  Public
- */
-router.get('/listings/nearby', goatListingController.getNearbyGoatListings);
-
-/**
- * @route   GET /api/goats/listings/:id
- * @desc    Get single goat listing by ID
- * @access  Public
- */
-router.get('/listings/:id', goatListingController.getGoatListingById);
-
-// Protected routes - authentication required
+// Protected routes - authentication required (POST routes first)
 /**
  * @route   POST /api/goats/listings
  * @desc    Create a new goat listing
@@ -103,6 +76,28 @@ router.post(
   goatValidationRules,
   goatListingController.createGoatListing
 );
+
+// Public routes - no authentication required
+/**
+ * @route   GET /api/goats/listings/nearby
+ * @desc    Get nearby goat listings based on location
+ * @access  Public
+ */
+router.get('/listings/nearby', goatListingController.getNearbyGoatListings);
+
+/**
+ * @route   GET /api/goats/listings
+ * @desc    Get all goat listings with filters and pagination
+ * @access  Public
+ */
+router.get('/listings', goatListingController.getAllGoatListings);
+
+/**
+ * @route   GET /api/goats/listings/:id
+ * @desc    Get single goat listing by ID
+ * @access  Public
+ */
+router.get('/listings/:id', goatListingController.getGoatListingById);
 
 /**
  * @route   GET /api/goats/my-listings

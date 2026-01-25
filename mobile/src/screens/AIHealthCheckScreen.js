@@ -9,24 +9,50 @@ import {
   ActivityIndicator,
   Alert,
   TextInput,
+  Modal,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../utils/constants';
 import { healthCheckService } from '../services/api';
 
-// Animal types in Marathi
+// Animal types in Marathi with images from assets
 const ANIMAL_TYPES = [
-  { id: 'cow', name: 'गाय', icon: '🐄' },
-  { id: 'buffalo', name: 'म्हैस', icon: '🐃' },
-  { id: 'goat', name: 'शेळी', icon: '🐐' },
-  { id: 'sheep', name: 'मेंढी', icon: '🐑' },
-  { id: 'horse', name: 'घोडा', icon: '🐴' },
-  { id: 'dog', name: 'कुत्रा', icon: '🐕' },
-  { id: 'cat', name: 'मांजर', icon: '🐈' },
-  { id: 'chicken', name: 'कोंबडी', icon: '🐔' },
+  { id: 'cow', name: 'गाय', image: require('../assets/cow1.png'), color: '#D2691E', emoji: '🐄' },
+  { id: 'buffalo', name: 'म्हैस', image: require('../assets/buffalo1.png'), color: '#2F4F4F', emoji: '🐃' },
+  { id: 'goat', name: 'शेळी', image: require('../assets/goat1.png'), color: '#8B7355', emoji: '🐐' },
+  { id: 'horse', name: 'घोडा', image: require('../assets/horse1.png'), color: '#8B4513', emoji: '🐴' },
+  { id: 'dog', name: 'कुत्रा', image: require('../assets/dog1.png'), color: '#CD853F', emoji: '🐕' },
+  { id: 'cat', name: 'मांजर', image: require('../assets/cat1.png'), color: '#FFA07A', emoji: '🐈' },
+  { id: 'other', name: 'इतर', icon: 'dots-horizontal-circle', color: '#6B7280', emoji: '🐾' },
 ];
+
+// Helper functions
+const getScoreColor = (score) => {
+  if (score >= 8) return '#10B981'; // Green
+  if (score >= 6) return '#F59E0B'; // Amber
+  if (score >= 4) return '#F97316'; // Orange
+  return '#EF4444'; // Red
+};
+
+const getUrgencyColor = (urgency) => {
+  if (urgency === 'तातडीची' || urgency === 'High') return '#EF4444';
+  if (urgency === 'मध्यम' || urgency === 'Medium') return '#F59E0B';
+  return '#10B981';
+};
+
+const getBodyConditionText = (score) => {
+  const num = Number(score);
+  if (num <= 2) return 'कमी वजन';
+  if (num >= 4) return 'जास्त वजन';
+  return 'सामान्य';
+};
+
+const getAnimalEmoji = (animalId) => {
+  const animal = ANIMAL_TYPES.find(a => a.id === animalId);
+  return animal?.emoji || '🐾';
+};
 
 // Result Card Component
 const ResultCard = ({ title, icon, children, color = COLORS.primary }) => (
@@ -81,6 +107,7 @@ const SeverityBadge = ({ severity }) => {
 };
 
 const AIHealthCheckScreen = ({ navigation }) => {
+  const { t } = useTranslation();
   const [selectedAnimal, setSelectedAnimal] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [symptoms, setSymptoms] = useState('');
@@ -88,6 +115,7 @@ const AIHealthCheckScreen = ({ navigation }) => {
   const [additionalInfo, setAdditionalInfo] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
   // Pick image from gallery
   const pickImage = async () => {
@@ -174,6 +202,7 @@ const AIHealthCheckScreen = ({ navigation }) => {
 
       if (response.success) {
         setResult(response.data);
+        setModalVisible(true);
       } else {
         Alert.alert('त्रुटी', response.message || 'विश्लेषण अयशस्वी');
       }
@@ -193,6 +222,7 @@ const AIHealthCheckScreen = ({ navigation }) => {
     setAge('');
     setAdditionalInfo('');
     setResult(null);
+    setModalVisible(false);
   };
 
   return (
@@ -255,18 +285,37 @@ const AIHealthCheckScreen = ({ navigation }) => {
                 style={[
                   styles.animalButton,
                   selectedAnimal === animal.id && styles.animalButtonSelected,
+                  selectedAnimal === animal.id && { borderColor: animal.color },
                 ]}
                 onPress={() => setSelectedAnimal(animal.id)}
               >
-                <Text style={styles.animalIcon}>{animal.icon}</Text>
-                <Text
-                  style={[
-                    styles.animalName,
-                    selectedAnimal === animal.id && styles.animalNameSelected,
-                  ]}
-                >
-                  {animal.name}
-                </Text>
+                <View style={styles.animalCardContent}>
+                  {animal.image ? (
+                    <Image 
+                      source={animal.image} 
+                      style={styles.animalImage}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={styles.animalIconWrapper}>
+                      <MaterialCommunityIcons 
+                        name={animal.icon} 
+                        size={40} 
+                        color={selectedAnimal === animal.id ? animal.color : COLORS.gray} 
+                      />
+                    </View>
+                  )}
+                </View>
+                <View style={styles.animalNameContainer}>
+                  <Text
+                    style={[
+                      styles.animalName,
+                      selectedAnimal === animal.id && styles.animalNameSelected,
+                    ]}
+                  >
+                    {animal.name}
+                  </Text>
+                </View>
               </TouchableOpacity>
             ))}
           </View>
@@ -331,47 +380,78 @@ const AIHealthCheckScreen = ({ navigation }) => {
           )}
         </TouchableOpacity>
 
-        {/* Results */}
-        {result && (
-          <View style={styles.resultsContainer}>
-            <View style={styles.resultsHeader}>
-              <Text style={styles.resultsTitle}>विश्लेषण परिणाम</Text>
-              <TouchableOpacity onPress={resetForm}>
-                <Text style={styles.resetText}>नवीन तपासणी</Text>
+        <View style={styles.bottomPadding} />
+      </ScrollView>
+
+      {/* Results Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>विश्लेषण परिणाम</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeButton}>
+                <Ionicons name="close" size={28} color={COLORS.black} />
               </TouchableOpacity>
             </View>
 
-            {/* Overall Health */}
-            <ResultCard title="एकूण आरोग्य स्थिती" icon="heart" color="#EF4444">
-              <InfoRow label="आरोग्य स्थिती" value={result.overallHealth?.status} />
-              <View style={styles.scoreContainer}>
-                <Text style={styles.scoreLabel}>आरोग्य गुण:</Text>
-                <View style={styles.scoreBarContainer}>
-                  <View
-                    style={[
-                      styles.scoreBar,
-                      { width: `${result.overallHealth?.healthScore || 0}%` },
-                    ]}
-                  />
-                </View>
-                <Text style={styles.scoreValue}>
-                  {result.overallHealth?.healthScore}/100
-                </Text>
-              </View>
-              <InfoRow label="तातडीचे?" value={result.overallHealth?.urgency} />
-              <InfoRow label="सारांश" value={result.overallHealth?.summary} />
-            </ResultCard>
+            <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+              {result && (
+                <>
+                  {/* Overall Health Summary */}
+                  <View style={styles.summaryCard}>
+                    <View style={styles.summaryGrid}>
+                      {/* Health Score */}
+                      <View style={styles.summaryItem}>
+                        <Text style={styles.summaryLabel}>आरोग्य गुण</Text>
+                        <View style={[styles.scoreCircle, { backgroundColor: getScoreColor(result.healthScore) }]}>
+                          <Text style={styles.scoreText}>{result.healthScore || '?'}</Text>
+                        </View>
+                        <Text style={styles.summaryValue}>{result.overallHealth || '-'}</Text>
+                        <View style={[styles.urgencyBadge, { backgroundColor: getUrgencyColor(result.urgencyLevel) + '20' }]}>
+                          <Text style={[styles.urgencyText, { color: getUrgencyColor(result.urgencyLevel) }]}>
+                            {result.urgencyLevel || 'सामान्य'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Body Condition */}
+                      <View style={[styles.summaryItem, styles.summaryItemBorder]}>
+                        <Text style={styles.summaryLabel}>शरीर स्थिती</Text>
+                        <View style={styles.bodyConditionCircle}>
+                          <Text style={styles.bodyConditionEmoji}>
+                            {Number(result.bodyConditionScore) <= 2 || Number(result.bodyConditionScore) >= 4 ? '⚠️' : '✅'}
+                          </Text>
+                        </View>
+                        <Text style={styles.summaryValue}>{getBodyConditionText(result.bodyConditionScore)}</Text>
+                        <Text style={styles.bodyConditionScore}>{result.bodyConditionScore || '3'}/5</Text>
+                      </View>
+
+                      {/* Animal Type */}
+                      <View style={styles.summaryItem}>
+                        <Text style={styles.summaryLabel}>प्राणी</Text>
+                        <View style={styles.animalTypeCircle}>
+                          <Text style={styles.animalEmoji}>{getAnimalEmoji(selectedAnimal)}</Text>
+                        </View>
+                        <Text style={styles.summaryValue}>{result.animalType || '-'}</Text>
+                      </View>
+                    </View>
+                  </View>
 
             {/* Age Estimation */}
             {result.estimatedAge && (
               <ResultCard title="अंदाजे वय" icon="calendar" color="#8B5CF6">
                 <View style={styles.ageDisplay}>
                   <Text style={styles.ageValue}>
-                    {result.estimatedAge.years || 0} वर्षे {result.estimatedAge.months || 0} महिने
+                    {result.estimatedAge?.years || 0} वर्षे {result.estimatedAge?.months || 0} महिने
                   </Text>
                 </View>
-                <InfoRow label="वयाचे वर्णन" value={result.estimatedAge.ageDescription} />
-                <InfoRow label="वय निर्धारण आधार" value={result.estimatedAge.ageIndicators} />
+                <InfoRow label="वयाचे वर्णन" value={result.estimatedAge?.ageDescription || 'उपलब्ध नाही'} />
+                <InfoRow label="वय निर्धारण आधार" value={result.estimatedAge?.ageIndicators || 'उपलब्ध नाही'} />
               </ResultCard>
             )}
 
@@ -380,22 +460,22 @@ const AIHealthCheckScreen = ({ navigation }) => {
               <ResultCard title="प्रजनन तयारी" icon="male-female" color="#EC4899">
                 <View style={styles.readinessContainer}>
                   <Ionicons
-                    name={result.breedingReadiness.isReadyForMating ? 'checkmark-circle' : 'close-circle'}
+                    name={result.breedingReadiness?.isReadyForMating ? 'checkmark-circle' : 'close-circle'}
                     size={32}
-                    color={result.breedingReadiness.isReadyForMating ? '#22C55E' : '#EF4444'}
+                    color={result.breedingReadiness?.isReadyForMating ? '#22C55E' : '#EF4444'}
                   />
                   <Text style={styles.readinessStatus}>
-                    {result.breedingReadiness.matingReadinessStatus}
+                    {result.breedingReadiness?.matingReadinessStatus || 'उपलब्ध नाही'}
                   </Text>
                 </View>
-                {result.breedingReadiness.daysUntilMatingReady > 0 && (
+                {result.breedingReadiness?.daysUntilMatingReady > 0 && (
                   <InfoRow
                     label="प्रजननासाठी दिवस"
                     value={`${result.breedingReadiness.daysUntilMatingReady} दिवस`}
                   />
                 )}
-                <InfoRow label="योग्य प्रजनन वय" value={result.breedingReadiness.optimalMatingAge} />
-                <InfoRow label="सल्ला" value={result.breedingReadiness.matingAdvice} />
+                <InfoRow label="योग्य प्रजनन वय" value={result.breedingReadiness?.optimalMatingAge || 'उपलब्ध नाही'} />
+                <InfoRow label="सल्ला" value={result.breedingReadiness?.matingAdvice || 'उपलब्ध नाही'} />
               </ResultCard>
             )}
 
@@ -404,131 +484,119 @@ const AIHealthCheckScreen = ({ navigation }) => {
               <ResultCard title="गर्भधारणा माहिती" icon="woman" color="#F59E0B">
                 <View style={styles.readinessContainer}>
                   <Ionicons
-                    name={result.pregnancyInfo.canGetPregnant ? 'checkmark-circle' : 'close-circle'}
+                    name={result.pregnancyInfo?.canGetPregnant ? 'checkmark-circle' : 'close-circle'}
                     size={32}
-                    color={result.pregnancyInfo.canGetPregnant ? '#22C55E' : '#EF4444'}
+                    color={result.pregnancyInfo?.canGetPregnant ? '#22C55E' : '#EF4444'}
                   />
                   <Text style={styles.readinessStatus}>
-                    {result.pregnancyInfo.pregnancyReadinessStatus}
+                    {result.pregnancyInfo?.pregnancyReadinessStatus || 'उपलब्ध नाही'}
                   </Text>
                 </View>
-                {result.pregnancyInfo.daysUntilPregnancyReady > 0 && (
+                {result.pregnancyInfo?.daysUntilPregnancyReady > 0 && (
                   <InfoRow
                     label="गर्भधारणेसाठी दिवस"
                     value={`${result.pregnancyInfo.daysUntilPregnancyReady} दिवस`}
                   />
                 )}
-                <InfoRow label="गर्भधारणा कालावधी" value={result.pregnancyInfo.gestationPeriod} />
-                <InfoRow label="सल्ला" value={result.pregnancyInfo.pregnancyAdvice} />
+                <InfoRow label="गर्भधारणा कालावधी" value={result.pregnancyInfo?.gestationPeriod || 'उपलब्ध नाही'} />
+                <InfoRow label="सल्ला" value={result.pregnancyInfo?.pregnancyAdvice || 'उपलब्ध नाही'} />
               </ResultCard>
             )}
 
-            {/* Identified Conditions */}
-            {result.identifiedConditions?.length > 0 && (
-              <ResultCard title="आढळलेल्या समस्या" icon="warning" color="#F59E0B">
-                {result.identifiedConditions.map((condition, index) => (
-                  <View key={index} style={styles.conditionItem}>
-                    <View style={styles.conditionHeader}>
-                      <Text style={styles.conditionName}>{condition.condition}</Text>
-                      <SeverityBadge severity={condition.severity} />
-                    </View>
-                    <Text style={styles.conditionProbability}>
-                      संभाव्यता: {condition.probability}
-                    </Text>
-                    <Text style={styles.conditionDescription}>{condition.description}</Text>
+            {/* Visible Signs */}
+            {result.visibleSigns?.length > 0 && (
+              <ResultCard title="दिसलेली चिन्हे" icon="eye" color="#3B82F6">
+                {result.visibleSigns.map((sign, index) => (
+                  <View key={index} style={styles.symptomItem}>
+                    <View style={styles.bulletPoint} />
+                    <Text style={styles.symptomText}>{sign}</Text>
                   </View>
                 ))}
               </ResultCard>
             )}
 
-            {/* Symptoms */}
-            {result.symptoms?.observed?.length > 0 && (
-              <ResultCard title="दिसलेली लक्षणे" icon="eye" color="#3B82F6">
-                {result.symptoms.observed.map((symptom, index) => (
+            {/* Healthy Indicators */}
+            {result.healthyIndicators?.length > 0 && (
+              <ResultCard title="निरोगी चिन्हे" icon="checkmark-circle" color="#22C55E">
+                {result.healthyIndicators.map((indicator, index) => (
                   <View key={index} style={styles.symptomItem}>
-                    <View style={styles.bulletPoint} />
-                    <Text style={styles.symptomText}>{symptom}</Text>
+                    <Ionicons name="checkmark" size={16} color="#22C55E" />
+                    <Text style={styles.symptomText}>{indicator}</Text>
+                  </View>
+                ))}
+              </ResultCard>
+            )}
+
+            {/* Potential Issues */}
+            {result.potentialIssues?.length > 0 && (
+              <ResultCard title="संभाव्य समस्या" icon="warning" color="#F59E0B">
+                {result.potentialIssues.map((issue, index) => (
+                  <View key={index} style={styles.conditionItem}>
+                    <View style={styles.conditionHeader}>
+                      <Text style={styles.conditionName}>{issue.issue || issue.condition}</Text>
+                      <SeverityBadge severity={issue.severity} />
+                    </View>
+                    <Text style={styles.conditionDescription}>{issue.description}</Text>
                   </View>
                 ))}
               </ResultCard>
             )}
 
             {/* Recommendations */}
-            {result.recommendations && (
-              <ResultCard title="शिफारसी" icon="bulb" color="#22C55E">
-                {result.recommendations.immediate?.length > 0 && (
-                  <View style={styles.recommendSection}>
-                    <Text style={styles.recommendTitle}>तात्काळ कृती:</Text>
-                    {result.recommendations.immediate.map((rec, index) => (
-                      <View key={index} style={styles.recommendItem}>
-                        <Ionicons name="alert-circle" size={16} color="#EF4444" />
-                        <Text style={styles.recommendText}>{rec}</Text>
-                      </View>
-                    ))}
+            {result.recommendations?.length > 0 && (
+              <ResultCard title="शिफारसी" icon="bulb" color="#10B981">
+                {result.recommendations.map((rec, index) => (
+                  <View key={index} style={styles.recommendItem}>
+                    <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+                    <Text style={styles.recommendText}>{rec}</Text>
                   </View>
-                )}
-                {result.recommendations.shortTerm?.length > 0 && (
-                  <View style={styles.recommendSection}>
-                    <Text style={styles.recommendTitle}>अल्पकालीन:</Text>
-                    {result.recommendations.shortTerm.map((rec, index) => (
-                      <View key={index} style={styles.recommendItem}>
-                        <Ionicons name="time" size={16} color="#F59E0B" />
-                        <Text style={styles.recommendText}>{rec}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-                {result.recommendations.longTerm?.length > 0 && (
-                  <View style={styles.recommendSection}>
-                    <Text style={styles.recommendTitle}>दीर्घकालीन:</Text>
-                    {result.recommendations.longTerm.map((rec, index) => (
-                      <View key={index} style={styles.recommendItem}>
-                        <Ionicons name="calendar" size={16} color="#3B82F6" />
-                        <Text style={styles.recommendText}>{rec}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
+                ))}
               </ResultCard>
             )}
 
-            {/* Veterinary Consultation */}
-            {result.veterinaryConsultation && (
-              <ResultCard
-                title="पशुवैद्यकीय सल्ला"
-                icon="medkit"
-                color={result.veterinaryConsultation.required ? '#EF4444' : '#22C55E'}
-              >
-                <View style={styles.consultationContainer}>
-                  <Ionicons
-                    name={result.veterinaryConsultation.required ? 'alert-circle' : 'checkmark-circle'}
-                    size={32}
-                    color={result.veterinaryConsultation.required ? '#EF4444' : '#22C55E'}
-                  />
-                  <Text style={styles.consultationText}>
-                    {result.veterinaryConsultation.required
-                      ? 'पशुवैद्यकांची भेट आवश्यक'
-                      : 'पशुवैद्यकांची भेट आत्ता आवश्यक नाही'}
-                  </Text>
+            {/* Dietary Suggestions */}
+            {result.dietarySuggestions?.length > 0 && (
+              <ResultCard title="आहार सूचना" icon="restaurant" color="#8B5CF6">
+                {result.dietarySuggestions.map((diet, index) => (
+                  <View key={index} style={styles.recommendItem}>
+                    <Ionicons name="leaf" size={18} color="#8B5CF6" />
+                    <Text style={styles.recommendText}>{diet}</Text>
+                  </View>
+                ))}
+              </ResultCard>
+            )}
+
+            {/* When to See Vet */}
+            {result.whenToSeeVet && (
+              <ResultCard title="पशुवैद्यकांना कधी भेटावे" icon="medical" color="#EF4444">
+                <View style={styles.vetWarningContainer}>
+                  <Ionicons name="warning" size={24} color="#EF4444" />
+                  <Text style={styles.vetWarningText}>{result.whenToSeeVet}</Text>
                 </View>
-                <InfoRow label="तातडी" value={result.veterinaryConsultation.urgency} />
-                <InfoRow label="कारण" value={result.veterinaryConsultation.reason} />
               </ResultCard>
             )}
 
             {/* Disclaimer */}
-            <View style={styles.disclaimerContainer}>
-              <Ionicons name="information-circle" size={20} color={COLORS.gray} />
-              <Text style={styles.disclaimerText}>
-                हे AI-आधारित विश्लेषण आहे आणि हे व्यावसायिक पशुवैद्यकीय सल्ल्याची जागा घेत नाही.
-                गंभीर आरोग्य समस्यांसाठी नेहमी पात्र पशुवैद्यकाचा सल्ला घ्या.
-              </Text>
-            </View>
-          </View>
-        )}
+            {result.disclaimer && (
+              <View style={styles.disclaimerContainer}>
+                <Ionicons name="information-circle" size={20} color={COLORS.gray} />
+                <Text style={styles.disclaimerText}>{result.disclaimer}</Text>
+              </View>
+            )}
 
-        <View style={styles.bottomPadding} />
-      </ScrollView>
+            {/* New Check Button */}
+            <TouchableOpacity style={styles.newCheckButton} onPress={resetForm}>
+              <Ionicons name="refresh" size={20} color={COLORS.white} />
+              <Text style={styles.newCheckButtonText}>नवीन तपासणी</Text>
+            </TouchableOpacity>
+
+            <View style={styles.bottomPadding} />
+                </>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -654,38 +722,64 @@ const styles = StyleSheet.create({
   animalGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    justifyContent: 'space-between',
+    gap: 12,
   },
   animalButton: {
-    width: '23%',
+    width: '22.5%',
     aspectRatio: 1,
     backgroundColor: COLORS.white,
     borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
+    overflow: 'hidden',
+    borderWidth: 2.5,
+    borderColor: '#E5E7EB',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
+    position: 'relative',
   },
   animalButtonSelected: {
     borderColor: COLORS.primary,
-    backgroundColor: COLORS.primary + '10',
+    shadowColor: COLORS.primary,
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  animalIcon: {
-    fontSize: 28,
-    marginBottom: 4,
+  animalCardContent: {
+    width: '100%',
+    height: '100%',
+  },
+  animalImage: {
+    width: '100%',
+    height: '100%',
+  },
+  animalIconWrapper: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+  },
+  animalNameContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingVertical: 6,
+    paddingHorizontal: 4,
   },
   animalName: {
-    fontSize: 12,
-    color: COLORS.gray,
-    fontWeight: '500',
+    fontSize: 11,
+    color: COLORS.black,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   animalNameSelected: {
     color: COLORS.primary,
+    fontWeight: '700',
   },
   inputContainer: {
     marginBottom: 12,
@@ -943,6 +1037,157 @@ const styles = StyleSheet.create({
   },
   bottomPadding: {
     height: 30,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '90%',
+    paddingBottom: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.lightGray,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: COLORS.black,
+  },
+  closeButton: {
+    padding: 4,
+  },
+  modalContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+  },
+  newCheckButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 16,
+  },
+  newCheckButtonText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  summaryCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  summaryItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  summaryItemBorder: {
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: COLORS.lightGray,
+  },
+  summaryLabel: {
+    fontSize: 12,
+    color: COLORS.gray,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  scoreCircle: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  scoreText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: COLORS.white,
+  },
+  summaryValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.black,
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  urgencyBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  urgencyText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  bodyConditionCircle: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  bodyConditionEmoji: {
+    fontSize: 36,
+  },
+  bodyConditionScore: {
+    fontSize: 11,
+    color: COLORS.gray,
+  },
+  animalTypeCircle: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: '#EDE9FE',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  animalEmoji: {
+    fontSize: 36,
+  },
+  vetWarningContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    padding: 12,
+    backgroundColor: '#FEE2E2',
+    borderRadius: 12,
+  },
+  vetWarningText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#991B1B',
+    lineHeight: 20,
   },
 });
 

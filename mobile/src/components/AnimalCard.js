@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, formatPrice, formatTimeAgo, getAnimalTypeIcon } from '../utils/constants';
 import { useWishlist } from '../context/WishlistContext';
+import { callLogService } from '../services/api';
 
 const AnimalCard = ({
   listing,
@@ -20,11 +21,11 @@ const AnimalCard = ({
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
   const inWishlist = isInWishlist(listing.id);
 
-  const handleWishlistToggle = () => {
+  const handleWishlistToggle = async () => {
     if (inWishlist) {
-      removeFromWishlist(listing.id);
+      await removeFromWishlist(listing.id, listing.animal_type);
     } else {
-      addToWishlist(listing);
+      await addToWishlist(listing);
     }
   };
 
@@ -47,19 +48,56 @@ const AnimalCard = ({
   const imageUrl = front_photo || side_photo || null;
   const animalIcon = getAnimalTypeIcon(animal_type);
 
-  const handleCall = () => {
+  const handleCall = async () => {
     if (seller?.phone) {
-      Linking.openURL(`tel:${seller.phone}`);
+      try {
+        // Log the call before making it
+        await callLogService.logCall({
+          receiverId: seller.id || listing.user_id,
+          receiverPhoneNumber: seller.phone,
+          callType: 'direct',
+          listingId: listing.id,
+          listingType: animal_type,
+        });
+        
+        // Open phone dialer
+        Linking.openURL(`tel:${seller.phone}`);
+      } catch (error) {
+        console.error('Error logging call:', error);
+        // Still make the call even if logging fails
+        Linking.openURL(`tel:${seller.phone}`);
+      }
     }
   };
 
-  const handleWhatsApp = () => {
+  const handleWhatsApp = async () => {
     if (seller?.phone) {
-      const message = `Hi! I'm interested in your ${animal_type} listing: "${breed_name}" - ₹${formatPrice(expected_price)}`;
-      const url = `whatsapp://send?phone=91${seller.phone}&text=${encodeURIComponent(message)}`;
-      Linking.openURL(url).catch(() => {
-        Linking.openURL(`https://wa.me/91${seller.phone}?text=${encodeURIComponent(message)}`);
-      });
+      try {
+        // Log the WhatsApp call before initiating
+        await callLogService.logCall({
+          receiverId: seller.id || listing.user_id,
+          receiverPhoneNumber: seller.phone,
+          callType: 'direct',
+          listingId: listing.id,
+          listingType: animal_type,
+        });
+        
+        const message = `Hi! I'm interested in your ${animal_type} listing: "${breed_name}" - ₹${formatPrice(expected_price)}`;
+        // Remove duplicate 91 - phone already has country code
+        const url = `whatsapp://send?phone=${seller.phone}&text=${encodeURIComponent(message)}`;
+        Linking.openURL(url).catch(() => {
+          Linking.openURL(`https://wa.me/${seller.phone}?text=${encodeURIComponent(message)}`);
+        });
+      } catch (error) {
+        console.error('Error logging WhatsApp call:', error);
+        // Still make the call even if logging fails
+        const message = `Hi! I'm interested in your ${animal_type} listing: "${breed_name}" - ₹${formatPrice(expected_price)}`;
+        // Remove duplicate 91 - phone already has country code
+        const url = `whatsapp://send?phone=${seller.phone}&text=${encodeURIComponent(message)}`;
+        Linking.openURL(url).catch(() => {
+          Linking.openURL(`https://wa.me/${seller.phone}?text=${encodeURIComponent(message)}`);
+        });
+      }
     }
   };
 

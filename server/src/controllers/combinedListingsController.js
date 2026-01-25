@@ -234,7 +234,7 @@ class CombinedListingsController {
 
           SELECT
             id,
-            animal_type as animal_type,
+            'other' as animal_type,
             breed_name,
             COALESCE(age, '') as age,
             NULL::text as milk_capacity,
@@ -530,14 +530,15 @@ class CombinedListingsController {
         horse: { table: 'horse_listings', model: 'HorseListing' },
         goat: { table: 'goat_listings', model: 'GoatListing' },
         cat: { table: 'cat_listings', model: 'CatListing' },
-        dog: { table: 'dog_listings', model: 'DogListing' }
+        dog: { table: 'dog_listings', model: 'DogListing' },
+        other: { table: 'other_animal_listings', model: 'OtherAnimalListing' }
       };
 
       const tableInfo = tableMap[animalType.toLowerCase()];
       if (!tableInfo) {
         return res.status(400).json({
           success: false,
-          message: 'Invalid animal type. Valid types: cow, buffalo, horse, goat, cat, dog'
+          message: 'Invalid animal type. Valid types: cow, buffalo, horse, goat, cat, dog, other'
         });
       }
 
@@ -656,14 +657,15 @@ class CombinedListingsController {
         horse: { table: 'horse_listings', model: 'HorseListing' },
         goat: { table: 'goat_listings', model: 'GoatListing' },
         cat: { table: 'cat_listings', model: 'CatListing' },
-        dog: { table: 'dog_listings', model: 'DogListing' }
+        dog: { table: 'dog_listings', model: 'DogListing' },
+        other: { table: 'other_animal_listings', model: 'OtherAnimalListing' }
       };
 
       const tableInfo = tableMap[animalType.toLowerCase()];
       if (!tableInfo) {
         return res.status(400).json({
           success: false,
-          message: 'Invalid animal type. Valid types: cow, buffalo, horse, goat, cat, dog'
+          message: 'Invalid animal type. Valid types: cow, buffalo, horse, goat, cat, dog, other'
         });
       }
 
@@ -761,7 +763,8 @@ class CombinedListingsController {
           horse: 'horse_listings',
           goat: 'goat_listings',
           cat: 'cat_listings',
-          dog: 'dog_listings'
+          dog: 'dog_listings',
+          other: 'other_animal_listings'
         };
 
         const tableName = tableMap[animalType.toLowerCase()];
@@ -893,6 +896,233 @@ class CombinedListingsController {
         error: error.message
       });
     }
+  }
+
+  /**
+   * Get all listings for the authenticated user
+   * GET /api/listings/my-listings or /api/combined/my-listings
+   */
+  async getMyListings(req, res) {
+    try {
+      const userId = req.user?.userId;
+      
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: 'User not authenticated'
+        });
+      }
+
+      console.log('Fetching listings for user:', userId);
+
+      // Fetch listings from all tables in parallel (including sold listings)
+      const [
+        cowListings,
+        buffaloListings,
+        goatListings,
+        horseListings,
+        dogListings,
+        catListings,
+        otherListings
+      ] = await Promise.all([
+        db.AnimalListing.findAll({ 
+          where: { user_id: userId },
+          order: [['created_at', 'DESC']]
+        }),
+        db.BuffaloListing.findAll({ 
+          where: { user_id: userId },
+          order: [['created_at', 'DESC']]
+        }),
+        db.GoatListing.findAll({ 
+          where: { user_id: userId },
+          order: [['created_at', 'DESC']]
+        }),
+        db.HorseListing.findAll({ 
+          where: { user_id: userId },
+          order: [['created_at', 'DESC']]
+        }),
+        db.DogListing.findAll({ 
+          where: { user_id: userId },
+          order: [['created_at', 'DESC']]
+        }),
+        db.CatListing.findAll({ 
+          where: { user_id: userId },
+          order: [['created_at', 'DESC']]
+        }),
+        db.OtherAnimalListing.findAll({ 
+          where: { user_id: userId },
+          order: [['created_at', 'DESC']]
+        })
+      ]);
+
+      // Helper function to format listings
+      const formatListing = (listing, type) => {
+        const data = listing.toJSON ? listing.toJSON() : listing;
+        return {
+          id: data.id,
+          type: type,
+          animal_type: type,
+          breed: data.breed_name || data.breedName,
+          age: data.age,
+          price: data.expected_price || data.expectedPrice,
+          photo1: data.front_photo || data.frontPhoto || data.photo_1 || data.photo1,
+          photo2: data.side_photo || data.sidePhoto || data.photo_2 || data.photo2,
+          photos: [
+            data.front_photo || data.frontPhoto || data.photo_1 || data.photo1,
+            data.side_photo || data.sidePhoto || data.photo_2 || data.photo2,
+            data.photo_3 || data.photo3,
+            data.photo_4 || data.photo4,
+            data.photo_5 || data.photo5
+          ].filter(Boolean),
+          city: data.city,
+          state: data.state,
+          pincode: data.pincode,
+          status: data.status,
+          created_at: data.created_at || data.createdAt,
+          updated_at: data.updated_at || data.updatedAt
+        };
+      };
+
+      // Combine and format all listings
+      const allListings = [
+        ...cowListings.map(listing => formatListing(listing, 'cow')),
+        ...buffaloListings.map(listing => formatListing(listing, 'buffalo')),
+        ...goatListings.map(listing => formatListing(listing, 'goat')),
+        ...horseListings.map(listing => formatListing(listing, 'horse')),
+        ...dogListings.map(listing => formatListing(listing, 'dog')),
+        ...catListings.map(listing => formatListing(listing, 'cat')),
+        ...otherListings.map(listing => formatListing(listing, 'other'))
+      ];
+
+      // Sort by created_at descending
+      allListings.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+      console.log(`Found ${allListings.length} listings for user ${userId}`);
+
+      res.json({
+        success: true,
+        listings: allListings,
+        count: allListings.length
+      });
+
+    } catch (error) {
+      console.error('Get my listings error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch listings',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Mark listing as sold
+   * PATCH /api/listings/:animalType/:id/sold
+   */
+  async markListingAsSold(req, res) {
+    try {
+      const { animalType, id } = req.params;
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: 'User not authenticated'
+        });
+      }
+
+      // Map animal type to model
+      const tableMap = {
+        cow: { table: 'animal_listings', model: 'AnimalListing' },
+        buffalo: { table: 'buffalo_listings', model: 'BuffaloListing' },
+        horse: { table: 'horse_listings', model: 'HorseListing' },
+        goat: { table: 'goat_listings', model: 'GoatListing' },
+        cat: { table: 'cat_listings', model: 'CatListing' },
+        dog: { table: 'dog_listings', model: 'DogListing' },
+        other: { table: 'other_animal_listings', model: 'OtherAnimalListing' }
+      };
+
+      const tableInfo = tableMap[animalType.toLowerCase()];
+      if (!tableInfo) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid animal type. Valid types: cow, buffalo, horse, goat, cat, dog, other'
+        });
+      }
+
+      // Get the model
+      const Model = db[tableInfo.model];
+      if (!Model) {
+        return res.status(500).json({
+          success: false,
+          message: 'Model not found'
+        });
+      }
+
+      // Fetch the listing
+      const listing = await Model.findByPk(id);
+
+      if (!listing) {
+        return res.status(404).json({
+          success: false,
+          message: 'Listing not found'
+        });
+      }
+
+      // Check ownership
+      if (listing.user_id !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'You are not authorized to modify this listing'
+        });
+      }
+
+      // Mark as sold
+      await listing.markAsSold();
+
+      res.json({
+        success: true,
+        message: 'Listing marked as sold successfully',
+        data: listing
+      });
+
+    } catch (error) {
+      console.error('Error marking listing as sold:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to mark listing as sold',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Helper method to format listing data
+   */
+  formatListing(listing, type) {
+    return {
+      id: listing.id,
+      type: type,
+      animal_type: type,
+      breed: listing.breed_name || listing.breedName,
+      age: listing.age,
+      price: listing.expected_price || listing.expectedPrice,
+      photo1: listing.front_photo || listing.frontPhoto || listing.photo_1 || listing.photo1,
+      photo2: listing.side_photo || listing.sidePhoto || listing.photo_2 || listing.photo2,
+      photos: [
+        listing.front_photo || listing.frontPhoto || listing.photo_1 || listing.photo1,
+        listing.side_photo || listing.sidePhoto || listing.photo_2 || listing.photo2,
+        listing.photo_3 || listing.photo3,
+        listing.photo_4 || listing.photo4,
+        listing.photo_5 || listing.photo5
+      ].filter(Boolean),
+      city: listing.city,
+      state: listing.state,
+      pincode: listing.pincode,
+      status: listing.status,
+      created_at: listing.created_at || listing.createdAt,
+      updated_at: listing.updated_at || listing.updatedAt
+    };
   }
 }
 

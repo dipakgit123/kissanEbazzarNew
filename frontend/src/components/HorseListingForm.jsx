@@ -11,6 +11,7 @@ import {
   InfoBanner,
   SubmitButton
 } from './common';
+import './AnimalListingPage.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -29,7 +30,7 @@ const HorseListingForm = () => {
     vaccinationDetails: '',
     description: '',
     expectedPrice: '',
-    isNegotiable: true,
+    isNegotiable: 'true',
     deliveryAvailable: false
   });
 
@@ -86,8 +87,11 @@ const HorseListingForm = () => {
         throw new Error('Please login to create a listing');
       }
 
+      const endpoint = `${API_URL}/api/horses/listings`;
+      console.log('🐴 [HORSE] Submitting to API endpoint:', endpoint);
+      
       const response = await axios.post(
-        `${API_URL}/api/horses/listings`,
+        endpoint,
         formDataToSend,
         {
           headers: {
@@ -96,6 +100,9 @@ const HorseListingForm = () => {
           }
         }
       );
+
+      console.log('✅ [HORSE] API Response:', response.data);
+      console.log('✅ [HORSE] Listing created successfully at:', endpoint);
 
       if (response.data.success) {
         setSuccess(true);
@@ -112,7 +119,7 @@ const HorseListingForm = () => {
           vaccinationDetails: '',
           description: '',
           expectedPrice: '',
-          isNegotiable: true,
+          isNegotiable: 'true',
           deliveryAvailable: false
         });
         setFiles({

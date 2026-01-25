@@ -23,10 +23,13 @@
   },
   "header": {
     "home": "Home",
-    "sell": "Sell Animal",
+    "sell": "Sell",
+    "sellAnimal": "Sell Animal",
     "veterinarian": "Veterinarian",
+    "vet": "Vet",
     "pregnancy": "Pregnancy Calendar",
     "healthCheck": "AI Health Check",
+    "health": "Health",
     "wishlist": "Wishlist",
     "map": "Map View",
     "profile": "Profile"
@@ -103,7 +106,8 @@
     "savedAnimals": "Saved Animals"
   },
   "sellAnimal": {
-    "title": "Sell Animal",
+    "title": "Sell Your Animal",
+    "subtitle": "List your animal for sale",
     "selectAnimalType": "Select Animal Type",
     "animalDetails": "Animal Details",
     "animalName": "Animal Name",
@@ -112,14 +116,34 @@
     "ageUnit": "Age Unit",
     "years": "Years",
     "months": "Months",
-    "price": "Price",
+    "price": "Price (₹)",
     "description": "Description",
     "photos": "Photos",
     "uploadPhotos": "Upload Photos",
     "location": "Location",
     "contactDetails": "Contact Details",
-    "submitListing": "Submit Listing",
-    "listingSuccess": "Animal listed successfully"
+    "submitListing": "Post Listing",
+    "listingSuccess": "Animal listed successfully",
+    "daysToSell": "Days to Sell",
+    "lactation": "Lactation",
+    "milkPerDay": "Current Milk per Day",
+    "additionalInfo": "Additional Information",
+    "moreDetails": "More Details",
+    "hasDelivered": "Has it delivered?",
+    "isPregnant": "Is it pregnant?",
+    "hasCalf": "Does the animal have a calf?",
+    "negotiable": "Price Negotiable",
+    "negotiableDesc": "Allow price negotiation",
+    "milkCapacity": "Milk Capacity per Day",
+    "femaleCalf": "Female Calf",
+    "maleCalf": "Male Calf",
+    "noCalf": "No Calf",
+    "uploadSidePhoto": "Side Photo",
+    "uploadUdderPhoto": "Udder Photo",
+    "uploadVideo": "Upload Video (Optional)",
+    "selectPhoto": "Select Photo",
+    "changePhoto": "Change Photo",
+    "removePhoto": "Remove Photo"
   },
   "veterinarian": {
     "title": "Find Veterinarians",
@@ -655,7 +679,19 @@
     "submit": "Submit Listing",
     "submitting": "Creating Listing...",
     "createSuccess": "Listing created successfully!",
-    "createError": "Failed to create listing. Please try again."
+    "createError": "Failed to create listing. Please try again.",
+    "createListing": "Create Animal Listing",
+    "subtitle": "List your animal for sale and reach thousands of potential buyers",
+    "instructions": {
+      "title": "Quick Tips",
+      "tip1": "Select the animal type below to get started",
+      "tip2": "Fill in all required details accurately",
+      "tip3": "Upload clear photos for better visibility",
+      "tip4": "Set a competitive price to attract buyers"
+    },
+    "selectAnimalType": "Select Animal Type",
+    "details": "Details",
+    "formSubtitle": "Fill in the information below to create your listing"
   },
   "validation": {
     "required": "This field is required",
