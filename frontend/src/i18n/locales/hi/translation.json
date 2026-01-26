@@ -192,7 +192,9 @@
     "addedOn": "जोड़ा गया",
     "removeFromWishlist": "विशलिस्ट से हटाएं",
     "contactSeller": "विक्रेता से संपर्क करें",
-    "viewDetails": "विवरण देखें"
+    "viewDetails": "विवरण देखें",
+    "addedToWishlist": "विशलिस्ट में जोड़ा गया!",
+    "removedFromWishlist": "विशलिस्ट से हटाया गया"
   },
   "location": {
     "setupLocation": "अपना स्थान सेटअप करें",

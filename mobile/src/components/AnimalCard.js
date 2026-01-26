@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,8 +6,11 @@ import {
   TouchableOpacity,
   StyleSheet,
   Linking,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
+import Toast from 'react-native-toast-message';
 import { COLORS, formatPrice, formatTimeAgo, getAnimalTypeIcon } from '../utils/constants';
 import { useWishlist } from '../context/WishlistContext';
 import { callLogService } from '../services/api';
@@ -18,14 +21,44 @@ const AnimalCard = ({
 }) => {
   if (!listing) return null;
 
+  const { t } = useTranslation();
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
   const inWishlist = isInWishlist(listing.id);
+  const [isWishlistLoading, setIsWishlistLoading] = useState(false);
 
   const handleWishlistToggle = async () => {
-    if (inWishlist) {
-      await removeFromWishlist(listing.id, listing.animal_type);
-    } else {
-      await addToWishlist(listing);
+    if (isWishlistLoading) return;
+    
+    setIsWishlistLoading(true);
+    try {
+      if (inWishlist) {
+        console.log('🗑️ Removing from wishlist:', { id: listing.id, animal_type: listing.animal_type });
+        await removeFromWishlist(listing.id, listing.animal_type);
+        Toast.show({
+          type: 'success',
+          text1: t('wishlist.removedFromWishlist') || 'Removed from wishlist',
+          visibilityTime: 2000,
+          topOffset: 60,
+        });
+      } else {
+        await addToWishlist(listing);
+        Toast.show({
+          type: 'success',
+          text1: t('wishlist.addedToWishlist') || 'Added to wishlist!',
+          visibilityTime: 2000,
+          topOffset: 60,
+        });
+      }
+    } catch (error) {
+      Toast.show({
+        type: 'error',
+        text1: t('common.error') || 'Error',
+        text2: error.message || 'Something went wrong',
+        visibilityTime: 2000,
+        topOffset: 60,
+      });
+    } finally {
+      setIsWishlistLoading(false);
     }
   };
 
@@ -102,10 +135,10 @@ const AnimalCard = ({
   };
 
   const getLocationText = () => {
-    let loc = city || 'Unknown';
+    let loc = city || t('buyAnimals.unknownLocation');
     if (state) loc += `, ${state}`;
     if (distance) {
-      loc += ` (${Math.round(distance)} km)`;
+      loc += ` (${Math.round(distance)} ${t('common.km') || 'km'})`;
     }
     return loc;
   };
@@ -157,16 +190,22 @@ const AnimalCard = ({
         <TouchableOpacity
           style={[
             styles.wishlistButton,
-            inWishlist && styles.wishlistButtonActive
+            inWishlist && styles.wishlistButtonActive,
+            isWishlistLoading && styles.wishlistButtonLoading
           ]}
           onPress={handleWishlistToggle}
           activeOpacity={0.7}
+          disabled={isWishlistLoading}
         >
-          <Ionicons
-            name={inWishlist ? "heart" : "heart-outline"}
-            size={24}
-            color={inWishlist ? "#EF4444" : "#FFFFFF"}
-          />
+          {isWishlistLoading ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Ionicons
+              name={inWishlist ? "heart" : "heart-outline"}
+              size={24}
+              color={inWishlist ? "#EF4444" : "#FFFFFF"}
+            />
+          )}
         </TouchableOpacity>
 
         {/* Status Badge */}
@@ -181,7 +220,7 @@ const AnimalCard = ({
       <View style={styles.content}>
         {/* Breed Name */}
         <Text style={styles.breedName} numberOfLines={2}>
-          {breed_name || 'Unknown Breed'}
+          {breed_name || t('buyAnimals.unknownBreed')}
         </Text>
 
         {/* Info Tags */}
@@ -189,7 +228,7 @@ const AnimalCard = ({
           {milk_capacity && (
             <View style={styles.infoTag}>
               <Ionicons name="water" size={14} color="#3B82F6" />
-              <Text style={styles.infoTagText}>{milk_capacity}L milk</Text>
+              <Text style={styles.infoTagText}>{milk_capacity}L {t('animalCard.milk')}</Text>
             </View>
           )}
           {age && (
@@ -232,11 +271,11 @@ const AnimalCard = ({
           </View>
           <View style={styles.sellerInfo}>
             <Text style={styles.sellerName} numberOfLines={1}>
-              {seller?.name || 'Unknown Seller'}
+              {seller?.name || t('buyAnimals.unknownSeller')}
             </Text>
             <View style={styles.verifiedRow}>
               <Ionicons name="checkmark-circle" size={12} color={COLORS.primary} />
-              <Text style={styles.verifiedText}>Verified Seller</Text>
+              <Text style={styles.verifiedText}>{t('animalCard.verifiedSeller')}</Text>
             </View>
           </View>
         </View>
@@ -249,7 +288,7 @@ const AnimalCard = ({
             activeOpacity={0.8}
           >
             <Ionicons name="call" size={18} color="#FFFFFF" />
-            <Text style={styles.buttonText}>Call</Text>
+            <Text style={styles.buttonText}>{t('animalCard.call')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.whatsappButton}
@@ -257,7 +296,7 @@ const AnimalCard = ({
             activeOpacity={0.8}
           >
             <Ionicons name="logo-whatsapp" size={18} color="#FFFFFF" />
-            <Text style={styles.buttonText}>WhatsApp</Text>
+            <Text style={styles.buttonText}>{t('animalCard.whatsapp')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -364,6 +403,9 @@ const styles = StyleSheet.create({
   },
   wishlistButtonActive: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
+  },
+  wishlistButtonLoading: {
+    backgroundColor: 'rgba(156, 163, 175, 0.95)',
   },
   statusBadge: {
     position: 'absolute',

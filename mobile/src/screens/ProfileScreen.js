@@ -109,15 +109,15 @@ const ProfileScreen = ({ navigation }) => {
 
   const handleMarkAsSold = async (listing) => {
     Alert.alert(
-      'Mark as Sold',
-      `Are you sure you want to mark "${listing.breed_name || listing.breed}" as sold?`,
+      t('profile.markAsSold'),
+      t('profile.markAsSoldConfirm', { breed: listing.breed_name || listing.breed }),
       [
         {
-          text: 'Cancel',
+          text: t('common.cancel'),
           style: 'cancel',
         },
         {
-          text: 'Mark as Sold',
+          text: t('profile.markAsSold'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -125,15 +125,15 @@ const ProfileScreen = ({ navigation }) => {
               const response = await listingsService.markListingAsSold(animalType, listing.id);
               
               if (response.success) {
-                Alert.alert('Success', 'Listing marked as sold successfully!');
+                Alert.alert(t('common.success'), t('profile.markAsSoldSuccess'));
                 // Reload listings to show updated status
                 await loadMyListings();
               } else {
-                Alert.alert('Error', response.message || 'Failed to mark listing as sold');
+                Alert.alert(t('common.error'), response.message || t('profile.markAsSoldError'));
               }
             } catch (error) {
               console.error('Error marking as sold:', error);
-              Alert.alert('Error', error.message || 'Failed to mark listing as sold');
+              Alert.alert(t('common.error'), error.message || t('profile.markAsSoldError'));
             }
           },
         },
@@ -144,7 +144,7 @@ const ProfileScreen = ({ navigation }) => {
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission Required', 'Please allow access to your photo library');
+      Alert.alert(t('profile.permissionRequired'), t('profile.allowPhotoAccess'));
       return;
     }
 
@@ -163,7 +163,7 @@ const ProfileScreen = ({ navigation }) => {
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission Required', 'Please allow camera access');
+      Alert.alert(t('profile.permissionRequired'), t('profile.allowCameraAccess'));
       return;
     }
 
@@ -195,9 +195,9 @@ const ProfileScreen = ({ navigation }) => {
           profilePhoto: response.user.profile_photo 
         }));
         
-        Alert.alert('Success', 'Profile photo updated successfully!');
+        Alert.alert(t('common.success'), t('profile.photoUpdated'));
       } else {
-        Alert.alert('Error', response.message || 'Failed to upload photo');
+        Alert.alert(t('common.error'), response.message || t('errors.uploadFailed'));
       }
     } catch (error) {
       console.error('Photo upload error:', error);
@@ -217,12 +217,12 @@ const ProfileScreen = ({ navigation }) => {
 
   const deleteProfilePhoto = async () => {
     Alert.alert(
-      'Remove Photo',
-      'Are you sure you want to remove your profile photo?',
+      t('profile.removePhoto'),
+      t('profile.removePhotoConfirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Remove',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             setUploadingPhoto(true);
@@ -241,13 +241,13 @@ const ProfileScreen = ({ navigation }) => {
                   profilePhoto: null 
                 }));
                 
-                Alert.alert('Success', 'Profile photo removed successfully!');
+                Alert.alert(t('common.success'), t('profile.photoRemoved'));
               } else {
-                Alert.alert('Error', response.message || 'Failed to remove photo');
+                Alert.alert(t('common.error'), response.message || t('errors.uploadFailed'));
               }
             } catch (error) {
               console.error('Delete photo error:', error);
-              Alert.alert('Error', error.message || 'Failed to remove photo');
+              Alert.alert(t('common.error'), error.message || t('errors.uploadFailed'));
             } finally {
               setUploadingPhoto(false);
             }
@@ -259,23 +259,23 @@ const ProfileScreen = ({ navigation }) => {
 
   const showPhotoOptions = () => {
     const options = [
-      { text: 'Take Photo', onPress: takePhoto },
-      { text: 'Choose from Library', onPress: pickImage },
+      { text: t('profile.takePhoto'), onPress: takePhoto },
+      { text: t('profile.chooseLibrary'), onPress: pickImage },
     ];
 
     if (formData.profilePhoto) {
-      options.push({ text: 'Remove Photo', onPress: deleteProfilePhoto, style: 'destructive' });
+      options.push({ text: t('profile.removePhoto'), onPress: deleteProfilePhoto, style: 'destructive' });
     }
 
-    options.push({ text: 'Cancel', style: 'cancel' });
+    options.push({ text: t('common.cancel'), style: 'cancel' });
 
-    Alert.alert('Profile Photo', 'Choose an option', options);
+    Alert.alert(t('profile.photoOptions'), t('profile.chooseOption'), options);
   };
 
   const handleSave = async () => {
     // Validate required fields
     if (!formData.fullName.trim()) {
-      Alert.alert('Error', 'Please enter your name');
+      Alert.alert(t('common.error'), t('profile.nameRequired'));
       return;
     }
 
@@ -283,14 +283,14 @@ const ProfileScreen = ({ navigation }) => {
     if (formData.email && formData.email.trim()) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(formData.email.trim())) {
-        Alert.alert('Error', 'Please enter a valid email address');
+        Alert.alert(t('common.error'), t('profile.invalidEmail'));
         return;
       }
     }
 
     // Validate pincode if provided
     if (formData.pincode && formData.pincode.trim() && formData.pincode.trim().length !== 6) {
-      Alert.alert('Error', 'Please enter a valid 6-digit pincode');
+      Alert.alert(t('common.error'), t('profile.invalidPincode'));
       return;
     }
 
@@ -329,18 +329,18 @@ const ProfileScreen = ({ navigation }) => {
         // Show success message with location update if pincode changed
         if (response.user.city && response.user.state) {
           Alert.alert(
-            'Success', 
-            `Profile updated successfully!\nLocation: ${response.user.city}, ${response.user.state}`
+            t('common.success'), 
+            t('profile.profileUpdateLocation', { city: response.user.city, state: response.user.state })
           );
         } else {
-          Alert.alert('Success', 'Profile updated successfully!');
+          Alert.alert(t('common.success'), t('profile.profileUpdateSuccess'));
         }
       } else {
-        Alert.alert('Error', response.message || 'Failed to update profile');
+        Alert.alert(t('common.error'), response.message || t('profile.profileUpdateError'));
       }
     } catch (error) {
       console.error('Profile update error:', error);
-      Alert.alert('Error', error.message || 'Failed to update profile');
+      Alert.alert(t('common.error'), error.message || t('profile.profileUpdateError'));
     } finally {
       setLoading(false);
     }
@@ -478,23 +478,23 @@ const ProfileScreen = ({ navigation }) => {
           /* Edit Form */
           <View style={styles.editSection}>
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Full Name *</Text>
+              <Text style={styles.label}>{t('profile.fullName')} *</Text>
               <TextInput
                 style={styles.input}
                 value={formData.fullName}
                 onChangeText={(text) => setFormData({ ...formData, fullName: text })}
-                placeholder="Enter your full name"
+                placeholder={t('profile.enterFullName')}
                 placeholderTextColor="#9CA3AF"
               />
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Email</Text>
+              <Text style={styles.label}>{t('profile.email')}</Text>
               <TextInput
                 style={styles.input}
                 value={formData.email}
                 onChangeText={(text) => setFormData({ ...formData, email: text })}
-                placeholder="Enter your email"
+                placeholder={t('profile.enterEmail')}
                 placeholderTextColor="#9CA3AF"
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -502,12 +502,12 @@ const ProfileScreen = ({ navigation }) => {
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Address</Text>
+              <Text style={styles.label}>{t('profile.address')}</Text>
               <TextInput
                 style={[styles.input, styles.textArea]}
                 value={formData.address}
                 onChangeText={(text) => setFormData({ ...formData, address: text })}
-                placeholder="Enter your address"
+                placeholder={t('profile.enterAddress')}
                 placeholderTextColor="#9CA3AF"
                 multiline
                 numberOfLines={3}
@@ -516,36 +516,36 @@ const ProfileScreen = ({ navigation }) => {
 
             <View style={styles.row}>
               <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                <Text style={styles.label}>City</Text>
+                <Text style={styles.label}>{t('profile.city')}</Text>
                 <TextInput
                   style={styles.input}
                   value={formData.city}
                   onChangeText={(text) => setFormData({ ...formData, city: text })}
-                  placeholder="City"
+                  placeholder={t('profile.enterCity')}
                   placeholderTextColor="#9CA3AF"
                 />
               </View>
 
               <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
-                <Text style={styles.label}>State</Text>
+                <Text style={styles.label}>{t('profile.state')}</Text>
                 <TextInput
                   style={styles.input}
                   value={formData.state}
                   onChangeText={(text) => setFormData({ ...formData, state: text })}
-                  placeholder="State"
+                  placeholder={t('profile.enterState')}
                   placeholderTextColor="#9CA3AF"
                 />
               </View>
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Pincode</Text>
+              <Text style={styles.label}>{t('profile.pincode')}</Text>
               <TextInput
                 ref={pincodeInputRef}
                 style={styles.input}
                 value={formData.pincode}
                 onChangeText={(text) => setFormData({ ...formData, pincode: text })}
-                placeholder="Enter pincode"
+                placeholder={t('profile.enterPincode')}
                 placeholderTextColor="#9CA3AF"
                 keyboardType="numeric"
                 maxLength={6}
@@ -563,7 +563,7 @@ const ProfileScreen = ({ navigation }) => {
                 style={[styles.button, styles.cancelButton]}
                 onPress={handleCancel}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.button, styles.saveButton, loading && styles.buttonDisabled]}
@@ -573,7 +573,7 @@ const ProfileScreen = ({ navigation }) => {
                 {loading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.saveButtonText}>Save Changes</Text>
+                  <Text style={styles.saveButtonText}>{t('profile.saveChanges')}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -583,7 +583,7 @@ const ProfileScreen = ({ navigation }) => {
           <>
             {/* My Listings Section */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>{t('profile.myListings') || 'My Listings'}</Text>
+              <Text style={styles.sectionTitle}>{t('profile.myListings')}</Text>
               <View style={styles.menuContainer}>
                 <TouchableOpacity 
                   style={styles.menuItem}
@@ -593,9 +593,9 @@ const ProfileScreen = ({ navigation }) => {
                     <Ionicons name="pricetags" size={20} color={COLORS.primary} />
                   </View>
                   <View style={styles.menuContent}>
-                    <Text style={styles.menuTitle}>My Listings</Text>
+                    <Text style={styles.menuTitle}>{t('profile.myListings')}</Text>
                     <Text style={styles.menuSubtitle}>
-                      {loadingListings ? 'Loading...' : `${myListings.length} animals listed`}
+                      {loadingListings ? t('common.loading') : `${myListings.length} ${t('profile.animalsListed')}`}
                     </Text>
                   </View>
                   <Ionicons 
@@ -612,7 +612,7 @@ const ProfileScreen = ({ navigation }) => {
                   {loadingListings ? (
                     <View style={styles.loadingContainer}>
                       <ActivityIndicator size="large" color={COLORS.primary} />
-                      <Text style={styles.loadingText}>Loading your listings...</Text>
+                      <Text style={styles.loadingText}>{t('profile.loadingListings')}</Text>
                     </View>
                   ) : myListings.length > 0 ? (
                     <View style={styles.listingsContainer}>
@@ -655,7 +655,7 @@ const ProfileScreen = ({ navigation }) => {
                                                   listing.status === 'sold' ? '#EF4444' : '#F59E0B' 
                                 }]}>
                                   <Text style={styles.statusText}>
-                                    {listing.status?.toUpperCase()}
+                                    {t(`profile.${listing.status}`)?.toUpperCase()}
                                   </Text>
                                 </View>
                               )}
@@ -698,7 +698,7 @@ const ProfileScreen = ({ navigation }) => {
                               <View style={styles.myListingLocation}>
                                 <Ionicons name="location-outline" size={14} color="#6B7280" />
                                 <Text style={styles.myListingLocationText} numberOfLines={1}>
-                                  {[city, state].filter(Boolean).join(', ') || 'Location not specified'}
+                                  {[city, state].filter(Boolean).join(', ') || t('profile.locationNotSpecified')}
                                 </Text>
                               </View>
 
@@ -713,7 +713,7 @@ const ProfileScreen = ({ navigation }) => {
                                   activeOpacity={0.7}
                                 >
                                   <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
-                                  <Text style={styles.markSoldButtonText}>Mark as Sold</Text>
+                                  <Text style={styles.markSoldButtonText}>{t('profile.markAsSold')}</Text>
                                 </TouchableOpacity>
                               )}
                             </View>
@@ -724,14 +724,14 @@ const ProfileScreen = ({ navigation }) => {
                   ) : (
                     <View style={styles.emptyListings}>
                       <Ionicons name="list" size={48} color="#D1D5DB" />
-                      <Text style={styles.emptyText}>No listings yet</Text>
-                      <Text style={styles.emptySubtext}>Start selling animals to see them here</Text>
+                      <Text style={styles.emptyText}>{t('profile.noListingsYet')}</Text>
+                      <Text style={styles.emptySubtext}>{t('profile.noListingsDesc')}</Text>
                       <TouchableOpacity 
                         style={styles.addListingButton}
                         onPress={() => navigation.navigate('SellAnimal')}
                       >
                         <Ionicons name="add-circle" size={20} color="#fff" />
-                        <Text style={styles.addListingText}>Add Listing</Text>
+                        <Text style={styles.addListingText}>{t('profile.addListing')}</Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -744,9 +744,7 @@ const ProfileScreen = ({ navigation }) => {
               <Text style={styles.sectionTitle}>{t('profile.myActivity')}</Text>
               <View style={styles.menuContainer}>
                 {renderMenuItem('heart', t('profile.wishlist'), t('profile.wishlistDesc'), () => navigation.navigate('Wishlist'))}
-                {renderMenuItem('calendar', 'My Appointments', 'View and manage your appointments', () => navigation.navigate('MyAppointments'))}
-                {/* Appointments feature - Coming soon */}
-                {/* {renderMenuItem('calendar', t('profile.appointments'), t('profile.appointmentsDesc'), () => navigation.navigate('MyAppointments'))} */}
+                {renderMenuItem('calendar', t('profile.myAppointments'), t('profile.myAppointmentsDesc'), () => navigation.navigate('MyAppointments'))}
                 {renderMenuItem('call', t('profile.callHistory'), t('profile.callHistoryDesc'), () => navigation.navigate('CallHistory'))}
               </View>
             </View>

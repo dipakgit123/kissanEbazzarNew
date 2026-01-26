@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import notificationService from '../services/notificationService';
+import io from 'socket.io-client';
+import { API_URL } from '../services/api';
 
 const NotificationContext = createContext();
 
@@ -13,7 +15,7 @@ export const useNotifications = () => {
 };
 
 export const NotificationProvider = ({ children, navigation }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -21,11 +23,15 @@ export const NotificationProvider = ({ children, navigation }) => {
 
   const notificationListener = useRef();
   const responseListener = useRef();
+  const socketRef = useRef(null);
 
   // Register for push notifications when authenticated
   useEffect(() => {
     if (isAuthenticated) {
       setupNotifications();
+      connectSocket();
+    } else {
+      disconnectSocket();
     }
 
     return () => {
@@ -36,8 +42,72 @@ export const NotificationProvider = ({ children, navigation }) => {
       if (responseListener.current) {
         responseListener.current.remove();
       }
+      disconnectSocket();
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user]);
+
+  // Connect to Socket.IO for real-time notifications
+  const connectSocket = () => {
+    if (!user?.id || socketRef.current) return;
+
+    try {
+      const socket = io(API_URL, {
+        transports: ['websocket'],
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionAttempts: 5
+      });
+
+      socket.on('connect', () => {
+        console.log('✅ Socket.IO connected:', socket.id);
+        // Register user with socket
+        socket.emit('register', user.id);
+      });
+
+      socket.on('notification', (data) => {
+        console.log('🔔 Real-time notification received:', data);
+        
+        // Add notification to local state
+        const newNotification = {
+          id: Date.now(),
+          title: data.title,
+          message: data.body,
+          data: data.data,
+          is_read: false,
+          created_at: data.timestamp
+        };
+        
+        setNotifications(prev => [newNotification, ...prev]);
+        setUnreadCount(prev => prev + 1);
+        
+        // Show local notification
+        notificationService.scheduleLocalNotification(data.title, data.body, data.data);
+        
+        // Refresh from server to get complete data
+        fetchNotifications();
+      });
+
+      socket.on('disconnect', () => {
+        console.log('❌ Socket.IO disconnected');
+      });
+
+      socket.on('connect_error', (error) => {
+        console.log('Socket connection error:', error.message);
+      });
+
+      socketRef.current = socket;
+    } catch (error) {
+      console.error('Error connecting socket:', error);
+    }
+  };
+
+  const disconnectSocket = () => {
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current = null;
+      console.log('Socket disconnected');
+    }
+  };
 
   const setupNotifications = async () => {
     try {

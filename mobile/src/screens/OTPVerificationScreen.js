@@ -13,7 +13,44 @@ import {
 import { COLORS } from '../utils/constants';
 import { otpService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { registerForPushNotificationsAsync } from '../services/notificationService';
+import { API_URL } from '../services/api';
 
+
+// Register push notification token with backend
+const registerPushToken = async (userId) => {
+  try {
+    const pushToken = await registerForPushNotificationsAsync();
+    
+    if (pushToken) {
+      console.log('Push token obtained:', pushToken);
+      
+      // Send token to backend
+      const response = await fetch(`${API_URL}/notifications/register-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: userId,
+          token: pushToken,
+          platform: Platform.OS,
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        console.log('Ã¢Å“â€¦ Push token registered successfully');
+      } else {
+        console.log('Ã¢Å¡Â Ã¯Â¸Â Failed to register push token:', data.message);
+      }
+    }
+  } catch (error) {
+    console.log('Ã¢ÂÅ’ Error registering push token:', error);
+    // Don't block login if token registration fails
+  }
+};
 const OTPVerificationScreen = ({ route, navigation }) => {
   const { phoneNumber } = route.params;
   const { login } = useAuth();
@@ -73,6 +110,9 @@ const OTPVerificationScreen = ({ route, navigation }) => {
       if (response.success) {
         await login(response.token, response.user);
 
+        // Register push notification token
+        await registerPushToken(response.user.id);
+
         if (response.requiresProfileCompletion) {
           navigation.replace('ProfileCompletion');
         } else {
@@ -117,12 +157,12 @@ const OTPVerificationScreen = ({ route, navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backButtonText}>← Back</Text>
+          <Text style={styles.backButtonText}>ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Ãƒâ€šÃ‚Â Back</Text>
         </TouchableOpacity>
 
         <View style={styles.headerContainer}>
           <View style={styles.iconCircle}>
-            <Text style={styles.icon}>📱</Text>
+            <Text style={styles.icon}>ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â±</Text>
           </View>
           <Text style={styles.title}>Verify OTP</Text>
           <Text style={styles.subtitle}>

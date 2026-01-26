@@ -115,8 +115,11 @@ export const WishlistProvider = ({ children }) => {
             if (!animalType) {
                 const item = wishlist.find(w => w.animal_id === animalId || w.id === animalId);
                 animalType = item?.animal_type || item?.animalType || 'cow';
+                console.log('🔍 Animal type lookup:', { animalId, found: !!item, animalType });
+                console.log('🔍 Wishlist item:', JSON.stringify(item));
             }
 
+            console.log('📤 Removing from wishlist:', { animalType, animalId });
             const response = await wishlistService.removeFromWishlist(animalType, animalId);
             
             if (response.success) {

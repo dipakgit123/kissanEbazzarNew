@@ -80,8 +80,11 @@ const BuyAnimalsScreen = ({ navigation }) => {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(animal =>
         animal.animal_type?.toLowerCase().includes(query) ||
-        animal.breed?.toLowerCase().includes(query) ||
-        animal.location?.toLowerCase().includes(query)
+        animal.breed_name?.toLowerCase().includes(query) ||
+        animal.city?.toLowerCase().includes(query) ||
+        animal.state?.toLowerCase().includes(query) ||
+        animal.age?.toLowerCase().includes(query) ||
+        animal.seller?.name?.toLowerCase().includes(query)
       );
     }
 

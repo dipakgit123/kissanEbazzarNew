@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const http = require('http');
+const { Server } = require('socket.io');
 const { connectDB } = require('./src/config/database');
 const authRoutes = require('./src/routes/authRoutes');
 const locationRoutes = require('./src/routes/locationRoutes');
@@ -28,6 +30,16 @@ const otpService = require('./src/services/otpService');
 require('dotenv').config();
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST']
+  }
+});
+
+// Make io accessible to routes
+app.set('io', io);
 
 // Security middleware
 app.use(helmet());
@@ -226,12 +238,43 @@ setInterval(async () => {
   }
 }, 5 * 60 * 1000);
 
+// Socket.IO connection handling
+const connectedUsers = new Map(); // userId -> socketId mapping
+
+io.on('connection', (socket) => {
+  console.log('👤 User connected:', socket.id);
+
+  // User authentication and registration
+  socket.on('register', (userId) => {
+    connectedUsers.set(userId.toString(), socket.id);
+    console.log(`✅ User ${userId} registered with socket ${socket.id}`);
+    console.log(`👥 Total connected users: ${connectedUsers.size}`);
+  });
+
+  // Handle disconnection
+  socket.on('disconnect', () => {
+    // Remove user from connected users
+    for (const [userId, socketId] of connectedUsers.entries()) {
+      if (socketId === socket.id) {
+        connectedUsers.delete(userId);
+        console.log(`❌ User ${userId} disconnected`);
+        break;
+      }
+    }
+    console.log(`👥 Total connected users: ${connectedUsers.size}`);
+  });
+});
+
+// Make connectedUsers accessible globally
+global.connectedUsers = connectedUsers;
+global.io = io;
+
 // Start server
 const startServer = async () => {
   try {
     await connectDB();
     
-    app.listen(PORT, () => {
+    server.listen(PORT, () => {
       console.log(`
 ╔══════════════════════════════════════════════╗
 ║   🚀 Server is running on port ${PORT}         ║
@@ -243,6 +286,7 @@ const startServer = async () => {
 ║   ☁️  Cloudinary Integration Enabled        ║
 ║   🗄️  Database: PostgreSQL                   ║
 ║   🔐 Environment: ${process.env.NODE_ENV || 'development'}     ║
+║   🔌 Socket.IO Real-time Notifications      ║
 ╚══════════════════════════════════════════════╝
 
 Available endpoints:

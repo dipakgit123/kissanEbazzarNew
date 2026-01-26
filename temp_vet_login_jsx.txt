@@ -1,0 +1,209 @@
+﻿return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
+
+  const validateEmail = (email) => {
+    const re = /\S+@\S+\.\S+/;
+    return re.test(email);
+  };
+
+  const handleLogin = async () => {
+    setError('');
+
+    // Validation
+    if (!email.trim()) {
+      setError(t('vetLogin.emailRequired') || 'Email is required');
+      return;
+    }
+
+    if (!validateEmail(email.trim())) {
+      setError(t('vetLogin.emailInvalid') || 'Please enter a valid email');
+      return;
+    }
+
+    if (!password) {
+      setError(t('vetLogin.passwordRequired') || 'Password is required');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError(t('vetLogin.passwordMinLength') || 'Password must be at least 6 characters');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await veterinarianService.login({
+        email: email.trim().toLowerCase(),
+        password: password,
+      });
+
+      if (response.success && response.token) {
+        await login(response.token, response.veterinarian);
+        Alert.alert(
+          t('common.success'),
+          t('vetLogin.loginSuccess') || 'Login successful!'
+        );
+      } else {
+        setError(response.message || t('vetLogin.loginFailed'));
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+      if (err.response?.status === 403) {
+        setError(err.response?.data?.message || t('vetLogin.accountPending'));
+      } else {
+        setError(err.response?.data?.message || t('vetLogin.loginFailed'));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Header Image Section */}
+        <View style={styles.imageContainer}>
+          <Image
+            source={require('../assets/login2.png')}
+            style={styles.heroImage}
+            resizeMode="cover"
+          />
+          <View style={styles.imageOverlay} />
+          
+          {/* Language Switcher Button */}
+          <TouchableOpacity 
+            style={styles.languageButton}
+            onPress={() => setLanguageModalVisible(true)}
+          >
+            <Ionicons name="language" size={20} color="#fff" />
+            <Text style={styles.languageButtonText}>{t('profile.language')}</Text>
+          </TouchableOpacity>
+          
+          <View style={styles.headerTextContainer}>
+            <View style={styles.iconBadge}>
+              <Ionicons name="medical" size={32} color="#fff" />
+            </View>
+            <Text style={styles.appTitle}>{t('vetAuth.loginTitle')}</Text>
+            <Text style={styles.appSubtitle}>{t('vetAuth.loginSubtitle')}</Text>
+          </View>
+        </View>
+
+        {/* Login Form */}
+        <View style={styles.formContainer}>
+          <View style={styles.formContent}>
+            <Text style={styles.welcomeText}>{t('vetAuth.welcome')}</Text>
+            <Text style={styles.subtitle}>{t('vetAuth.loginToContinue')}</Text>
+
+            {/* Error Message */}
+            {error ? (
+              <View style={styles.errorContainer}>
+                <Ionicons name="alert-circle" size={20} color="#DC2626" />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
+
+            {/* Email Input */}
+            <View style={styles.inputContainer}>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="mail-outline" size={20} color="#6B7280" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder={t('vetAuth.emailPlaceholder') || 'Email Address'}
+                  placeholderTextColor="#9CA3AF"
+                  value={email}
+                  onChangeText={(text) => {
+                    setEmail(text);
+                    setError('');
+                  }}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!loading}
+                />
+              </View>
+            </View>
+
+            {/* Password Input */}
+            <View style={styles.inputContainer}>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="lock-closed-outline" size={20} color="#6B7280" style={styles.inputIcon} />
+                <TextInput
+                  style={[styles.input, styles.passwordInput]}
+                  placeholder={t('vetAuth.passwordPlaceholder') || 'Password'}
+                  placeholderTextColor="#9CA3AF"
+                  value={password}
+                  onChangeText={(text) => {
+                    setPassword(text);
+                    setError('');
+                  }}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  editable={!loading}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={styles.eyeIcon}
+                >
+                  <Ionicons
+                    name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                    size={20}
+                    color="#6B7280"
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Login Button */}
+            <TouchableOpacity
+              style={[styles.loginButton, loading && styles.loginButtonDisabled]}
+              onPress={handleLogin}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Text style={styles.loginButtonText}>{t('vetAuth.loginButton')}</Text>
+                  <Ionicons name="arrow-forward" size={20} color="#fff" />
+                </>
+              )}
+            </TouchableOpacity>
+
+            {/* Register Link */}
+            <View style={styles.registerContainer}>
+              <Text style={styles.registerText}>{t('vetAuth.dontHaveAccount')}</Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('VetRegistration')}
+                disabled={loading}
+              >
+                <Text style={styles.registerLink}>{t('vetAuth.registerNow')}</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Back to Farmer Login */}
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.navigate('Login')}
+              disabled={loading}
+            >
+              <Ionicons name="arrow-back" size={20} color={COLORS.primary} />
+              <Text style={styles.backButtonText}>{t('vetAuth.backToFarmerLogin')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScrollView>
+      
+      <LanguageSwitcher 
+        visible={languageModalVisible} 
+        onClose={() => setLanguageModalVisible(false)} 
+      />
+    </SafeAreaView>

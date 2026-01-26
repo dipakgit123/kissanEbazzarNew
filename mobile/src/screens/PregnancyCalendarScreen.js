@@ -59,16 +59,18 @@ const PregnancyCalendarScreen = ({ navigation }) => {
   const [offspringGender, setOffspringGender] = useState('');
   const [offspringDetails, setOffspringDetails] = useState('');
 
-  const animalTypes = [
-    { key: 'cow', label: 'Cow', emoji: '🐄' },
-    { key: 'buffalo', label: 'Buffalo', emoji: '🐃' },
-    { key: 'goat', label: 'Goat', emoji: '🐐' },
-    { key: 'sheep', label: 'Sheep', emoji: '🐑' },
-    { key: 'horse', label: 'Horse', emoji: '🐴' },
-    { key: 'dog', label: 'Dog', emoji: '🐕' },
-    { key: 'cat', label: 'Cat', emoji: '🐱' },
-    { key: 'pig', label: 'Pig', emoji: '🐷' },
+  const getAnimalTypes = () => [
+    { key: 'cow', label: t('pregnancy.cow'), emoji: '🐄' },
+    { key: 'buffalo', label: t('pregnancy.buffalo'), emoji: '🐃' },
+    { key: 'goat', label: t('pregnancy.goat'), emoji: '🐐' },
+    { key: 'sheep', label: t('pregnancy.sheep'), emoji: '🐑' },
+    { key: 'horse', label: t('pregnancy.horse'), emoji: '🐴' },
+    { key: 'dog', label: t('pregnancy.dog'), emoji: '🐕' },
+    { key: 'cat', label: t('pregnancy.cat'), emoji: '🐱' },
+    { key: 'pig', label: t('pregnancy.pig'), emoji: '🐷' },
   ];
+  
+  const animalTypes = getAnimalTypes();
 
   useEffect(() => {
     loadData();
@@ -229,14 +231,14 @@ const PregnancyCalendarScreen = ({ navigation }) => {
     try {
       // Validate manual entry (always manual for mobile)
       if (!manualAnimalName.trim()) {
-        Alert.alert('Error', 'Please enter animal name');
+        Alert.alert(t('common.error'), t('pregnancy.nameRequired'));
         return;
       }
 
       // Validate date format
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
       if (!dateRegex.test(matingDate)) {
-        Alert.alert('Error', 'Please enter date in YYYY-MM-DD format');
+        Alert.alert(t('common.error'), t('pregnancy.invalidDateFormat'));
         return;
       }
 
@@ -257,16 +259,16 @@ const PregnancyCalendarScreen = ({ navigation }) => {
       console.log('Create record response:', response);
 
       if (response?.success) {
-        Alert.alert('Success', 'Pregnancy record created successfully!');
+        Alert.alert(t('common.success'), t('pregnancy.recordCreated'));
         setShowAddModal(false);
         resetForm();
         await loadData();
       } else {
-        Alert.alert('Error', response?.message || 'Failed to create record');
+        Alert.alert(t('common.error'), response?.message || t('pregnancy.recordCreatedError'));
       }
     } catch (error) {
       console.error('Error creating record:', error);
-      Alert.alert('Error', error?.message || 'Failed to create pregnancy record. Please try again.');
+      Alert.alert(t('common.error'), error?.message || t('pregnancy.recordCreatedError'));
     } finally {
       setSubmitting(false);
     }
@@ -286,38 +288,38 @@ const PregnancyCalendarScreen = ({ navigation }) => {
       const response = await pregnancyService.markDelivered(selectedRecord.id, deliveryData);
 
       if (response?.success) {
-        Alert.alert('Congratulations!', 'Delivery recorded successfully!');
+        Alert.alert(t('pregnancy.congratulations'), t('pregnancy.deliveryRecorded'));
         setShowDeliveryModal(false);
         setSelectedRecord(null);
         resetDeliveryForm();
         loadData();
       } else {
-        Alert.alert('Error', response?.message || 'Failed to record delivery');
+        Alert.alert(t('common.error'), response?.message || t('pregnancy.deliveryRecordedError'));
       }
     } catch (error) {
       console.log('Error marking delivered:', error);
-      Alert.alert('Error', error.message || 'Failed to record delivery');
+      Alert.alert(t('common.error'), error.message || t('pregnancy.deliveryRecordedError'));
     }
   };
 
   const handleDeleteRecord = (record) => {
     Alert.alert(
-      'Delete Record',
-      `Are you sure you want to delete the pregnancy record for ${record.animal_name}?`,
+      t('pregnancy.deleteRecord'),
+      t('pregnancy.deleteConfirm', { name: record.animal_name }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
               const response = await pregnancyService.deleteRecord(record.id);
               if (response.success) {
-                Alert.alert('Success', 'Record deleted successfully');
+                Alert.alert(t('common.success'), t('pregnancy.deleteSuccess'));
                 loadData();
               }
             } catch (error) {
-              Alert.alert('Error', 'Failed to delete record');
+              Alert.alert(t('common.error'), t('pregnancy.deleteError'));
             }
           },
         },
@@ -424,7 +426,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
             <Ionicons name="calendar" size={48} color={COLORS.primary} />
           </View>
           <ActivityIndicator size="large" color={COLORS.primary} style={styles.loadingSpinner} />
-          <Text style={styles.loadingText}>Loading pregnancy calendar...</Text>
+          <Text style={styles.loadingText}>{t('pregnancy.loadingCalendar')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -447,7 +449,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
           <Ionicons name="calendar" size={28} color={COLORS.white} />
         </View>
         <Text style={styles.title}>{t('pregnancy.title')}</Text>
-        <Text style={styles.subtitle}>Track pregnant animals with accurate durations</Text>
+        <Text style={styles.subtitle}>{t('pregnancy.subtitle')}</Text>
       </View>
 
       {/* Stats - Removed for mobile */}
@@ -479,11 +481,11 @@ const PregnancyCalendarScreen = ({ navigation }) => {
         <View style={styles.legendRow}>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: COLORS.primary }]} />
-            <Text style={styles.legendText}>Pregnant</Text>
+            <Text style={styles.legendText}>{t('pregnancy.pregnant')}</Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#EF4444' }]} />
-            <Text style={styles.legendText}>Due Date</Text>
+            <Text style={styles.legendText}>{t('pregnancy.dueDate')}</Text>
           </View>
         </View>
       </View>
@@ -492,7 +494,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
       <View style={styles.addButtonContainer}>
         <TouchableOpacity style={styles.addPregnancyButton} onPress={() => setShowAddModal(true)}>
           <Ionicons name="add-circle" size={24} color={COLORS.white} />
-          <Text style={styles.addPregnancyButtonText}>Add Pregnancy Record</Text>
+          <Text style={styles.addPregnancyButtonText}>{t('pregnancy.addPregnancyRecord')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -514,7 +516,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
                   <View style={styles.animalInfo}>
                     <Text style={styles.animalName}>{record.animal_name}</Text>
                     <Text style={styles.animalBreed}>
-                      {record.breed_name || record.animal_type} • {daysLeft} days left
+                      {record.breed_name || record.animal_type} • {daysLeft} {t('pregnancy.daysLeft')}
                     </Text>
                   </View>
                   <View style={styles.progressBadge}>
@@ -525,8 +527,8 @@ const PregnancyCalendarScreen = ({ navigation }) => {
                 </View>
 
                 <View style={styles.animalDetails}>
-                  <Text style={styles.detailText}>Mating: {formatDate(record.mating_date)}</Text>
-                  <Text style={styles.detailText}>Expected: {formatDate(record.expected_delivery_date)}</Text>
+                  <Text style={styles.detailText}>{t('pregnancy.mating')}: {formatDate(record.mating_date)}</Text>
+                  <Text style={styles.detailText}>{t('pregnancy.expected')}: {formatDate(record.expected_delivery_date)}</Text>
                 </View>
 
                 <View style={styles.progressBarContainer}>
@@ -545,7 +547,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
                       onPress={() => openDeliveryModal(record)}
                     >
                       <Ionicons name="checkmark-circle" size={18} color="#22C55E" />
-                      <Text style={styles.deliverBtnText}>Mark Delivered</Text>
+                      <Text style={styles.deliverBtnText}>{t('pregnancy.markDelivered')}</Text>
                     </TouchableOpacity>
                   )}
                   <TouchableOpacity
@@ -561,7 +563,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
         ) : (
           <View style={styles.emptyState}>
             <Ionicons name="calendar-outline" size={48} color={COLORS.gray} />
-            <Text style={styles.emptyText}>No pregnant animals for this date</Text>
+            <Text style={styles.emptyText}>{t('pregnancy.noPregnantAnimals')}</Text>
           </View>
         )}
       </View>
@@ -575,7 +577,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
             onPress={() => setActiveTab(tab)}
           >
             <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {t(`pregnancy.${tab}`)}
             </Text>
           </TouchableOpacity>
         ))}
@@ -584,8 +586,8 @@ const PregnancyCalendarScreen = ({ navigation }) => {
       {/* All Records List */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>
-          {activeTab === 'active' ? 'Active Pregnancies' :
-           activeTab === 'delivered' ? 'Delivered' : 'All Records'}
+          {activeTab === 'active' ? t('pregnancy.activePregnancies') :
+           activeTab === 'delivered' ? t('pregnancy.delivered') : t('pregnancy.allRecords')}
         </Text>
 
         {filteredRecords.length > 0 ? (
@@ -599,8 +601,8 @@ const PregnancyCalendarScreen = ({ navigation }) => {
                   <Text style={styles.miniAnimalName}>{record.animal_name}</Text>
                   <Text style={styles.miniAnimalDate}>
                     {record.status === 'pregnant'
-                      ? `Due: ${formatDate(record.expected_delivery_date)}`
-                      : `Delivered: ${formatDate(record.actual_delivery_date)}`}
+                      ? `${t('pregnancy.due')}: ${formatDate(record.expected_delivery_date)}`
+                      : `${t('pregnancy.delivered')}: ${formatDate(record.actual_delivery_date)}`}
                   </Text>
                 </View>
                 {record.status === 'pregnant' ? (
@@ -619,7 +621,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
           })
         ) : (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No records found</Text>
+            <Text style={styles.emptyText}>{t('pregnancy.noRecordsFound')}</Text>
           </View>
         )}
       </View>
@@ -632,7 +634,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add Pregnancy Record</Text>
+              <Text style={styles.modalTitle}>{t('pregnancy.addPregnancyRecord')}</Text>
               <TouchableOpacity onPress={() => { setShowAddModal(false); resetForm(); }}>
                 <Ionicons name="close" size={24} color={COLORS.black} />
               </TouchableOpacity>
@@ -642,18 +644,18 @@ const PregnancyCalendarScreen = ({ navigation }) => {
               {/* Toggle between listing selection and manual entry */}
               {/* Manual Entry Fields - Always shown for mobile */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Animal Name *</Text>
+                <Text style={styles.inputLabel}>{t('pregnancy.animalName')} *</Text>
                 <TextInput
                   style={styles.input}
                   value={manualAnimalName}
                   onChangeText={setManualAnimalName}
-                  placeholder="Enter animal name"
+                  placeholder={t('pregnancy.enterAnimalName')}
                   placeholderTextColor="#9CA3AF"
                 />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Animal Type *</Text>
+                <Text style={styles.inputLabel}>{t('pregnancy.animalType')} *</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   <View style={styles.typeSelector}>
                     {animalTypes.map((type) => (
@@ -681,38 +683,38 @@ const PregnancyCalendarScreen = ({ navigation }) => {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Breed (Optional)</Text>
+                <Text style={styles.inputLabel}>{t('pregnancy.breedOptional')}</Text>
                 <TextInput
                   style={styles.input}
                   value={manualBreedName}
                   onChangeText={setManualBreedName}
-                  placeholder="Enter breed name"
+                  placeholder={t('pregnancy.enterBreedName')}
                   placeholderTextColor="#9CA3AF"
                 />
               </View>
 
               {/* Common Fields */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Mating Date *</Text>
+                <Text style={styles.inputLabel}>{t('pregnancy.matingDate')} *</Text>
                 <TextInput
                   style={styles.input}
                   value={matingDate}
                   onChangeText={setMatingDate}
-                  placeholder="YYYY-MM-DD"
+                  placeholder={t('pregnancy.dateFormatPlaceholder')}
                   placeholderTextColor="#9CA3AF"
                 />
-                <Text style={styles.inputHint}>Format: 2025-01-15</Text>
+                <Text style={styles.inputHint}>{t('pregnancy.dateFormat')}</Text>
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Mating Type</Text>
+                <Text style={styles.inputLabel}>{t('pregnancy.matingType')}</Text>
                 <View style={styles.matingTypeRow}>
                   <TouchableOpacity
                     style={[styles.matingTypeBtn, matingType === 'natural' && styles.matingTypeBtnActive]}
                     onPress={() => setMatingType('natural')}
                   >
                     <Text style={[styles.matingTypeText, matingType === 'natural' && styles.matingTypeTextActive]}>
-                      Natural
+                      {t('pregnancy.natural')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -720,30 +722,30 @@ const PregnancyCalendarScreen = ({ navigation }) => {
                     onPress={() => setMatingType('artificial_insemination')}
                   >
                     <Text style={[styles.matingTypeText, matingType === 'artificial_insemination' && styles.matingTypeTextActive]}>
-                      AI
+                      {t('pregnancy.artificialInsemination')}
                     </Text>
                   </TouchableOpacity>
                 </View>
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Bull/Sire Details (Optional)</Text>
+                <Text style={styles.inputLabel}>{t('pregnancy.bullSireDetails')}</Text>
                 <TextInput
                   style={styles.input}
                   value={bullSireDetails}
                   onChangeText={setBullSireDetails}
-                  placeholder="Enter bull/sire information"
+                  placeholder={t('pregnancy.enterBullSire')}
                   placeholderTextColor="#9CA3AF"
                 />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Notes (Optional)</Text>
+                <Text style={styles.inputLabel}>{t('pregnancy.notes')}</Text>
                 <TextInput
                   style={[styles.input, styles.textArea]}
                   value={notes}
                   onChangeText={setNotes}
-                  placeholder="Any additional notes..."
+                  placeholder={t('pregnancy.notesPlaceholder')}
                   placeholderTextColor="#9CA3AF"
                   multiline
                   numberOfLines={3}
@@ -754,7 +756,10 @@ const PregnancyCalendarScreen = ({ navigation }) => {
               <View style={styles.durationInfo}>
                 <Ionicons name="information-circle" size={20} color={COLORS.primary} />
                 <Text style={styles.durationInfoText}>
-                  {`${animalTypes.find(a => a.key === manualAnimalType)?.label || 'Animal'}: ~${pregnancyDurations[manualAnimalType] || 150} days pregnancy duration`}
+                  {t('pregnancy.pregnancyDurationInfo', {
+                    animal: animalTypes.find(a => a.key === manualAnimalType)?.label || t('pregnancy.cow'),
+                    days: pregnancyDurations[manualAnimalType] || 150
+                  })}
                 </Text>
               </View>
 
@@ -766,10 +771,10 @@ const PregnancyCalendarScreen = ({ navigation }) => {
                 {submitting ? (
                   <>
                     <ActivityIndicator size="small" color={COLORS.white} />
-                    <Text style={[styles.submitBtnText, { marginLeft: 8 }]}>Creating...</Text>
+                    <Text style={[styles.submitBtnText, { marginLeft: 8 }]}>{t('pregnancy.creating')}</Text>
                   </>
                 ) : (
-                  <Text style={styles.submitBtnText}>Create Record</Text>
+                  <Text style={styles.submitBtnText}>{t('pregnancy.createRecord')}</Text>
                 )}
               </TouchableOpacity>
             </ScrollView>
@@ -782,7 +787,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Record Delivery</Text>
+              <Text style={styles.modalTitle}>{t('pregnancy.recordDelivery')}</Text>
               <TouchableOpacity onPress={() => { setShowDeliveryModal(false); resetDeliveryForm(); }}>
                 <Ionicons name="close" size={24} color={COLORS.black} />
               </TouchableOpacity>
@@ -799,7 +804,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Number of Offspring</Text>
+                  <Text style={styles.inputLabel}>{t('pregnancy.numberOfOffspring')}</Text>
                   <TextInput
                     style={styles.input}
                     value={offspringCount}
@@ -810,22 +815,22 @@ const PregnancyCalendarScreen = ({ navigation }) => {
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Gender(s)</Text>
+                  <Text style={styles.inputLabel}>{t('pregnancy.genders')}</Text>
                   <TextInput
                     style={styles.input}
                     value={offspringGender}
                     onChangeText={setOffspringGender}
-                    placeholder="e.g., Male, Female, 2 Male 1 Female"
+                    placeholder={t('pregnancy.genderPlaceholder')}
                   />
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Additional Details (Optional)</Text>
+                  <Text style={styles.inputLabel}>{t('pregnancy.additionalDetails')}</Text>
                   <TextInput
                     style={[styles.input, styles.textArea]}
                     value={offspringDetails}
                     onChangeText={setOffspringDetails}
-                    placeholder="Health status, weight, etc..."
+                    placeholder={t('pregnancy.healthStatusPlaceholder')}
                     multiline
                     numberOfLines={3}
                   />
@@ -833,7 +838,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
 
                 <TouchableOpacity style={[styles.submitBtn, { backgroundColor: '#22C55E' }]} onPress={handleMarkDelivered}>
                   <Ionicons name="checkmark-circle" size={20} color={COLORS.white} />
-                  <Text style={styles.submitBtnText}> Confirm Delivery</Text>
+                  <Text style={styles.submitBtnText}> {t('pregnancy.confirmDelivery')}</Text>
                 </TouchableOpacity>
               </ScrollView>
             )}

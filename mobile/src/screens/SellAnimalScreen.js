@@ -34,8 +34,7 @@ const SellAnimalScreen = ({ navigation }) => {
       emoji: '🐄', 
       image: require('../assets/cow1.png'), 
       color: '#F59E0B', 
-      bgColor: '#FEF3C7',
-      description: 'Milk & Breeding'
+      bgColor: '#FEF3C7'
     },
     { 
       id: 'buffalo', 
@@ -43,8 +42,7 @@ const SellAnimalScreen = ({ navigation }) => {
       emoji: '🐃', 
       image: require('../assets/buffalo1.png'), 
       color: '#6B7280', 
-      bgColor: '#F3F4F6',
-      description: 'Milk & Breeding'
+      bgColor: '#F3F4F6'
     },
     { 
       id: 'goat', 
@@ -52,8 +50,7 @@ const SellAnimalScreen = ({ navigation }) => {
       emoji: '🐐', 
       image: require('../assets/goat1.png'), 
       color: '#10B981', 
-      bgColor: '#D1FAE5',
-      description: 'Milk & Meat'
+      bgColor: '#D1FAE5'
     },
     { 
       id: 'horse', 
@@ -61,8 +58,7 @@ const SellAnimalScreen = ({ navigation }) => {
       emoji: '🐴', 
       image: require('../assets/horse1.png'), 
       color: '#8B5CF6', 
-      bgColor: '#EDE9FE',
-      description: 'Riding & Work'
+      bgColor: '#EDE9FE'
     },
     { 
       id: 'dog', 
@@ -70,8 +66,7 @@ const SellAnimalScreen = ({ navigation }) => {
       emoji: '🐕', 
       image: require('../assets/dog1.png'), 
       color: '#F97316', 
-      bgColor: '#FED7AA',
-      description: 'Pet & Guard'
+      bgColor: '#FED7AA'
     },
     { 
       id: 'cat', 
@@ -79,8 +74,7 @@ const SellAnimalScreen = ({ navigation }) => {
       emoji: '🐱', 
       image: require('../assets/cat1.png'), 
       color: '#EC4899', 
-      bgColor: '#FCE7F3',
-      description: 'Pet & Companion'
+      bgColor: '#FCE7F3'
     },
     { 
       id: 'other', 
@@ -88,8 +82,7 @@ const SellAnimalScreen = ({ navigation }) => {
       emoji: '🐾', 
       image: null, 
       color: '#3B82F6', 
-      bgColor: '#DBEAFE',
-      description: 'Sheep, Pig, Rabbit & More'
+      bgColor: '#DBEAFE'
     }
   ];
 
@@ -126,19 +119,6 @@ const SellAnimalScreen = ({ navigation }) => {
   // Animal Selection Screen
   const renderAnimalSelection = () => (
     <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-      {/* Instructions Card */}
-      <View style={styles.instructionsCard}>
-        <Ionicons name="information-circle" size={24} color={COLORS.primary} />
-        <View style={styles.instructionsText}>
-          <Text style={styles.instructionsTitle}>
-            {t('listing.instructions.title') || 'Quick Tips'}
-          </Text>
-          <Text style={styles.instructionsSubtitle}>
-            {t('listing.instructions.subtitle') || 'Select the animal type below to get started with your listing'}
-          </Text>
-        </View>
-      </View>
-
       {/* Section Title */}
       <Text style={styles.sectionTitle}>
         {t('listing.selectAnimalType') || 'Select Animal Type'}
@@ -165,11 +145,6 @@ const SellAnimalScreen = ({ navigation }) => {
             {/* Animal Name */}
             <Text style={[styles.animalName, { color: animal.color }]}>
               {animal.name}
-            </Text>
-            
-            {/* Description */}
-            <Text style={styles.animalDescription}>
-              {animal.description}
             </Text>
             
             {/* Select Button */}
@@ -327,6 +302,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#111827',
     marginHorizontal: 16,
+    marginTop: 16,
     marginBottom: 16,
   },
   animalGrid: {
@@ -337,8 +313,8 @@ const styles = StyleSheet.create({
   },
   animalCard: {
     width: '48%',
-    padding: 16,
-    borderRadius: 16,
+    padding: 12,
+    borderRadius: 12,
     marginBottom: 12,
     alignItems: 'center',
     position: 'relative',
@@ -347,34 +323,29 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    minHeight: 120,
   },
   animalImage: {
-    width: 70,
-    height: 70,
-    marginBottom: 12,
+    width: 55,
+    height: 55,
+    marginBottom: 10,
     resizeMode: 'contain',
   },
   animalIconContainer: {
-    width: 70,
-    height: 70,
+    width: 55,
+    height: 55,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 35,
-    marginBottom: 12,
+    borderRadius: 28,
+    marginBottom: 10,
   },
   animalEmoji: {
-    fontSize: 36,
+    fontSize: 30,
   },
   animalName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    marginBottom: 4,
-  },
-  animalDescription: {
-    fontSize: 12,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: 24,
   },
   selectButton: {
     position: 'absolute',

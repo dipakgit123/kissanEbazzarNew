@@ -107,9 +107,21 @@ class AppointmentController {
         status: 'pending'
       });
 
-      // Send notification to veterinarian
+      // Send real-time notification to veterinarian
       try {
-        await notificationService.sendAppointmentNotification(veterinarian, appointment, 'new');
+        await notificationService.sendRealtimeNotification(
+          veterinarian.id,
+          '🔔 New Appointment Request',
+          `${farmer_name} has booked an appointment for ${animal_type} on ${appointment_date} at ${appointment_time}`,
+          {
+            type: 'new_appointment',
+            appointmentId: appointment.id,
+            animalType: animal_type,
+            appointmentDate: appointment_date,
+            appointmentTime: appointment_time
+          },
+          db
+        );
       } catch (notifError) {
         console.error('Failed to send notification:', notifError);
       }
@@ -382,9 +394,38 @@ class AppointmentController {
 
       await appointment.update(updateData);
 
-      // Send notification to user
+      // Send real-time notification to user
       try {
-        await notificationService.sendAppointmentNotification(appointment.user, appointment, status);
+        let title, body;
+        switch (status) {
+          case 'confirmed':
+            title = '✅ Appointment Confirmed';
+            body = `Your appointment for ${appointment.appointment_date} at ${appointment.appointment_time} has been confirmed`;
+            break;
+          case 'cancelled':
+            title = '❌ Appointment Cancelled';
+            body = `Appointment for ${appointment.appointment_date} has been cancelled`;
+            break;
+          case 'completed':
+            title = '✔️ Appointment Completed';
+            body = `Your appointment has been marked as completed`;
+            break;
+          default:
+            title = 'Appointment Update';
+            body = `Your appointment status has been updated to ${status}`;
+        }
+
+        await notificationService.sendRealtimeNotification(
+          appointment.user.id,
+          title,
+          body,
+          {
+            type: `appointment_${status}`,
+            appointmentId: appointment.id,
+            status: status
+          },
+          db
+        );
       } catch (notifError) {
         console.error('Failed to send notification:', notifError);
       }
@@ -453,9 +494,20 @@ class AppointmentController {
         cancelled_at: new Date()
       });
 
-      // Send notification to veterinarian
+      // Send real-time notification to veterinarian
       try {
-        await notificationService.sendAppointmentNotification(appointment.veterinarian, appointment, 'cancelled');
+        await notificationService.sendRealtimeNotification(
+          appointment.veterinarian.id,
+          '❌ Appointment Cancelled',
+          `${appointment.farmer_name} cancelled appointment for ${appointment.appointment_date} at ${appointment.appointment_time}`,
+          {
+            type: 'appointment_cancelled',
+            appointmentId: appointment.id,
+            cancelledBy: 'user',
+            reason: cancellation_reason
+          },
+          db
+        );
       } catch (notifError) {
         console.error('Failed to send notification:', notifError);
       }

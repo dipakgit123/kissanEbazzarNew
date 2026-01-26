@@ -39,62 +39,56 @@ const VeterinarianScreen = ({ navigation }) => {
   const services = [
     {
       id: 1,
-      name: 'Emergency Care',
-      nameHindi: 'आपातकालीन देखभाल',
+      name: t('veterinarian.serviceNames.emergencyCare'),
       icon: '🚨',
-      description: '24/7 emergency veterinary services',
+      description: t('veterinarian.serviceDescriptions.emergencyCare'),
       price: '₹500-2000',
-      duration: 'Immediate',
+      duration: t('veterinarian.serviceDurations.immediate'),
       available: true,
     },
     {
       id: 2,
-      name: 'General Checkup',
-      nameHindi: 'सामान्य जांच',
+      name: t('veterinarian.serviceNames.generalCheckup'),
       icon: '🩺',
-      description: 'Comprehensive health examination',
+      description: t('veterinarian.serviceDescriptions.generalCheckup'),
       price: '₹300-800',
-      duration: '30-45 mins',
+      duration: t('veterinarian.serviceDurations.30to45'),
       available: true,
     },
     {
       id: 3,
-      name: 'Vaccination',
-      nameHindi: 'टीकाकरण',
+      name: t('veterinarian.serviceNames.vaccination'),
       icon: '💉',
-      description: 'Complete vaccination schedule',
+      description: t('veterinarian.serviceDescriptions.vaccination'),
       price: '₹200-500',
-      duration: '15-30 mins',
+      duration: t('veterinarian.serviceDurations.15to30'),
       available: true,
     },
     {
       id: 4,
-      name: 'Surgery',
-      nameHindi: 'सर्जरी',
+      name: t('veterinarian.serviceNames.surgery'),
       icon: '⚕️',
-      description: 'Minor and major surgical procedures',
+      description: t('veterinarian.serviceDescriptions.surgery'),
       price: '₹2000-15000',
-      duration: '1-4 hours',
+      duration: t('veterinarian.serviceDurations.1to4hours'),
       available: true,
     },
     {
       id: 5,
-      name: 'Dental Care',
-      nameHindi: 'दंत चिकित्सा',
+      name: t('veterinarian.serviceNames.dentalCare'),
       icon: '🦷',
-      description: 'Oral health care and treatments',
+      description: t('veterinarian.serviceDescriptions.dentalCare'),
       price: '₹400-1200',
-      duration: '45-60 mins',
+      duration: t('veterinarian.serviceDurations.45to60'),
       available: true,
     },
     {
       id: 6,
-      name: 'Pregnancy Care',
-      nameHindi: 'गर्भावस्था देखभाल',
+      name: t('veterinarian.serviceNames.pregnancyCare'),
       icon: '🤰',
-      description: 'Prenatal and postnatal care',
+      description: t('veterinarian.serviceDescriptions.pregnancyCare'),
       price: '₹600-1500',
-      duration: '1-2 hours',
+      duration: t('veterinarian.serviceDurations.1to2hours'),
       available: true,
     },
   ];
@@ -202,13 +196,13 @@ const VeterinarianScreen = ({ navigation }) => {
 
   const getSpecializationLabel = (spec) => {
     const labels = {
-      'large_animal': 'Large Animal',
-      'small_animal': 'Small Animal',
-      'livestock': 'Livestock',
-      'surgery': 'Surgery',
-      'general': 'General Practice',
-      'emergency': 'Emergency Care',
-      'reproduction': 'Reproduction',
+      'large_animal': t('veterinarian.specializations.largeAnimal'),
+      'small_animal': t('veterinarian.specializations.smallAnimal'),
+      'livestock': t('veterinarian.specializations.livestock'),
+      'surgery': t('veterinarian.specializations.surgery'),
+      'general': t('veterinarian.specializations.general'),
+      'emergency': t('veterinarian.specializations.emergency'),
+      'reproduction': t('veterinarian.specializations.reproduction'),
     };
     return labels[spec] || spec;
   };
@@ -216,7 +210,7 @@ const VeterinarianScreen = ({ navigation }) => {
   const filteredServices = services.filter(
     (service) =>
       service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      service.nameHindi.includes(searchQuery)
+      service.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const filteredVets = veterinarians.filter(
@@ -255,7 +249,7 @@ const VeterinarianScreen = ({ navigation }) => {
         <Text style={styles.title}>पशु डॉक्टर</Text>
         <Text style={styles.titleEn}>{t('veterinarian.title')}</Text>
         <Text style={styles.subtitle}>
-          Professional veterinary care for your farm animals
+          {t('veterinarian.subtitle')}
         </Text>
 
         {/* Search Bar */}
@@ -288,7 +282,6 @@ const VeterinarianScreen = ({ navigation }) => {
             >
               <Text style={styles.serviceIcon}>{service.icon}</Text>
               <Text style={styles.serviceName}>{service.name}</Text>
-              <Text style={styles.serviceNameHindi}>{service.nameHindi}</Text>
               <Text style={styles.serviceDesc} numberOfLines={2}>
                 {service.description}
               </Text>
@@ -323,13 +316,13 @@ const VeterinarianScreen = ({ navigation }) => {
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={COLORS.primary} />
-            <Text style={styles.loadingText}>Finding veterinarians near you...</Text>
+            <Text style={styles.loadingText}>{t('veterinarian.findingVets')}</Text>
           </View>
         ) : filteredVets.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="medical-outline" size={60} color={COLORS.gray} />
-            <Text style={styles.emptyText}>No veterinarians found</Text>
-            <Text style={styles.emptySubtext}>Try adjusting your search or check back later</Text>
+            <Text style={styles.emptyText}>{t('veterinarian.noVetsFoundTitle')}</Text>
+            <Text style={styles.emptySubtext}>{t('veterinarian.noVetsFoundSubtext')}</Text>
           </View>
         ) : (
           filteredVets.map((vet) => (
@@ -371,7 +364,7 @@ const VeterinarianScreen = ({ navigation }) => {
                   <View style={styles.detailRow}>
                     <Ionicons name="navigate-outline" size={16} color={COLORS.primary} />
                     <Text style={[styles.detailText, { color: COLORS.primary }]}>
-                      {vet.distance.toFixed(1)} km away
+                      {vet.distance.toFixed(1)} {t('veterinarian.kmAway')}
                     </Text>
                   </View>
                 )}
@@ -410,7 +403,7 @@ const VeterinarianScreen = ({ navigation }) => {
                   onPress={() => handleVetPress(vet)}
                 >
                   <Ionicons name="eye-outline" size={18} color={COLORS.primary} />
-                  <Text style={styles.viewBtnText}>View</Text>
+                  <Text style={styles.viewBtnText}>{t('veterinarian.view')}</Text>
                 </TouchableOpacity>
               </View>
             </TouchableOpacity>
@@ -420,8 +413,8 @@ const VeterinarianScreen = ({ navigation }) => {
 
       {/* Emergency Section */}
       <View style={styles.emergencyCard}>
-        <Text style={styles.emergencyTitle}>Emergency Veterinary Care</Text>
-        <Text style={styles.emergencySubtitle}>24/7 {t('veterinarian.emergencyAvailable')}</Text>
+        <Text style={styles.emergencyTitle}>{t('veterinarian.emergencyCare')}</Text>
+        <Text style={styles.emergencySubtitle}>{t('veterinarian.serviceDescriptions.emergencyCare')}</Text>
         <View style={styles.emergencyButtons}>
           <TouchableOpacity style={styles.emergencyCallBtn} onPress={handleEmergencyCall}>
             <Ionicons name="call" size={20} color={COLORS.red} />

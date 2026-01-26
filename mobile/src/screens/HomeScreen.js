@@ -64,7 +64,7 @@ const HomeScreen = ({ navigation }) => {
         <View style={styles.logoWrapper}>
           <View style={styles.logoShadow}>
             <Image
-              source={require('../assets/animal_bazar_logo.jpeg')}
+              source={require('../assets/animal_logog.jpeg')}
               style={styles.headerLogoImage}
               resizeMode="cover"
             />
@@ -177,7 +177,7 @@ const HomeScreen = ({ navigation }) => {
               />
               <View style={styles.featureContent}>
                 <Text style={styles.featureCardTitle}>{t('services.aiAssistant')}</Text>
-                <Text style={styles.featureCardSubtitle}>Instant AI support</Text>
+                <Text style={styles.featureCardSubtitle}>{t('homeScreen.instantAiSupport')}</Text>
                 <View style={styles.featureArrow}>
                   <Ionicons name="arrow-forward" size={20} color="#3B82F6" />
                 </View>
@@ -197,7 +197,7 @@ const HomeScreen = ({ navigation }) => {
               />
               <View style={styles.featureContent}>
                 <Text style={styles.featureCardTitle}>{t('services.veterinarian')}</Text>
-                <Text style={styles.featureCardSubtitle}>Expert vet care</Text>
+                <Text style={styles.featureCardSubtitle}>{t('homeScreen.expertVetCare')}</Text>
                 <View style={styles.featureArrow}>
                   <Ionicons name="arrow-forward" size={20} color="#10B981" />
                 </View>
@@ -217,7 +217,7 @@ const HomeScreen = ({ navigation }) => {
               />
               <View style={styles.featureContent}>
                 <Text style={styles.featureCardTitle}>{t('services.aiHealthCheck')}</Text>
-                <Text style={styles.featureCardSubtitle}>Health monitoring</Text>
+                <Text style={styles.featureCardSubtitle}>{t('homeScreen.healthMonitoring')}</Text>
                 <View style={styles.featureArrow}>
                   <Ionicons name="arrow-forward" size={20} color="#8B5CF6" />
                 </View>
@@ -237,7 +237,7 @@ const HomeScreen = ({ navigation }) => {
               />
               <View style={styles.featureContent}>
                 <Text style={styles.featureCardTitle}>{t('services.pregnancy')}</Text>
-                <Text style={styles.featureCardSubtitle}>Track pregnancy</Text>
+                <Text style={styles.featureCardSubtitle}>{t('homeScreen.trackPregnancy')}</Text>
                 <View style={styles.featureArrow}>
                   <Ionicons name="arrow-forward" size={20} color="#EC4899" />
                 </View>

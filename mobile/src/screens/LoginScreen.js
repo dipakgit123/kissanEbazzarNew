@@ -93,7 +93,7 @@ const LoginScreen = ({ navigation }) => {
           </TouchableOpacity>
           
           <View style={styles.headerTextContainer}>
-            <Text style={styles.appTitle}>🐄 {t('common.appName')}</Text>
+            <Text style={styles.appTitle}>{t('common.appName')}</Text>
             <Text style={styles.appSubtitle}>{t('home.heroSubtitle')}</Text>
           </View>
         </View>
@@ -175,20 +175,7 @@ const LoginScreen = ({ navigation }) => {
                 <Text style={styles.vetLoginSubtext}>{t('vetAuth.loginSubtitle')}</Text>
               </View>
               <Ionicons name="chevron-forward" size={24} color={COLORS.primary} />
-            </TouchableOpacity>
-
-            {/* Register Links */}
-            <View style={styles.footerLinks}>
-              <Text style={styles.footerText}>{t('auth.newUser')}</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('OTPVerification', {
-                phoneNumber: '',
-                type: 'register'
-              })}>
-                <Text style={styles.linkText}> {t('auth.registerNow')}</Text>
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity
+            </TouchableOpacity><TouchableOpacity
               style={styles.vetRegisterButton}
               onPress={() => navigation.navigate('VetRegistration')}
               activeOpacity={0.8}
@@ -482,3 +469,4 @@ const styles = StyleSheet.create({
 });
 
 export default LoginScreen;
+

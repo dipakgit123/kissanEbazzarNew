@@ -12,6 +12,9 @@ const IS_PRODUCTION = false;
 
 const API_URL = IS_PRODUCTION ? PROD_API_URL : DEV_API_URL;
 
+// Export API_URL for use in other services
+export { API_URL };
+
 // Create axios instance
 const api = axios.create({
   baseURL: API_URL,

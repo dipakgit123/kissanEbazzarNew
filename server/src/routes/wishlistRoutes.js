@@ -14,6 +14,7 @@ router.post('/add', wishlistController.addToWishlist);
 
 // Remove item from wishlist
 router.post('/remove', wishlistController.removeFromWishlist);
+router.delete('/remove', wishlistController.removeFromWishlist); // Alternative DELETE method
 
 // Check if item is in wishlist
 router.get('/check', wishlistController.checkWishlist);

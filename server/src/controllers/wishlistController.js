@@ -141,7 +141,40 @@ exports.addToWishlist = async (req, res) => {
 exports.removeFromWishlist = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { animal_type, animal_id } = req.body;
+    
+    // Get data from body (POST/DELETE) or query params (DELETE with query)
+    const { animal_type, animal_id } = req.body.animal_type ? req.body : req.query;
+    
+    console.log('========== REMOVE FROM WISHLIST ==========');
+    console.log('User ID:', userId);
+    console.log('Animal Type:', animal_type);
+    console.log('Animal ID:', animal_id);
+    console.log('Method:', req.method);
+    console.log('Body:', JSON.stringify(req.body));
+    console.log('Query:', JSON.stringify(req.query));
+    console.log('==========================================');
+
+    if (!animal_type || !animal_id) {
+      console.log('❌ Missing parameters!');
+      return res.status(400).json({
+        success: false,
+        message: 'animal_type and animal_id are required'
+      });
+    }
+
+    // Check if item exists in wishlist first
+    const existingItem = await Wishlist.findOne({
+      where: {
+        user_id: userId,
+        animal_type,
+        animal_id
+      }
+    });
+
+    console.log('Existing wishlist item:', existingItem ? 'FOUND' : 'NOT FOUND');
+    if (existingItem) {
+      console.log('Wishlist item details:', JSON.stringify(existingItem));
+    }
 
     const deleted = await Wishlist.destroy({
       where: {
@@ -150,6 +183,8 @@ exports.removeFromWishlist = async (req, res) => {
         animal_id
       }
     });
+
+    console.log('Deleted count:', deleted);
 
     if (deleted === 0) {
       return res.status(404).json({

@@ -3,6 +3,7 @@
 const db = require('../models');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudinary');
 const { Op } = require('sequelize');
+const notificationService = require('../services/notificationService');
 
 class AnimalListingController {
   // CREATE - Requires authentication
@@ -90,7 +91,53 @@ class AnimalListingController {
         additionalNotes,
         ...uploadedFiles,
         ...locationData
-      });
+      });      
+      // ðŸ”” SEND NOTIFICATIONS TO NEARBY USERS
+      try {
+        // Get users within 50km radius (excluding the listing creator)
+        const nearbyUsers = await db.User.findAll({
+          where: {
+            id: { [Op.ne]: userIdInt },
+            latitude: { [Op.ne]: null },
+            longitude: { [Op.ne]: null }
+          }
+        });
+
+        // Calculate distance and send notifications to nearby users
+        const notificationPromises = [];
+        for (const nearbyUser of nearbyUsers) {
+          // Calculate distance using Haversine formula
+          const distance = calculateDistance(
+            user.latitude, user.longitude,
+            nearbyUser.latitude, nearbyUser.longitude
+          );
+
+          // Send notification if within 50km
+          if (distance <= 50) {
+            notificationPromises.push(
+              notificationService.sendRealtimeNotification(
+                nearbyUser.id,
+                'New Animal Available!',
+                `${breedName} posted just ${distance.toFixed(1)}km from you - Rs.${expectedPrice}`,
+                {
+                  type: 'new_listing',
+                  listingId: listing.id.toString(),
+                  animalType: 'cow',
+                  distance: distance.toFixed(1)
+                },
+                db
+              )
+            );
+          }
+        }
+
+        // Send all notifications in parallel
+        await Promise.allSettled(notificationPromises);
+        console.log('Real-time notifications sent to nearby users for new listing');
+      } catch (notifError) {
+        console.error('Error sending notifications:', notifError);
+        // Don't fail the listing creation if notifications fail
+      }
 
       res.status(201).json({
         success: true,
@@ -509,4 +556,17 @@ class AnimalListingController {
   }
 }
 
+
+// Calculate distance between two points using Haversine formula
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distance in km
+}
 module.exports = new AnimalListingController();

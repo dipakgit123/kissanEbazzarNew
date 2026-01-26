@@ -256,7 +256,9 @@
     "addedOn": "जोडले",
     "removeFromWishlist": "विशलिस्टमधून काढा",
     "contactSeller": "विक्रेत्याशी संपर्क साधा",
-    "viewDetails": "तपशील पहा"
+    "viewDetails": "तपशील पहा",
+    "addedToWishlist": "विशलिस्टमध्ये जोडले!",
+    "removedFromWishlist": "विशलिस्टमधून काढले"
   },
   "location": {
     "setupLocation": "तुमचे स्थान सेटअप करा",

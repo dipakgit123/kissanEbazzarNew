@@ -1,4 +1,4 @@
-{
+﻿{
   "expo": {
     "name": "Kissan E-Bazzar",
     "slug": "kissan-ebazzar",
@@ -30,10 +30,10 @@
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.RECORD_AUDIO"
-      ]
+        "android.permission.RECORD_AUDIO",
+        "android.permission.POST_NOTIFICATIONS"
+      ],
+      "useNextNotificationsApi": true
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -50,12 +50,26 @@
         {
           "photosPermission": "Allow Kissan E-Bazzar to access your photos to upload animal images."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#15BB73",
+          "defaultChannel": "default"
+        }
       ]
     ],
     "extra": {
       "eas": {
         "projectId": "96a399a4-5977-446b-83ae-d746b0bfea7d"
       }
+    },
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#15BB73",
+      "androidMode": "default",
+      "androidCollapsedTitle": "{{unread_notifications}} new notifications"
     }
   }
 }

@@ -5,6 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { ActivityIndicator, View, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 import { useAuth } from '../context/AuthContext';
 import { useVetAuth } from '../context/VetAuthContext';
@@ -50,6 +51,7 @@ const Tab = createBottomTabNavigator();
 
 // Bottom Tab Navigator
 const MainTabs = () => {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   
   return (
@@ -92,27 +94,27 @@ const MainTabs = () => {
       <Tab.Screen
         name="Home"
         component={HomeScreen}
-        options={{ tabBarLabel: 'Home' }}
+        options={{ tabBarLabel: t('navigation.home') }}
       />
       <Tab.Screen
         name="BuyAnimals"
         component={BuyAnimalsScreen}
-        options={{ tabBarLabel: 'Buy' }}
+        options={{ tabBarLabel: t('navigation.buy') }}
       />
       <Tab.Screen
         name="SellAnimal"
         component={SellAnimalScreen}
-        options={{ tabBarLabel: 'Sell' }}
+        options={{ tabBarLabel: t('navigation.sell') }}
       />
       <Tab.Screen
         name="Veterinarian"
         component={VeterinarianScreen}
-        options={{ tabBarLabel: 'Veterinarian' }}
+        options={{ tabBarLabel: t('navigation.veterinarian') }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
-        options={{ tabBarLabel: 'Profile' }}
+        options={{ tabBarLabel: t('navigation.profile') }}
       />
     </Tab.Navigator>
   );

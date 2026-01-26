@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
+import Toast from 'react-native-toast-message';
 import { AuthProvider } from './src/context/AuthContext';
 import { VetAuthProvider } from './src/context/VetAuthContext';
 import { NotificationProvider } from './src/context/NotificationContext';
@@ -54,6 +55,7 @@ export default function App() {
             <WishlistProvider>
               <StatusBar style="light" backgroundColor="#15BB73" />
               <AppNavigator />
+              <Toast />
             </WishlistProvider>
           </NotificationProvider>
         </VetAuthProvider>

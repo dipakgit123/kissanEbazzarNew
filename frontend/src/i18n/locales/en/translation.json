@@ -256,7 +256,9 @@
     "addedOn": "Added on",
     "removeFromWishlist": "Remove from Wishlist",
     "contactSeller": "Contact Seller",
-    "viewDetails": "View Details"
+    "viewDetails": "View Details",
+    "addedToWishlist": "Added to wishlist!",
+    "removedFromWishlist": "Removed from wishlist"
   },
   "location": {
     "setupLocation": "Setup Your Location",

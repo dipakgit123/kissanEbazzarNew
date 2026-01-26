@@ -14,18 +14,19 @@ import {
   FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
 import { veterinarianService, vetReviewService, vetReportService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
-const REPORT_TYPES = [
-  { value: 'fake_profile', label: 'Fake Profile' },
-  { value: 'inappropriate_behavior', label: 'Inappropriate Behavior' },
-  { value: 'unprofessional_conduct', label: 'Unprofessional Conduct' },
-  { value: 'fraud', label: 'Fraud' },
-  { value: 'wrong_information', label: 'Wrong Information' },
-  { value: 'harassment', label: 'Harassment' },
-  { value: 'other', label: 'Other' },
+const getReportTypes = (t) => [
+  { value: 'fake_profile', label: t('vetDetail.reportTypes.fake_profile') },
+  { value: 'inappropriate_behavior', label: t('vetDetail.reportTypes.inappropriate_behavior') },
+  { value: 'unprofessional_conduct', label: t('vetDetail.reportTypes.unprofessional_conduct') },
+  { value: 'fraud', label: t('vetDetail.reportTypes.fraud') },
+  { value: 'wrong_information', label: t('vetDetail.reportTypes.wrong_information') },
+  { value: 'harassment', label: t('vetDetail.reportTypes.harassment') },
+  { value: 'other', label: t('vetDetail.reportTypes.other') },
 ];
 
 const SERVICE_TYPES = [
@@ -40,6 +41,7 @@ const SERVICE_TYPES = [
 
 const VetDetailScreen = ({ route, navigation }) => {
   const { vetId } = route.params;
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
 
   const [vet, setVet] = useState(null);
@@ -134,12 +136,12 @@ const VetDetailScreen = ({ route, navigation }) => {
 
   const handleSubmitReview = async () => {
     if (!isAuthenticated) {
-      Alert.alert('Login Required', 'Please login to submit a review');
+      Alert.alert(t('vetDetail.loginRequired'), t('vetDetail.pleaseLoginReview'));
       return;
     }
 
     if (!reviewText.trim()) {
-      Alert.alert('Error', 'Please write your review');
+      Alert.alert(t('vetDetail.error'), t('vetDetail.pleaseWriteReview'));
       return;
     }
 
@@ -177,18 +179,18 @@ const VetDetailScreen = ({ route, navigation }) => {
 
   const handleDeleteReview = async () => {
     Alert.alert(
-      'Delete Review',
-      'Are you sure you want to delete your review?',
+      t('vetDetail.deleteReviewConfirm'),
+      t('vetDetail.deleteReviewMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('vetDetail.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('vetDetail.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
               const response = await vetReviewService.deleteReview(myReview.id);
               if (response.success) {
-                Alert.alert('Success', 'Review deleted successfully');
+                Alert.alert(t('vetDetail.success'), t('vetDetail.reviewDeleted'));
                 setMyReview(null);
                 setReviewRating(5);
                 setReviewText('');
@@ -197,7 +199,7 @@ const VetDetailScreen = ({ route, navigation }) => {
                 fetchVetDetails();
               }
             } catch (error) {
-              Alert.alert('Error', 'Failed to delete review');
+              Alert.alert(t('vetDetail.error'), t('vetDetail.failedDeleteReview'));
             }
           },
         },
@@ -207,17 +209,17 @@ const VetDetailScreen = ({ route, navigation }) => {
 
   const handleSubmitReport = async () => {
     if (!isAuthenticated) {
-      Alert.alert('Login Required', 'Please login to submit a report');
+      Alert.alert(t('vetDetail.loginRequired'), t('vetDetail.pleaseLoginReport'));
       return;
     }
 
     if (!reportType) {
-      Alert.alert('Error', 'Please select a report type');
+      Alert.alert(t('vetDetail.error'), t('vetDetail.pleaseSelectReportType'));
       return;
     }
 
     if (!reportDescription.trim()) {
-      Alert.alert('Error', 'Please describe the issue');
+      Alert.alert(t('vetDetail.error'), t('vetDetail.describeIssue'));
       return;
     }
 
@@ -230,7 +232,7 @@ const VetDetailScreen = ({ route, navigation }) => {
       });
 
       if (response.success) {
-        Alert.alert('Success', 'Report submitted successfully. Our team will review it shortly.');
+        Alert.alert(t('vetDetail.success'), t('vetDetail.reportSubmitted'));
         setReportModalVisible(false);
         setReportType('');
         setReportDescription('');
@@ -246,7 +248,7 @@ const VetDetailScreen = ({ route, navigation }) => {
 
   const handleMarkHelpful = async (reviewId) => {
     if (!isAuthenticated) {
-      Alert.alert('Login Required', 'Please login to mark reviews as helpful');
+      Alert.alert(t('vetDetail.loginRequired'), t('vetDetail.pleaseLoginHelpful'));
       return;
     }
 
@@ -338,9 +340,9 @@ const VetDetailScreen = ({ route, navigation }) => {
   if (!vet) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Veterinarian not found</Text>
+        <Text style={styles.errorText}>{t('vetDetail.veterinarianNotFound')}</Text>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.backBtnText}>Go Back</Text>
+          <Text style={styles.backBtnText}>{t('vetDetail.goBack')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -399,24 +401,24 @@ const VetDetailScreen = ({ route, navigation }) => {
         <View style={styles.contactButtons}>
           <TouchableOpacity style={styles.callBtn} onPress={handleCall}>
             <Ionicons name="call" size={20} color={COLORS.white} />
-            <Text style={styles.contactBtnText}>Call</Text>
+            <Text style={styles.contactBtnText}>{t('vetDetail.call')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.whatsappBtn} onPress={handleWhatsApp}>
             <Ionicons name="logo-whatsapp" size={20} color={COLORS.white} />
-            <Text style={styles.contactBtnText}>WhatsApp</Text>
+            <Text style={styles.contactBtnText}>{t('vetDetail.whatsapp')}</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.bookBtn} 
             onPress={() => navigation.navigate('AppointmentBooking', { veterinarian: vet })}
           >
             <Ionicons name="calendar" size={20} color={COLORS.white} />
-            <Text style={styles.contactBtnText}>Book</Text>
+            <Text style={styles.contactBtnText}>{t('vetDetail.book')}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Details Section */}
         <View style={styles.detailsSection}>
-          <Text style={styles.sectionTitle}>About</Text>
+          <Text style={styles.sectionTitle}>{t('vetDetail.about')}</Text>
 
           <View style={styles.detailRow}>
             <Ionicons name="school-outline" size={20} color={COLORS.primary} />
@@ -440,14 +442,14 @@ const VetDetailScreen = ({ route, navigation }) => {
           {vet.consultation_fee && (
             <View style={styles.detailRow}>
               <Ionicons name="cash-outline" size={20} color={COLORS.primary} />
-              <Text style={styles.detailText}>Consultation Fee: Rs {vet.consultation_fee}</Text>
+              <Text style={styles.detailText}>{t('vetDetail.consultationFee')}: ₹{vet.consultation_fee}</Text>
             </View>
           )}
 
           {vet.emergency_available && (
             <View style={styles.emergencyBadge}>
               <Ionicons name="alert-circle" size={16} color={COLORS.white} />
-              <Text style={styles.emergencyText}>Emergency Services Available</Text>
+              <Text style={styles.emergencyText}>{t('vetDetail.emergencyServicesAvailable')}</Text>
             </View>
           )}
         </View>
@@ -455,7 +457,7 @@ const VetDetailScreen = ({ route, navigation }) => {
         {/* Services Section */}
         {vet.services && vet.services.length > 0 && (
           <View style={styles.servicesSection}>
-            <Text style={styles.sectionTitle}>Services</Text>
+            <Text style={styles.sectionTitle}>{t('vetDetail.services')}</Text>
             <View style={styles.servicesList}>
               {vet.services.map((service, index) => (
                 <View key={index} style={styles.serviceTag}>
@@ -515,7 +517,7 @@ const VetDetailScreen = ({ route, navigation }) => {
               <View key={review.id}>{renderReviewItem({ item: review })}</View>
             ))
           ) : (
-            <Text style={styles.noReviewsText}>No reviews yet. Be the first to review!</Text>
+            <Text style={styles.noReviewsText}>{t('vetDetail.noReviewsYet')}</Text>
           )}
         </View>
 
@@ -540,10 +542,10 @@ const VetDetailScreen = ({ route, navigation }) => {
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.ratingLabel}>Your Rating</Text>
+            <Text style={styles.ratingLabel}>{t('vetDetail.yourRating')}</Text>
             {renderStars(reviewRating, 32, setReviewRating)}
 
-            <Text style={styles.inputLabel}>Service Type (Optional)</Text>
+            <Text style={styles.inputLabel}>{t('vetDetail.serviceType')}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={styles.serviceTypeList}>
                 {SERVICE_TYPES.map((type) => (
@@ -568,10 +570,10 @@ const VetDetailScreen = ({ route, navigation }) => {
               </View>
             </ScrollView>
 
-            <Text style={styles.inputLabel}>Your Review</Text>
+            <Text style={styles.inputLabel}>{t('vetDetail.yourReview')}</Text>
             <TextInput
               style={styles.reviewInput}
-              placeholder="Share your experience..."
+              placeholder={t('vetDetail.shareExperience')}
               placeholderTextColor={COLORS.gray}
               multiline
               numberOfLines={4}
@@ -613,15 +615,15 @@ const VetDetailScreen = ({ route, navigation }) => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Report Veterinarian</Text>
+              <Text style={styles.modalTitle}>{t('vetDetail.reportVeterinarian')}</Text>
               <TouchableOpacity onPress={() => setReportModalVisible(false)}>
                 <Ionicons name="close" size={24} color={COLORS.black} />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.inputLabel}>Report Type</Text>
+            <Text style={styles.inputLabel}>{t('vetDetail.reportType')}</Text>
             <ScrollView style={styles.reportTypeList}>
-              {REPORT_TYPES.map((type) => (
+              {getReportTypes(t).map((type) => (
                 <TouchableOpacity
                   key={type.value}
                   style={[
@@ -640,10 +642,10 @@ const VetDetailScreen = ({ route, navigation }) => {
               ))}
             </ScrollView>
 
-            <Text style={styles.inputLabel}>Description</Text>
+            <Text style={styles.inputLabel}>{t('vetDetail.description')}</Text>
             <TextInput
               style={styles.reviewInput}
-              placeholder="Describe the issue in detail..."
+              placeholder={t('vetDetail.describeIssue')}
               placeholderTextColor={COLORS.gray}
               multiline
               numberOfLines={4}
@@ -659,7 +661,7 @@ const VetDetailScreen = ({ route, navigation }) => {
               {submittingReport ? (
                 <ActivityIndicator color={COLORS.white} />
               ) : (
-                <Text style={styles.submitBtnText}>Submit Report</Text>
+                <Text style={styles.submitBtnText}>{t('vetDetail.submitReport')}</Text>
               )}
             </TouchableOpacity>
           </View>

@@ -313,6 +313,84 @@ async function sendCallNotification(veterinarian, caller) {
   }
 }
 
+/**
+ * Send real-time notification via Socket.IO + Expo Push
+ * @param {Number} userId - User ID to send notification to
+ * @param {String} title - Notification title
+ * @param {String} body - Notification body/message
+ * @param {Object} data - Additional data
+ * @param {Object} db - Database models
+ */
+const sendRealtimeNotification = async (userId, title, body, data = {}, db = null) => {
+  try {
+    // 1. Send via Socket.IO for instant in-app notification
+    if (global.io && global.connectedUsers) {
+      const socketId = global.connectedUsers.get(userId.toString());
+      if (socketId) {
+        global.io.to(socketId).emit('notification', {
+          title,
+          body,
+          data,
+          timestamp: new Date().toISOString()
+        });
+        console.log(`🔔 Real-time notification sent to user ${userId} via Socket.IO`);
+      }
+    }
+
+    // 2. Save notification to database
+    if (db && db.Notification) {
+      await db.Notification.create({
+        user_id: userId,
+        title,
+        message: body,
+        type: data.type || 'general',
+        data,
+        is_read: false
+      });
+    }
+
+    // 3. Send Expo push notification (for background/closed app)
+    if (db && db.DeviceToken) {
+      const tokens = await db.DeviceToken.findAll({
+        where: { user_id: userId, is_active: true }
+      });
+
+      if (tokens.length > 0) {
+        const pushTokens = tokens.map(t => t.token);
+        await sendBulkPushNotifications(pushTokens, title, body, data);
+        console.log(`📱 Expo push notification sent to user ${userId}`);
+      }
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error sending real-time notification:', error);
+    return false;
+  }
+};
+
+/**
+ * Send real-time notification to multiple users
+ * @param {Array} userIds - Array of user IDs
+ * @param {String} title - Notification title
+ * @param {String} body - Notification body/message
+ * @param {Object} data - Additional data
+ * @param {Object} db - Database models
+ */
+const sendBulkRealtimeNotification = async (userIds, title, body, data = {}, db = null) => {
+  try {
+    const promises = userIds.map(userId => 
+      sendRealtimeNotification(userId, title, body, data, db)
+    );
+    await Promise.all(promises);
+    console.log(`📢 Bulk notification sent to ${userIds.length} users`);
+    return true;
+  } catch (error) {
+    console.error('Error sending bulk real-time notification:', error);
+    return false;
+  }
+};
+
 module.exports = {
   sendPushNotification,
   sendBulkPushNotifications,
@@ -321,5 +399,7 @@ module.exports = {
   notifyPregnancyReminder,
   createSystemNotification,
   sendAppointmentNotification,
-  sendCallNotification
+  sendCallNotification,
+  sendRealtimeNotification,
+  sendBulkRealtimeNotification
 };

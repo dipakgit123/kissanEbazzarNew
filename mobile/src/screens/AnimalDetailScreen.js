@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Video } from 'expo-av';
+import { useTranslation } from 'react-i18next';
 import { COLORS, formatPrice, formatDate, getAnimalTypeLabel } from '../utils/constants';
 import { listingsService, callLogService } from '../services/api';
 import { useWishlist } from '../context/WishlistContext';
@@ -22,6 +23,7 @@ const { width } = Dimensions.get('window');
 
 const AnimalDetailScreen = ({ route, navigation }) => {
   const { animalType, id } = route.params;
+  const { t } = useTranslation();
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -182,7 +184,7 @@ const AnimalDetailScreen = ({ route, navigation }) => {
     return (
       <SafeAreaView style={styles.loadingContainer} edges={['top', 'bottom']}>
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Loading listing...</Text>
+        <Text style={styles.loadingText}>{t('animalDetail.loadingListing')}</Text>
       </SafeAreaView>
     );
   }
@@ -191,10 +193,10 @@ const AnimalDetailScreen = ({ route, navigation }) => {
     return (
       <SafeAreaView style={styles.errorContainer} edges={['top', 'bottom']}>
         <Text style={styles.errorIcon}>😔</Text>
-        <Text style={styles.errorTitle}>Listing Not Found</Text>
-        <Text style={styles.errorText}>{error || 'The listing you are looking for does not exist.'}</Text>
+        <Text style={styles.errorTitle}>{t('animalDetail.listingNotFound')}</Text>
+        <Text style={styles.errorText}>{error || t('animalDetail.listingNotFoundDesc')}</Text>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.backButtonText}>Go Back</Text>
+          <Text style={styles.backButtonText}>{t('animalDetail.goBack')}</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -243,7 +245,7 @@ const AnimalDetailScreen = ({ route, navigation }) => {
           <View style={styles.photosSection}>
             <View style={styles.sectionHeader}>
               <Ionicons name="images" size={20} color={COLORS.primary} />
-              <Text style={styles.sectionHeaderText}>Photos ({images.length})</Text>
+              <Text style={styles.sectionHeaderText}>{t('animalDetail.photos')} ({images.length})</Text>
             </View>
             <View style={styles.imageGalleryContainer}>
               <ScrollView
@@ -317,7 +319,7 @@ const AnimalDetailScreen = ({ route, navigation }) => {
           <View style={styles.videoSection}>
             <View style={styles.sectionHeader}>
               <Ionicons name="videocam" size={20} color={COLORS.primary} />
-              <Text style={styles.sectionHeaderText}>Video</Text>
+              <Text style={styles.sectionHeaderText}>{t('animalDetail.video')}</Text>
             </View>
             <View style={styles.videoContainer}>
               <Video
@@ -336,7 +338,7 @@ const AnimalDetailScreen = ({ route, navigation }) => {
         {!hasVideo && images.length === 0 && (
           <View style={styles.noMediaContainer}>
             <Ionicons name="image-outline" size={64} color={COLORS.gray} />
-            <Text style={styles.noMediaText}>No Media Available</Text>
+            <Text style={styles.noMediaText}>{t('animalDetail.noMediaAvailable')}</Text>
           </View>
         )}
 
@@ -347,13 +349,13 @@ const AnimalDetailScreen = ({ route, navigation }) => {
             <Text style={styles.price}>₹{formatPrice(listing.expected_price)}</Text>
             {listing.is_negotiable && (
               <View style={styles.negotiableBadge}>
-                <Text style={styles.negotiableText}>Negotiable</Text>
+                <Text style={styles.negotiableText}>{t('animalDetail.negotiable')}</Text>
               </View>
             )}
           </View>
           <View style={styles.dateRow}>
             <Ionicons name="time-outline" size={14} color={COLORS.gray} />
-            <Text style={styles.dateText}>Posted on {formatDate(listing.created_at)}</Text>
+            <Text style={styles.dateText}>{t('animalDetail.postedOn')} {formatDate(listing.created_at)}</Text>
           </View>
         </View>
 
@@ -361,10 +363,10 @@ const AnimalDetailScreen = ({ route, navigation }) => {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Ionicons name="location-outline" size={20} color={COLORS.primary} />
-            <Text style={styles.cardTitle}>Location</Text>
+            <Text style={styles.cardTitle}>{t('animalDetail.location')}</Text>
           </View>
           <Text style={styles.cardText}>
-            {[listing.city, listing.state, listing.pincode].filter(Boolean).join(', ') || 'Location not specified'}
+            {[listing.city, listing.state, listing.pincode].filter(Boolean).join(', ') || t('animalDetail.locationNotSpecified')}
           </Text>
         </View>
 
@@ -372,68 +374,68 @@ const AnimalDetailScreen = ({ route, navigation }) => {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Ionicons name="document-text-outline" size={20} color={COLORS.primary} />
-            <Text style={styles.cardTitle}>Animal Details</Text>
+            <Text style={styles.cardTitle}>{t('animalDetail.animalDetails')}</Text>
           </View>
           <View style={styles.detailsGrid}>
             {listing.breed_name && (
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Breed</Text>
+                <Text style={styles.detailLabel}>{t('animalDetail.breed')}</Text>
                 <Text style={styles.detailValue}>{listing.breed_name}</Text>
               </View>
             )}
             {listing.age && (
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Age</Text>
+                <Text style={styles.detailLabel}>{t('animalDetail.age')}</Text>
                 <Text style={styles.detailValue}>{listing.age}</Text>
               </View>
             )}
             {listing.milk_capacity && (
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Milk Capacity</Text>
-                <Text style={styles.detailValue}>{listing.milk_capacity} L/day</Text>
+                <Text style={styles.detailLabel}>{t('animalDetail.milkCapacity')}</Text>
+                <Text style={styles.detailValue}>{listing.milk_capacity} {t('animalDetail.lPerDay')}</Text>
               </View>
             )}
             {listing.pregnancy_status && (
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Pregnancy</Text>
+                <Text style={styles.detailLabel}>{t('animalDetail.pregnancy')}</Text>
                 <Text style={styles.detailValue}>{listing.pregnancy_status.replace('_', ' ')}</Text>
               </View>
             )}
             {listing.health_condition && (
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Health</Text>
+                <Text style={styles.detailLabel}>{t('animalDetail.health')}</Text>
                 <Text style={styles.detailValue}>{listing.health_condition}</Text>
               </View>
             )}
             {listing.gender && (
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Gender</Text>
+                <Text style={styles.detailLabel}>{t('animalDetail.gender')}</Text>
                 <Text style={styles.detailValue}>{listing.gender}</Text>
               </View>
             )}
             {listing.weight && (
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Weight</Text>
+                <Text style={styles.detailLabel}>{t('animalDetail.weight')}</Text>
                 <Text style={styles.detailValue}>{listing.weight} kg</Text>
               </View>
             )}
             {listing.color && (
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Color</Text>
+                <Text style={styles.detailLabel}>{t('animalDetail.color')}</Text>
                 <Text style={styles.detailValue}>{listing.color}</Text>
               </View>
             )}
             {listing.purpose && (
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Purpose</Text>
+                <Text style={styles.detailLabel}>{t('animalDetail.purpose')}</Text>
                 <Text style={styles.detailValue}>{listing.purpose}</Text>
               </View>
             )}
             {listing.delivery_available !== undefined && (
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Delivery</Text>
+                <Text style={styles.detailLabel}>{t('animalDetail.delivery')}</Text>
                 <Text style={styles.detailValue}>
-                  {listing.delivery_available ? 'Available' : 'Not Available'}
+                  {listing.delivery_available ? t('animalDetail.available') : t('animalDetail.notAvailable')}
                 </Text>
               </View>
             )}
@@ -445,23 +447,23 @@ const AnimalDetailScreen = ({ route, navigation }) => {
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Ionicons name="information-circle-outline" size={20} color={COLORS.primary} />
-              <Text style={styles.cardTitle}>Additional Information</Text>
+              <Text style={styles.cardTitle}>{t('animalDetail.additionalInformation')}</Text>
             </View>
             {listing.description && (
               <View style={styles.infoSection}>
-                <Text style={styles.infoLabel}>Description</Text>
+                <Text style={styles.infoLabel}>{t('animalDetail.description')}</Text>
                 <Text style={styles.infoText}>{listing.description}</Text>
               </View>
             )}
             {listing.vaccination_details && (
               <View style={styles.infoSection}>
-                <Text style={styles.infoLabel}>Vaccination Details</Text>
+                <Text style={styles.infoLabel}>{t('animalDetail.vaccinationDetails')}</Text>
                 <Text style={styles.infoText}>{listing.vaccination_details}</Text>
               </View>
             )}
             {listing.additional_notes && (
               <View style={styles.infoSection}>
-                <Text style={styles.infoLabel}>Notes</Text>
+                <Text style={styles.infoLabel}>{t('animalDetail.notes')}</Text>
                 <Text style={styles.infoText}>{listing.additional_notes}</Text>
               </View>
             )}
@@ -473,7 +475,7 @@ const AnimalDetailScreen = ({ route, navigation }) => {
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Ionicons name="person-outline" size={20} color={COLORS.primary} />
-              <Text style={styles.cardTitle}>Seller Information</Text>
+              <Text style={styles.cardTitle}>{t('animalDetail.sellerInformation')}</Text>
             </View>
             <View style={styles.sellerRow}>
               {listing.seller.profile_photo ? (
@@ -489,13 +491,13 @@ const AnimalDetailScreen = ({ route, navigation }) => {
                 </View>
               )}
               <View style={styles.sellerInfo}>
-                <Text style={styles.sellerName}>{listing.seller.name || 'Unknown Seller'}</Text>
+                <Text style={styles.sellerName}>{listing.seller.name || t('animalDetail.unknownSeller')}</Text>
                 {listing.seller.city && (
                   <Text style={styles.sellerLocation}>
                     {listing.seller.city}{listing.seller.state ? `, ${listing.seller.state}` : ''}
                   </Text>
                 )}
-                <Text style={styles.verifiedText}>Verified Seller</Text>
+                <Text style={styles.verifiedText}>{t('animalDetail.verifiedSeller')}</Text>
               </View>
             </View>
           </View>
@@ -509,17 +511,17 @@ const AnimalDetailScreen = ({ route, navigation }) => {
       <SafeAreaView edges={['bottom']} style={styles.bottomBarSafeArea}>
         <View style={styles.bottomBar}>
           <View style={styles.bottomPriceContainer}>
-            <Text style={styles.bottomPriceLabel}>Listed Price</Text>
+            <Text style={styles.bottomPriceLabel}>{t('animalDetail.listedPrice')}</Text>
             <Text style={styles.bottomPrice}>₹{formatPrice(listing.expected_price)}</Text>
           </View>
           <View style={styles.bottomButtons}>
             <TouchableOpacity style={styles.callBtn} onPress={handleCall}>
               <Ionicons name="call" size={20} color={COLORS.white} />
-              <Text style={styles.btnText}>Call</Text>
+              <Text style={styles.btnText}>{t('animalCard.call')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.whatsappBtn} onPress={handleWhatsApp}>
               <Ionicons name="logo-whatsapp" size={20} color={COLORS.white} />
-              <Text style={styles.btnText}>WhatsApp</Text>
+              <Text style={styles.btnText}>{t('animalCard.whatsapp')}</Text>
             </TouchableOpacity>
           </View>
         </View>

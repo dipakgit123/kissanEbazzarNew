@@ -1,7 +1,7 @@
 import React from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import logo from '../assets/images/animal_bazar_logo.jpeg';
+import logo from '../assets/images/animal_logog.jpeg';
 import AIAssistant from './AIAssistant';
 import LanguageSwitcher from './LanguageSwitcher';
 

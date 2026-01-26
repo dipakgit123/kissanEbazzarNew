@@ -11,24 +11,26 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, formatPrice } from '../utils/constants';
 import { useWishlist } from '../context/WishlistContext';
 
 const WishlistScreen = ({ navigation }) => {
+  const { t } = useTranslation();
   const { wishlist, removeFromWishlist: removeFromWishlistContext, clearWishlist: clearWishlistContext, loading } = useWishlist();
   const [refreshing, setRefreshing] = useState(false);
   const insets = useSafeAreaInsets();
 
   const handleRemoveFromWishlist = (item) => {
     Alert.alert(
-      'Remove from Wishlist',
-      'Are you sure you want to remove this item from your wishlist?',
+      t('wishlist.removeFromWishlist'),
+      t('wishlist.removeConfirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Remove',
+          text: t('wishlist.remove'),
           style: 'destructive',
           onPress: async () => {
             await removeFromWishlistContext(item.id || item.animal_id, item.animal_type);
@@ -42,12 +44,12 @@ const WishlistScreen = ({ navigation }) => {
     if (wishlist.length === 0) return;
 
     Alert.alert(
-      'Clear Wishlist',
-      'Are you sure you want to remove all items from your wishlist?',
+      t('wishlist.clearWishlist'),
+      t('wishlist.clearWishlistConfirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Clear All',
+          text: t('wishlist.clearAll'),
           style: 'destructive',
           onPress: async () => {
             await clearWishlistContext();
@@ -172,7 +174,7 @@ const WishlistScreen = ({ navigation }) => {
           <View style={styles.cardLocation}>
             <Ionicons name="location-outline" size={14} color="#6B7280" />
             <Text style={styles.cardLocationText} numberOfLines={1}>
-              {[city, state].filter(Boolean).join(', ') || 'Location not specified'}
+              {[city, state].filter(Boolean).join(', ') || t('profile.locationNotSpecified')}
             </Text>
           </View>
         </View>
@@ -185,15 +187,15 @@ const WishlistScreen = ({ navigation }) => {
       <View style={styles.emptyIconContainer}>
         <Ionicons name="heart-outline" size={80} color={COLORS.lightGray} />
       </View>
-      <Text style={styles.emptyTitle}>Your Wishlist is Empty</Text>
+      <Text style={styles.emptyTitle}>{t('wishlist.emptyTitle')}</Text>
       <Text style={styles.emptySubtitle}>
-        Save your favorite animals here by tapping the heart icon on any listing
+        {t('wishlist.emptySubtitle')}
       </Text>
       <TouchableOpacity
         style={styles.browseButton}
         onPress={() => navigation.navigate('MainTabs', { screen: 'Home' })}
       >
-        <Text style={styles.browseButtonText}>Browse Animals</Text>
+        <Text style={styles.browseButtonText}>{t('wishlist.browseAnimals')}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -205,10 +207,10 @@ const WishlistScreen = ({ navigation }) => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={COLORS.black} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Wishlist</Text>
+        <Text style={styles.headerTitle}>{t('wishlist.title')}</Text>
         {wishlist.length > 0 && (
           <TouchableOpacity onPress={handleClearWishlist}>
-            <Text style={styles.clearText}>Clear All</Text>
+            <Text style={styles.clearText}>{t('wishlist.clearAll')}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -217,7 +219,7 @@ const WishlistScreen = ({ navigation }) => {
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>Loading wishlist...</Text>
+          <Text style={styles.loadingText}>{t('wishlist.loadingWishlist')}</Text>
         </View>
       ) : (
         <FlatList

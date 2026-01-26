@@ -60,22 +60,22 @@ const MyAppointmentsScreen = ({ navigation }) => {
 
   const handleCancelAppointment = (appointmentId) => {
     Alert.alert(
-      'Cancel Appointment',
-      'Are you sure you want to cancel this appointment?',
+      t('appointments.cancelAppointment'),
+      t('appointments.cancelConfirm'),
       [
-        { text: 'No', style: 'cancel' },
+        { text: t('common.no'), style: 'cancel' },
         {
-          text: 'Yes, Cancel',
+          text: t('appointments.yesCancelIt'),
           style: 'destructive',
           onPress: async () => {
             try {
               const response = await appointmentService.cancelAppointment(appointmentId);
               if (response.success) {
-                Alert.alert('Success', 'Appointment cancelled successfully');
+                Alert.alert(t('common.success'), t('appointments.cancelSuccess'));
                 fetchAppointments();
               }
             } catch (error) {
-              Alert.alert('Error', 'Failed to cancel appointment');
+              Alert.alert(t('common.error'), t('appointments.cancelError'));
             }
           },
         },
@@ -125,13 +125,13 @@ const MyAppointmentsScreen = ({ navigation }) => {
       >
         <View style={styles.cardHeader}>
           <View style={styles.vetInfo}>
-            <Text style={styles.vetName}>Dr. {appointment.veterinarian?.full_name}</Text>
+            <Text style={styles.vetName}>{t('appointments.doctor')} {appointment.veterinarian?.full_name}</Text>
             <Text style={styles.vetSpec}>{appointment.veterinarian?.specialization}</Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
             <Ionicons name={statusIcon} size={16} color={statusColor} />
             <Text style={[styles.statusText, { color: statusColor }]}>
-              {appointment.status}
+              {t(`appointments.${appointment.status}`)}
             </Text>
           </View>
         </View>
@@ -163,7 +163,7 @@ const MyAppointmentsScreen = ({ navigation }) => {
 
           {appointment.reason && (
             <View style={styles.reasonContainer}>
-              <Text style={styles.reasonLabel}>Reason:</Text>
+              <Text style={styles.reasonLabel}>{t('appointments.reason')}:</Text>
               <Text style={styles.reasonText} numberOfLines={2}>
                 {appointment.reason}
               </Text>
@@ -177,7 +177,7 @@ const MyAppointmentsScreen = ({ navigation }) => {
             onPress={() => navigation.navigate('VetDetail', { vetId: appointment.veterinarian_id })}
           >
             <Ionicons name="eye-outline" size={18} color={COLORS.primary} />
-            <Text style={styles.actionButtonText}>View Vet</Text>
+            <Text style={styles.actionButtonText}>{t('appointments.viewVet')}</Text>
           </TouchableOpacity>
 
           {appointment.status === 'pending' && (
@@ -195,10 +195,10 @@ const MyAppointmentsScreen = ({ navigation }) => {
   };
 
   const filterButtons = [
-    { key: 'all', label: 'All', icon: 'list-outline' },
-    { key: 'upcoming', label: 'Upcoming', icon: 'arrow-up-outline' },
-    { key: 'past', label: 'Past', icon: 'time-outline' },
-    { key: 'cancelled', label: 'Cancelled', icon: 'close-circle-outline' },
+    { key: 'all', label: t('appointments.all'), icon: 'list-outline' },
+    { key: 'upcoming', label: t('appointments.upcoming'), icon: 'arrow-up-outline' },
+    { key: 'past', label: t('appointments.past'), icon: 'time-outline' },
+    { key: 'cancelled', label: t('appointments.cancelled'), icon: 'close-circle-outline' },
   ];
 
   return (
@@ -208,7 +208,7 @@ const MyAppointmentsScreen = ({ navigation }) => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={COLORS.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Appointments</Text>
+        <Text style={styles.headerTitle}>{t('appointments.title')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -243,22 +243,22 @@ const MyAppointmentsScreen = ({ navigation }) => {
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>Loading appointments...</Text>
+          <Text style={styles.loadingText}>{t('appointments.loadingAppointments')}</Text>
         </View>
       ) : appointments.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="calendar-outline" size={80} color={COLORS.gray} />
-          <Text style={styles.emptyTitle}>No Appointments</Text>
+          <Text style={styles.emptyTitle}>{t('appointments.noAppointments')}</Text>
           <Text style={styles.emptyText}>
             {filter === 'all'
-              ? "You haven't booked any appointments yet"
-              : `No ${filter} appointments found`}
+              ? t('appointments.noAppointmentsAll')
+              : t('appointments.noAppointmentsFiltered', { filter })}
           </Text>
           <TouchableOpacity
             style={styles.bookButton}
             onPress={() => navigation.navigate('Veterinarian')}
           >
-            <Text style={styles.bookButtonText}>Find a Veterinarian</Text>
+            <Text style={styles.bookButtonText}>{t('appointments.findVeterinarian')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
