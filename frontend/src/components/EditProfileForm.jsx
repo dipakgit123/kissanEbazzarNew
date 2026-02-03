@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { userService } from '../services/api';
 
@@ -16,6 +16,27 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [errors, setErrors] = useState({});
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    setForm({
+      name: initialData.name || initialData.full_name || '',
+      phone: initialData.phone || initialData.phone_number || '',
+      address: initialData.address || '',
+      pincode: initialData.pincode || initialData.postal_code || '',
+    });
+    const photo = initialData.profile_photo || null;
+    setProfilePhoto(photo);
+    setPhotoPreview(photo);
+  }, [
+    initialData.name,
+    initialData.full_name,
+    initialData.phone,
+    initialData.phone_number,
+    initialData.address,
+    initialData.pincode,
+    initialData.postal_code,
+    initialData.profile_photo
+  ]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -58,10 +79,11 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
     try {
       const response = await userService.uploadProfilePhoto(file);
       if (response.success) {
-        setProfilePhoto(response.profile_photo);
-        setPhotoPreview(response.profile_photo);
+        const newPhoto = response.user?.profile_photo || null;
+        setProfilePhoto(newPhoto);
+        setPhotoPreview(newPhoto);
         if (onPhotoUpdate) {
-          onPhotoUpdate(response.profile_photo);
+          onPhotoUpdate(newPhoto);
         }
       } else {
         alert(response.message || 'Failed to upload photo');

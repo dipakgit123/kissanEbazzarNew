@@ -15,6 +15,7 @@ import {
   Filler
 } from 'chart.js';
 import { Line, Bar, Doughnut, Pie } from 'react-chartjs-2';
+import { API_BASE_URL } from '../../config/api';
 
 // Register Chart.js components
 ChartJS.register(
@@ -43,7 +44,7 @@ const AdminDashboard = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const API_URL = API_BASE_URL;
 
   useEffect(() => {
     const adminData = localStorage.getItem('adminData');

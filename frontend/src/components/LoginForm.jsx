@@ -100,7 +100,7 @@ const LoginForm = ({ onLoginSuccess }) => {
         setResendTimer(OTP_RESEND_DELAY);
       }
     } catch (error) {
-      toast.error(error.message || t('auth.otpSent'));
+      toast.error(error.message || t('auth.otpSendFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -153,7 +153,7 @@ const LoginForm = ({ onLoginSuccess }) => {
     const otpCode = otpString || otp.join('');
     
     if (otpCode.length !== 6) {
-      setOtpError('Please enter a valid 6-digit OTP');
+      setOtpError(t('auth.invalidOtpLength'));
       return;
     }
     
@@ -179,8 +179,8 @@ const LoginForm = ({ onLoginSuccess }) => {
         }
       }
     } catch (error) {
-      setOtpError(error.message || 'Invalid OTP');
-      toast.error(error.message || 'Invalid OTP');
+      setOtpError(error.message || t('auth.invalidOtp'));
+      toast.error(error.message || t('auth.invalidOtp'));
     } finally {
       setIsLoading(false);
     }
@@ -196,7 +196,7 @@ const LoginForm = ({ onLoginSuccess }) => {
       const response = await otpService.resendOTP(fullPhoneNumber);
       
       if (response.success) {
-        toast.success('OTP resent successfully!');
+        toast.success(t('auth.otpResentSuccess'));
         setOtp(['', '', '', '', '', '']);
         setOtpError('');
         setResendTimer(OTP_RESEND_DELAY);
@@ -205,7 +205,7 @@ const LoginForm = ({ onLoginSuccess }) => {
         if (firstInput) firstInput.focus();
       }
     } catch (error) {
-      toast.error(error.message || 'Failed to resend OTP');
+      toast.error(error.message || t('auth.otpResentFailed'));
     } finally {
       setIsLoading(false);
     }

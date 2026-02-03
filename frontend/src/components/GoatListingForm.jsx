@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
+import { API_BASE_URL } from '../config/api';
 import {
   FormInput,
   FormSelect,
@@ -14,7 +15,7 @@ import {
 } from './common';
 import './AnimalListingPage.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = API_BASE_URL;
 
 const GoatListingForm = () => {
   const { t } = useTranslation();
@@ -89,7 +90,7 @@ const GoatListingForm = () => {
       const token = localStorage.getItem('token');
 
       if (!token) {
-        throw new Error('Please login to create a listing');
+        throw new Error(t('auth.loginToContinue'));
       }
 
       const endpoint = `${API_URL}/api/goats/listings`;
@@ -138,12 +139,12 @@ const GoatListingForm = () => {
           video: null
         });
 
-        alert('Goat listing created successfully!');
+        alert(t('listing.createSuccess'));
       }
     } catch (err) {
       console.error('Error creating listing:', err);
-      setError(err.response?.data?.message || err.message || 'Failed to create listing');
-      alert(`Error: ${err.response?.data?.message || err.message || 'Failed to create listing'}`);
+      setError(err.response?.data?.message || err.message || t('listing.createError'));
+      alert(`Error: ${err.response?.data?.message || err.message || t('listing.createError')}`);
     } finally {
       setLoading(false);
     }
@@ -151,27 +152,27 @@ const GoatListingForm = () => {
 
   return (
     <form className="listing-form" onSubmit={handleSubmit}>
-      <h2 className="form-title">Goat Listing Form</h2>
+      <h2 className="form-title">{t('goatForm.title')}</h2>
 
-      <FormAlert type="success" message={success ? 'Goat listing created successfully!' : null} />
+      <FormAlert type="success" message={success ? t('listing.createSuccess') : null} />
       <FormAlert type="error" message={error} />
 
-      <FormSection number="1" title="Goat Details">
+      <FormSection number="1" title={t('goatForm.section1')}>
           <div className="form-row">
           <FormSelect
-            label="Goat Type"
+            label={t('animal.gender')}
             name="goatType"
             value={formData.goatType}
             onChange={handleChange}
             required
             options={[
-              { value: 'male', label: 'Male' },
-              { value: 'female', label: 'Female' }
+              { value: 'male', label: t('animal.male') },
+              { value: 'female', label: t('animal.female') }
             ]}
           />
 
           <FormInput
-            label="Breed Name"
+            label={t('cowForm.breedName')}
             name="breedName"
             value={formData.breedName}
             onChange={handleChange}
@@ -182,21 +183,21 @@ const GoatListingForm = () => {
 
         <div className="form-row">
           <FormInput
-            label="Age"
+            label={t('animal.age')}
             name="age"
             value={formData.age}
             onChange={handleChange}
-            placeholder="e.g., 2 years"
+            placeholder={t('animal.agePlaceholder')}
             required
           />
 
           <FormInput
-            label="Weight (kg)"
+            label={t('animalListing.weight')}
             name="weight"
             type="number"
             value={formData.weight}
             onChange={handleChange}
-            placeholder="e.g., 40"
+            placeholder={t('goatForm.weightPlaceholder')}
             step="0.01"
             min="0"
             max="200"
@@ -206,83 +207,83 @@ const GoatListingForm = () => {
 
         <div className="form-row">
           <FormInput
-            label="Color"
+            label={t('animalListing.color')}
             name="color"
             value={formData.color}
             onChange={handleChange}
-            placeholder="e.g., White, Black, Brown"
+            placeholder={t('otherAnimal.colorPlaceholder') || "e.g., White, Black, Brown"}
             required
           />
 
           <FormSelect
-            label="Horn Type"
+            label={t('goatForm.hornType')}
             name="hornType"
             value={formData.hornType}
             onChange={handleChange}
             required
             options={[
-              { value: 'with_horns', label: 'With Horns' },
-              { value: 'without_horns', label: 'Without Horns' }
+              { value: 'with_horns', label: t('cowForm.yes') },
+              { value: 'without_horns', label: t('cowForm.no') }
             ]}
           />
         </div>
 
         <div className="form-row">
           <FormSelect
-            label="Health Status"
+            label={t('animal.healthCondition')}
             name="healthStatus"
             value={formData.healthStatus}
             onChange={handleChange}
             required
             options={[
-              { value: 'healthy', label: 'Healthy' },
-              { value: 'under_treatment', label: 'Under Treatment' },
-              { value: 'vaccinated', label: 'Vaccinated' }
+              { value: 'healthy', label: t('animal.healthGood') },
+              { value: 'under_treatment', label: t('animal.underTreatment') },
+              { value: 'vaccinated', label: t('animal.vaccinated') }
             ]}
           />
 
           <FormSelect
-            label="Purpose"
+            label={t('goatForm.purpose')}
             name="purpose"
             value={formData.purpose}
             onChange={handleChange}
             required
             options={[
-              { value: 'milk', label: 'Milk' },
-              { value: 'meat', label: 'Meat' },
-              { value: 'breeding', label: 'Breeding' },
-              { value: 'pet', label: 'Pet' }
+              { value: 'milk', label: t('goatForm.purposeMilk') },
+              { value: 'meat', label: t('goatForm.purposeMeat') },
+              { value: 'breeding', label: t('goatForm.purposeBreeding') },
+              { value: 'pet', label: t('goatForm.purposePet') }
             ]}
           />
         </div>
 
         <FormInput
-          label="Description"
+          label={t('sellAnimal.description')}
           name="description"
           type="textarea"
           value={formData.description}
           onChange={handleChange}
-          placeholder="Any additional information..."
+          placeholder={t('animal.additionalNotesPlaceholder')}
           rows="3"
         />
       </FormSection>
 
       {formData.goatType === 'female' && (
-        <FormSection number="2" title="Production Info (For Female Goats)">
+        <FormSection number="2" title={t('goatForm.productionInfo')}>
             <div className="form-row">
             <FormInput
-              label="Milk Capacity (liters/day)"
+              label={t('cowForm.milkCapacity')}
               name="milkCapacity"
               type="number"
               value={formData.milkCapacity}
               onChange={handleChange}
-              placeholder="e.g., 2.5"
+              placeholder={t('cowForm.milkPlaceholder') || "e.g., 2.5"}
               step="0.01"
               min="0"
             />
 
             <FormInput
-              label="Last Delivery Date"
+              label={t('goatForm.lastDeliveryDate')}
               name="lastDeliveryDate"
               type="date"
               value={formData.lastDeliveryDate}
@@ -302,12 +303,12 @@ const GoatListingForm = () => {
         </FormSection>
       )}
 
-      <FormSection number={formData.goatType === 'female' ? '3' : '2'} title="Images (min 1, max 5 photos + 1 video)">
+      <FormSection number={formData.goatType === 'female' ? '3' : '2'} title={t('animal.section4')}>
           <div className="form-row">
           {[1, 2, 3, 4, 5].map((num) => (
             <FormFileInput
               key={num}
-              label={`Photo ${num}`}
+              label={t('formLabels.photo') + ' ' + num}
               name={`photo${num}`}
               id={`goat-photo${num}`}
               accept="image/*"
@@ -318,7 +319,7 @@ const GoatListingForm = () => {
           ))}
 
           <FormFileInput
-            label="Video (max 1)"
+            label={t('animal.video')}
             name="video"
             id="goat-video"
             accept="video/*"
@@ -328,38 +329,38 @@ const GoatListingForm = () => {
         </div>
       </FormSection>
 
-      <FormSection number={formData.goatType === 'female' ? '4' : '3'} title="Pricing">
+      <FormSection number={formData.goatType === 'female' ? '4' : '3'} title={t('animal.section3')}>
           <div className="form-row">
           <FormInput
-            label="Expected Price (₹)"
+            label={t('sellAnimal.price') + ' (₹)'}
             name="expectedPrice"
             type="number"
             value={formData.expectedPrice}
             onChange={handleChange}
-            placeholder="e.g., 15000"
+            placeholder={t('formLabels.pricePlaceholder')}
             min="0"
             step="100"
             required
           />
 
           <FormRadioGroup
-            label="Negotiable?"
+            label={t('animal.negotiable')}
             name="isNegotiable"
             value={formData.isNegotiable}
             onChange={handleChange}
             options={[
-              { value: 'true', label: 'Yes' },
-              { value: 'false', label: 'No' }
+              { value: 'true', label: t('cowForm.yes') },
+              { value: 'false', label: t('cowForm.no') }
             ]}
           />
         </div>
       </FormSection>
 
-      <FormSection number={formData.goatType === 'female' ? '5' : '4'} title="Terms & Confirmation">
+      <FormSection number={formData.goatType === 'female' ? '5' : '4'} title={t('listing.termsConfirmation')}>
           <FormCheckbox
           id="goat-detailsConfirmed"
           name="detailsConfirmed"
-          label="I confirm all the above details are true."
+          label={t('listing.confirmDetails')}
           checked={formData.detailsConfirmed}
           onChange={handleChange}
           required
@@ -368,7 +369,7 @@ const GoatListingForm = () => {
         <FormCheckbox
           id="goat-termsAccepted"
           name="termsAccepted"
-          label="I agree to Animal E-Bazzar's listing terms."
+          label={t('listing.agreeTerms')}
           checked={formData.termsAccepted}
           onChange={handleChange}
           required
@@ -377,7 +378,7 @@ const GoatListingForm = () => {
 
       <InfoBanner />
 
-      <SubmitButton loading={loading} loadingText="Submitting..." submitText="Submit Goat Listing" />
+      <SubmitButton loading={loading} loadingText={t('listing.submitting')} submitText={t('listing.submit')} />
     </form>
   );
 };

@@ -21,6 +21,9 @@ import AppointmentBookingForm from './components/AppointmentBookingForm';
 import WishlistPage from './components/WishlistPage';
 import AIHealthCheck from './components/AIHealthCheck';
 import CallHistory from './components/CallHistory';
+import HelpCenter from './components/HelpCenter';
+import TermsPage from './components/TermsPage';
+import PrivacyPage from './components/PrivacyPage';
 import AdminLogin from './components/admin/AdminLogin';
 import AdminDashboard from './components/admin/AdminDashboard';
 import BuyAnimalsPage from './components/BuyAnimalsPage';
@@ -31,9 +34,22 @@ function App() {
     // Check if user has token (logged in before)
     const token = localStorage.getItem('token');
     const savedPage = localStorage.getItem('currentPage');
+    const savedUser = localStorage.getItem('userData');
     
     // If user has token, go to saved page or home
     if (token) {
+      if (savedUser) {
+        try {
+          const parsedUser = JSON.parse(savedUser);
+          const hasProfile = !!(parsedUser?.full_name && parsedUser?.postal_code);
+          const hasLocation = parsedUser?.latitude !== null && parsedUser?.longitude !== null;
+          if (!hasProfile) return 'profile-completion';
+          if (!hasLocation) return 'location';
+          return 'home';
+        } catch (e) {
+          return savedPage || 'home';
+        }
+      }
       return savedPage || 'home';
     }
     
@@ -60,14 +76,22 @@ function App() {
       localStorage.setItem('userData', JSON.stringify(response.user));
     }
 
+    const hasProfile = !!(response?.user?.full_name && response?.user?.postal_code);
+    const hasLocationFromUser = response?.user?.latitude !== null && response?.user?.longitude !== null;
+
+    if (response?.user) {
+      setHasLocation(hasLocationFromUser);
+      localStorage.setItem('hasLocation', hasLocationFromUser ? 'true' : 'false');
+    }
+
     // Check if user needs to complete profile (first-time login)
-    if (response.requiresProfileCompletion) {
+    if (response.requiresProfileCompletion && !hasProfile) {
       setCurrentPage('profile-completion');
       localStorage.setItem('currentPage', 'profile-completion');
       window.location.href = '/profile-completion';
     }
     // Check if user needs to set location
-    else if (response.requiresLocation) {
+    else if (response.requiresLocation && !hasLocationFromUser) {
       setCurrentPage('location');
       localStorage.setItem('currentPage', 'location');
       window.location.href = '/location-setup';
@@ -186,7 +210,7 @@ function App() {
             )
           }
         />
-        <Route path="/profile" element={<ProfilePage wishlistCount={wishlist.length} />} />
+        <Route path="/profile" element={<ProfilePage wishlist={wishlist} />} />
         <Route path="/buy-animals" element={<BuyAnimalsPage wishlist={wishlist} addToWishlist={addToWishlist} removeFromWishlist={removeFromWishlist} isInWishlist={isInWishlist} />} />
         <Route path="/sell-animal" element={<AnimalListingPage />} />
         <Route path="/animal/:animalType/:id" element={<AnimalDetailPage />} />
@@ -194,6 +218,9 @@ function App() {
         <Route path="/pregnancy-calendar" element={<PregnancyCalendar />} />
         <Route path="/ai-health-check" element={<AIHealthCheck />} />
         <Route path="/call-history" element={<CallHistory />} />
+        <Route path="/help" element={<HelpCenter />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/wishlist" element={<WishlistPage wishlist={wishlist} removeFromWishlist={removeFromWishlist} isInWishlist={isInWishlist} />} />
         <Route path="/map" element={<MapView wishlist={wishlist} addToWishlist={addToWishlist} removeFromWishlist={removeFromWishlist} isInWishlist={isInWishlist} />} />
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../../config/api';
 
 const AdminLogin = () => {
   const { t } = useTranslation();
@@ -13,7 +14,7 @@ const AdminLogin = () => {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const API_URL = API_BASE_URL;
 
   const handleSubmit = async (e) => {
     e.preventDefault();

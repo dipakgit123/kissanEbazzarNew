@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import toast, { Toaster } from 'react-hot-toast';
+import { API_BASE_URL } from '../config/api';
 import {
   FormSection,
   FormInput,
@@ -228,7 +229,7 @@ const OtherAnimalListingForm = () => {
         formDataToSend.append('video', formData.video);
       }
 
-      const endpoint = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/other-animals/listings`;
+      const endpoint = `${API_BASE_URL}/api/other-animals/listings`;
       console.log('🐾 [OTHER ANIMAL] Submitting to API endpoint:', endpoint);
       console.log('🐾 [OTHER ANIMAL] Animal Type:', formData.animalType);
       

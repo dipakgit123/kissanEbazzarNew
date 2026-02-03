@@ -53,7 +53,9 @@ class AuthController {
   
       // Check if user has location and profile completed
       const hasLocation = result.user.latitude !== null && result.user.longitude !== null;
-      const isFirstTimeLogin = !result.user.full_name || !result.user.postal_code;
+      const isNewUserFlag = result.user.metadata && result.user.metadata.is_new_user === true;
+      const isProfileIncomplete = !result.user.full_name || !result.user.postal_code;
+      const isFirstTimeLogin = isNewUserFlag && isProfileIncomplete;
 
       res.status(200).json({
         success: true,
@@ -62,6 +64,14 @@ class AuthController {
           id: result.user.id,
           phone_number: result.user.phone_number,
           full_name: result.user.full_name,
+          postal_code: result.user.postal_code,
+          city: result.user.city,
+          state: result.user.state,
+          country: result.user.country,
+          latitude: result.user.latitude,
+          longitude: result.user.longitude,
+          profile_photo: result.user.profile_photo,
+          metadata: result.user.metadata,
           is_verified: result.user.is_verified,
           hasLocation: hasLocation,
           isFirstTimeLogin: isFirstTimeLogin
@@ -244,6 +254,14 @@ class AuthController {
       }
 
       // Update user profile
+      const existingMetadata = user.metadata || {};
+      const updatedMetadata = {
+        ...existingMetadata,
+        is_new_user: false,
+        profile_completed: true,
+        profile_completed_at: new Date().toISOString()
+      };
+
       await user.update({
         full_name: full_name.trim(),
         postal_code: locationData.postal_code || postal_code.trim(),
@@ -254,7 +272,8 @@ class AuthController {
         country: locationData.country || 'India',
         address: locationData.address,
         location_type: locationData.location_type || 'manual',
-        location_set_at: new Date()
+        location_set_at: new Date(),
+        metadata: updatedMetadata
       });
 
       res.status(200).json({

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
+import { API_BASE_URL } from '../config/api';
 
 const CallHistory = () => {
   const { t } = useTranslation();
@@ -11,7 +12,19 @@ const CallHistory = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const API_URL = API_BASE_URL;
+  const getCurrentUserId = () => {
+    const saved = localStorage.getItem('userData');
+    if (!saved) return null;
+    try {
+      const data = JSON.parse(saved);
+      return data?.id || data?.userId || data?.user_id || null;
+    } catch (e) {
+      return null;
+    }
+  };
+  const currentUserId = getCurrentUserId();
+  const normalizedCurrentUserId = currentUserId != null ? Number(currentUserId) : null;
 
   useEffect(() => {
     fetchCallStats();
@@ -156,8 +169,13 @@ const CallHistory = () => {
         ) : (
           <div className="divide-y divide-gray-100">
             {calls.map((call) => {
-              const isOutgoing = activeTab === 'made' || (activeTab === 'all' && call.caller);
+              const callerId = call.callerId || call.caller_id || call.caller?.id;
+              const callerIdNumber = callerId != null ? Number(callerId) : null;
+              const isOutgoing = activeTab === 'made' || (activeTab === 'all' && (normalizedCurrentUserId != null ? callerIdNumber === normalizedCurrentUserId : !!call.caller));
               const otherPerson = isOutgoing ? call.receiver : call.caller;
+              const otherPhoneNumber = isOutgoing
+                ? (call.receiverPhoneNumber || otherPerson?.phone_number)
+                : (call.caller?.phone_number || otherPerson?.phone_number);
               
               return (
                 <div key={call.id} className="p-4 hover:bg-gray-50 transition-colors">
@@ -204,8 +222,17 @@ const CallHistory = () => {
 
                     {/* Call Again Button */}
                     <button
-                      onClick={() => window.open(`tel:${call.receiverPhoneNumber}`, '_self')}
-                      className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                      onClick={() => {
+                        if (otherPhoneNumber) {
+                          window.open(`tel:${otherPhoneNumber}`, '_self');
+                        }
+                      }}
+                      disabled={!otherPhoneNumber}
+                      className={`p-2 rounded-lg transition-colors ${
+                        otherPhoneNumber
+                          ? 'text-green-600 hover:bg-green-50'
+                          : 'text-gray-300 cursor-not-allowed'
+                      }`}
                       title="Call Again"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

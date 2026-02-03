@@ -1,19 +1,19 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { pregnancyService } from '../services/api';
 import { useTranslation } from 'react-i18next';
 
 // Pregnancy duration in days for different animal types
 const PREGNANCY_DURATIONS = {
-  cow: { days: 280, months: '9 months', emoji: '🐄' },
-  buffalo: { days: 310, months: '10 months', emoji: '🐃' },
-  goat: { days: 150, months: '5 months', emoji: '🐐' },
-  sheep: { days: 150, months: '5 months', emoji: '🐑' },
-  horse: { days: 340, months: '11 months', emoji: '🐴' },
-  dog: { days: 63, months: '2 months', emoji: '🐕' },
-  cat: { days: 65, months: '2 months', emoji: '🐱' },
-  pig: { days: 114, months: '4 months', emoji: '🐷' },
-  other: { days: 150, months: '5 months', emoji: '🐾' }
+  cow: { days: 280, monthCount: 9, emoji: '🐄' },
+  buffalo: { days: 310, monthCount: 10, emoji: '🐃' },
+  goat: { days: 150, monthCount: 5, emoji: '🐐' },
+  sheep: { days: 150, monthCount: 5, emoji: '🐑' },
+  horse: { days: 340, monthCount: 11, emoji: '🐴' },
+  dog: { days: 63, monthCount: 2, emoji: '🐕' },
+  cat: { days: 65, monthCount: 2, emoji: '🐱' },
+  pig: { days: 114, monthCount: 4, emoji: '🐷' },
+  other: { days: 150, monthCount: 5, emoji: '🐾' }
 };
 
 // Get animal type emoji
@@ -33,13 +33,13 @@ const formatDate = (dateString) => {
 };
 
 // Get status badge styling
-const getStatusBadge = (status) => {
+const getStatusBadge = (status, t) => {
   const badges = {
-    pregnant: { bg: 'bg-green-100', text: 'text-green-700', label: 'Active' },
-    delivered: { bg: 'bg-gray-100', text: 'text-gray-700', label: 'Delivered' },
-    miscarriage: { bg: 'bg-red-100', text: 'text-red-700', label: 'Miscarriage' },
-    false_pregnancy: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'False Pregnancy' },
-    cancelled: { bg: 'bg-gray-100', text: 'text-gray-500', label: 'Cancelled' }
+    pregnant: { bg: 'bg-green-100', text: 'text-green-700', label: t('pregnancy.statusActive') },
+    delivered: { bg: 'bg-gray-100', text: 'text-gray-700', label: t('pregnancy.delivered') },
+    miscarriage: { bg: 'bg-red-100', text: 'text-red-700', label: t('pregnancy.statusMiscarriage') },
+    false_pregnancy: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: t('pregnancy.statusFalsePregnancy') },
+    cancelled: { bg: 'bg-gray-100', text: 'text-gray-500', label: t('pregnancy.statusCancelled') }
   };
   return badges[status] || badges.pregnant;
 };
@@ -160,7 +160,7 @@ const PregnancyCalendar = () => {
 
   // Handle delete
   const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this pregnancy record?')) return;
+    if (!confirm(t('pregnancy.deleteConfirm'))) return;
     try {
       const response = await pregnancyService.deleteRecord(id);
       if (response.success) {
@@ -277,9 +277,7 @@ const PregnancyCalendar = () => {
             )}
           </div>
           {hasDueDate && (
-            <div className="text-xs text-red-400 font-semibold">
-              📅 Due
-            </div>
+            <div className="text-xs text-red-400 font-semibold">?? {t("pregnancy.due")}</div>
           )}
         </div>
       );
@@ -300,7 +298,7 @@ const PregnancyCalendar = () => {
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-300 font-medium">Loading pregnancy calendar...</p>
+          <p className="text-gray-300 font-medium">{t("pregnancy.loadingCalendar")}</p>
         </div>
       </div>
     );
@@ -313,29 +311,21 @@ const PregnancyCalendar = () => {
         <div className="mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-white mb-2">
-                Pregnancy Calendar
-              </h1>
-              <p className="text-gray-400">
-                Track your animals' pregnancy journey
-              </p>
+              <h1 className="text-3xl font-bold text-white mb-2">{t("pregnancy.pageTitle")}</h1>
+              <p className="text-gray-400">{t("pregnancy.pageDescription")}</p>
             </div>
             <div className="flex items-center gap-3">
               <Link
                 to="/"
                 className="px-4 py-2 border border-gray-700 text-gray-300 rounded-lg hover:bg-gray-900 hover:border-gray-600 transition-colors font-medium"
-              >
-                ← Back
-              </Link>
+              >{t("pregnancy.back")}</Link>
               <button
                 onClick={() => setShowAddForm(true)}
                 className="px-5 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-all shadow-sm hover:shadow-md flex items-center gap-2"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                Add Pregnancy
-              </button>
+                </svg>{t("pregnancy.addPregnancy")}</button>
             </div>
           </div>
         </div>
@@ -352,7 +342,7 @@ const PregnancyCalendar = () => {
             <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 shadow-sm hover:shadow-md hover:border-green-700 transition-all">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-400 mb-1">Active Pregnancies</p>
+                  <p className="text-sm font-medium text-gray-400 mb-1">{t("pregnancy.activePregnancies")}</p>
                   <p className="text-3xl font-bold text-white">{stats.active_pregnancies || 0}</p>
                 </div>
                 <div className="w-12 h-12 bg-green-900/50 rounded-lg flex items-center justify-center border border-green-700">
@@ -364,7 +354,7 @@ const PregnancyCalendar = () => {
             <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 shadow-sm hover:shadow-md hover:border-blue-700 transition-all">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-400 mb-1">Delivered</p>
+                  <p className="text-sm font-medium text-gray-400 mb-1">{t("pregnancy.delivered")}</p>
                   <p className="text-3xl font-bold text-white">{stats.successful_deliveries || 0}</p>
                 </div>
                 <div className="w-12 h-12 bg-blue-900/50 rounded-lg flex items-center justify-center border border-blue-700">
@@ -376,7 +366,7 @@ const PregnancyCalendar = () => {
             <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 shadow-sm hover:shadow-md hover:border-orange-700 transition-all">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-400 mb-1">Due Soon</p>
+                  <p className="text-sm font-medium text-gray-400 mb-1">{t("pregnancy.dueSoon")}</p>
                   <p className="text-3xl font-bold text-white">{stats.upcoming_deliveries?.length || 0}</p>
                 </div>
                 <div className="w-12 h-12 bg-orange-900/50 rounded-lg flex items-center justify-center border border-orange-700">
@@ -388,7 +378,7 @@ const PregnancyCalendar = () => {
             <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 shadow-sm hover:shadow-md hover:border-purple-700 transition-all">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-400 mb-1">Total Records</p>
+                  <p className="text-sm font-medium text-gray-400 mb-1">{t("pregnancy.totalRecords")}</p>
                   <p className="text-3xl font-bold text-white">{stats.total_records || 0}</p>
                 </div>
                 <div className="w-12 h-12 bg-purple-900/50 rounded-lg flex items-center justify-center border border-purple-700">
@@ -399,17 +389,15 @@ const PregnancyCalendar = () => {
           </div>
         )}
 
-        {/* Pregnancy Duration Reference */}
+        {/* {t("pregnancy.pregnancyDurationReference")} */}
         <div className="mb-8 bg-gray-900 rounded-xl p-6 border border-gray-800 shadow-sm">
-          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <span>📅</span> Pregnancy Duration Reference
-          </h3>
+          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><span>📅</span> {t("pregnancy.pregnancyDurationReference")}</h3>
           <div className="flex flex-wrap gap-2">
             {Object.entries(PREGNANCY_DURATIONS).map(([type, info]) => (
               <div key={type} className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-lg border border-gray-700 hover:border-green-600 transition-colors">
                 <span className="text-lg">{info.emoji}</span>
-                <span className="text-sm text-gray-300 font-medium capitalize">{type}:</span>
-                <span className="text-sm text-green-400 font-semibold">{info.months}</span>
+                <span className="text-sm text-gray-300 font-medium">{t(`pregnancy.animal${type.charAt(0).toUpperCase() + type.slice(1)}`)}:</span>
+                <span className="text-sm text-green-400 font-semibold">{t(`pregnancy.months${info.monthCount}`)}</span>
               </div>
             ))}
           </div>
@@ -447,7 +435,7 @@ const PregnancyCalendar = () => {
 
               {/* Calendar Grid */}
               <div className="grid grid-cols-7 gap-2 mb-2">
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                {[t('pregnancy.sun'), t('pregnancy.mon'), t('pregnancy.tue'), t('pregnancy.wed'), t('pregnancy.thu'), t('pregnancy.fri'), t('pregnancy.sat')].map((day) => (
                   <div key={day} className="text-center text-sm font-semibold text-gray-400 py-2">
                     {day}
                   </div>
@@ -462,15 +450,15 @@ const PregnancyCalendar = () => {
               <div className="mt-6 flex flex-wrap gap-4 text-sm">
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded bg-green-500"></div>
-                  <span className="text-gray-300">Today</span>
+                  <span className="text-gray-300">{t("pregnancy.today")}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded bg-orange-900/50 border-2 border-orange-500"></div>
-                  <span className="text-gray-300">Pregnant</span>
+                  <span className="text-gray-300">{t("pregnancy.pregnant")}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded bg-red-900/50 border-2 border-red-500"></div>
-                  <span className="text-gray-300">Due Date</span>
+                  <span className="text-gray-300">{t("pregnancy.dueDate")}</span>
                 </div>
               </div>
             </div>
@@ -487,9 +475,7 @@ const PregnancyCalendar = () => {
                     ? 'bg-green-600 text-white shadow-sm'
                     : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
                 }`}
-              >
-                Active
-              </button>
+              >{t("pregnancy.active")}</button>
               <button
                 onClick={() => setActiveTab('delivered')}
                 className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-all ${
@@ -497,9 +483,7 @@ const PregnancyCalendar = () => {
                     ? 'bg-green-600 text-white shadow-sm'
                     : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
                 }`}
-              >
-                Delivered
-              </button>
+              >{t("pregnancy.delivered")}</button>
               <button
                 onClick={() => setActiveTab('all')}
                 className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-all ${
@@ -507,9 +491,7 @@ const PregnancyCalendar = () => {
                     ? 'bg-green-600 text-white shadow-sm'
                     : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
                 }`}
-              >
-                All
-              </button>
+              >{t('pregnancy.all')}</button>
             </div>
 
             {/* Records List */}
@@ -517,7 +499,7 @@ const PregnancyCalendar = () => {
               {filteredRecords.length > 0 ? (
                 <div className="space-y-4">
                   {filteredRecords.map((record) => {
-                    const statusBadge = getStatusBadge(record.status);
+                    const statusBadge = getStatusBadge(record.status, t);
                     const totalDays = PREGNANCY_DURATIONS[record.animal_type]?.days || 150;
                     
                     return (
@@ -544,7 +526,7 @@ const PregnancyCalendar = () => {
                           <>
                             <div className="mb-3">
                               <div className="flex justify-between text-xs text-gray-400 mb-1.5">
-                                <span>Progress</span>
+                                <span>{t("pregnancy.progress")}</span>
                                 <span className="font-bold text-green-400">{record.progress_percentage || 0}%</span>
                               </div>
                               <div className="w-full bg-gray-700 rounded-full h-2.5 overflow-hidden">
@@ -556,8 +538,8 @@ const PregnancyCalendar = () => {
                             </div>
 
                             <div className="flex justify-between text-xs mb-3 px-3 py-2 bg-orange-900/30 rounded-lg border border-orange-700">
-                              <span className="text-gray-300 font-medium">Days Remaining</span>
-                              <span className="text-orange-400 font-bold">{record.days_remaining || 0} days</span>
+                              <span className="text-gray-300 font-medium">{t("pregnancy.daysRemainingLabel")}</span>
+                              <span className="text-orange-400 font-bold">{record.days_remaining || 0} {t("pregnancy.days")}</span>
                             </div>
                           </>
                         )}
@@ -565,11 +547,11 @@ const PregnancyCalendar = () => {
                         {/* Dates */}
                         <div className="grid grid-cols-2 gap-2 text-xs mb-3">
                           <div className="bg-gray-900 rounded-lg p-2.5 border border-gray-700">
-                            <p className="text-gray-400 mb-1">Mating Date</p>
+                            <p className="text-gray-400 mb-1">{t("pregnancy.matingDateLabel")}</p>
                             <p className="text-gray-200 font-semibold">{formatDate(record.mating_date)}</p>
                           </div>
                           <div className="bg-gray-900 rounded-lg p-2.5 border border-gray-700">
-                            <p className="text-gray-400 mb-1">Expected Date</p>
+                            <p className="text-gray-400 mb-1">{t("pregnancy.expectedDateLabel")}</p>
                             <p className="text-green-400 font-semibold">{formatDate(record.expected_delivery_date)}</p>
                           </div>
                         </div>
@@ -578,7 +560,7 @@ const PregnancyCalendar = () => {
                         {record.status === 'delivered' && record.actual_delivery_date && (
                           <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-2.5 mb-3">
                             <p className="text-blue-300 text-xs font-medium">
-                              ✓ Delivered on {formatDate(record.actual_delivery_date)}
+                              {t("pregnancy.statusDelivered")} on {formatDate(record.actual_delivery_date)}
                               {record.offspring_count && ` - ${record.offspring_count} offspring`}
                             </p>
                           </div>
@@ -594,14 +576,12 @@ const PregnancyCalendar = () => {
                               }}
                               className="flex-1 py-2.5 px-3 bg-green-600 text-white rounded-lg text-xs font-semibold hover:bg-green-700 transition-colors shadow-sm"
                             >
-                              Mark Delivered
+                              {t("pregnancy.markDelivered")}
                             </button>
                             <button
                               onClick={() => handleDelete(record.id)}
                               className="py-2.5 px-3 bg-red-900/30 text-red-400 rounded-lg text-xs font-semibold hover:bg-red-900/50 transition-colors border border-red-700"
-                            >
-                              Delete
-                            </button>
+                            >{t("pregnancy.delete")}</button>
                           </div>
                         )}
                       </div>
@@ -613,13 +593,11 @@ const PregnancyCalendar = () => {
                   <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-700">
                     <span className="text-3xl">📅</span>
                   </div>
-                  <p className="text-gray-400 text-sm mb-3">No {activeTab} pregnancy records</p>
+                  <p className="text-gray-400 text-sm mb-3">{t("pregnancy.noRecords")}</p>
                   <button
                     onClick={() => setShowAddForm(true)}
                     className="text-green-400 font-semibold text-sm hover:text-green-300"
-                  >
-                    + Add your first pregnancy
-                  </button>
+                  >{t("pregnancy.addPregnancy")}</button>
                 </div>
               )}
             </div>
@@ -628,8 +606,7 @@ const PregnancyCalendar = () => {
             {stats?.upcoming_deliveries?.length > 0 && (
               <div className="bg-orange-900/30 rounded-xl p-4 border border-orange-700">
                 <h3 className="text-sm font-bold text-orange-300 mb-3 flex items-center gap-2">
-                  <span>⚠️</span> Due Within 30 Days
-                </h3>
+                  <span>⚠️</span>{t("pregnancy.dueWithin30Days")}</h3>
                 <div className="space-y-2">
                   {stats.upcoming_deliveries.slice(0, 3).map((item) => (
                     <div key={item.id} className="flex items-center justify-between p-2.5 bg-gray-800 rounded-lg border border-orange-700/50">
@@ -637,7 +614,7 @@ const PregnancyCalendar = () => {
                         <span className="text-lg">{getAnimalEmoji(item.animal_type)}</span>
                         <span className="text-sm text-gray-200 font-semibold">{item.animal_name}</span>
                       </div>
-                      <span className="text-xs text-orange-400 font-bold">{item.days_remaining} days</span>
+                      <span className="text-xs text-orange-400 font-bold">{item.days_remaining} {t("pregnancy.days")}</span>
                     </div>
                   ))}
                 </div>
@@ -654,8 +631,7 @@ const PregnancyCalendar = () => {
             {/* Modal Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <span>🤰</span> Add Pregnancy Record
-              </h3>
+                <span>🤰</span>{t("pregnancy.addPregnancyRecord")}</h3>
               <button
                 onClick={() => setShowAddForm(false)}
                 className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -668,37 +644,11 @@ const PregnancyCalendar = () => {
 
             {/* Modal Body */}
             <div className="overflow-y-auto flex-1 p-6">
-              {/* My Animals Selection */}
-              {myAnimals.length > 0 && (
-                <div className="mb-6">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">
-                    Select from your animals
-                  </label>
-                  <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-3 bg-gray-50 rounded-lg border border-gray-200">
-                    {myAnimals.filter(a => !a.has_active_pregnancy).map((animal) => (
-                      <button
-                        key={`${animal.listing_type}-${animal.id}`}
-                        type="button"
-                        onClick={() => handleSelectAnimal(animal)}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                          formData.listing_id === animal.id
-                            ? 'bg-green-600 text-white shadow-sm'
-                            : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-                        }`}
-                      >
-                        <span>{getAnimalEmoji(animal.animal_type)}</span>
-                        <span>{animal.breed_name}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               <form onSubmit={handleSubmit} className="space-y-5">
                 {/* Row 1: Animal Type & Mating Type */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Animal Type *</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.animalType")}</label>
                     <select
                       value={formData.animal_type}
                       onChange={(e) => setFormData({ ...formData, animal_type: e.target.value })}
@@ -707,20 +657,20 @@ const PregnancyCalendar = () => {
                     >
                       {Object.keys(PREGNANCY_DURATIONS).map(type => (
                         <option key={type} value={type}>
-                          {getAnimalEmoji(type)} {type.charAt(0).toUpperCase() + type.slice(1)}
+                          {getAnimalEmoji(type)} {t(`pregnancy.animal${type.charAt(0).toUpperCase() + type.slice(1)}`)}
                         </option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Mating Type</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.matingType")}</label>
                     <select
                       value={formData.mating_type}
                       onChange={(e) => setFormData({ ...formData, mating_type: e.target.value })}
                       className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     >
-                      <option value="natural">Natural</option>
-                      <option value="artificial_insemination">Artificial Insemination</option>
+                      <option value="natural">{t("pregnancy.natural")}</option>
+                      <option value="artificial_insemination">{t("pregnancy.artificialInsemination")}</option>
                     </select>
                   </div>
                 </div>
@@ -728,31 +678,31 @@ const PregnancyCalendar = () => {
                 {/* Row 2: Animal Name & Breed */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Animal Name *</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.animalName")}</label>
                     <input
                       type="text"
                       value={formData.animal_name}
                       onChange={(e) => setFormData({ ...formData, animal_name: e.target.value })}
                       className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      placeholder="e.g., Lakshmi"
+                      placeholder={t("pregnancy.placeholderAnimalName")}
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Breed Name</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.breedName")}</label>
                     <input
                       type="text"
                       value={formData.breed_name}
                       onChange={(e) => setFormData({ ...formData, breed_name: e.target.value })}
                       className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      placeholder="e.g., Gir"
+                      placeholder={t("pregnancy.placeholderBreed")}
                     />
                   </div>
                 </div>
 
                 {/* Mating Date */}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Mating Date *</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.matingDate")}</label>
                   <input
                     type="date"
                     value={formData.mating_date}
@@ -764,31 +714,31 @@ const PregnancyCalendar = () => {
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                     </svg>
-                    Expected delivery: ~{PREGNANCY_DURATIONS[formData.animal_type]?.months} from mating date
+                    {t("pregnancy.expectedDelivery")}: ~{t(`pregnancy.months${PREGNANCY_DURATIONS[formData.animal_type]?.monthCount}`)} {t("pregnancy.fromMatingDate")}
                   </p>
                 </div>
 
                 {/* Bull/Sire Details */}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Bull/Sire Details</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.bullSireDetails")}</label>
                   <input
                     type="text"
                     value={formData.bull_sire_details}
                     onChange={(e) => setFormData({ ...formData, bull_sire_details: e.target.value })}
                     className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    placeholder="e.g., Bull name, AI straw number"
+                    placeholder={t("pregnancy.placeholderBullSire")}
                   />
                 </div>
 
                 {/* Notes */}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Notes</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.notes")}</label>
                   <textarea
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                     className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
                     rows="3"
-                    placeholder="Any additional notes..."
+                    placeholder={t("pregnancy.placeholderNotes")}
                   />
                 </div>
 
@@ -798,17 +748,11 @@ const PregnancyCalendar = () => {
                     type="button"
                     onClick={() => setShowAddForm(false)}
                     className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold transition-colors"
-                  >
-                    Cancel
-                  </button>
+                  >{t("pregnancy.cancel")}</button>
                   <button
                     type="submit"
                     className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors shadow-sm"
-                  >
-                    Add Pregnancy
-                  </button>
-                </div>
-              </form>
+                  >{t("pregnancy.addRecord")}</button></div></form>
             </div>
           </div>
         </div>
@@ -821,8 +765,7 @@ const PregnancyCalendar = () => {
             {/* Modal Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <span>🐣</span> Mark as Delivered
-              </h3>
+                <span>🐣</span>{t("pregnancy.recordDelivery")}</h3>
               <button
                 onClick={() => {
                   setShowDeliverModal(false);
@@ -851,7 +794,7 @@ const PregnancyCalendar = () => {
                 {/* Delivery Date & Offspring Count */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Delivery Date</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.deliveryDateLabel")}</label>
                     <input
                       type="date"
                       value={deliveryData.delivery_date}
@@ -860,7 +803,7 @@ const PregnancyCalendar = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Count</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.count")}</label>
                     <input
                       type="number"
                       min="1"
@@ -873,7 +816,7 @@ const PregnancyCalendar = () => {
 
                 {/* Gender Selection */}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Gender</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.gender")}</label>
                   <div className="grid grid-cols-3 gap-2">
                     {['male', 'female', 'mixed'].map((gender) => (
                       <button
@@ -886,7 +829,7 @@ const PregnancyCalendar = () => {
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
                         }`}
                       >
-                        {gender === 'male' ? '♂ Male' : gender === 'female' ? '♀ Female' : '⚥ Mixed'}
+                        {gender === 'male' ? t('pregnancy.genderMale') : gender === 'female' ? t('pregnancy.genderFemale') : t('pregnancy.genderMixed')}
                       </button>
                     ))}
                   </div>
@@ -894,13 +837,13 @@ const PregnancyCalendar = () => {
 
                 {/* Offspring Details */}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Details (Optional)</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.detailsOptional")}</label>
                   <textarea
                     value={deliveryData.offspring_details}
                     onChange={(e) => setDeliveryData({ ...deliveryData, offspring_details: e.target.value })}
                     className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
                     rows="3"
-                    placeholder="Health, weight, markings..."
+                    placeholder={t("pregnancy.placeholderOffspringDetails")}
                   />
                 </div>
 
@@ -913,15 +856,11 @@ const PregnancyCalendar = () => {
                       setSelectedRecord(null);
                     }}
                     className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold transition-colors"
-                  >
-                    Cancel
-                  </button>
+                  >{t("pregnancy.cancel")}</button>
                   <button
                     onClick={handleDeliver}
                     className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors shadow-sm"
-                  >
-                    Confirm Delivery
-                  </button>
+                  >{t("pregnancy.confirmDelivery")}</button>
                 </div>
               </div>
             </div>

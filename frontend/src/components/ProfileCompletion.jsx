@@ -29,11 +29,11 @@ const ProfileCompletion = ({ onComplete }) => {
     const newErrors = {};
 
     if (!formData.full_name || formData.full_name.trim().length < 2) {
-      newErrors.full_name = 'Please enter your full name (at least 2 characters)';
+      newErrors.full_name = t('profileCompletion.fullNameError');
     }
 
     if (!formData.postal_code || formData.postal_code.trim().length < 4) {
-      newErrors.postal_code = 'Please enter a valid postal code';
+      newErrors.postal_code = t('profileCompletion.pincodeError');
     }
 
     setErrors(newErrors);
@@ -59,7 +59,7 @@ const ProfileCompletion = ({ onComplete }) => {
     e.preventDefault();
 
     if (!validateForm()) {
-      toast.error('Please fill in all required fields correctly');
+      toast.error(t('profileCompletion.requiredFieldsError'));
       return;
     }
 
@@ -72,16 +72,26 @@ const ProfileCompletion = ({ onComplete }) => {
       });
 
       if (response.success) {
-        toast.success('Profile completed successfully!');
+        toast.success(t('profileCompletion.success'));
 
         // Update user data in localStorage
         const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
         const updatedUser = {
           ...currentUser,
           full_name: formData.full_name,
+          postal_code: formData.postal_code,
           ...response.location
         };
         localStorage.setItem('user', JSON.stringify(updatedUser));
+
+        const currentUserData = JSON.parse(localStorage.getItem('userData') || '{}');
+        const updatedUserData = {
+          ...currentUserData,
+          full_name: formData.full_name,
+          postal_code: formData.postal_code,
+          ...response.location
+        };
+        localStorage.setItem('userData', JSON.stringify(updatedUserData));
 
         // Call completion callback
         if (onComplete) {
@@ -90,7 +100,7 @@ const ProfileCompletion = ({ onComplete }) => {
       }
     } catch (error) {
       console.error('Profile completion error:', error);
-      toast.error(error.message || 'Failed to complete profile');
+      toast.error(error.message || t('profileCompletion.failed'));
     } finally {
       setIsLoading(false);
     }
@@ -106,9 +116,9 @@ const ProfileCompletion = ({ onComplete }) => {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-[#15BB73]/10 to-[#0FA568]/20 rounded-full mb-4">
             <UserIcon />
           </div>
-          <h2 className="text-2xl font-bold text-gray-800">Complete Your Profile</h2>
+          <h2 className="text-2xl font-bold text-gray-800">{t('profileCompletion.title')}</h2>
           <p className="text-gray-600 mt-2">
-            Help us personalize your experience
+            {t('profileCompletion.subtitle')}
           </p>
         </div>
 
@@ -117,7 +127,7 @@ const ProfileCompletion = ({ onComplete }) => {
           {/* Full Name */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Full Name <span className="text-red-500">*</span>
+              {t('profileCompletion.fullName')} <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <input
@@ -128,7 +138,7 @@ const ProfileCompletion = ({ onComplete }) => {
                 className={`w-full pl-10 pr-4 py-3 border-2 ${
                   errors.full_name ? 'border-red-400' : 'border-gray-200'
                 } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all`}
-                placeholder="Enter your full name"
+                placeholder={t('profileCompletion.fullNamePlaceholder')}
                 autoFocus
               />
               <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
@@ -145,7 +155,7 @@ const ProfileCompletion = ({ onComplete }) => {
           {/* Postal Code */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Pincode / Postal Code <span className="text-red-500">*</span>
+              {t('profileCompletion.pincode')} <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <input
@@ -156,7 +166,7 @@ const ProfileCompletion = ({ onComplete }) => {
                 className={`w-full pl-10 pr-4 py-3 border-2 ${
                   errors.postal_code ? 'border-red-400' : 'border-gray-200'
                 } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all`}
-                placeholder="Enter your pincode"
+                placeholder={t('profileCompletion.pincodePlaceholder')}
                 maxLength="10"
               />
               <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
@@ -170,7 +180,7 @@ const ProfileCompletion = ({ onComplete }) => {
               <p className="text-red-500 text-sm mt-1">{errors.postal_code}</p>
             )}
             <p className="text-xs text-gray-500 mt-2">
-              We'll automatically fetch your location details based on your pincode
+              {t('profileCompletion.pincodeHint')}
             </p>
           </div>
 
@@ -181,8 +191,8 @@ const ProfileCompletion = ({ onComplete }) => {
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
               </svg>
               <div className="text-sm text-gray-700">
-                <p className="font-semibold mb-1">Why do we need this?</p>
-                <p className="text-xs">Your name helps us personalize your experience, and your pincode helps us connect you with nearby farmers and customers in your area.</p>
+                <p className="font-semibold mb-1">{t('profileCompletion.infoTitle')}</p>
+                <p className="text-xs">{t('profileCompletion.infoBody')}</p>
               </div>
             </div>
           </div>

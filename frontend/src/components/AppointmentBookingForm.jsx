@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import toast, { Toaster } from 'react-hot-toast';
+import { API_BASE_API } from '../config/api';
 
 const AppointmentBookingForm = () => {
   const { t } = useTranslation();
@@ -28,8 +29,6 @@ const AppointmentBookingForm = () => {
 
   const [loading, setLoading] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
-
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
   const animalTypes = [
     { value: 'cow', label: '🐄 Cow' },
@@ -117,7 +116,7 @@ const AppointmentBookingForm = () => {
         farmer_longitude: userLocation?.longitude
       };
 
-      const response = await fetch(`${API_BASE_URL}/appointments`, {
+      const response = await fetch(`${API_BASE_API}/appointments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

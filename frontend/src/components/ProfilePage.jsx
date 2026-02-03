@@ -4,11 +4,12 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import EditProfileForm from './EditProfileForm';
 import CallHistory from './CallHistory';
-import { userService } from '../services/api';
+import { userService, listingsService } from '../services/api';
+import { API_BASE_URL } from '../config/api';
+import { SUPPORT_WHATSAPP_NUMBER, SUPPORT_WHATSAPP_MESSAGE } from '../config/support';
+import toast from 'react-hot-toast';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-
-const ProfilePage = ({ onBack, wishlistCount = 0 }) => {
+const ProfilePage = ({ onBack, wishlist = [] }) => {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -34,6 +35,8 @@ const ProfilePage = ({ onBack, wishlistCount = 0 }) => {
   const [selectedAnimal, setSelectedAnimal] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
   const [showCallHistory, setShowCallHistory] = useState(false);
+  const [markingSoldId, setMarkingSoldId] = useState(null);
+  const likedAnimals = Array.isArray(wishlist) ? wishlist : [];
 
   useEffect(() => {
     fetchUserProfile();
@@ -41,6 +44,23 @@ const ProfilePage = ({ onBack, wishlistCount = 0 }) => {
       fetchAllListings();
     }, 100);
   }, []);
+
+
+
+  const getTotalListings = () => {
+    return animalListings.length + buffaloListings.length + catListings.length +
+           dogListings.length + goatListings.length + horseListings.length;
+  };
+
+  const handleMessageUs = () => {
+    if (!SUPPORT_WHATSAPP_NUMBER) {
+      toast.error(t('profile.supportWhatsAppMissing') || 'Support WhatsApp number not configured');
+      return;
+    }
+    const message = t('profile.supportWhatsAppMessage') || SUPPORT_WHATSAPP_MESSAGE;
+    const whatsappUrl = `https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+  };
 
   const fetchUserProfile = async () => {
     try {
@@ -58,10 +78,10 @@ const ProfilePage = ({ onBack, wishlistCount = 0 }) => {
         const locationParts = [];
         if (userData.city) locationParts.push(userData.city);
         if (userData.state) locationParts.push(userData.state);
-        const location = locationParts.length > 0 ? locationParts.join(', ') : 'Location not set';
+        const location = locationParts.length > 0 ? locationParts.join(', ') : t('profile.locationNotSet');
 
         setUser({
-          name: userData.full_name || 'User',
+          name: userData.full_name || t('profile.user'),
           full_name: userData.full_name || '',
           location: location,
           phone: userData.phone_number || '',
@@ -80,6 +100,7 @@ const ProfilePage = ({ onBack, wishlistCount = 0 }) => {
     }
   };
 
+
   const fetchAllListings = async () => {
     setLoading(true);
     const token = localStorage.getItem('token');
@@ -90,142 +111,169 @@ const ProfilePage = ({ onBack, wishlistCount = 0 }) => {
     }
 
     try {
-      const headers = { Authorization: `Bearer ${token}` };
+      // Use the combined API endpoint to fetch all listings at once
+      const response = await listingsService.getMyListings();
+      console.log('API Response:', response);
+      console.log('Listings:', response.listings);
       
-      // Fetch each listing type individually and handle errors gracefully
-      const fetchListing = async (url, setter) => {
-        try {
-          const res = await axios.get(url, { headers });
-          if (res.data.success) {
-            setter(res.data.listings || []);
-          }
-        } catch (err) {
-          // Silently handle 404s - endpoint may not exist yet
-          if (err.response?.status !== 404) {
-            console.error(`Error fetching from ${url}:`, err.message);
-          }
-          setter([]);
-        }
-      };
-
-      await Promise.all([
-        fetchListing(`${API_URL}/api/animals/my-listings`, setAnimalListings),
-        fetchListing(`${API_URL}/api/buffalos/my-listings`, setBuffaloListings),
-        fetchListing(`${API_URL}/api/cats/my-listings`, setCatListings),
-        fetchListing(`${API_URL}/api/dogs/my-listings`, setDogListings),
-        fetchListing(`${API_URL}/api/goats/my-listings`, setGoatListings),
-        fetchListing(`${API_URL}/api/horses/my-listings`, setHorseListings),
-      ]);
+      if (response.success) {
+        const listings = response.listings || [];
+        
+        // Separate listings by type
+        const cows = listings.filter(l => l.animal_type === 'cow' || l.type === 'cow');
+        const buffalos = listings.filter(l => l.animal_type === 'buffalo' || l.type === 'buffalo');
+        const cats = listings.filter(l => l.animal_type === 'cat' || l.type === 'cat');
+        const dogs = listings.filter(l => l.animal_type === 'dog' || l.type === 'dog');
+        const goats = listings.filter(l => l.animal_type === 'goat' || l.type === 'goat');
+        const horses = listings.filter(l => l.animal_type === 'horse' || l.type === 'horse');
+        
+        setAnimalListings(cows);
+        setBuffaloListings(buffalos);
+        setCatListings(cats);
+        setDogListings(dogs);
+        setGoatListings(goats);
+        setHorseListings(horses);
+      }
     } catch (error) {
       console.error('Error fetching listings:', error);
+      // Set empty arrays on error
+      setAnimalListings([]);
+      setBuffaloListings([]);
+      setCatListings([]);
+      setDogListings([]);
+      setGoatListings([]);
+      setHorseListings([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const getTotalListings = () => {
-    return (
-      animalListings.length +
-      buffaloListings.length +
-      catListings.length +
-      dogListings.length +
-      goatListings.length +
-      horseListings.length
-    );
-  };
-
   const handleSaveProfile = async (profileData) => {
-    setSavingProfile(true);
     try {
+      setSavingProfile(true);
       const response = await userService.updateProfile(profileData);
-      if (response.success) {
-        const userData = response.user;
 
-        let completion = 0;
-        if (userData.full_name) completion += 20;
-        if (userData.phone_number) completion += 20;
-        if (userData.address) completion += 20;
-        if (userData.postal_code) completion += 20;
-        if (user.profile_photo) completion += 20;
-
-        const locationParts = [];
-        if (userData.city) locationParts.push(userData.city);
-        if (userData.state) locationParts.push(userData.state);
-        const location = locationParts.length > 0 ? locationParts.join(', ') : 'Location not set';
-
-        setUser(prev => ({
-          ...prev,
-          name: userData.full_name || 'User',
-          full_name: userData.full_name || '',
-          location: location,
-          phone: userData.phone_number || '',
-          phone_number: userData.phone_number || '',
-          address: userData.address || '',
-          postal_code: userData.postal_code || '',
-          city: userData.city || '',
-          state: userData.state || '',
-          country: userData.country || '',
-          completion: completion,
-        }));
-
+      if (response?.success && response?.user) {
+        localStorage.setItem('userData', JSON.stringify(response.user));
+        await fetchUserProfile();
         setEditing(false);
-        alert('Profile updated successfully!');
+        alert(t('profile.updateSuccess') || 'Profile updated successfully');
       } else {
-        alert(response.message || 'Failed to update profile');
+        alert(response?.message || t('profile.updateFailed') || 'Failed to update profile');
       }
     } catch (error) {
       console.error('Error updating profile:', error);
-      alert(error.message || 'Failed to update profile');
+      alert(t('profile.updateFailed') || 'Failed to update profile');
     } finally {
       setSavingProfile(false);
     }
   };
 
-  const handlePhotoUpdate = (newPhotoUrl) => {
-    setUser(prev => {
-      const hasPhoto = !!newPhotoUrl;
-      let completion = 0;
-      if (prev.full_name) completion += 20;
-      if (prev.phone_number || prev.phone) completion += 20;
-      if (prev.address) completion += 20;
-      if (prev.postal_code) completion += 20;
-      if (hasPhoto) completion += 20;
+  const handlePhotoUpdate = (photoUrl) => {
+    if (typeof photoUrl === 'undefined') {
+      fetchUserProfile();
+      return;
+    }
 
-      return {
-        ...prev,
-        profile_photo: newPhotoUrl,
-        completion: completion,
-      };
+    setUser(prev => {
+      const updated = { ...prev, profile_photo: photoUrl };
+      const completion =
+        (updated.full_name ? 20 : 0) +
+        (updated.phone_number ? 20 : 0) +
+        (updated.address ? 20 : 0) +
+        (updated.postal_code ? 20 : 0) +
+        (updated.profile_photo ? 20 : 0);
+      return { ...updated, completion };
     });
+
+    const saved = localStorage.getItem('userData');
+    if (saved) {
+      try {
+        const userData = JSON.parse(saved);
+        localStorage.setItem('userData', JSON.stringify({ ...userData, profile_photo: photoUrl }));
+      } catch {
+        // Ignore localStorage parse issues
+      }
+    }
+  };
+
+  const getListingEndpoint = (listingType) => {
+    const type = (listingType || 'cow').toLowerCase();
+    const map = {
+      cow: 'animals',
+      buffalo: 'buffalos',
+      goat: 'goats',
+      horse: 'horses',
+      cat: 'cats',
+      dog: 'dogs',
+      other: 'other-animals'
+    };
+    return map[type] || 'animals';
   };
 
   const handleDeleteListing = async (listingId, listingType) => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
+    if (!listingId) return;
+    const confirmMessage = t('profile.deleteConfirm') || 'Are you sure you want to delete this listing?';
+    if (!window.confirm(confirmMessage)) return;
 
     try {
-      const endpoints = {
-        cow: 'animal-listings',
-        buffalo: 'buffalo-listings',
-        cat: 'cat-listings',
-        dog: 'dog-listings',
-        goat: 'goat-listings',
-        horse: 'horse-listings',
-      };
-
-      const endpoint = endpoints[listingType] || 'animal-listings';
-      await axios.delete(`${API_URL}/api/${endpoint}/${listingId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const token = localStorage.getItem('token');
+      const endpoint = getListingEndpoint(listingType);
+      const response = await axios.delete(`${API_BASE_URL}/api/${endpoint}/listings/${listingId}`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
 
-      fetchAllListings();
-      setShowDeleteConfirm(null);
-      setSelectedAnimal(null);
+      if (response?.data?.success) {
+        setShowDeleteConfirm(null);
+        if (selectedAnimal?.id === listingId) {
+          setSelectedAnimal(null);
+        }
+        await fetchAllListings();
+        alert(t('profile.deleteSuccess') || 'Listing deleted successfully');
+      } else {
+        alert(response?.data?.message || t('profile.deleteFailed') || 'Failed to delete listing');
+      }
     } catch (error) {
       console.error('Error deleting listing:', error);
-      alert('Failed to delete listing');
+      alert(t('profile.deleteFailed') || 'Failed to delete listing');
     }
   };
+
+  const getListingType = (listing) => {
+    return (listing?.animal_type || listing?.type || 'cow').toLowerCase();
+  };
+
+  const isListingSold = (listing) => {
+    return (listing?.status || '').toLowerCase() === 'sold';
+  };
+
+  const handleMarkAsSold = async (listingId, listingType) => {
+    if (!listingId) return;
+    const confirmMessage = t('profile.markSoldConfirm') || 'Mark this listing as sold?';
+    if (!window.confirm(confirmMessage)) return;
+
+    try {
+      setMarkingSoldId(listingId);
+      const type = (listingType || 'cow').toLowerCase();
+      const response = await listingsService.markListingAsSold(type, listingId);
+
+      if (response?.success) {
+        if (selectedAnimal?.id === listingId) {
+          setSelectedAnimal(prev => (prev ? { ...prev, status: 'sold' } : prev));
+        }
+        await fetchAllListings();
+        alert(t('profile.markSoldSuccess') || 'Listing marked as sold.');
+      } else {
+        alert(response?.message || t('profile.markSoldFailed') || 'Failed to mark as sold.');
+      }
+    } catch (error) {
+      console.error('Error marking listing as sold:', error);
+      alert(t('profile.markSoldFailed') || 'Failed to mark as sold.');
+    } finally {
+      setMarkingSoldId(null);
+    }
+  };
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -294,7 +342,7 @@ const ProfilePage = ({ onBack, wishlistCount = 0 }) => {
                   </svg>
                   <span>{user.location}</span>
                 </div>
-                <div className="hidden sm:block text-gray-300">•</div>
+                <div className="hidden sm:block text-gray-300">|</div>
                 <div className="flex items-center gap-1.5 justify-center sm:justify-start">
                   <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
@@ -358,7 +406,7 @@ const ProfilePage = ({ onBack, wishlistCount = 0 }) => {
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">{t('profile.animalsListed') || 'Animals Listed'}</p>
+                <p className="text-sm font-medium text-gray-600 mb-1">{t('profile.animalsListed')}</p>
                 <p className="text-3xl font-bold text-gray-900">{loading ? '...' : getTotalListings()}</p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -373,7 +421,7 @@ const ProfilePage = ({ onBack, wishlistCount = 0 }) => {
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">{t('profile.callsMade') || 'Calls Made'}</p>
+                <p className="text-sm font-medium text-gray-600 mb-1">{t('profile.callsMade')}</p>
                 <p className="text-3xl font-bold text-gray-900">0</p>
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -388,7 +436,7 @@ const ProfilePage = ({ onBack, wishlistCount = 0 }) => {
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">{t('profile.callsReceived') || 'Calls Received'}</p>
+                <p className="text-sm font-medium text-gray-600 mb-1">{t('profile.callsReceived')}</p>
                 <p className="text-3xl font-bold text-gray-900">0</p>
               </div>
               <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -403,11 +451,14 @@ const ProfilePage = ({ onBack, wishlistCount = 0 }) => {
         {/* Listings & Activity Section */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-bold text-gray-900">{t('profile.listingsActivity') || 'Listings & Activity'}</h3>
-            <p className="text-sm text-gray-500 mt-0.5">{t('profile.listingsActivityDesc') || 'Manage your animal listings and activity'}</p>
+            <h3 className="text-lg font-bold text-gray-900">{t('profile.listingsActivity')}</h3>
+            <p className="text-sm text-gray-500 mt-0.5">{t('profile.listingsActivityDesc')}</p>
           </div>
           <div className="divide-y divide-gray-100">
-            <button className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors group">
+            <button
+              onClick={handleMessageUs}
+              className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors group"
+            >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200 transition-colors">
                   <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -415,8 +466,8 @@ const ProfilePage = ({ onBack, wishlistCount = 0 }) => {
                   </svg>
                 </div>
                 <div className="text-left">
-                  <p className="text-sm font-semibold text-gray-900">{t('profile.myListings') || 'My Listings'}</p>
-                  <p className="text-xs text-gray-500">{t('profile.myListingsDesc') || 'View all your posted listings'}</p>
+                  <p className="text-sm font-semibold text-gray-900">{t('profile.myListings')}</p>
+                  <p className="text-xs text-gray-500">{t('profile.myListingsDesc')}</p>
                 </div>
               </div>
               <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -482,7 +533,7 @@ const ProfilePage = ({ onBack, wishlistCount = 0 }) => {
                 </div>
                 <div className="text-left">
                   <p className="text-sm font-semibold text-gray-900">{t('profile.savedAnimals') || 'Saved Animals'}</p>
-                  <p className="text-xs text-gray-500">{wishlistCount} {t('profile.animalsSaved') || 'animals saved'}</p>
+                    <p className="text-xs text-gray-500">{likedAnimals.length} {t('profile.animalsSaved') || 'animals saved'}</p>
                 </div>
               </div>
               <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -490,22 +541,59 @@ const ProfilePage = ({ onBack, wishlistCount = 0 }) => {
               </svg>
             </Link>
 
-            <button className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors group">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center group-hover:bg-red-200 transition-colors">
-                  <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-                  </svg>
+            <div className="px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                    </svg>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-semibold text-gray-900">{t('profile.likedAnimals') || 'Liked Animals'}</p>
+                    <p className="text-xs text-gray-500">
+                      {likedAnimals.length} {t('profile.animalsSaved') || 'animals saved'}
+                    </p>
+                  </div>
                 </div>
-                <div className="text-left">
-                  <p className="text-sm font-semibold text-gray-900">{t('profile.likedAnimals') || 'Liked Animals'}</p>
-                  <p className="text-xs text-gray-500">{t('profile.likedAnimalsDesc') || 'Animals you liked'}</p>
-                </div>
+                <Link
+                  to="/wishlist"
+                  className="text-xs font-semibold text-green-600 hover:text-green-700"
+                >
+                  {t('profile.viewAll') || 'View all'}
+                </Link>
               </div>
-              <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
+
+              {likedAnimals.length === 0 ? (
+                <p className="mt-3 text-xs text-gray-500">
+                  {t('profile.likedAnimalsEmpty') || 'No liked animals yet'}
+                </p>
+              ) : (
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {likedAnimals.slice(0, 4).map((animal) => (
+                    <div
+                      key={animal.id}
+                      className="flex items-center gap-3 bg-gray-50 rounded-lg p-2"
+                    >
+                      <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
+                        <img
+                          src={animal.imageSrc || animal.photo1 || animal.front_photo || 'data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" width=\"80\" height=\"80\"%3E%3Crect fill=\"%23f0f0f0\" width=\"80\" height=\"80\"/%3E%3Ctext fill=\"%23999\" font-family=\"sans-serif\" font-size=\"10\" dy=\"4\" font-weight=\"bold\" x=\"50%25\" y=\"50%25\" text-anchor=\"middle\"%3ENo Image%3C/text%3E%3C/svg%3E'}
+                          alt={animal.title || 'Animal'}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-gray-900 truncate">{animal.title || 'Animal'}</p>
+                        <p className="text-xs text-gray-500 truncate">{animal.location || ''}</p>
+                      </div>
+                      <span className="text-xs font-semibold text-green-700 flex-shrink-0">
+                        {t('animalDetail.currency')}{animal.price}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <button
               onClick={() => setShowCallHistory(true)}
@@ -518,8 +606,8 @@ const ProfilePage = ({ onBack, wishlistCount = 0 }) => {
                   </svg>
                 </div>
                 <div className="text-left">
-                  <p className="text-sm font-semibold text-gray-900">{t('profile.callsMadeLabel') || 'Calls Made'}</p>
-                  <p className="text-xs text-gray-500">{t('profile.callsMadeDesc') || 'View outgoing call history'}</p>
+                  <p className="text-sm font-semibold text-gray-900">{t('profile.callsMadeLabel')}</p>
+                  <p className="text-xs text-gray-500">{t('profile.callsMadeDesc')}</p>
                 </div>
               </div>
               <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -532,11 +620,14 @@ const ProfilePage = ({ onBack, wishlistCount = 0 }) => {
         {/* Support Section */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-bold text-gray-900">{t('profile.support') || 'Support'}</h3>
-            <p className="text-sm text-gray-500 mt-0.5">{t('profile.supportDesc') || 'Get help and assistance'}</p>
+            <h3 className="text-lg font-bold text-gray-900">{t('profile.support')}</h3>
+            <p className="text-sm text-gray-500 mt-0.5">{t('profile.supportDesc')}</p>
           </div>
           <div className="divide-y divide-gray-100">
-            <button className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors group">
+            <Link
+              to="/help"
+              className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors group"
+            >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200 transition-colors">
                   <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -544,14 +635,14 @@ const ProfilePage = ({ onBack, wishlistCount = 0 }) => {
                   </svg>
                 </div>
                 <div className="text-left">
-                  <p className="text-sm font-semibold text-gray-900">{t('profile.messageUs') || 'Message Us'}</p>
-                  <p className="text-xs text-gray-500">{t('profile.messageUsDesc') || 'Contact support team'}</p>
+                  <p className="text-sm font-semibold text-gray-900">{t('profile.messageUs')}</p>
+                  <p className="text-xs text-gray-500">{t('profile.messageUsDesc')}</p>
                 </div>
               </div>
               <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
-            </button>
+            </Link>
 
             <button className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors group">
               <div className="flex items-center gap-3">
@@ -561,8 +652,8 @@ const ProfilePage = ({ onBack, wishlistCount = 0 }) => {
                   </svg>
                 </div>
                 <div className="text-left">
-                  <p className="text-sm font-semibold text-gray-900">{t('profile.helpCenter') || 'Help Center'}</p>
-                  <p className="text-xs text-gray-500">{t('profile.helpCenterDesc') || 'FAQs and guides'}</p>
+                  <p className="text-sm font-semibold text-gray-900">{t('profile.helpCenter')}</p>
+                  <p className="text-xs text-gray-500">{t('profile.helpCenterDesc')}</p>
                 </div>
               </div>
               <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -578,11 +669,11 @@ const ProfilePage = ({ onBack, wishlistCount = 0 }) => {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-8">
             <EditProfileForm
-              user={user}
+              initialData={user}
               onSave={handleSaveProfile}
               onCancel={() => setEditing(false)}
               onPhotoUpdate={handlePhotoUpdate}
-              saving={savingProfile}
+              loading={savingProfile}
             />
           </div>
         </div>
@@ -593,7 +684,7 @@ const ProfilePage = ({ onBack, wishlistCount = 0 }) => {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">My Animals ({getTotalListings()})</h2>
+              <h2 className="text-xl font-bold text-gray-900">{t("profile.myAnimals")} ({getTotalListings()})</h2>
               <button
                 onClick={() => {
                   setShowMyAnimals(false);
@@ -625,18 +716,48 @@ const ProfilePage = ({ onBack, wishlistCount = 0 }) => {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {[...animalListings, ...buffaloListings, ...catListings, ...dogListings, ...goatListings, ...horseListings].map((animal) => (
-                    <div key={`${animal.listing_type || 'cow'}-${animal.id}`} className="bg-gray-50 rounded-lg border border-gray-200 p-4 hover:shadow-md transition-all">
+                    <div key={`${animal.animal_type || animal.type || 'cow'}-${animal.id}`} className="bg-gray-50 rounded-lg border border-gray-200 p-4 hover:shadow-md transition-all">
                       <div className="flex gap-4">
-                        {animal.photo && <img src={animal.photo} alt={animal.breed_name} className="w-20 h-20 rounded-lg object-cover" />}
+                        {(animal.photo1 || animal.front_photo) && <img src={(animal.photo1 || animal.front_photo)} alt={animal.breed || animal.breed_name} className="w-20 h-20 rounded-lg object-cover" />}
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-gray-900 mb-1 truncate">{animal.breed_name}</h3>
-                          <p className="text-sm text-gray-600 mb-2 capitalize">{animal.listing_type || 'cow'}</p>
-                          <p className="text-lg font-bold text-green-600">₹{animal.price?.toLocaleString()}</p>
+                          <h3 className="font-semibold text-gray-900 mb-1 truncate">{animal.breed || animal.breed_name}</h3>
+                          <p className="text-sm text-gray-600 mb-2 capitalize">{animal.animal_type || animal.type || 'cow'}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-lg font-bold text-green-600">{t("animalDetail.currency")}{((animal.price || animal.expected_price) || 0).toLocaleString()}</p>
+                            {isListingSold(animal) && (
+                              <span className="px-2 py-0.5 bg-gray-200 text-gray-700 text-xs font-semibold rounded-full">
+                                {t('profile.sold') || 'Sold'}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <div className="mt-4 flex gap-2">
-                        <button onClick={() => setSelectedAnimal(animal)} className="flex-1 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors">View Details</button>
-                        <button onClick={() => setShowDeleteConfirm(animal)} className="px-3 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors">Delete</button>
+                      <div className="mt-4 grid grid-cols-3 gap-2">
+                        <button
+                          onClick={() => setSelectedAnimal(animal)}
+                          className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+                        >
+                          {t('profile.viewDetails') || 'View Details'}
+                        </button>
+                        <button
+                          onClick={() => handleMarkAsSold(animal.id, getListingType(animal))}
+                          disabled={isListingSold(animal) || markingSoldId === animal.id}
+                          className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            isListingSold(animal)
+                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                              : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                          }`}
+                        >
+                          {markingSoldId === animal.id
+                            ? (t('profile.markingSold') || 'Marking...')
+                            : (isListingSold(animal) ? (t('profile.sold') || 'Sold') : (t('profile.markSold') || 'Mark Sold'))}
+                        </button>
+                        <button
+                          onClick={() => setShowDeleteConfirm(animal)}
+                          className="px-3 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors"
+                        >
+                          {t("profile.delete")}
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -657,11 +778,11 @@ const ProfilePage = ({ onBack, wishlistCount = 0 }) => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Listing</h3>
-              <p className="text-gray-600 mb-6">Are you sure you want to delete "{showDeleteConfirm.breed_name}"? This action cannot be undone.</p>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">{t("profile.deleteListing")}</h3>
+              <p className="text-gray-600 mb-6">{t("profile.deleteConfirm")} "{showDeleteConfirm.breed_name}"? {t("profile.deleteCannotUndo")}</p>
               <div className="flex gap-3">
-                <button onClick={() => setShowDeleteConfirm(null)} className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition-colors">Cancel</button>
-                <button onClick={() => handleDeleteListing(showDeleteConfirm.id, showDeleteConfirm.listing_type || 'cow')} className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors">Delete</button>
+                <button onClick={() => setShowDeleteConfirm(null)} className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition-colors">{t("profile.cancel")}</button>
+                <button onClick={() => handleDeleteListing(showDeleteConfirm.id, showDeleteConfirm.animal_type || showDeleteConfirm.type || 'cow')} className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors">{t("profile.delete")}</button>
               </div>
             </div>
           </div>
@@ -673,7 +794,7 @@ const ProfilePage = ({ onBack, wishlistCount = 0 }) => {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">Call History</h2>
+              <h2 className="text-xl font-bold text-gray-900">{t("profile.callHistory")}</h2>
               <button onClick={() => setShowCallHistory(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
                 <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -692,7 +813,7 @@ const ProfilePage = ({ onBack, wishlistCount = 0 }) => {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">Animal Details</h2>
+              <h2 className="text-xl font-bold text-gray-900">{t("profile.animalDetails")}</h2>
               <button onClick={() => setSelectedAnimal(null)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
                 <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -700,19 +821,46 @@ const ProfilePage = ({ onBack, wishlistCount = 0 }) => {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-6">
-              {selectedAnimal.photo && <img src={selectedAnimal.photo} alt={selectedAnimal.breed_name} className="w-full h-64 object-cover rounded-lg mb-6" />}
+              {(selectedAnimal.photo1 || selectedAnimal.front_photo) && (
+                <img
+                  src={selectedAnimal.photo1 || selectedAnimal.front_photo}
+                  alt={selectedAnimal.breed || selectedAnimal.breed_name}
+                  className="w-full h-64 object-cover rounded-lg mb-6"
+                />
+              )}
               <div className="space-y-4">
                 <div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">{selectedAnimal.breed_name}</h3>
-                  <p className="text-3xl font-bold text-green-600">₹{selectedAnimal.price?.toLocaleString()}</p>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-2">{selectedAnimal.breed || selectedAnimal.breed_name}</h3>
+                  <p className="text-3xl font-bold text-green-600">{t("animalDetail.currency")}{((selectedAnimal.price || selectedAnimal.expected_price) || 0).toLocaleString()}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div><p className="text-sm text-gray-500">Type</p><p className="font-semibold text-gray-900 capitalize">{selectedAnimal.listing_type || 'cow'}</p></div>
-                  <div><p className="text-sm text-gray-500">Age</p><p className="font-semibold text-gray-900">{selectedAnimal.age || 'N/A'}</p></div>
-                  <div><p className="text-sm text-gray-500">Weight</p><p className="font-semibold text-gray-900">{selectedAnimal.weight || 'N/A'} kg</p></div>
-                  <div><p className="text-sm text-gray-500">Milk Capacity</p><p className="font-semibold text-gray-900">{selectedAnimal.milk_capacity || 'N/A'} L/day</p></div>
+                  <div><p className="text-sm text-gray-500">{t("profile.type")}</p><p className="font-semibold text-gray-900 capitalize">{selectedAnimal.animal_type || selectedAnimal.type || 'cow'}</p></div>
+                  <div><p className="text-sm text-gray-500">{t("profile.age")}</p><p className="font-semibold text-gray-900">{selectedAnimal.age || t("profile.na")}</p></div>
+                  <div><p className="text-sm text-gray-500">{t("profile.weight")}</p><p className="font-semibold text-gray-900">{selectedAnimal.weight || t("profile.na")} {t("profile.kg")}</p></div>
+                  <div><p className="text-sm text-gray-500">{t("profile.milkCapacity")}</p><p className="font-semibold text-gray-900">{selectedAnimal.milk_capacity || t("profile.na")} {t("profile.lPerDay")}</p></div>
                 </div>
-                {selectedAnimal.description && <div><p className="text-sm text-gray-500 mb-1">Description</p><p className="text-gray-700">{selectedAnimal.description}</p></div>}
+                {selectedAnimal.description && <div><p className="text-sm text-gray-500 mb-1">{t("profile.description")}</p><p className="text-gray-700">{selectedAnimal.description}</p></div>}
+                <div className="flex items-center gap-3 pt-2">
+                  <span className="text-sm text-gray-500">{t('profile.status') || 'Status'}:</span>
+                  <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                    isListingSold(selectedAnimal) ? 'bg-gray-200 text-gray-700' : 'bg-green-100 text-green-700'
+                  }`}>
+                    {isListingSold(selectedAnimal) ? (t('profile.sold') || 'Sold') : (t('profile.active') || 'Active')}
+                  </span>
+                </div>
+                {!isListingSold(selectedAnimal) && (
+                  <div className="pt-2">
+                    <button
+                      onClick={() => handleMarkAsSold(selectedAnimal.id, getListingType(selectedAnimal))}
+                      disabled={markingSoldId === selectedAnimal.id}
+                      className="px-4 py-2 bg-amber-50 text-amber-700 rounded-lg text-sm font-semibold hover:bg-amber-100 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {markingSoldId === selectedAnimal.id
+                        ? (t('profile.markingSold') || 'Marking...')
+                        : (t('profile.markSold') || 'Mark as Sold')}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -723,3 +871,4 @@ const ProfilePage = ({ onBack, wishlistCount = 0 }) => {
 };
 
 export default ProfilePage;
+

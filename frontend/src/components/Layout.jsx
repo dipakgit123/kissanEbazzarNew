@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import logo from '../assets/images/animal_logog.jpeg';
 import AIAssistant from './AIAssistant';
 import LanguageSwitcher from './LanguageSwitcher';
+import Footer from './Footer';
 
 const Layout = ({ showHeaderFooter = true, wishlistCount = 0 }) => {
   const { pathname } = useLocation();
@@ -197,6 +198,7 @@ const Layout = ({ showHeaderFooter = true, wishlistCount = 0 }) => {
       <main className={`flex-1 ${showHeaderFooter ? 'p-4 pb-20' : 'p-0'}`}>
         <Outlet />
       </main>
+      {showHeaderFooter && <Footer />}
 
       {/* Bottom Navigation - conditionally rendered */}
       {showHeaderFooter && (

@@ -71,7 +71,8 @@ async sendOTP(phoneNumber, ipAddress = null, userAgent = null) {
         otp_expiry: otpExpiry,
         last_otp_sent_at: new Date(),
         otp_attempts: 0,
-        is_verified: false
+        is_verified: false,
+        metadata: { is_new_user: true, profile_completed: false }
       }, { transaction });
     }
 
@@ -199,14 +200,31 @@ async sendOTP(phoneNumber, ipAddress = null, userAgent = null) {
         throw new Error(`Invalid OTP. ${3 - newAttempts} attempts remaining`);
       }
 
-      // Mark user as verified
-      await user.update({
+      const hasProfile = Boolean(user.full_name && user.postal_code);
+      const existingMetadata = user.metadata || {};
+      const shouldUpdateProfileFlags = hasProfile && (
+        existingMetadata.is_new_user === true || existingMetadata.profile_completed !== true
+      );
+
+      const updatePayload = {
         is_verified: true,
         verified_at: new Date(),
         otp: null,
         otp_expiry: null,
         otp_attempts: 0
-      }, { transaction });
+      };
+
+      if (shouldUpdateProfileFlags) {
+        updatePayload.metadata = {
+          ...existingMetadata,
+          is_new_user: false,
+          profile_completed: true,
+          profile_completed_at: existingMetadata.profile_completed_at || new Date().toISOString()
+        };
+      }
+
+      // Mark user as verified (and normalize profile flags if already completed)
+      await user.update(updatePayload, { transaction });
 
       // Log successful verification
       if (OtpLog) {
@@ -236,6 +254,15 @@ async sendOTP(phoneNumber, ipAddress = null, userAgent = null) {
       const userResponse = {
         id: user.id,
         phone_number: user.phone_number,
+        full_name: user.full_name,
+        postal_code: user.postal_code,
+        city: user.city,
+        state: user.state,
+        country: user.country,
+        latitude: user.latitude,
+        longitude: user.longitude,
+        profile_photo: user.profile_photo,
+        metadata: user.metadata,
         is_verified: user.is_verified,
         verified_at: user.verified_at,
         created_at: user.created_at,

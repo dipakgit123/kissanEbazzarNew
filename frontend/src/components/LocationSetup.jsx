@@ -2,9 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast, { Toaster } from 'react-hot-toast';
-
-// Use the same API_BASE_URL as your other services
-const API_BASE_URL = 'http://localhost:5000'; // Your backend URL
+import { API_BASE_API } from '../config/api';
 
 // Icons
 const LocationIcon = () => (
@@ -30,7 +28,7 @@ const ManualLocationIcon = () => (
 const locationService = {
   async checkStatus() {
     const token = localStorage.getItem('token');
-    const response = await fetch(`${API_BASE_URL}/api/location/status`, {
+    const response = await fetch(`${API_BASE_API}/location/status`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
@@ -49,7 +47,7 @@ const locationService = {
 
   async setCurrentLocation(latitude, longitude) {
     const token = localStorage.getItem('token');
-    const response = await fetch(`${API_BASE_URL}/api/location/set/current`, {
+    const response = await fetch(`${API_BASE_API}/location/set/current`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -69,7 +67,7 @@ const locationService = {
 
   async setManualLocation(addressData) {
     const token = localStorage.getItem('token');
-    const response = await fetch(`${API_BASE_URL}/api/location/set/manual`, {
+    const response = await fetch(`${API_BASE_API}/location/set/manual`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

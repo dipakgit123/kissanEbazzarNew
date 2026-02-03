@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { API_BASE_API } from '../config/api';
 
 const NearbyVeterinarians = () => {
   const { t } = useTranslation();
@@ -11,8 +12,6 @@ const NearbyVeterinarians = () => {
   const [userLocation, setUserLocation] = useState(null);
   const [radius, setRadius] = useState(100); // Default 100km
   const [selectedSpecialization, setSelectedSpecialization] = useState('');
-
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
   const specializations = [
     { value: '', label: 'All Specializations' },
@@ -81,7 +80,7 @@ const NearbyVeterinarians = () => {
         params.append('specialization', selectedSpecialization);
       }
 
-      const response = await fetch(`${API_BASE_URL}/veterinarians/nearby?${params}`);
+      const response = await fetch(`${API_BASE_API}/veterinarians/nearby?${params}`);
       const data = await response.json();
 
       if (data.success) {

@@ -43,7 +43,7 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
 
   // Helper function to format time ago
   const formatTimeAgo = useCallback((dateString) => {
-    if (!dateString) return 'Recently';
+    if (!dateString) return t('time.recently');
 
     const date = new Date(dateString);
     const now = new Date();
@@ -52,13 +52,13 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 60) return `${diffMins} minutes ago`;
-    if (diffHours < 24) return `${diffHours} hours ago`;
-    if (diffDays === 1) return '1 day ago';
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-    return `${Math.floor(diffDays / 30)} months ago`;
-  }, []);
+    if (diffMins < 60) return t('time.minutesAgo', { count: diffMins });
+    if (diffHours < 24) return t('time.hoursAgo', { count: diffHours });
+    if (diffDays === 1) return t('time.dayAgo');
+    if (diffDays < 7) return t('time.daysAgo', { count: diffDays });
+    if (diffDays < 30) return t('time.weeksAgo', { count: Math.floor(diffDays / 7) });
+    return t('time.monthsAgo', { count: Math.floor(diffDays / 30) });
+  }, [t]);
 
   // Fetch user location on mount
   useEffect(() => {
@@ -154,6 +154,7 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
           datePosted: formatTimeAgo(listing.created_at),
           imageSrc: listing.front_photo || listing.side_photo || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="200"%3E%3Crect fill="%23f0f0f0" width="300" height="200"/%3E%3Ctext fill="%23999" font-family="sans-serif" font-size="16" dy="10.5" font-weight="bold" x="50%25" y="50%25" text-anchor="middle"%3ENo Image%3C/text%3E%3C/svg%3E',
           sellerName: listing.seller?.name || 'Unknown Seller',
+          sellerId: listing.seller?.id,
           phoneNumber: listing.seller?.phone || '',
           breed: listing.breed_name || 'Unknown',
           animalType: listing.animal_type.charAt(0).toUpperCase() + listing.animal_type.slice(1),
@@ -229,7 +230,7 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
                 </div>
                 <input
                   type="text"
-                  placeholder="Search animals..."
+                  placeholder={t('buyPage.searchPlaceholder')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-10 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#15BB73] focus:border-transparent transition-all duration-200 text-sm"
@@ -247,7 +248,7 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
               </div>
               {/* Results count on the right */}
               <span className="hidden sm:block text-sm text-gray-600 whitespace-nowrap">
-                {filteredAnimals.length} {filteredAnimals.length === 1 ? 'result' : 'results'}
+                {filteredAnimals.length} {filteredAnimals.length === 1 ? t('buyPage.result') : t('buyPage.results')}
               </span>
             </div>
           </div>
@@ -258,7 +259,7 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
         {/* Page Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl sm:text-4xl font-bold text-[#000600] mb-2">{t('home.buyAnimals')}</h1>
-          <p className="text-gray-600 text-sm sm:text-base">Browse and purchase quality farm animals</p>
+          <p className="text-gray-600 text-sm sm:text-base">{t('buyPage.pageSubtitle')}</p>
         </div>
 
         {/* Search & Filter Section */}
@@ -275,7 +276,7 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
               </div>
               <input
                 type="text"
-                placeholder="Search by breed, type, or location..."
+                placeholder={t('buyPage.searchPlaceholderDetail')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-14 pr-11 py-3 bg-white border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[#15BB73] focus:border-[#15BB73] transition-all duration-200 text-sm shadow-sm hover:shadow-md"
@@ -309,7 +310,7 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
                     <svg className={`w-4 h-4 ${distanceMode === 'all' ? 'animate-pulse' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span>All Animals</span>
+                    <span>{t('buyPage.allAnimals')}</span>
                   </div>
                 </button>
                 <button
@@ -325,7 +326,7 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
-                    <span>Nearby (100 km)</span>
+                    <span>{t('buyPage.nearby')}</span>
                   </div>
                 </button>
               </div>
@@ -333,11 +334,11 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
           </div>
         </div>
 
-        {/* Browse by Category Section */}
+        {/* {t('buyPage.browseByCategory')} Section */}
         <div className="mb-8">
           <div className="text-center mb-6">
-            <h3 className="text-2xl sm:text-3xl font-bold text-[#000600] mb-2">Browse by Category</h3>
-            <p className="text-gray-600 text-sm">Select an animal type to explore available listings</p>
+            <h3 className="text-2xl sm:text-3xl font-bold text-[#000600] mb-2">{t('buyPage.browseByCategory')}</h3>
+            <p className="text-gray-600 text-sm">{t('buyPage.browseCategorySubtitle')}</p>
           </div>
           
           {/* Category Grid - Same structure as HomePage feature cards */}
@@ -360,8 +361,8 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
                 <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 bg-gradient-to-t from-black/80 to-transparent">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow-lg">Cows</h3>
-                      <p className="text-xs text-white/80 mt-1">Browse cows</p>
+                      <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow-lg">{t('buyPage.cows')}</h3>
+                      <p className="text-xs text-white/80 mt-1">{t('buyPage.browseCows')}</p>
                     </div>
                     <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
                       <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -390,8 +391,8 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
                 <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 bg-gradient-to-t from-black/80 to-transparent">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow-lg">Buffalo</h3>
-                      <p className="text-xs text-white/80 mt-1">Browse buffalo</p>
+                      <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow-lg">{t('buyPage.buffalo')}</h3>
+                      <p className="text-xs text-white/80 mt-1">{t('buyPage.browseBuffalo')}</p>
                     </div>
                     <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
                       <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -420,8 +421,8 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
                 <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 bg-gradient-to-t from-black/80 to-transparent">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow-lg">Goats</h3>
-                      <p className="text-xs text-white/80 mt-1">Browse goats</p>
+                      <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow-lg">{t('buyPage.goats')}</h3>
+                      <p className="text-xs text-white/80 mt-1">{t('buyPage.browseGoats')}</p>
                     </div>
                     <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
                       <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -450,8 +451,8 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
                 <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 bg-gradient-to-t from-black/80 to-transparent">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow-lg">Bulls</h3>
-                      <p className="text-xs text-white/80 mt-1">Browse bulls</p>
+                      <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow-lg">{t('buyPage.bulls')}</h3>
+                      <p className="text-xs text-white/80 mt-1">{t('buyPage.browseBulls')}</p>
                     </div>
                     <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
                       <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -480,8 +481,8 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
                 <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 bg-gradient-to-t from-black/80 to-transparent">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow-lg">Horses</h3>
-                      <p className="text-xs text-white/80 mt-1">Browse horses</p>
+                      <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow-lg">{t('buyPage.horses')}</h3>
+                      <p className="text-xs text-white/80 mt-1">{t('buyPage.browseHorses')}</p>
                     </div>
                     <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
                       <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -510,8 +511,8 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
                 <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 bg-gradient-to-t from-black/80 to-transparent">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow-lg">Dogs</h3>
-                      <p className="text-xs text-white/80 mt-1">Browse dogs</p>
+                      <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow-lg">{t('buyPage.dogs')}</h3>
+                      <p className="text-xs text-white/80 mt-1">{t('buyPage.browseDogs')}</p>
                     </div>
                     <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
                       <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -540,8 +541,8 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
                 <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 bg-gradient-to-t from-black/80 to-transparent">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow-lg">Cats</h3>
-                      <p className="text-xs text-white/80 mt-1">Browse cats</p>
+                      <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow-lg">{t('buyPage.cats')}</h3>
+                      <p className="text-xs text-white/80 mt-1">{t('buyPage.browseCats')}</p>
                     </div>
                     <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
                       <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -570,8 +571,8 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
                 <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 bg-gradient-to-t from-black/80 to-transparent">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow-lg">Other Animals</h3>
-                      <p className="text-xs text-white/80 mt-1">Browse all</p>
+                      <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow-lg">{t('buyPage.otherAnimals')}</h3>
+                      <p className="text-xs text-white/80 mt-1">{t('buyPage.browseAll')}</p>
                     </div>
                     <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
                       <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -588,7 +589,7 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
         {(selectedCategory || searchQuery) && (
           <div className="mb-6 bg-white rounded-xl p-4 shadow-sm border border-gray-100">
             <div className="flex flex-wrap items-center gap-3">
-              <span className="text-sm font-semibold text-gray-700">Active Filters:</span>
+              <span className="text-sm font-semibold text-gray-700">{t('buyPage.activeFilters')}</span>
               
               {selectedCategory && (
                 <button
@@ -626,7 +627,7 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
             </div>
             
             <div className="mt-2 text-sm text-gray-600">
-              Showing {filteredAnimals.length} {filteredAnimals.length === 1 ? 'result' : 'results'}
+              Showing {filteredAnimals.length} {filteredAnimals.length === 1 ? t('buyPage.result') : t('buyPage.results')}
             </div>
           </div>
         )}
@@ -639,13 +640,13 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
                 {selectedCategory
                   ? `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}s`
                   : searchQuery
-                    ? 'Search Results'
+                    ? t('buyPage.searchResults')
                     : distanceMode === 'nearby'
-                      ? 'Nearby Animals'
-                      : 'All Available Animals'}
+                      ? t('home.nearbyAnimals')
+                      : t('home.allAvailableAnimals')}
               </h3>
               {distanceMode === 'nearby' && !selectedCategory && !searchQuery && (
-                <p className="text-sm text-gray-600 mt-1">Within 100 km from your location</p>
+                <p className="text-sm text-gray-600 mt-1">{t('buyPage.within100km')}</p>
               )}
             </div>
             {userLocation && distanceMode === 'nearby' && (
@@ -654,7 +655,7 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                Sorted by distance
+                {t('buyPage.sortedByDistance')}
               </span>
             )}
           </div>
@@ -676,6 +677,7 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
                   datePosted={animal.datePosted}
                   imageSrc={animal.imageSrc}
                   sellerName={animal.sellerName}
+                  sellerId={animal.sellerId}
                   phoneNumber={animal.phoneNumber}
                   breed={animal.breed}
                   animalType={animal.animalType}

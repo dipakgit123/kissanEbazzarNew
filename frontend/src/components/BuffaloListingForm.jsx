@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
+import { API_BASE_URL } from '../config/api';
 import {
   FormInput,
   FormSelect,
@@ -14,7 +15,7 @@ import {
 } from './common';
 import './AnimalListingPage.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = API_BASE_URL;
 
 const BuffaloListingForm = () => {
   const { t } = useTranslation();
@@ -82,7 +83,7 @@ const BuffaloListingForm = () => {
       const token = localStorage.getItem('token');
 
       if (!token) {
-        throw new Error('Please login to create a listing');
+        throw new Error(t('auth.loginToContinue'));
       }
 
       const endpoint = `${API_URL}/api/buffalos/listings`;
@@ -124,12 +125,12 @@ const BuffaloListingForm = () => {
           video: null
         });
 
-        alert('Buffalo listing created successfully!');
+        alert(t('listing.createSuccess'));
       }
     } catch (err) {
       console.error('Error creating listing:', err);
-      setError(err.response?.data?.message || err.message || 'Failed to create listing');
-      alert(`Error: ${err.response?.data?.message || err.message || 'Failed to create listing'}`);
+      setError(err.response?.data?.message || err.message || t('listing.createError'));
+      alert(`Error: ${err.response?.data?.message || err.message || t('listing.createError')}`);
     } finally {
       setLoading(false);
     }
@@ -137,15 +138,15 @@ const BuffaloListingForm = () => {
 
   return (
     <form className="listing-form" onSubmit={handleSubmit}>
-      <h2 className="form-title">Buffalo Listing Form</h2>
+      <h2 className="form-title">{t('buffaloForm.title')}</h2>
 
-      <FormAlert type="success" message={success ? 'Buffalo listing created successfully!' : null} />
+      <FormAlert type="success" message={success ? t('listing.createSuccess') : null} />
       <FormAlert type="error" message={error} />
 
-      <FormSection number="1" title="Buffalo Details">
+      <FormSection number="1" title={t('buffaloForm.section1')}>
           <div className="form-row">
           <FormInput
-            label="Breed Name"
+            label={t('cowForm.breedName')}
             name="breedName"
             value={formData.breedName}
             onChange={handleChange}
@@ -154,23 +155,23 @@ const BuffaloListingForm = () => {
           />
 
           <FormInput
-            label="Age"
+            label={t('animal.age')}
             name="age"
             value={formData.age}
             onChange={handleChange}
-            placeholder="e.g., 3 years or 36 months"
+            placeholder={t('animal.agePlaceholder')}
             required
           />
         </div>
 
         <div className="form-row">
           <FormInput
-            label="Milk Capacity (liters/day)"
+            label={t('cowForm.milkCapacity')}
             name="milkCapacity"
             type="number"
             value={formData.milkCapacity}
             onChange={handleChange}
-            placeholder="e.g., 12"
+            placeholder={t('cowForm.milkPlaceholder') || "e.g., 12"}
             step="0.01"
             min="0"
             max="100"
@@ -178,53 +179,53 @@ const BuffaloListingForm = () => {
           />
 
           <FormSelect
-            label="Pregnancy Status"
+            label={t('cowForm.pregnancyStatus')}
             name="pregnancyStatus"
             value={formData.pregnancyStatus}
             onChange={handleChange}
             required
             options={[
-              { value: 'pregnant', label: 'Pregnant' },
-              { value: 'not_pregnant', label: 'Not Pregnant' },
-              { value: 'recently_delivered', label: 'Recently Delivered' },
-              { value: 'unknown', label: 'Unknown' }
+              { value: 'pregnant', label: t('cowForm.pregnant') },
+              { value: 'not_pregnant', label: t('cowForm.notPregnant') },
+              { value: 'recently_delivered', label: t('cowForm.recentlyCalved') },
+              { value: 'unknown', label: t('animal.healthGood') || 'Unknown' }
             ]}
           />
         </div>
       </FormSection>
 
-      <FormSection number="2" title="Physical Details">
+      <FormSection number="2" title={t('buffaloForm.section2')}>
           <div className="form-row">
           <FormRadioGroup
-            label="Has Horns?"
+            label={t('cowForm.hasHorns')}
             name="hasHorns"
             value={formData.hasHorns}
             onChange={handleChange}
             options={[
-              { value: 'true', label: 'Yes' },
-              { value: 'false', label: 'No' }
+              { value: 'true', label: t('cowForm.yes') },
+              { value: 'false', label: t('cowForm.no') }
             ]}
           />
 
           <FormSelect
-            label="Health Condition"
+            label={t('animal.healthCondition')}
             name="healthCondition"
             value={formData.healthCondition}
             onChange={handleChange}
             required
             options={[
-              { value: 'excellent', label: 'Excellent' },
-              { value: 'good', label: 'Good' },
-              { value: 'average', label: 'Average' }
+              { value: 'excellent', label: t('animal.healthExcellent') },
+              { value: 'good', label: t('animal.healthGood') },
+              { value: 'average', label: t('animal.healthAverage') }
             ]}
           />
         </div>
       </FormSection>
 
-      <FormSection number="3" title="Photos & Videos">
+      <FormSection number="3" title={t('animal.section4')}>
           <div className="form-row">
           <FormFileInput
-            label="Front Photo"
+            label={t('animal.frontPhoto')}
             name="frontPhoto"
             id="buffalo-frontPhoto"
             accept="image/*"
@@ -233,7 +234,7 @@ const BuffaloListingForm = () => {
           />
 
           <FormFileInput
-            label="Side Photo"
+            label={t('cowForm.sidePhoto')}
             name="sidePhoto"
             id="buffalo-sidePhoto"
             accept="image/*"
@@ -244,7 +245,7 @@ const BuffaloListingForm = () => {
 
         <div className="form-row">
           <FormFileInput
-            label="Milk Scene Photo"
+            label={t('cowForm.milkScenePhoto')}
             name="milkScenePhoto"
             id="buffalo-milkScenePhoto"
             accept="image/*"
@@ -253,7 +254,7 @@ const BuffaloListingForm = () => {
           />
 
           <FormFileInput
-            label="Video"
+            label={t('cowForm.video')}
             name="video"
             id="buffalo-video"
             accept="video/*"
@@ -263,15 +264,15 @@ const BuffaloListingForm = () => {
         </div>
       </FormSection>
 
-      <FormSection number="4" title="Price & Negotiation">
+      <FormSection number="4" title={t('animal.section3')}>
           <div className="form-row">
           <FormInput
-            label="Expected Price (₹)"
+            label={t('sellAnimal.price') + ' (₹)'}
             name="expectedPrice"
             type="number"
             value={formData.expectedPrice}
             onChange={handleChange}
-            placeholder="e.g., 80000"
+            placeholder={t('formLabels.pricePlaceholder')}
             min="0"
             step="100"
             required
@@ -280,38 +281,38 @@ const BuffaloListingForm = () => {
           <FormCheckbox
             id="buffalo-isNegotiable"
             name="isNegotiable"
-            label="Price is Negotiable"
+            label={t('animal.negotiable')}
             checked={formData.isNegotiable}
             onChange={handleChange}
           />
         </div>
       </FormSection>
 
-      <FormSection number="5" title="Additional Information">
+      <FormSection number="5" title={t('animal.section5')}>
           <FormInput
-          label="Vaccination Details"
+          label={t('animal.vaccination')}
           name="vaccinationDetails"
           type="textarea"
           value={formData.vaccinationDetails}
           onChange={handleChange}
-          placeholder="Enter vaccination history..."
+          placeholder={t('formLabels.vaccinationPlaceholder')}
           rows="3"
         />
 
         <FormInput
-          label="Additional Notes"
+          label={t('animal.additionalNotes')}
           name="additionalNotes"
           type="textarea"
           value={formData.additionalNotes}
           onChange={handleChange}
-          placeholder="Any other important information..."
+          placeholder={t('formLabels.additionalNotesPlaceholder')}
           rows="3"
         />
 
         <FormCheckbox
           id="buffalo-deliveryAvailable"
           name="deliveryAvailable"
-          label="Delivery Available"
+          label={t('formLabels.deliveryAvailable')}
           checked={formData.deliveryAvailable}
           onChange={handleChange}
         />
@@ -319,7 +320,7 @@ const BuffaloListingForm = () => {
 
       <InfoBanner />
 
-      <SubmitButton loading={loading} loadingText="Submitting..." submitText="Submit Buffalo Listing" />
+      <SubmitButton loading={loading} loadingText={t('listing.submitting')} submitText={t('listing.submit')} />
     </form>
   );
 };

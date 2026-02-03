@@ -1,9 +1,11 @@
 // MobileVerification.js - Updated to work with location flow
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import toast, { Toaster } from 'react-hot-toast';
 import { otpService } from '../services/api'; // Make sure this path is correct
 
 const MobileVerification = ({ onBack, onSuccess }) => {
+  const { t } = useTranslation();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [otpError, setOtpError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -95,7 +97,7 @@ const MobileVerification = ({ onBack, onSuccess }) => {
     const otpCode = otpString || otp.join('');
     
     if (otpCode.length !== 6) {
-      setOtpError('Please enter a valid 6-digit OTP');
+      setOtpError(t('auth.invalidOtpLength'));
       return;
     }
     
@@ -105,7 +107,7 @@ const MobileVerification = ({ onBack, onSuccess }) => {
       const response = await otpService.verifyOTP(phoneNumber, otpCode);
       
       if (response.success) {
-        toast.success('Verification successful!');
+        toast.success(t('auth.verifySuccess'));
         
         // Store token and user info
         if (response.token) {
@@ -123,8 +125,8 @@ const MobileVerification = ({ onBack, onSuccess }) => {
         }, 1000);
       }
     } catch (error) {
-      setOtpError(error.message || 'Invalid OTP');
-      toast.error(error.message || 'Invalid OTP');
+      setOtpError(error.message || t('auth.invalidOtp'));
+      toast.error(error.message || t('auth.invalidOtp'));
     } finally {
       setIsLoading(false);
     }
@@ -140,7 +142,7 @@ const MobileVerification = ({ onBack, onSuccess }) => {
       const response = await otpService.resendOTP(phoneNumber);
       
       if (response.success) {
-        toast.success('OTP resent successfully!');
+        toast.success(t('auth.otpResentSuccess'));
         setOtp(['', '', '', '', '', '']);
         setOtpError('');
         setResendTimer(60);
@@ -149,7 +151,7 @@ const MobileVerification = ({ onBack, onSuccess }) => {
         if (firstInput) firstInput.focus();
       }
     } catch (error) {
-      toast.error(error.message || 'Failed to resend OTP');
+      toast.error(error.message || t('auth.otpResentFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -162,9 +164,9 @@ const MobileVerification = ({ onBack, onSuccess }) => {
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Verify OTP</h2>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">{t('auth.verifyOTP')}</h2>
           <p className="text-gray-600">
-            Enter the code sent to {phoneNumber}
+            {t('auth.enterOTP')} {phoneNumber}
           </p>
         </div>
         
@@ -172,7 +174,7 @@ const MobileVerification = ({ onBack, onSuccess }) => {
         <div className="space-y-6">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-4">
-              Enter 6-digit code
+              {t('auth.enter6DigitCode')}
             </label>
             <div className="flex space-x-3 justify-center">
               {otp.map((digit, index) => (
@@ -202,7 +204,7 @@ const MobileVerification = ({ onBack, onSuccess }) => {
           <div className="text-center">
             {resendTimer > 0 ? (
               <p className="text-gray-600 text-sm">
-                Resend code in <span className="font-semibold">{resendTimer}</span> seconds
+                {t('auth.resendCodeIn')} <span className="font-semibold">{resendTimer}</span> {t('auth.seconds')}
               </p>
             ) : (
               <button
@@ -210,7 +212,7 @@ const MobileVerification = ({ onBack, onSuccess }) => {
                 disabled={isLoading}
                 className="text-[#15BB73] font-semibold text-sm hover:underline disabled:opacity-50"
               >
-                Resend OTP
+                {t('auth.resendOTP')}
               </button>
             )}
           </div>
@@ -225,7 +227,7 @@ const MobileVerification = ({ onBack, onSuccess }) => {
                 : 'bg-gradient-to-r from-[#15BB73] to-[#0FA568] hover:shadow-lg transform hover:-translate-y-0.5'
             }`}
           >
-            {isLoading ? 'Verifying...' : 'Verify & Continue'}
+            {isLoading ? t('auth.verifying') : t('auth.verifyAndContinue')}
           </button>
           
           {/* Back Button */}
@@ -233,7 +235,7 @@ const MobileVerification = ({ onBack, onSuccess }) => {
             onClick={onBack}
             className="w-full text-center text-sm text-gray-600 hover:text-[#15BB73] transition-colors"
           >
-            Change phone number
+            {t('auth.changePhoneNumber')}
           </button>
         </div>
       </div>

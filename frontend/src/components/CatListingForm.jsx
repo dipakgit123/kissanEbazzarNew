@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
+import { API_BASE_URL } from '../config/api';
 import {
   FormInput,
   FormSelect,
@@ -14,7 +15,7 @@ import {
 } from './common';
 import './AnimalListingPage.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = API_BASE_URL;
 
 const CatListingForm = () => {
   const { t } = useTranslation();
@@ -88,7 +89,7 @@ const CatListingForm = () => {
       const token = localStorage.getItem('token');
 
       if (!token) {
-        throw new Error('Please login to create a listing');
+        throw new Error(t('auth.loginToContinue'));
       }
 
       const endpoint = `${API_URL}/api/cats/listings`;
@@ -136,12 +137,12 @@ const CatListingForm = () => {
           video: null
         });
 
-        alert('Cat listing created successfully!');
+        alert(t('listing.createSuccess'));
       }
     } catch (err) {
       console.error('Error creating listing:', err);
-      setError(err.response?.data?.message || err.message || 'Failed to create listing');
-      alert(`Error: ${err.response?.data?.message || err.message || 'Failed to create listing'}`);
+      setError(err.response?.data?.message || err.message || t('listing.createError'));
+      alert(`Error: ${err.response?.data?.message || err.message || t('listing.createError')}`);
     } finally {
       setLoading(false);
     }
@@ -149,63 +150,63 @@ const CatListingForm = () => {
 
   return (
     <form className="listing-form" onSubmit={handleSubmit}>
-      <h2 className="form-title">Cat Listing Form</h2>
+      <h2 className="form-title">{t('catForm.title')}</h2>
 
-      <FormAlert type="success" message={success ? 'Cat listing created successfully!' : null} />
+      <FormAlert type="success" message={success ? t('listing.createSuccess') : null} />
       <FormAlert type="error" message={error} />
 
       <FormSection number="1" title="Cat Details">
           <div className="form-row">
           <FormSelect
-            label="Cat Type"
+            label={t('animal.gender')}
             name="catType"
             value={formData.catType}
             onChange={handleChange}
             required
             options={[
-              { value: 'male', label: 'Male' },
-              { value: 'female', label: 'Female' }
+              { value: 'male', label: t('animal.male') },
+              { value: 'female', label: t('animal.female') }
             ]}
           />
 
           <FormInput
-            label="Breed Name"
+            label={t('cowForm.breedName')}
             name="breedName"
             value={formData.breedName}
             onChange={handleChange}
-            placeholder="e.g., Persian, Siamese, Indian, Maine Coon"
+            placeholder={t('animal.agePlaceholder') || "e.g., Persian, Siamese, Indian, Maine Coon"}
             required
           />
         </div>
 
         <div className="form-row">
           <FormInput
-            label="Age"
+            label={t('animal.age')}
             name="age"
             value={formData.age}
             onChange={handleChange}
-            placeholder="e.g., 6 months or 2 years"
+            placeholder={t('animal.agePlaceholder')}
             required
           />
 
           <FormInput
-            label="Color"
+            label={t('animalListing.color')}
             name="color"
             value={formData.color}
             onChange={handleChange}
-            placeholder="e.g., White, Black, Brown"
+            placeholder={t('otherAnimal.colorPlaceholder') || "e.g., White, Black, Brown"}
             required
           />
         </div>
 
         <div className="form-row">
           <FormInput
-            label="Weight (kg)"
+            label={t('animalListing.weight')}
             name="weight"
             type="number"
             value={formData.weight}
             onChange={handleChange}
-            placeholder="e.g., 4.5"
+            placeholder={t('goatForm.weightPlaceholder') || "e.g., 4.5"}
             step="0.01"
             min="0"
             max="50"
@@ -213,84 +214,84 @@ const CatListingForm = () => {
           />
 
           <FormInput
-            label="Eye Color"
+            label={t('catForm.eyeColor')}
             name="eyeColor"
             value={formData.eyeColor}
             onChange={handleChange}
-            placeholder="e.g., Blue, Green, Yellow"
+            placeholder={t('catForm.eyeColorPlaceholder')}
             required
           />
         </div>
 
         <div className="form-row">
           <FormSelect
-            label="Fur Type"
+            label={t('catForm.furType')}
             name="furType"
             value={formData.furType}
             onChange={handleChange}
             required
             options={[
-              { value: 'short', label: 'Short' },
-              { value: 'long', label: 'Long' },
-              { value: 'curly', label: 'Curly' }
+              { value: 'short', label: t('catForm.furShort') },
+              { value: 'long', label: t('catForm.furLong') },
+              { value: 'curly', label: t('catForm.furCurly') }
             ]}
           />
 
           <FormSelect
-            label="Vaccination Status"
+            label={t('animal.vaccination')}
             name="vaccinationStatus"
             value={formData.vaccinationStatus}
             onChange={handleChange}
             required
             options={[
-              { value: 'yes', label: 'Yes' },
-              { value: 'no', label: 'No' }
+              { value: 'yes', label: t('cowForm.yes') },
+              { value: 'no', label: t('cowForm.no') }
             ]}
           />
         </div>
 
         <div className="form-row">
           <FormSelect
-            label="Health Condition"
+            label={t('animal.healthCondition')}
             name="healthCondition"
             value={formData.healthCondition}
             onChange={handleChange}
             required
             options={[
-              { value: 'healthy', label: 'Healthy' },
-              { value: 'under_treatment', label: 'Under Treatment' }
+              { value: 'healthy', label: t('animal.healthGood') },
+              { value: 'under_treatment', label: t('animal.underTreatment') }
             ]}
           />
 
           <FormSelect
-            label="Behavior"
+            label={t('catForm.behavior')}
             name="behavior"
             value={formData.behavior}
             onChange={handleChange}
             required
             options={[
-              { value: 'friendly', label: 'Friendly' },
-              { value: 'aggressive', label: 'Aggressive' },
-              { value: 'calm', label: 'Calm' }
+              { value: 'friendly', label: t('catForm.behaviorFriendly') },
+              { value: 'aggressive', label: t('catForm.behaviorAggressive') },
+              { value: 'calm', label: t('catForm.behaviorCalm') }
             ]}
           />
         </div>
 
         <FormInput
-          label="Description"
+          label={t('sellAnimal.description')}
           name="description"
           type="textarea"
           value={formData.description}
           onChange={handleChange}
-          placeholder="e.g., playful, good with kids..."
+          placeholder={t('animal.additionalNotesPlaceholder') || "e.g., playful, good with kids..."}
           rows="3"
         />
       </FormSection>
 
-      <FormSection number="2" title="Images (min 1, max 5 photos + 1 video)">
+      <FormSection number="2" title={t('catForm.imagesTitle')}>
           <div className="form-row">
           <FormFileInput
-            label="Photo 1 (Front View)"
+            label={t('animal.frontPhoto')}
             name="photo1"
             id="cat-photo1"
             accept="image/*"
@@ -300,7 +301,7 @@ const CatListingForm = () => {
           />
 
           <FormFileInput
-            label="Photo 2 (Side View)"
+            label={t('animal.sidePhoto')}
             name="photo2"
             id="cat-photo2"
             accept="image/*"
@@ -311,7 +312,7 @@ const CatListingForm = () => {
 
         <div className="form-row">
           <FormFileInput
-            label="Photo 3 (Full Body)"
+            label={t('formLabels.photo') + ' 3'}
             name="photo3"
             id="cat-photo3"
             accept="image/*"
@@ -320,7 +321,7 @@ const CatListingForm = () => {
           />
 
           <FormFileInput
-            label="Photo 4"
+            label={t('formLabels.photo') + ' 4'}
             name="photo4"
             id="cat-photo4"
             accept="image/*"
@@ -331,7 +332,7 @@ const CatListingForm = () => {
 
         <div className="form-row">
           <FormFileInput
-            label="Photo 5"
+            label={t('formLabels.photo') + ' 5'}
             name="photo5"
             id="cat-photo5"
             accept="image/*"
@@ -340,7 +341,7 @@ const CatListingForm = () => {
           />
 
           <FormFileInput
-            label="Video (max 1)"
+            label={t('animal.video')}
             name="video"
             id="cat-video"
             accept="video/*"
@@ -350,38 +351,38 @@ const CatListingForm = () => {
         </div>
       </FormSection>
 
-      <FormSection number="3" title="Pricing">
+      <FormSection number="3" title={t('formLabels.pricing')}>
           <div className="form-row">
           <FormInput
-            label="Expected Price (₹)"
+            label={t('sellAnimal.price') + ' (₹)'}
             name="expectedPrice"
             type="number"
             value={formData.expectedPrice}
             onChange={handleChange}
-            placeholder="e.g., 15000"
+            placeholder={t('formLabels.pricePlaceholder')}
             min="0"
             step="100"
             required
           />
 
           <FormRadioGroup
-            label="Negotiable?"
+            label={t('animal.negotiable')}
             name="isNegotiable"
             value={formData.isNegotiable}
             onChange={handleChange}
             options={[
-              { value: 'true', label: 'Yes' },
-              { value: 'false', label: 'No' }
+              { value: 'true', label: t('cowForm.yes') },
+              { value: 'false', label: t('cowForm.no') }
             ]}
           />
         </div>
       </FormSection>
 
-      <FormSection number="4" title="Terms & Confirmation">
+      <FormSection number="4" title={t('listing.termsConfirmation')}>
           <FormCheckbox
           id="cat-detailsConfirmed"
           name="detailsConfirmed"
-          label="I confirm all the above details are true."
+          label={t('listing.confirmDetails')}
           checked={formData.detailsConfirmed}
           onChange={handleChange}
           required
@@ -390,7 +391,7 @@ const CatListingForm = () => {
         <FormCheckbox
           id="cat-termsAccepted"
           name="termsAccepted"
-          label="I agree to Animal E-Bazzar's listing terms."
+          label={t('listing.agreeTerms')}
           checked={formData.termsAccepted}
           onChange={handleChange}
           required
@@ -399,7 +400,7 @@ const CatListingForm = () => {
 
       <InfoBanner />
 
-      <SubmitButton loading={loading} loadingText="Submitting..." submitText="Submit Cat Listing" />
+      <SubmitButton loading={loading} loadingText={t('listing.submitting')} submitText={t('listing.submit')} />
     </form>
   );
 };

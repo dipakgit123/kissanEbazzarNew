@@ -1,6 +1,7 @@
-import axios from 'axios';
+﻿import axios from 'axios';
+import { API_BASE_URL } from '../config/api';
 
-const API_URL =  import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = API_BASE_URL;
 
 // Create axios instance with default config
 const api = axios.create({
@@ -279,6 +280,16 @@ export const listingsService = {
     } catch (error) {
       throw error.response?.data || error;
     }
+  },
+  // Get user's own listings
+  getMyListings: async () => {
+    try {
+      const response = await api.get('/api/listings/my-listings');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+
   }
 };
 
