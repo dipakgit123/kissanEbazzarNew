@@ -2,6 +2,7 @@
 
 const jwt = require('jsonwebtoken');
 const db = require('../models');
+const { getJwtSecret } = require('../config/jwt');
 require('dotenv').config();
 
 const authMiddleware = async (req, res, next) => {
@@ -29,7 +30,21 @@ const authMiddleware = async (req, res, next) => {
     const token = parts[1];
 
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default_secret_change_this');
+    const decoded = jwt.verify(token, getJwtSecret());
+
+    if (decoded.type === 'veterinarian') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. User account required.'
+      });
+    }
+
+    if (!decoded.userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid user token'
+      });
+    }
 
     // Check if user exists
     const { User } = db;
@@ -47,6 +62,26 @@ const authMiddleware = async (req, res, next) => {
         return res.status(401).json({
           success: false,
           message: 'Phone number not verified'
+        });
+      }
+
+      if (user.is_blocked) {
+        const blockedUntil = user.blocked_until ? new Date(user.blocked_until) : null;
+        const isTemporaryBlockActive = blockedUntil && new Date() < blockedUntil;
+        const isIndefiniteBlock = !blockedUntil;
+
+        if (isTemporaryBlockActive || isIndefiniteBlock) {
+          return res.status(403).json({
+            success: false,
+            message: isTemporaryBlockActive
+              ? `Account is blocked until ${blockedUntil.toISOString()}`
+              : 'Account is blocked'
+          });
+        }
+
+        await user.update({
+          is_blocked: false,
+          blocked_until: null
         });
       }
 

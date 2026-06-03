@@ -6,7 +6,6 @@ const API_URL = API_BASE_URL;
 
 const AIHealthCheck = () => {
   const { t, i18n } = useTranslation();
-  const currentLang = i18n.language;
 
   const animalTypes = [
     { id: 'cow', name: t('animalTypes.cow'), emoji: '🐄' },
@@ -27,6 +26,7 @@ const AIHealthCheck = () => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [customPrompt, setCustomPrompt] = useState('');
   const fileInputRef = useRef(null);
 
   const handleFileSelect = (e) => {
@@ -79,6 +79,8 @@ const AIHealthCheck = () => {
       formData.append('symptoms', symptoms);
       formData.append('age', age);
       formData.append('additionalInfo', additionalInfo);
+      formData.append('customQuestion', customPrompt);
+      formData.append('languageHint', i18n.language);
 
       const token = localStorage.getItem('token');
       const response = await fetch(`${API_URL}/api/health-check/upload-and-analyze`, {
@@ -93,7 +95,7 @@ const AIHealthCheck = () => {
       } else {
         setError(data.message || t('healthCheck.errorAnalysisFailed'));
       }
-    } catch (err) {
+    } catch {
       setError(t('healthCheck.errorConnectionFailed'));
     } finally {
       setLoading(false);
@@ -109,18 +111,13 @@ const AIHealthCheck = () => {
     setAdditionalInfo('');
     setResult(null);
     setError(null);
+    setCustomPrompt('');
   };
 
   const getHealthScoreColor = (score) => {
     if (score >= 7) return 'from-emerald-500 to-green-600';
     if (score >= 4) return 'from-amber-500 to-orange-600';
     return 'from-red-500 to-rose-600';
-  };
-
-  const getHealthScoreBg = (score) => {
-    if (score >= 7) return 'bg-emerald-50 border-emerald-200';
-    if (score >= 4) return 'bg-amber-50 border-amber-200';
-    return 'bg-red-50 border-red-200';
   };
 
   const getUrgencyStyle = (urgency) => {
@@ -138,6 +135,9 @@ const AIHealthCheck = () => {
     if (numScore >= 4) return t('healthCheck.overweight');
     return t('healthCheck.normal');
   };
+
+  const selectedAnimalMeta = animalTypes.find((animal) => animal.id === selectedAnimal);
+  const primaryRecommendation = result?.recommendations?.[0];
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 via-green-50/30 to-gray-100 py-8 px-4">
@@ -298,6 +298,28 @@ const AIHealthCheck = () => {
                     className="w-full pl-10 pr-3 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#15BB73] focus:border-[#15BB73] focus:bg-white transition-all text-sm font-devanagari resize-none"
                   />
                 </div>
+                <div className="sm:col-span-2 rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50/80 via-white to-green-50/70 p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-800 font-devanagari">
+                        {t('healthCheck.askQuestionLabel')}
+                      </label>
+                      <p className="mt-1 text-xs leading-5 text-gray-500 font-devanagari">
+                        {t('healthCheck.askQuestionInlineHint')}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-white px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] text-emerald-700 shadow-sm">
+                      AI
+                    </span>
+                  </div>
+                  <textarea
+                    value={customPrompt}
+                    onChange={(e) => setCustomPrompt(e.target.value)}
+                    placeholder={t('healthCheck.askQuestionPlaceholder')}
+                    rows={3}
+                    className="w-full rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-sm text-gray-800 shadow-inner shadow-emerald-50/40 transition-all focus:border-[#15BB73] focus:outline-none focus:ring-2 focus:ring-[#15BB73]/20 font-devanagari resize-none"
+                  />
+                </div>
               </div>
             </div>
 
@@ -351,9 +373,69 @@ const AIHealthCheck = () => {
           </div>
         ) : (
           /* Results Section - Premium Redesigned */
-          <div className="space-y-6">
+          <div className="space-y-8">
+            <div className="rounded-[2rem] border border-emerald-100 bg-white shadow-2xl shadow-emerald-100/30 overflow-hidden">
+              <div className={`h-1.5 w-full bg-gradient-to-r ${getHealthScoreColor(result.healthScore || 5)}`}></div>
+              <div className="p-6 md:p-8">
+                <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+                  <div className="max-w-2xl">
+                    <div className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.24em] text-emerald-700">
+                      {t('healthCheck.results')}
+                    </div>
+                    <h2 className="mt-4 text-2xl md:text-3xl font-bold text-gray-900 font-devanagari">
+                      {result.overallHealth || t('healthCheck.sectionOverview')}
+                    </h2>
+                    <p className="mt-2 text-sm md:text-base leading-7 text-gray-600 font-devanagari">
+                      {result.whenToSeeVet || primaryRecommendation || t('healthCheck.disclaimer')}
+                    </p>
+                    <div className="mt-5 flex flex-wrap gap-3">
+                      <span className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-bold border font-devanagari ${getUrgencyStyle(result.urgencyLevel).bg} ${getUrgencyStyle(result.urgencyLevel).text} ${getUrgencyStyle(result.urgencyLevel).border}`}>
+                        {result.urgencyLevel || t('healthCheck.normal')}
+                      </span>
+                      <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 font-devanagari">
+                        {selectedAnimalMeta?.emoji || 'ðŸ¾'} {result.animalType || selectedAnimalMeta?.name || t('healthCheck.animal')}
+                      </span>
+                      <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 border border-amber-200 font-devanagari">
+                        {t('healthCheck.bodyCondition')}: {result.bodyConditionScore || '3'}/5
+                      </span>
+                    </div>
+                  </div>
 
-
+                  <div className="grid w-full gap-4 sm:grid-cols-3 xl:max-w-xl">
+                    <div className="rounded-3xl bg-gradient-to-br from-emerald-500 to-green-600 px-5 py-6 text-white shadow-lg shadow-emerald-200/70">
+                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/80 font-devanagari">
+                        {t('healthCheck.healthScore')}
+                      </p>
+                      <p className="mt-3 text-4xl font-bold">{result.healthScore || '?'}</p>
+                      <p className="mt-2 text-sm text-white/90 font-devanagari">{result.overallHealth || '-'}</p>
+                    </div>
+                    <div className="rounded-3xl border border-slate-200 bg-slate-50 px-5 py-6 shadow-sm">
+                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 font-devanagari">
+                        {t('healthCheck.bodyCondition')}
+                      </p>
+                      <p className="mt-3 text-3xl">
+                        {Number(result.bodyConditionScore) <= 2 || Number(result.bodyConditionScore) >= 4 ? 'âš ï¸' : 'âœ…'}
+                      </p>
+                      <p className="mt-2 text-sm font-bold text-slate-900 font-devanagari">
+                        {getBodyConditionText(result.bodyConditionScore)}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500 font-devanagari">
+                        {result.bodyConditionScore || '3'} ({t('healthCheck.average')})/5
+                      </p>
+                    </div>
+                    <div className="rounded-3xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-purple-50 px-5 py-6 shadow-sm">
+                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-indigo-500 font-devanagari">
+                        {t('healthCheck.animal')}
+                      </p>
+                      <p className="mt-3 text-3xl">{selectedAnimalMeta?.emoji || 'ðŸ¾'}</p>
+                      <p className="mt-2 text-sm font-bold text-slate-900 font-devanagari">
+                        {result.animalType || selectedAnimalMeta?.name || '-'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
             {/* SECTION 1: HEALTH OVERVIEW */}
             <div className="space-y-4">
               <div className="flex items-center space-x-2">
@@ -414,6 +496,57 @@ const AIHealthCheck = () => {
                 </div>
               </div>
             </div>
+
+            {result.questionAnswer && (
+              <div className="rounded-[2rem] border border-emerald-100 bg-white shadow-2xl shadow-emerald-100/30 overflow-hidden">
+                <div className="h-1.5 bg-gradient-to-r from-emerald-500 to-green-500"></div>
+                <div className="p-6 md:p-7">
+                  <div className="flex items-center justify-between gap-4 mb-5">
+                    <div className="flex items-center">
+                      <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-100 to-green-100 flex items-center justify-center mr-3 shadow-sm">
+                        <span className="text-sm font-bold text-emerald-700">AI</span>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-600">
+                          {t('healthCheck.information')}
+                        </p>
+                        <h3 className="font-bold text-gray-900 text-lg font-devanagari">{t('healthCheck.askQuestionResponseTitle')}</h3>
+                      </div>
+                    </div>
+                    <span className="hidden sm:inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 font-devanagari">
+                      {selectedAnimalMeta?.emoji || 'ðŸ¾'} {result.animalType || selectedAnimalMeta?.name || t('healthCheck.animal')}
+                    </span>
+                  </div>
+
+                  <div className="grid gap-5 xl:grid-cols-[0.95fr,1.45fr]">
+                    {result.questionAsked && (
+                      <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-slate-700 shadow-sm">
+                            <span className="text-sm font-bold">Q</span>
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">
+                              {t('healthCheck.askQuestionAskedLabel')}
+                            </p>
+                            <p className="text-sm font-semibold text-slate-900 font-devanagari">
+                              {t('healthCheck.askQuestionLabel')}
+                            </p>
+                          </div>
+                        </div>
+                        <p className="text-sm text-slate-700 leading-7 font-devanagari">{result.questionAsked}</p>
+                      </div>
+                    )}
+
+                    <div className="rounded-3xl bg-gradient-to-br from-emerald-50 via-white to-green-50 p-5 border border-emerald-100">
+                      <p className="whitespace-pre-line text-sm leading-7 text-gray-700 font-devanagari">
+                        {result.questionAnswer}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Section Divider */}
             <div className="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent my-8"></div>

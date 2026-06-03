@@ -34,13 +34,7 @@ const AnimalCard = ({
   images = [],
   imageSrc,
   sellerName,
-  sellerPhoto,
   phoneNumber,
-  breed,
-  age,
-  milkProduction,
-  healthCondition,
-  pregnancyStatus,
   onCallClick,
   onWhatsAppClick,
   isInWishlist = false,
@@ -52,20 +46,9 @@ const AnimalCard = ({
 }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isWishlistLoading, setIsWishlistLoading] = useState(false);
 
-  // Prepare images array - filter out null/undefined values
-  const photoArray = images.length > 0 
-    ? images.filter(img => img && img.trim() !== '')
-    : (imageSrc ? [imageSrc] : []);
-  
-  // Use placeholder if no images
-  const displayImages = photoArray.length > 0 
-    ? photoArray 
-    : ['data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect fill="%23f0f0f0" width="400" height="300"/%3E%3Ctext fill="%23999" font-family="sans-serif" font-size="18" dy="10.5" font-weight="bold" x="50%25" y="50%25" text-anchor="middle"%3ENo Image Available%3C/text%3E%3C/svg%3E'];
-
-  const hasMultipleImages = displayImages.length > 1;
+  const displayImage = images.find((img) => img && img.trim() !== '') || imageSrc;
   // Handle call action
   const handleCall = async () => {
     // Log the call in backend first
@@ -164,7 +147,7 @@ const AnimalCard = ({
           icon: '❤️',
         });
       }
-    } catch (error) {
+    } catch {
       toast.error(t('common.error') || 'Something went wrong', {
         duration: 2000,
       });
@@ -178,11 +161,11 @@ const AnimalCard = ({
       className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden w-full max-w-sm mx-auto group hover:shadow-xl transition-all duration-300 cursor-pointer"
       onClick={handleCardClick}
     >
-      {/* Image Container */}
+        {/* Image Container */}
       <div className="relative overflow-hidden h-52 bg-gray-50">
-        {imageSrc && (
+        {displayImage && (
           <img
-            src={imageSrc}
+            src={displayImage}
             alt={title}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />

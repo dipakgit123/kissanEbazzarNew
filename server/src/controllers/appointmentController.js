@@ -4,6 +4,10 @@ const db = require('../models');
 const { Op } = require('sequelize');
 const notificationService = require('../services/notificationService');
 
+const VALID_APPOINTMENT_STATUSES = ['pending', 'confirmed', 'cancelled', 'completed', 'no-show'];
+const VALID_APPOINTMENT_TYPES = ['consultation', 'emergency', 'vaccination', 'surgery', 'checkup', 'other'];
+const VALID_CONTACT_PREFERENCES = ['call', 'visit', 'both'];
+
 class AppointmentController {
 
   /**
@@ -37,6 +41,20 @@ class AppointmentController {
         return res.status(400).json({
           success: false,
           message: 'Required fields: veterinarian_id, animal_type, appointment_date, appointment_time, farmer_name, farmer_phone'
+        });
+      }
+
+      if (appointment_type && !VALID_APPOINTMENT_TYPES.includes(appointment_type)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid appointment type'
+        });
+      }
+
+      if (contact_preference && !VALID_CONTACT_PREFERENCES.includes(contact_preference)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid contact preference'
         });
       }
 
@@ -165,7 +183,15 @@ class AppointmentController {
       const { status, page = 1, limit = 10 } = req.query;
 
       const where = { user_id: userId };
-      if (status) where.status = status;
+      if (status) {
+        if (!VALID_APPOINTMENT_STATUSES.includes(status)) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid appointment status filter'
+          });
+        }
+        where.status = status;
+      }
 
       const offset = (parseInt(page) - 1) * parseInt(limit);
 
@@ -212,7 +238,15 @@ class AppointmentController {
       const { status, date, page = 1, limit = 20 } = req.query;
 
       const where = { veterinarian_id: vetId };
-      if (status) where.status = status;
+      if (status) {
+        if (!VALID_APPOINTMENT_STATUSES.includes(status)) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid appointment status filter'
+          });
+        }
+        where.status = status;
+      }
       if (date) where.appointment_date = date;
 
       const offset = (parseInt(page) - 1) * parseInt(limit);

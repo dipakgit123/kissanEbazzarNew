@@ -11,7 +11,7 @@ class AnalyticsService {
   async getDashboardStats() {
     const {
       User, AnimalListing, BuffaloListing, GoatListing,
-      HorseListing, DogListing, CatListing, ContactLog, PregnancyRecord
+      HorseListing, DogListing, CatListing, OtherAnimalListing, ContactLog, PregnancyRecord
     } = this.models;
 
     // Get total users
@@ -46,7 +46,8 @@ class AnalyticsService {
       { model: GoatListing, type: 'goat' },
       { model: HorseListing, type: 'horse' },
       { model: DogListing, type: 'dog' },
-      { model: CatListing, type: 'cat' }
+      { model: CatListing, type: 'cat' },
+      { model: OtherAnimalListing, type: 'other' }
     ];
 
     const listingStats = {};
@@ -133,7 +134,7 @@ class AnalyticsService {
   async getListingsGrowth(days = 30) {
     const {
       AnimalListing, BuffaloListing, GoatListing,
-      HorseListing, DogListing, CatListing
+      HorseListing, DogListing, CatListing, OtherAnimalListing
     } = this.models;
 
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
@@ -145,7 +146,8 @@ class AnalyticsService {
       { model: GoatListing, type: 'goat' },
       { model: HorseListing, type: 'horse' },
       { model: DogListing, type: 'dog' },
-      { model: CatListing, type: 'cat' }
+      { model: CatListing, type: 'cat' },
+      { model: OtherAnimalListing, type: 'other' }
     ];
 
     for (const { model, type } of listingModels) {
@@ -174,7 +176,7 @@ class AnalyticsService {
   async getSalesData(days = 30) {
     const {
       AnimalListing, BuffaloListing, GoatListing,
-      HorseListing, DogListing, CatListing
+      HorseListing, DogListing, CatListing, OtherAnimalListing
     } = this.models;
 
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
@@ -186,7 +188,8 @@ class AnalyticsService {
       { model: GoatListing, type: 'goat' },
       { model: HorseListing, type: 'horse' },
       { model: DogListing, type: 'dog' },
-      { model: CatListing, type: 'cat' }
+      { model: CatListing, type: 'cat' },
+      { model: OtherAnimalListing, type: 'other' }
     ];
 
     for (const { model, type } of listingModels) {
@@ -214,9 +217,9 @@ class AnalyticsService {
 
   // Get top sellers
   async getTopSellers(limit = 10) {
-    const { User, AnimalListing, BuffaloListing, GoatListing, HorseListing, DogListing, CatListing } = this.models;
+    const { User, AnimalListing, BuffaloListing, GoatListing, HorseListing, DogListing, CatListing, OtherAnimalListing } = this.models;
 
-    const listingModels = [AnimalListing, BuffaloListing, GoatListing, HorseListing, DogListing, CatListing];
+    const listingModels = [AnimalListing, BuffaloListing, GoatListing, HorseListing, DogListing, CatListing, OtherAnimalListing];
     const sellerCounts = {};
 
     for (const model of listingModels) {
@@ -294,7 +297,7 @@ class AnalyticsService {
   async getRecentActivity(limit = 20) {
     const {
       User, AnimalListing, BuffaloListing, GoatListing,
-      HorseListing, DogListing, CatListing
+      HorseListing, DogListing, CatListing, OtherAnimalListing
     } = this.models;
 
     const activities = [];
@@ -321,7 +324,8 @@ class AnalyticsService {
       { model: GoatListing, type: 'goat', alias: 'user' },
       { model: HorseListing, type: 'horse', alias: 'user' },
       { model: DogListing, type: 'dog', alias: 'user' },
-      { model: CatListing, type: 'cat', alias: 'user' }
+      { model: CatListing, type: 'cat', alias: 'user' },
+      { model: OtherAnimalListing, type: 'other', alias: 'seller' }
     ];
 
     for (const { model, type, alias } of listingModels) {
@@ -417,7 +421,7 @@ class AnalyticsService {
   async getListings(page = 1, limit = 20, animalType = 'all', status = 'all', search = '') {
     const {
       User, AnimalListing, BuffaloListing, GoatListing,
-      HorseListing, DogListing, CatListing
+      HorseListing, DogListing, CatListing, OtherAnimalListing
     } = this.models;
 
     const offset = (page - 1) * limit;
@@ -427,7 +431,8 @@ class AnalyticsService {
       goat: { model: GoatListing, alias: 'user' },
       horse: { model: HorseListing, alias: 'user' },
       dog: { model: DogListing, alias: 'user' },
-      cat: { model: CatListing, alias: 'user' }
+      cat: { model: CatListing, alias: 'user' },
+      other: { model: OtherAnimalListing, alias: 'seller' }
     };
 
     const results = [];

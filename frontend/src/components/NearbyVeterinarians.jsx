@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { API_BASE_API } from '../config/api';
+import { safeJsonParse } from '../utils/stringUtils';
+import { FullPageLoader } from './AppLoader';
 
 const NearbyVeterinarians = () => {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const [veterinarians, setVeterinarians] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,23 +25,15 @@ const NearbyVeterinarians = () => {
     { value: 'reproduction', label: 'Animal Reproduction' }
   ];
 
-  useEffect(() => {
-    getUserLocation();
-  }, []);
-
-  useEffect(() => {
-    if (userLocation) {
-      fetchNearbyVeterinarians();
-    }
-  }, [userLocation, radius, selectedSpecialization]);
-
-  const getUserLocation = () => {
+  const getUserLocation = useCallback(() => {
     // Try to get from localStorage first
     const savedLocation = localStorage.getItem('userLocation');
     if (savedLocation) {
-      const location = JSON.parse(savedLocation);
-      setUserLocation(location);
-      return;
+      const location = safeJsonParse(savedLocation, null);
+      if (location) {
+        setUserLocation(location);
+        return;
+      }
     }
 
     // Get current location
@@ -65,9 +57,9 @@ const NearbyVeterinarians = () => {
       toast.error('Geolocation is not supported by your browser');
       setLoading(false);
     }
-  };
+  }, []);
 
-  const fetchNearbyVeterinarians = async () => {
+  const fetchNearbyVeterinarians = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams({
@@ -94,7 +86,17 @@ const NearbyVeterinarians = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [radius, selectedSpecialization, userLocation]);
+
+  useEffect(() => {
+    getUserLocation();
+  }, [getUserLocation]);
+
+  useEffect(() => {
+    if (userLocation) {
+      fetchNearbyVeterinarians();
+    }
+  }, [userLocation, fetchNearbyVeterinarians]);
 
   const handleCall = (phoneNumber) => {
     window.open(`tel:${phoneNumber}`, '_self');
@@ -121,14 +123,7 @@ const NearbyVeterinarians = () => {
   };
 
   if (loading && !veterinarians.length) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-green-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Finding nearby veterinarians...</p>
-        </div>
-      </div>
-    );
+    return <FullPageLoader message="Finding nearby veterinarians..." />;
   }
 
   return (

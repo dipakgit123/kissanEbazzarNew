@@ -170,6 +170,9 @@ class AnimalListingController {
         sortBy = 'created_at',
         order = 'DESC'
       } = req.query;
+      const validSortFields = ['created_at', 'updated_at', 'expected_price', 'views'];
+      const sanitizedSortBy = validSortFields.includes(sortBy) ? sortBy : 'created_at';
+      const sanitizedOrder = String(order).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
       // Build where clause
       const where = { status: 'active' };
@@ -214,7 +217,7 @@ class AnimalListingController {
         }],
         limit: parseInt(limit),
         offset: offset,
-        order: [[sortBy, order]]
+        order: [[sanitizedSortBy, sanitizedOrder]]
       });
 
       res.json({
@@ -404,6 +407,14 @@ class AnimalListingController {
       const userId = req.user.userId || req.user.id;
       const userIdInt = parseInt(userId);
       const { status = 'all' } = req.query;
+      const validStatuses = ['all', 'active', 'sold', 'expired', 'deleted'];
+
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid listing status filter'
+        });
+      }
 
       const where = { user_id: userIdInt };
       

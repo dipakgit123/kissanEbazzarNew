@@ -68,25 +68,39 @@ const OTPVerificationScreen = ({ route, navigation }) => {
   }, []);
 
   const handleOtpChange = (value, index) => {
+    // ✅ FIXED: Handle paste (multiple digits at once)
     if (value.length > 1) {
-      // Handle paste
-      const otpArray = value.slice(0, 6).split('');
-      const newOtp = [...otp];
-      otpArray.forEach((digit, i) => {
-        if (index + i < 6) {
-          newOtp[index + i] = digit;
-        }
-      });
+      // Extract only digits, max 6
+      const digits = value.replace(/\D/g, '').slice(0, 6);
+
+      // Fill OTP array
+      const newOtp = digits.split('').concat(Array(6).fill('')).slice(0, 6);
       setOtp(newOtp);
-      const nextIndex = Math.min(index + otpArray.length, 5);
-      inputRefs.current[nextIndex]?.focus();
-    } else {
+
+      // Auto-submit if 6 digits pasted
+      if (digits.length === 6) {
+        handleVerifyOTP(digits);
+      } else {
+        // Focus the next empty input
+        const nextIndex = Math.min(index + digits.length, 5);
+        inputRefs.current[nextIndex]?.focus();
+      }
+      return;
+    }
+
+    // Handle single digit
+    if (value.length <= 1 && /^\d*$/.test(value)) {
       const newOtp = [...otp];
       newOtp[index] = value;
       setOtp(newOtp);
 
       if (value && index < 5) {
         inputRefs.current[index + 1]?.focus();
+      }
+
+      // Auto-submit if all 6 digits entered
+      if (index === 5 && value && newOtp.every(digit => digit)) {
+        handleVerifyOTP(newOtp.join(''));
       }
     }
   };

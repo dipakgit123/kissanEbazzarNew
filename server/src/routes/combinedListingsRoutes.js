@@ -26,7 +26,7 @@ router.get('/type/:animalType', combinedListingsController.getListingsByType);
 // Protected routes - Authentication required
 
 // Get user's own listings from all categories
-// GET /api/combined/my-listings
+// GET /api/listings/my-listings
 router.get('/my-listings', authMiddleware, combinedListingsController.getMyListings);
 
 // Mark listing as sold

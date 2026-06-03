@@ -69,9 +69,18 @@ const NotificationItem = ({ notification, onPress, onDelete }) => {
 };
 
 const getTimeAgo = (dateString) => {
+  if (!dateString) return 'Unknown';
+
   const now = new Date();
   const date = new Date(dateString);
+
+  // Check if date is valid
+  if (isNaN(date.getTime())) return 'Unknown';
+
   const seconds = Math.floor((now - date) / 1000);
+
+  // Check for future dates
+  if (seconds < 0) return 'Just now';
 
   if (seconds < 60) return 'Just now';
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
@@ -160,7 +169,7 @@ const NotificationsScreen = ({ navigation }) => {
 
   const onRefresh = useCallback(() => {
     fetchNotifications();
-  }, []);
+  }, [fetchNotifications]);
 
   const renderHeader = () => (
     <View style={styles.header}>
@@ -207,7 +216,7 @@ const NotificationsScreen = ({ navigation }) => {
       ) : (
         <FlatList
           data={notifications}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item) => item?.id?.toString() || Math.random().toString()}
           renderItem={({ item }) => (
             <NotificationItem
               notification={item}

@@ -2,11 +2,12 @@
 
 const db = require('../models');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudinary');
-const { Op } = require('sequelize');
+const { Op, UniqueConstraintError, ValidationError } = require('sequelize');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
-const crypto = require('crypto');
+const { getJwtSecret } = require('../config/jwt');
 
 class VeterinarianController {
 
@@ -26,13 +27,38 @@ class VeterinarianController {
   /**
    * Generate random password
    */
-  generatePassword(length = 12) {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
-    let password = '';
-    for (let i = 0; i < length; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return password;
+  generatePassword(email, fullName = '') {
+    const fallbackWords = [
+      'Animal', 'Health', 'Vet', 'Clinic', 'Care',
+      'Doctor', 'Farm', 'Guardian', 'Trusted', 'Rescue'
+    ];
+    const symbols = ['!', '@', '#'];
+    const pick = (items) => items[crypto.randomInt(items.length)];
+    const normalizeWord = (word) => {
+      if (!word) return '';
+      const cleanWord = word.replace(/[^a-zA-Z]/g, '');
+      if (!cleanWord) return '';
+      const clipped = cleanWord.slice(0, 10);
+      return clipped.charAt(0).toUpperCase() + clipped.slice(1).toLowerCase();
+    };
+
+    const emailWords = String(email || '')
+      .split('@')[0]
+      .split(/[^a-zA-Z]+/)
+      .map(normalizeWord)
+      .filter((word) => word.length >= 3);
+
+    const nameWords = String(fullName || '')
+      .split(/[^a-zA-Z]+/)
+      .map(normalizeWord)
+      .filter((word) => word.length >= 3);
+
+    const meaningfulWords = [...emailWords, ...nameWords].filter(Boolean);
+    const primaryWord = meaningfulWords[0] || pick(fallbackWords);
+    const secondaryWord = meaningfulWords[1] || 'Vet';
+    const digits = String(crypto.randomInt(10, 100));
+
+    return `${primaryWord}${secondaryWord}${digits}${pick(symbols)}`;
   }
 
   /**
@@ -40,9 +66,9 @@ class VeterinarianController {
    */
   async sendCredentialsEmail(veterinarian, password) {
     const mailOptions = {
-      from: `"Kissan E-Bazzar" <${process.env.SMTP_USER || 'noreply@kissanebazzar.com'}>`,
+      from: `"Animal E Bazar" <${process.env.SMTP_USER || 'noreply@kissanebazzar.com'}>`,
       to: veterinarian.email,
-      subject: 'Welcome to Kissan E-Bazzar - Your Account is Verified!',
+      subject: 'Welcome to Animal E Bazar - Your Account is Verified!',
       html: `
         <!DOCTYPE html>
         <html>
@@ -64,7 +90,7 @@ class VeterinarianController {
               <p>Your account has been verified</p>
             </div>
             <div class="content">
-              <p>Congratulations! Your registration as a veterinarian on Kissan E-Bazzar has been approved.</p>
+              <p>Congratulations! Your registration as a veterinarian on Animal E Bazar has been approved.</p>
 
               <p>You can now access your dashboard and connect with farmers who need your services.</p>
 
@@ -87,7 +113,7 @@ class VeterinarianController {
 
               <div class="footer">
                 <p>If you have any questions, please contact our support team.</p>
-                <p>&copy; ${new Date().getFullYear()} Kissan E-Bazzar. All rights reserved.</p>
+                <p>&copy; ${new Date().getFullYear()} Animal E Bazar. All rights reserved.</p>
               </div>
             </div>
           </div>
@@ -142,16 +168,26 @@ class VeterinarianController {
         state,
         pincode
       } = req.body;
+      const normalizedEmail = email ? email.trim().toLowerCase() : null;
 
       // Validate required fields
-      if (!full_name || !phone_number || !license_number || !latitude || !longitude) {
+      if (!full_name || !phone_number || !license_number || !latitude || !longitude || !city || !state || !pincode) {
         console.log('=== VALIDATION FAILED ===');
-        console.log('Missing:', { full_name: !!full_name, phone_number: !!phone_number, license_number: !!license_number, latitude: !!latitude, longitude: !!longitude });
+        console.log('Missing:', {
+          full_name: !!full_name,
+          phone_number: !!phone_number,
+          license_number: !!license_number,
+          latitude: !!latitude,
+          longitude: !!longitude,
+          city: !!city,
+          state: !!state,
+          pincode: !!pincode
+        });
         console.log('====================');
         
         return res.status(400).json({
           success: false,
-          message: 'Required fields: full_name, phone_number, license_number, latitude, longitude'
+          message: 'Required fields: full_name, phone_number, license_number, latitude, longitude, city, state, pincode'
         });
       }
 
@@ -175,61 +211,100 @@ class VeterinarianController {
         });
       }
 
+      if (normalizedEmail) {
+        const existingEmail = await db.Veterinarian.findOne({
+          where: { email: normalizedEmail }
+        });
+
+        if (existingEmail) {
+          return res.status(400).json({
+            success: false,
+            message: 'Email address already registered'
+          });
+        }
+      }
+
       // Process file uploads
       const uploadedFiles = {};
+      const uploadDocument = async (file, folder, resourceLabel) => {
+        const resourceType = file.mimetype === 'application/pdf' ? 'raw' : 'image';
+
+        try {
+          return await uploadToCloudinary(file, folder, resourceType);
+        } catch (error) {
+          console.error(`Error uploading ${resourceLabel}:`, error);
+          throw new Error(`Failed to upload ${resourceLabel}`);
+        }
+      };
 
       if (req.files) {
-        // Profile photo
-        if (req.files.profile_photo && req.files.profile_photo[0]) {
-          try {
-            const result = await uploadToCloudinary(req.files.profile_photo[0], 'image');
-            uploadedFiles.profile_photo = result.secure_url;
-            uploadedFiles.profile_photo_public_id = result.public_id;
-          } catch (error) {
-            console.error('Error uploading profile photo:', error);
-          }
-        }
-
-        // License document (required)
-        if (req.files.license_document && req.files.license_document[0]) {
-          try {
-            const result = await uploadToCloudinary(req.files.license_document[0], 'image');
-            uploadedFiles.license_document = result.secure_url;
-            uploadedFiles.license_document_public_id = result.public_id;
-          } catch (error) {
-            console.error('Error uploading license document:', error);
-            return res.status(400).json({
-              success: false,
-              message: 'Failed to upload license document'
-            });
-          }
-        } else {
+        if (!req.files.license_document || !req.files.license_document[0]) {
           return res.status(400).json({
             success: false,
             message: 'License document is required'
           });
         }
 
+        const uploadTasks = [
+          uploadDocument(
+            req.files.license_document[0],
+            'veterinarians/license-documents',
+            'license document'
+          ).then((result) => {
+            uploadedFiles.license_document = result.secure_url;
+            uploadedFiles.license_document_public_id = result.public_id;
+          })
+        ];
+
+        // Profile photo
+        if (req.files.profile_photo && req.files.profile_photo[0]) {
+          uploadTasks.push(
+            uploadDocument(
+              req.files.profile_photo[0],
+              'veterinarians/profile-photos',
+              'profile photo'
+            ).then((result) => {
+              uploadedFiles.profile_photo = result.secure_url;
+              uploadedFiles.profile_photo_public_id = result.public_id;
+            })
+          );
+        }
+
         // Degree certificate
         if (req.files.degree_certificate && req.files.degree_certificate[0]) {
-          try {
-            const result = await uploadToCloudinary(req.files.degree_certificate[0], 'image');
-            uploadedFiles.degree_certificate = result.secure_url;
-            uploadedFiles.degree_certificate_public_id = result.public_id;
-          } catch (error) {
-            console.error('Error uploading degree certificate:', error);
-          }
+          uploadTasks.push(
+            uploadDocument(
+              req.files.degree_certificate[0],
+              'veterinarians/degree-certificates',
+              'degree certificate'
+            ).then((result) => {
+              uploadedFiles.degree_certificate = result.secure_url;
+              uploadedFiles.degree_certificate_public_id = result.public_id;
+            })
+          );
         }
 
         // Aadhar document
         if (req.files.aadhar_document && req.files.aadhar_document[0]) {
-          try {
-            const result = await uploadToCloudinary(req.files.aadhar_document[0], 'image');
-            uploadedFiles.aadhar_document = result.secure_url;
-            uploadedFiles.aadhar_document_public_id = result.public_id;
-          } catch (error) {
-            console.error('Error uploading aadhar document:', error);
-          }
+          uploadTasks.push(
+            uploadDocument(
+              req.files.aadhar_document[0],
+              'veterinarians/aadhar-documents',
+              'aadhar document'
+            ).then((result) => {
+              uploadedFiles.aadhar_document = result.secure_url;
+              uploadedFiles.aadhar_document_public_id = result.public_id;
+            })
+          );
+        }
+
+        try {
+          await Promise.all(uploadTasks);
+        } catch (error) {
+          return res.status(400).json({
+            success: false,
+            message: error.message || 'Failed to upload registration documents'
+          });
         }
       } else {
         return res.status(400).json({
@@ -252,7 +327,7 @@ class VeterinarianController {
       const veterinarian = await db.Veterinarian.create({
         full_name,
         phone_number,
-        email,
+        email: normalizedEmail,
         specialization: specialization || 'general',
         experience_years: parseInt(experience_years) || 0,
         qualification: qualification || 'BVSc',
@@ -282,6 +357,28 @@ class VeterinarianController {
       });
     } catch (error) {
       console.error('Veterinarian registration error:', error);
+
+      if (error instanceof UniqueConstraintError) {
+        const field = error.errors?.[0]?.path;
+        const fieldMessages = {
+          phone_number: 'Phone number already registered',
+          license_number: 'License number already registered',
+          email: 'Email address already registered'
+        };
+
+        return res.status(400).json({
+          success: false,
+          message: fieldMessages[field] || 'A veterinarian with the same details already exists'
+        });
+      }
+
+      if (error instanceof ValidationError) {
+        return res.status(400).json({
+          success: false,
+          message: error.errors?.[0]?.message || 'Please check the submitted details'
+        });
+      }
+
       res.status(500).json({
         success: false,
         message: 'Registration failed',
@@ -384,7 +481,7 @@ class VeterinarianController {
           phone_number: veterinarian.phone_number,
           type: 'veterinarian'
         },
-        process.env.JWT_SECRET || 'your-secret-key',
+        getJwtSecret(),
         { expiresIn: '30d' }
       );
 
@@ -485,7 +582,7 @@ class VeterinarianController {
           email: veterinarian.email,
           type: 'veterinarian'
         },
-        process.env.JWT_SECRET || 'your-secret-key',
+        getJwtSecret(),
         { expiresIn: '30d' }
       );
 
@@ -585,6 +682,10 @@ class VeterinarianController {
         sortBy = 'rating',
         order = 'DESC'
       } = req.query;
+      const validSortFields = ['rating', 'total_reviews', 'consultation_fee', 'experience_years', 'created_at'];
+      const validSpecializations = ['large_animal', 'small_animal', 'livestock', 'surgery', 'general', 'emergency', 'reproduction'];
+      const sanitizedSortBy = validSortFields.includes(sortBy) ? sortBy : 'rating';
+      const sanitizedOrder = String(order).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
       const where = {
         verification_status: 'verified',
@@ -593,7 +694,15 @@ class VeterinarianController {
 
       if (city) where.city = { [Op.iLike]: `%${city}%` };
       if (state) where.state = { [Op.iLike]: `%${state}%` };
-      if (specialization) where.specialization = specialization;
+      if (specialization) {
+        if (!validSpecializations.includes(specialization)) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid veterinarian specialization filter'
+          });
+        }
+        where.specialization = specialization;
+      }
 
       const offset = (parseInt(page) - 1) * parseInt(limit);
 
@@ -607,7 +716,7 @@ class VeterinarianController {
         ],
         limit: parseInt(limit),
         offset,
-        order: [[sortBy, order]]
+        order: [[sanitizedSortBy, sanitizedOrder]]
       });
 
       res.json({
@@ -884,9 +993,18 @@ class VeterinarianController {
   async getAllForAdmin(req, res) {
     try {
       const { status, page = 1, limit = 20 } = req.query;
+      const validStatuses = ['pending', 'verified', 'rejected', 'suspended'];
 
       const where = {};
-      if (status) where.verification_status = status;
+      if (status) {
+        if (!validStatuses.includes(status)) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid veterinarian status filter'
+          });
+        }
+        where.verification_status = status;
+      }
 
       const offset = (parseInt(page) - 1) * parseInt(limit);
 
@@ -934,6 +1052,13 @@ class VeterinarianController {
         });
       }
 
+      if (veterinarian.verification_status === 'verified' && veterinarian.is_active) {
+        return res.status(400).json({
+          success: false,
+          message: 'Veterinarian is already verified'
+        });
+      }
+
       // Check if email exists
       if (!veterinarian.email) {
         return res.status(400).json({
@@ -943,7 +1068,7 @@ class VeterinarianController {
       }
 
       // Generate a random password
-      const plainPassword = this.generatePassword(12);
+      const plainPassword = this.generatePassword(veterinarian.email, veterinarian.full_name);
 
       // Hash the password
       const salt = await bcrypt.genSalt(10);
@@ -952,7 +1077,9 @@ class VeterinarianController {
       // Update veterinarian status and password
       await veterinarian.update({
         verification_status: 'verified',
+        is_active: true,
         verification_notes: notes,
+        rejection_reason: null,
         verified_by: adminId,
         verified_at: new Date(),
         password: hashedPassword

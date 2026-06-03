@@ -7,7 +7,7 @@ const FormCheckbox = ({
   onChange
 }) => {
   return (
-    <div className="form-group mb-4">
+    <div className="form-group checkbox-field mb-6">
       <div className="checkbox-group flex items-center">
         <input
           type="checkbox"

@@ -1,9 +1,48 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { listingsService } from '../services/api';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
+import { FullPageLoader } from './AppLoader';
+import AnimalCard from './AnimalCard';
+
+const normalizeListingData = (data) => {
+  if (!data) return null;
+  return {
+    ...data,
+    breed_name: data.breed_name || data.breedName,
+    expected_price: data.expected_price || data.expectedPrice,
+    is_negotiable: data.is_negotiable !== undefined ? data.is_negotiable : data.isNegotiable,
+    front_photo: data.front_photo || data.frontPhoto,
+    side_photo: data.side_photo || data.sidePhoto,
+    milk_scene_photo: data.milk_scene_photo || data.milkScenePhoto,
+    full_body_photo: data.full_body_photo || data.fullBodyPhoto,
+    milk_capacity: data.milk_capacity || data.milkCapacity,
+    pregnancy_status: data.pregnancy_status || data.pregnancyStatus,
+    has_horns: data.has_horns !== undefined ? data.has_horns : data.hasHorns,
+    health_condition: data.health_condition || data.healthCondition,
+    delivery_available: data.delivery_available !== undefined ? data.delivery_available : data.deliveryAvailable,
+    vaccination_details: data.vaccination_details || data.vaccinationDetails,
+    vaccination_status: data.vaccination_status || data.vaccinationStatus,
+    additional_notes: data.additional_notes || data.additionalNotes,
+    created_at: data.created_at || data.createdAt,
+    updated_at: data.updated_at || data.updatedAt,
+  };
+};
+
+const normalizeRelatedListing = (data, fallbackAnimalType) => {
+  if (!data) return null;
+  return {
+    ...normalizeListingData(data),
+    photo_1: data.photo_1 || data.photo1,
+    photo_2: data.photo_2 || data.photo2,
+    photo_3: data.photo_3 || data.photo3,
+    photo_4: data.photo_4 || data.photo4,
+    photo_5: data.photo_5 || data.photo5,
+    animal_type: (data.animal_type || data.animalType || fallbackAnimalType || '').toLowerCase()
+  };
+};
 
 const AnimalDetailPage = () => {
   const { t } = useTranslation();
@@ -13,36 +52,8 @@ const AnimalDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeImage, setActiveImage] = useState(0);
-  const [showContactModal, setShowContactModal] = useState(false);
-
-  // Normalize data to handle both camelCase and snake_case field names
-  const normalizeListingData = (data) => {
-    if (!data) return null;
-    return {
-      ...data,
-      // Basic info
-      breed_name: data.breed_name || data.breedName,
-      expected_price: data.expected_price || data.expectedPrice,
-      is_negotiable: data.is_negotiable !== undefined ? data.is_negotiable : data.isNegotiable,
-      // Photos
-      front_photo: data.front_photo || data.frontPhoto,
-      side_photo: data.side_photo || data.sidePhoto,
-      milk_scene_photo: data.milk_scene_photo || data.milkScenePhoto,
-      full_body_photo: data.full_body_photo || data.fullBodyPhoto,
-      // Animal details
-      milk_capacity: data.milk_capacity || data.milkCapacity,
-      pregnancy_status: data.pregnancy_status || data.pregnancyStatus,
-      has_horns: data.has_horns !== undefined ? data.has_horns : data.hasHorns,
-      health_condition: data.health_condition || data.healthCondition,
-      delivery_available: data.delivery_available !== undefined ? data.delivery_available : data.deliveryAvailable,
-      vaccination_details: data.vaccination_details || data.vaccinationDetails,
-      vaccination_status: data.vaccination_status || data.vaccinationStatus,
-      additional_notes: data.additional_notes || data.additionalNotes,
-      // Dates
-      created_at: data.created_at || data.createdAt,
-      updated_at: data.updated_at || data.updatedAt,
-    };
-  };
+  const [relatedListings, setRelatedListings] = useState([]);
+  const [relatedLoading, setRelatedLoading] = useState(false);
 
   useEffect(() => {
     const fetchListing = async () => {
@@ -66,7 +77,7 @@ const AnimalDetailPage = () => {
     if (animalType && id) {
       fetchListing();
     }
-  }, [animalType, id]);
+  }, [animalType, id, t]);
 
   // Placeholder image component
   const PlaceholderImage = ({ label, className = '' }) => (
@@ -147,29 +158,84 @@ const AnimalDetailPage = () => {
       year: 'numeric'
     });
   };
+
+  const formatTimeAgo = (dateString) => {
+    if (!dateString) return t('animalDetail.justNow', 'Just now');
+
+    const now = new Date();
+    const posted = new Date(dateString);
+    const diffMs = now - posted;
+
+    if (Number.isNaN(diffMs) || diffMs < 0) {
+      return formatDate(dateString);
+    }
+
+    const minutes = Math.floor(diffMs / (1000 * 60));
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (minutes < 1) return t('animalDetail.justNow', 'Just now');
+    if (minutes < 60) return t('animalDetail.minutesAgo', { count: minutes, defaultValue: `${minutes} min ago` });
+    if (hours < 24) return t('animalDetail.hoursAgo', { count: hours, defaultValue: `${hours} hr ago` });
+    if (days < 7) return t('animalDetail.daysAgo', { count: days, defaultValue: `${days} day ago` });
+
+    return formatDate(dateString);
+  };
+
   const getAnimalTypeLabel = (type) => {
     return t(`animalDetail.animalType.${type}`, type);
   };
+
+  useEffect(() => {
+    setActiveImage(0);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [animalType, id]);
+
+  useEffect(() => {
+    const fetchRelatedListings = async () => {
+      setRelatedListings([]);
+      setRelatedLoading(true);
+      try {
+        const response = await listingsService.getListingsByType(animalType, 8);
+        if (response.success && Array.isArray(response.data)) {
+          setRelatedListings(
+            response.data
+              .map((item) => normalizeRelatedListing(item, animalType))
+              .filter(Boolean)
+              .filter((item) => String(item.id) !== String(id))
+              .slice(0, 6)
+          );
+          return;
+        }
+
+        setRelatedListings([]);
+      } catch (err) {
+        console.error('Error fetching related listings:', err);
+        setRelatedListings([]);
+      } finally {
+        setRelatedLoading(false);
+      }
+    };
+
+    if (animalType && id) {
+      fetchRelatedListings();
+    }
+  }, [animalType, id]);
+
+  const currentAnimalType = (listing?.animal_type || animalType || '').toLowerCase();
 
 
 
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-[#E9F0F8] to-[#F0F8FF] flex items-center justify-center p-4">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-b-4 border-[#15BB73] mx-auto"></div>
-          <p className="mt-4 text-gray-600 font-medium text-sm sm:text-base">{t('animalDetail.loadingListing')}</p>
-        </div>
-      </div>
-    );
+    return <FullPageLoader message={t('animalDetail.loadingListing')} />;
   }
 
   if (error || !listing) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#E9F0F8] to-[#F0F8FF] flex items-center justify-center p-4">
         <div className="text-center bg-white rounded-2xl shadow-xl p-6 sm:p-8 max-w-md w-full mx-4">
-          <div className="text-5xl sm:text-6xl mb-4">Ã°Å¸Ëœâ€</div>
+          <div className="text-5xl sm:text-6xl mb-4">hey</div>
           <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2">{t('animalDetail.listingNotFound')}</h2>
           <p className="text-gray-600 mb-6 text-sm sm:text-base">{error || t('animalDetail.listingNotFoundMessage')}</p>
           <button
@@ -202,7 +268,7 @@ const AnimalDetailPage = () => {
             </button>
             <div className="flex items-center space-x-1.5 sm:space-x-2">
               <span className="bg-[#15BB73]/10 text-[#15BB73] px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium">
-                {getAnimalTypeLabel(animalType)}
+                {getAnimalTypeLabel(currentAnimalType)}
               </span>
               <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${
                 listing.status === 'active'
@@ -521,6 +587,66 @@ const AnimalDetailPage = () => {
             )}
           </div>
         </div>
+
+        {(relatedLoading || relatedListings.length > 0) && (
+          <section className="mt-8 sm:mt-10 lg:mt-14">
+            <div className="flex flex-col gap-2 mb-4 sm:mb-6">
+              <span className="inline-flex w-fit items-center rounded-full bg-[#15BB73]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-[#12895A]">
+                {t('animalDetail.moreLikeThis', 'More like this')}
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+                {t('animalDetail.similarAnimals')}
+              </h2>
+              <p className="text-sm sm:text-base text-gray-600">
+                {t('animalDetail.moreLikeThisSubtitle', {
+                  animalType: getAnimalTypeLabel(currentAnimalType),
+                  defaultValue: `Explore more ${getAnimalTypeLabel(currentAnimalType).toLowerCase()} listings from other sellers.`
+                })}
+              </p>
+            </div>
+
+            {relatedLoading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div
+                    key={`related-skeleton-${index}`}
+                    className="h-[360px] rounded-2xl bg-white/80 shadow-md animate-pulse"
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+                {relatedListings.map((relatedListing) => (
+                  <AnimalCard
+                    key={`${relatedListing.animal_type || currentAnimalType}-${relatedListing.id}`}
+                    id={`${relatedListing.animal_type || currentAnimalType}-${relatedListing.id}`}
+                    listingId={relatedListing.id}
+                    animalType={relatedListing.animal_type || currentAnimalType}
+                    title={`${relatedListing.breed_name || t('animalDetail.unknownBreed')} | ${getAnimalTypeLabel(relatedListing.animal_type || currentAnimalType)}`}
+                    price={relatedListing.expected_price ? Number(relatedListing.expected_price).toLocaleString('en-IN') : '0'}
+                    location={[relatedListing.city, relatedListing.state].filter(Boolean).join(', ') || t('animalDetail.locationNotSpecified')}
+                    datePosted={formatTimeAgo(relatedListing.created_at)}
+                    images={[
+                      relatedListing.front_photo,
+                      relatedListing.side_photo,
+                      relatedListing.milk_scene_photo,
+                      relatedListing.full_body_photo,
+                      relatedListing.photo_1,
+                      relatedListing.photo_2,
+                      relatedListing.photo_3,
+                      relatedListing.photo_4,
+                      relatedListing.photo_5
+                    ].filter(Boolean)}
+                    imageSrc={relatedListing.front_photo || relatedListing.side_photo || relatedListing.photo_1 || relatedListing.photo_2}
+                    sellerName={relatedListing.seller?.name || t('animalDetail.unknownSeller')}
+                    sellerId={relatedListing.seller?.id}
+                    phoneNumber={relatedListing.seller?.phone || ''}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        )}
       </div>
 
       {/* Fixed Bottom Contact Bar */}

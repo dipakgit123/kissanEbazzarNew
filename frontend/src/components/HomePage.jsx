@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import CircleBar from './CircleBar';
 import AnimalCard from './AnimalCard';
-import DistanceToggle from './DistanceToggle';
-import CowLoader from './CowLoader';
+import AppLoader from './AppLoader';
 import { listingsService, userService } from '../services/api';
+import { useWishlist } from '../contexts/useWishlist';
+import { safeJsonParse } from '../utils/stringUtils';
 
 import { Link } from 'react-router-dom';
 
@@ -23,24 +23,21 @@ const useDebounce = (value, delay) => {
   return debouncedValue;
 };
 
-const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist }) => {
+const HomePage = () => {
   const { t } = useTranslation();
+  const { isInWishlist, toggleWishlist } = useWishlist();
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredAnimals, setFilteredAnimals] = useState([]);
   const [isScrolled, setIsScrolled] = useState(false);
   const [animalData, setAnimalData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState(null);
-  const [distanceMode, setDistanceMode] = useState('all'); // 'all' = 500km, 'nearby' = 100km
-  const [selectedCategory, setSelectedCategory] = useState(null); // Category filter from CircleBar
+  const distanceMode = 'all';
+  const [selectedCategory, setSelectedCategory] = useState(null);
 
   // Search-related states
   const [isSearching, setIsSearching] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [recentSearches, setRecentSearches] = useState([]);
   const [searchMode, setSearchMode] = useState('local'); // 'local' or 'api'
-  const searchInputRef = useRef(null);
-  const suggestionsRef = useRef(null);
 
   // Debounced search query for real-time search
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -55,26 +52,14 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
     { label: t('animalTypes.cat'), icon: '🐱', query: 'cat' },
   ], [t]);
 
-  // Load recent searches from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem('recentSearches');
-    if (saved) {
-      setRecentSearches(JSON.parse(saved).slice(0, 5));
-    }
-  }, []);
-
   // Save search to recent searches
   const saveRecentSearch = useCallback((query) => {
     if (!query.trim()) return;
-    const updated = [query, ...recentSearches.filter(s => s !== query)].slice(0, 5);
-    setRecentSearches(updated);
+    const saved = localStorage.getItem('recentSearches');
+    const recentSearches = safeJsonParse(saved, []);
+    const searchHistory = Array.isArray(recentSearches) ? recentSearches : [];
+    const updated = [query, ...searchHistory.filter((item) => item !== query)].slice(0, 5);
     localStorage.setItem('recentSearches', JSON.stringify(updated));
-  }, [recentSearches]);
-
-  // Clear recent searches
-  const clearRecentSearches = useCallback(() => {
-    setRecentSearches([]);
-    localStorage.removeItem('recentSearches');
   }, []);
 
   // Toggle wishlist function
@@ -82,11 +67,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
     const animal = animalData.find(a => a.id === animalId) || filteredAnimals.find(a => a.id === animalId);
     if (!animal) return;
 
-    if (isInWishlist(animalId)) {
-      removeFromWishlist(animalId);
-    } else {
-      addToWishlist(animal);
-    }
+    toggleWishlist(animal);
   };
 
   // Helper function to format time ago - defined before useEffect
@@ -159,73 +140,6 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
     fetchUserLocation();
   }, []);
 
-  // Fetch listings based on distance mode
-  useEffect(() => {
-    const fetchListings = async () => {
-      setLoading(true);
-      try {
-        let listings = [];
-
-        if (distanceMode === 'all') {
-          // For "All Available" - fetch ALL animals without distance filter
-          const response = await listingsService.getFeaturedListings(100); // increased limit for all animals
-          if (response.success && response.data) {
-            listings = response.data;
-          }
-        } else {
-          // For "Nearby Animals" - fetch only within 100km radius
-          if (userLocation?.latitude && userLocation?.longitude) {
-            const response = await listingsService.getNearbyListings(
-              userLocation.latitude,
-              userLocation.longitude,
-              100, // Always 100km for nearby mode
-              50
-            );
-            if (response.success && response.data && response.data.length > 0) {
-              listings = response.data;
-            }
-          }
-
-          // Fallback to featured listings if no location or no nearby listings found
-          if (listings.length === 0) {
-            const response = await listingsService.getFeaturedListings(50);
-            if (response.success) {
-              listings = response.data;
-            }
-          }
-        }
-
-        // Transform listings data for AnimalCard component
-        const transformedListings = listings.map(listing => ({
-          id: `${listing.animal_type}-${listing.id}`,
-          listingId: listing.id,
-          title: `${listing.breed_name || 'Unknown Breed'} | ${listing.animal_type.charAt(0).toUpperCase() + listing.animal_type.slice(1)}`,
-          price: listing.expected_price ? Number(listing.expected_price).toLocaleString('en-IN') : '0',
-          location: `${listing.city || 'Unknown'}${listing.distance ? ` (${Math.round(listing.distance)} km)` : ''}`,
-          datePosted: formatTimeAgo(listing.created_at),
-          imageSrc: listing.front_photo || listing.side_photo || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="200"%3E%3Crect fill="%23f0f0f0" width="300" height="200"/%3E%3Ctext fill="%23999" font-family="sans-serif" font-size="16" dy="10.5" font-weight="bold" x="50%25" y="50%25" text-anchor="middle"%3ENo Image%3C/text%3E%3C/svg%3E',
-          sellerName: listing.seller?.name || 'Unknown Seller',
-          sellerId: listing.seller?.id,
-          phoneNumber: listing.seller?.phone || '',
-          breed: listing.breed_name || 'Unknown',
-          animalType: listing.animal_type.charAt(0).toUpperCase() + listing.animal_type.slice(1),
-          milkProduction: listing.milk_capacity ? `${listing.milk_capacity}L` : 'N/A',
-          distance: listing.distance,
-          status: listing.status,
-          sellerPhoto: listing.seller?.profile_photo
-        }));
-
-        setAnimalData(transformedListings);
-      } catch (error) {
-        console.error('Error fetching listings:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchListings();
-  }, [distanceMode, userLocation, formatTimeAgo]);
-
   // Transform listing data helper
   const transformListing = useCallback((listing) => ({
     id: `${listing.animal_type}-${listing.id}`,
@@ -243,8 +157,81 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
     milkProduction: listing.milk_capacity ? `${listing.milk_capacity}L` : 'N/A',
     distance: listing.distance,
     status: listing.status,
-    sellerPhoto: listing.seller?.profile_photo
+    sellerPhoto: listing.seller?.profile_photo,
+    createdAt: listing.created_at
   }), [formatTimeAgo]);
+
+  const sortAnimalsByLatest = useCallback((listings) => (
+    [...listings].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+  ), []);
+
+  const fetchListings = useCallback(async ({ showLoader = false } = {}) => {
+    if (showLoader) {
+      setLoading(true);
+    }
+
+    try {
+      let listings = [];
+
+      if (distanceMode === 'all') {
+        const response = await listingsService.getFeaturedListings(100);
+        if (response.success && response.data) {
+          listings = response.data;
+        }
+      } else {
+        if (userLocation?.latitude && userLocation?.longitude) {
+          const response = await listingsService.getNearbyListings(
+            userLocation.latitude,
+            userLocation.longitude,
+            100,
+            50
+          );
+          if (response.success && response.data && response.data.length > 0) {
+            listings = response.data;
+          }
+        }
+
+        if (listings.length === 0) {
+          const response = await listingsService.getFeaturedListings(50);
+          if (response.success) {
+            listings = response.data;
+          }
+        }
+      }
+
+      setAnimalData(sortAnimalsByLatest(listings.map(transformListing)));
+    } catch (error) {
+      console.error('Error fetching listings:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [distanceMode, sortAnimalsByLatest, transformListing, userLocation]);
+
+  // Fetch latest listings for home page
+  useEffect(() => {
+    fetchListings({ showLoader: animalData.length === 0 });
+  }, [animalData.length, fetchListings]);
+
+  // Refresh latest listings when the user comes back to the tab/page
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchListings();
+      }
+    };
+
+    const handleWindowFocus = () => {
+      fetchListings();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleWindowFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleWindowFocus);
+    };
+  }, [fetchListings]);
 
   // Perform local search (fast, on existing data)
   const performLocalSearch = useCallback((query) => {
@@ -318,121 +305,24 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
     }
   }, [debouncedSearchQuery, performLocalSearch, performApiSearch]);
 
-  // Handle form submit (explicit search)
-  const handleSearch = useCallback((e) => {
-    e?.preventDefault();
-    if (searchQuery.trim()) {
-      saveRecentSearch(searchQuery.trim());
-      setShowSuggestions(false);
-      performApiSearch(searchQuery);
-    }
-  }, [searchQuery, saveRecentSearch, performApiSearch]);
-
-  // Handle input change
-  const handleInputChange = useCallback((e) => {
-    const value = e.target.value;
-    setSearchQuery(value);
-    setShowSuggestions(true);
-
-    if (value.trim() === '') {
-      setFilteredAnimals([]);
-      setSearchMode('local');
-    }
-  }, []);
-
   // Handle quick search tag click
   const handleQuickSearch = useCallback((query) => {
     setSearchQuery(query);
     saveRecentSearch(query);
-    setShowSuggestions(false);
     performApiSearch(query);
   }, [saveRecentSearch, performApiSearch]);
-
-  // Handle recent search click
-  const handleRecentSearchClick = useCallback((query) => {
-    setSearchQuery(query);
-    setShowSuggestions(false);
-    performApiSearch(query);
-  }, [performApiSearch]);
 
   // Clear search
   const clearSearch = useCallback(() => {
     setSearchQuery('');
     setFilteredAnimals([]);
     setSearchMode('local');
-    setShowSuggestions(false);
-    searchInputRef.current?.focus();
   }, []);
-
-  // Handle category click from CircleBar
-  const handleCategoryClick = useCallback((category, apiEndpoint) => {
-    // Toggle category - if same category is clicked, deselect it
-    if (selectedCategory === category) {
-      setSelectedCategory(null);
-    } else {
-      setSelectedCategory(category);
-      // Clear any active search when selecting a category
-      if (searchQuery) {
-        setSearchQuery('');
-        setFilteredAnimals([]);
-      }
-    }
-  }, [selectedCategory, searchQuery]);
 
   // Clear category filter
   const clearCategoryFilter = useCallback(() => {
     setSelectedCategory(null);
   }, []);
-
-  // Close suggestions when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        suggestionsRef.current &&
-        !suggestionsRef.current.contains(event.target) &&
-        searchInputRef.current &&
-        !searchInputRef.current.contains(event.target)
-      ) {
-        setShowSuggestions(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Get search suggestions based on current input
-  const searchSuggestions = useMemo(() => {
-    if (!searchQuery.trim() || searchQuery.length < 2) return [];
-
-    const query = searchQuery.toLowerCase();
-    const suggestions = [];
-
-    // Add matching animal types
-    quickSearchTags.forEach(tag => {
-      if (tag.query.includes(query) && !suggestions.includes(tag.query)) {
-        suggestions.push(tag.query);
-      }
-    });
-
-    // Add matching breeds from existing data
-    animalData.forEach(animal => {
-      const breed = animal.breed.toLowerCase();
-      if (breed.includes(query) && !suggestions.includes(breed)) {
-        suggestions.push(breed);
-      }
-    });
-
-    // Add matching locations
-    animalData.forEach(animal => {
-      const location = animal.location.split(' (')[0].toLowerCase();
-      if (location.includes(query) && !suggestions.includes(location)) {
-        suggestions.push(location);
-      }
-    });
-
-    return suggestions.slice(0, 5);
-  }, [searchQuery, quickSearchTags, animalData]);
 
   // Filter animals by selected category
   const categoryFilteredAnimals = useMemo(() => {
@@ -469,18 +359,18 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
     <div className="bg-gradient-to-br from-[#E9F0F8] to-[#F0F8FF] min-h-screen flex flex-col">
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-white via-[#F0F8FF] to-[#E9F0F8] py-8 sm:py-12 lg:py-16">
+      <section className="bg-gradient-to-br from-white via-[#F0F8FF] to-[#E9F0F8] py-4 sm:py-6 lg:py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Hero Content */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-center">
             {/* Left Side - Banner Image */}
             <div className="order-1 lg:order-1">
               <div className="relative">
                 {/* Main Banner Image */}
                 <div className="relative rounded-2xl overflow-hidden shadow-2xl">
-                  <img 
-                    src="/src/assets/images/farmer_fixed_1920x1400.png" 
-                    alt={t('home.heroTitle') + ' ' + t('home.heroTitleHighlight')} 
+                  <img
+                    src="/src/assets/images/farmer_fixed_1920x1400.png"
+                    alt={t('home.heroTitle') + ' ' + t('home.heroTitleHighlight')}
                     className="w-full h-auto object-contain"
                   />
                   {/* Overlay gradient for better text visibility if needed */}
@@ -490,65 +380,65 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
             </div>
 
             {/* Right Side - Text Content and Search */}
-            <div className="order-2 lg:order-2 space-y-6">
+            <div className="order-2 lg:order-2 space-y-4">
               {/* Heading */}
-              <div className="space-y-3">
-                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-[#000600] leading-tight">
+              <div className="space-y-2">
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[#000600] leading-tight">
                   {t('home.heroTitle')}<br />
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#15BB73] to-[#0FA568]">{t('home.heroTitleHighlight')}</span>
                 </h1>
-                <p className="text-base sm:text-lg text-gray-600 max-w-xl">
+                <p className="text-sm sm:text-base text-gray-600 max-w-xl">
                   {t('home.heroDescription')}
                 </p>
               </div>
 
               {/* Trust Indicators */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 py-4 px-4 bg-gradient-to-r from-[#15BB73]/5 to-[#0FA568]/5 rounded-xl border border-[#15BB73]/10">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-[#15BB73] to-[#0FA568] rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 py-3 px-3 bg-gradient-to-r from-[#15BB73]/5 to-[#0FA568]/5 rounded-xl border border-[#15BB73]/10">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 bg-gradient-to-br from-[#15BB73] to-[#0FA568] rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
                   </div>
                   <div>
-                    <div className="text-lg font-bold text-[#000600]">{t('home.farmersCount')}</div>
+                    <div className="text-base font-bold text-[#000600]">{t('home.farmersCount')}</div>
                     <div className="text-xs text-gray-600">{t('home.farmers')}</div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-[#15BB73] to-[#0FA568] rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 bg-gradient-to-br from-[#15BB73] to-[#0FA568] rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                     </svg>
                   </div>
                   <div>
-                    <div className="text-lg font-bold text-[#000600]">{t('home.verified')}</div>
+                    <div className="text-base font-bold text-[#000600]">{t('home.verified')}</div>
                     <div className="text-xs text-gray-600">{t('home.sellers')}</div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-[#15BB73] to-[#0FA568] rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 bg-gradient-to-br from-[#15BB73] to-[#0FA568] rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
                   </div>
                   <div>
-                    <div className="text-lg font-bold text-[#000600]">{t('home.secure')}</div>
+                    <div className="text-base font-bold text-[#000600]">{t('home.secure')}</div>
                     <div className="text-xs text-gray-600">{t('home.chatAndDeals')}</div>
                   </div>
                 </div>
               </div>
 
               {/* Buy and Sell Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Link
                   to="/sell-animal"
-                  className="flex-1 group relative overflow-hidden bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-6 py-3 rounded-lg font-semibold text-sm sm:text-base shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5"
+                  className="flex-1 group relative overflow-hidden bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold text-sm shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5"
                 >
                   <div className="relative z-10 flex items-center justify-center gap-2">
-                    <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     </svg>
                     <span>{t('header.sell')}</span>
@@ -564,10 +454,10 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
                       listingsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     }
                   }}
-                  className="flex-1 group relative overflow-hidden bg-white text-[#15BB73] border-2 border-[#15BB73] px-6 py-3 rounded-lg font-semibold text-sm sm:text-base shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 hover:bg-[#15BB73] hover:text-white"
+                  className="flex-1 group relative overflow-hidden bg-white text-[#15BB73] border-2 border-[#15BB73] px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold text-sm shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 hover:bg-[#15BB73] hover:text-white"
                 >
                   <div className="relative z-10 flex items-center justify-center gap-2">
-                    <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                     </svg>
                     <span>{t('home.buyAnimals')}</span>
@@ -578,7 +468,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
           </div>
 
           {/* Feature Cards Section */}
-          <div className="mt-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* AI Assistant Card */}
             <button
               onClick={() => {
@@ -592,7 +482,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
               }}
               className="group relative bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105 cursor-pointer"
             >
-              <div className="relative h-56 overflow-hidden">
+              <div className="relative h-44 overflow-hidden">
                 <img
                   src="/src/assets/images/AI Assistant.png"
                   alt="AI Assistant"
@@ -620,7 +510,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
               to="/veterinarian"
               className="group relative bg-gradient-to-br from-green-500 to-green-600 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105"
             >
-              <div className="relative h-56 overflow-hidden">
+              <div className="relative h-44 overflow-hidden">
                 <img
                   src="/src/assets/images/veternarian.png"
                   alt="Veterinarian"
@@ -648,7 +538,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
               to="/ai-health-check"
               className="group relative bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105"
             >
-              <div className="relative h-56 overflow-hidden">
+              <div className="relative h-44 overflow-hidden">
                 <img
                   src="/src/assets/images/AI health.png"
                   alt="AI Health Check"
@@ -676,7 +566,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
               to="/pregnancy-calendar"
               className="group relative bg-gradient-to-br from-pink-500 to-pink-600 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105"
             >
-              <div className="relative h-56 overflow-hidden">
+              <div className="relative h-44 overflow-hidden">
                 <img
                   src="/src/assets/images/pregnancy calender.png"
                   alt="Pregnancy Calendar"
@@ -701,7 +591,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
           </div>
 
           {/* Animal Listings Preview Section */}
-          <div className="mt-16">
+          <div className="mt-8">
             {/* Section Header */}
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl sm:text-3xl font-bold text-[#000600]">
@@ -719,31 +609,34 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
             </div>
 
             {/* Animal Cards Grid - First 4 */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {animalData.slice(0, 4).map((animal) => (
-                <AnimalCard
-                  key={animal.id}
-                  id={animal.id}
-                  listingId={animal.listingId}
-                  title={animal.title}
-                  price={animal.price}
-                  location={animal.location}
-                  datePosted={animal.datePosted}
-                  imageSrc={animal.imageSrc}
-                  sellerName={animal.sellerName}
-                  sellerId={animal.sellerId}
-                  phoneNumber={animal.phoneNumber}
-                  breed={animal.breed}
-                  animalType={animal.animalType}
-                  milkProduction={animal.milkProduction}
-                  isInWishlist={isInWishlist(animal.id)}
-                  onToggleWishlist={handleToggleWishlist}
-                />
-              ))}
-            </div>
-
-            {/* Show message if no animals available */}
-            {animalData.length === 0 && (
+            {loading ? (
+              <div className="flex justify-center items-center py-12">
+                <AppLoader message={t('home.findingAnimals')} size="medium" />
+              </div>
+            ) : animalData.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {animalData.slice(0, 4).map((animal) => (
+                  <AnimalCard
+                    key={animal.id}
+                    id={animal.id}
+                    listingId={animal.listingId}
+                    title={animal.title}
+                    price={animal.price}
+                    location={animal.location}
+                    datePosted={animal.datePosted}
+                    imageSrc={animal.imageSrc}
+                    sellerName={animal.sellerName}
+                    sellerId={animal.sellerId}
+                    phoneNumber={animal.phoneNumber}
+                    breed={animal.breed}
+                    animalType={animal.animalType}
+                    milkProduction={animal.milkProduction}
+                    isInWishlist={isInWishlist(animal.id)}
+                    onToggleWishlist={handleToggleWishlist}
+                  />
+                ))}
+              </div>
+            ) : (
               <div className="text-center py-12">
                 <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
                   <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -760,7 +653,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
       </section>
 
       {/* App Download Banner - Full Width with Padding */}
-      <section className="w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] my-16 bg-gradient-to-r from-[#F0F8FF] to-[#E9F0F8] px-4 sm:px-6 md:px-8 lg:px-12 py-8">
+      <section className="w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] my-8 bg-gradient-to-r from-[#F0F8FF] to-[#E9F0F8] px-4 sm:px-6 md:px-8 lg:px-12 py-4 sm:py-6">
         <a 
           href="#" 
           className="block rounded-xl overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
@@ -853,7 +746,7 @@ const HomePage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist })
 
               {loading || (isSearching && filteredAnimals.length === 0) ? (
                 <div className="flex justify-center items-center py-12">
-                  <CowLoader message={isSearching ? t('home.searching', { query: searchQuery }) : t('home.findingAnimals')} size="medium" />
+                  <AppLoader message={isSearching ? t('home.searching', { query: searchQuery }) : t('home.findingAnimals')} size="medium" />
                 </div>
               ) : displayAnimals.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

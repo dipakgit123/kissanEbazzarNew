@@ -308,27 +308,26 @@ module.exports = (sequelize) => {
     });
   };
 
-  // Search with filters
-  OtherAnimalListing.search = async function(filters = {}) {
+  const buildSearchWhere = (filters = {}) => {
     const where = { status: 'active' };
-    
+
     if (filters.animalType) {
       where.animal_type = filters.animalType;
     }
-    
+
     if (filters.minPrice) {
       where.expected_price = { [sequelize.Sequelize.Op.gte]: filters.minPrice };
     }
-    
+
     if (filters.maxPrice) {
       where.expected_price = where.expected_price || {};
       where.expected_price[sequelize.Sequelize.Op.lte] = filters.maxPrice;
     }
-    
+
     if (filters.city) {
       where.city = { [sequelize.Sequelize.Op.like]: `%${filters.city}%` };
     }
-    
+
     if (filters.state) {
       where.state = filters.state;
     }
@@ -344,7 +343,17 @@ module.exports = (sequelize) => {
     if (filters.temperament) {
       where.temperament = filters.temperament;
     }
-    
+
+    return where;
+  };
+
+  // Search with filters
+  OtherAnimalListing.search = async function(filters = {}) {
+    const where = buildSearchWhere(filters);
+    const validSortFields = ['createdAt', 'updatedAt', 'expectedPrice', 'views'];
+    const sortBy = validSortFields.includes(filters.sortBy) ? filters.sortBy : 'createdAt';
+    const sortOrder = String(filters.sortOrder).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
     return await this.findAll({
       where,
       include: [{
@@ -352,9 +361,15 @@ module.exports = (sequelize) => {
         as: 'seller',
         attributes: ['id', 'full_name', 'phone_number', 'city', 'state']
       }],
-      order: [['created_at', 'DESC']],
+      order: [[sortBy, sortOrder]],
       limit: filters.limit || 50,
       offset: filters.offset || 0
+    });
+  };
+
+  OtherAnimalListing.countSearch = async function(filters = {}) {
+    return await this.count({
+      where: buildSearchWhere(filters)
     });
   };
 

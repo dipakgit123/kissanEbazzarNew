@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
+import toast from 'react-hot-toast';
 import { API_BASE_API } from '../config/api';
 
 const API_URL = API_BASE_API;
@@ -59,12 +60,12 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
     
     // Validation
     if (!form.animalType || !form.lactation || !form.milkToday || !form.rate) {
-      alert(t('validation.fillRequired') || 'Please fill all required fields');
+      toast.error(t('validation.fillRequired') || 'Please fill all required fields');
       return;
     }
 
     if (!form.photos.side && !form.photos.udder) {
-      alert(t('validation.required') || 'Please upload at least one photo');
+      toast.error(t('validation.required') || 'Please upload at least one photo');
       return;
     }
 
@@ -103,7 +104,7 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
       });
 
       if (response.data.success) {
-        alert(t('sellAnimal.listingSuccess') || 'Listing created successfully!');
+        toast.success(t('sellAnimal.listingSuccess') || 'Listing created successfully!');
         if (onSubmit) {
           onSubmit(response.data.data);
         } else {
@@ -112,7 +113,7 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
       }
     } catch (error) {
       console.error('Error creating listing:', error);
-      alert(t('listing.createError') || error.response?.data?.message || 'Failed to create listing. Please try again.');
+      toast.error(error.response?.data?.message || t('listing.createError') || 'Failed to create listing. Please try again.');
     } finally {
       setLoading(false);
     }

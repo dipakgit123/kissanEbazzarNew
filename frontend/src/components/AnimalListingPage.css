@@ -578,6 +578,10 @@
   gap: 6px;
 }
 
+.form-row > .checkbox-field {
+  padding-top: 34px;
+}
+
 .form-label {
   font-weight: 600;
   color: #1a202c;
@@ -779,6 +783,7 @@
   align-items: center;
   gap: 12px;
   padding: 14px 16px;
+  min-height: 42px;
   background: #fafbfc;
   border-radius: 10px;
   border: 2px solid #e2e8f0;
@@ -990,6 +995,10 @@
     grid-template-columns: 1fr;
     gap: 14px;
     margin-bottom: 14px;
+  }
+
+  .form-row > .checkbox-field {
+    padding-top: 0;
   }
 
   .form-group label {

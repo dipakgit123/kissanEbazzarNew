@@ -1,5 +1,6 @@
 const db = require('../models');
 const { Notification, DeviceToken } = db;
+const logger = require('../utils/logger');
 
 /**
  * Register device token for push notifications
@@ -41,7 +42,7 @@ const registerToken = async (req, res) => {
       message: 'Device token registered successfully',
     });
   } catch (error) {
-    console.error('Error registering device token:', error);
+    logger.error('Error registering device token:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to register device token',
@@ -54,6 +55,7 @@ const registerToken = async (req, res) => {
  */
 const unregisterToken = async (req, res) => {
   try {
+    const userId = req.user.id;
     const { token } = req.body;
 
     if (!token) {
@@ -63,17 +65,24 @@ const unregisterToken = async (req, res) => {
       });
     }
 
-    await DeviceToken.update(
+    const [updatedCount] = await DeviceToken.update(
       { is_active: false },
-      { where: { token } }
+      { where: { token, user_id: userId } }
     );
+
+    if (updatedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Device token not found for this user',
+      });
+    }
 
     res.json({
       success: true,
       message: 'Device token unregistered successfully',
     });
   } catch (error) {
-    console.error('Error unregistering device token:', error);
+    logger.error('Error unregistering device token:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to unregister device token',
@@ -87,13 +96,19 @@ const unregisterToken = async (req, res) => {
 const getNotifications = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { limit = 50, offset = 0 } = req.query;
+    let { limit = 50, offset = 0 } = req.query;
+
+    // Validate and sanitize limit (max 100 to prevent DoS)
+    limit = Math.min(Math.max(parseInt(limit) || 50, 1), 100);
+
+    // Validate and sanitize offset (must be non-negative)
+    offset = Math.max(parseInt(offset) || 0, 0);
 
     const notifications = await Notification.findAndCountAll({
       where: { user_id: userId },
       order: [['created_at', 'DESC']],
-      limit: parseInt(limit),
-      offset: parseInt(offset),
+      limit,
+      offset,
     });
 
     const unreadCount = await Notification.count({
@@ -107,7 +122,7 @@ const getNotifications = async (req, res) => {
       unread_count: unreadCount,
     });
   } catch (error) {
-    console.error('Error fetching notifications:', error);
+    logger.error('Error fetching notifications:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch notifications',
@@ -131,7 +146,7 @@ const getUnreadCount = async (req, res) => {
       unread_count: count,
     });
   } catch (error) {
-    console.error('Error fetching unread count:', error);
+    logger.error('Error fetching unread count:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch unread count',
@@ -165,7 +180,7 @@ const markAsRead = async (req, res) => {
       message: 'Notification marked as read',
     });
   } catch (error) {
-    console.error('Error marking notification as read:', error);
+    logger.error('Error marking notification as read:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to mark notification as read',
@@ -190,7 +205,7 @@ const markAllAsRead = async (req, res) => {
       message: 'All notifications marked as read',
     });
   } catch (error) {
-    console.error('Error marking all notifications as read:', error);
+    logger.error('Error marking all notifications as read:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to mark all notifications as read',
@@ -224,7 +239,7 @@ const deleteNotification = async (req, res) => {
       message: 'Notification deleted successfully',
     });
   } catch (error) {
-    console.error('Error deleting notification:', error);
+    logger.error('Error deleting notification:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete notification',
@@ -248,7 +263,7 @@ const clearAllNotifications = async (req, res) => {
       message: 'All notifications cleared',
     });
   } catch (error) {
-    console.error('Error clearing notifications:', error);
+    logger.error('Error clearing notifications:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to clear notifications',

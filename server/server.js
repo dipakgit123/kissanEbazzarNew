@@ -1,279 +1,84 @@
 const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
 const http = require('http');
 const { Server } = require('socket.io');
 const { connectDB } = require('./src/config/database');
-const authRoutes = require('./src/routes/authRoutes');
-const locationRoutes = require('./src/routes/locationRoutes');
-const animalListingRoutes = require('./src/routes/animalListingRoutes'); // NEW
-const buffaloListingRoutes = require('./src/routes/buffaloListingRoutes'); // NEW
-const horseListingRoutes = require('./src/routes/horseListingRoutes'); // NEW
-const goatListingRoutes = require('./src/routes/goatListingRoutes'); // NEW
-const catListingRoutes = require('./src/routes/catListingRoutes'); // NEW
-const dogListingRoutes = require('./src/routes/dogListingRoutes'); // NEW
-const otherAnimalListingRoutes = require('./src/routes/otherAnimalListingRoutes'); // NEW - Other animals
-const combinedListingsRoutes = require('./src/routes/combinedListingsRoutes'); // Combined listings
-const combinedRoutes = require('./src/routes/combinedListingsRoutes'); // Alias for /api/combined
-const callLogRoutes = require('./src/routes/callLogRoutes'); // Call tracking
-const notificationRoutes = require('./src/routes/notificationRoutes'); // Notifications
-const aiHealthRoutes = require('./src/routes/aiHealthRoutes'); // AI Health Check
-const pregnancyRoutes = require('./src/routes/pregnancyRoutes'); // Pregnancy Calendar
-const adminRoutes = require('./src/routes/adminRoutes'); // Admin Dashboard
-const veterinarianRoutes = require('./src/routes/veterinarianRoutes'); // Veterinarian routes
-const vetReviewRoutes = require('./src/routes/vetReviewRoutes'); // Veterinarian review routes
-const vetReportRoutes = require('./src/routes/vetReportRoutes'); // Veterinarian report routes
-const appointmentRoutes = require('./src/routes/appointmentRoutes'); // Appointment booking routes
-const wishlistRoutes = require('./src/routes/wishlistRoutes'); // Wishlist routes
+const { setupMiddleware } = require('./src/config/app');
+const { setupRoutes } = require('./src/config/routes');
+const { setupSocketIO } = require('./src/config/socket');
+const { errorHandler, notFoundHandler } = require('./src/config/errors');
+const { getJwtSecret } = require('./src/config/jwt');
 const otpService = require('./src/services/otpService');
+const { startBalanceMonitoring, usesTwilioProvider } = require('./src/utils/twilioMonitor');
+const { startAutoReactivation } = require('./src/utils/whatsappReactivate');
+const logger = require('./src/utils/logger');
+require('./src/services/scheduledNotifications'); // Start scheduled notification jobs
 require('dotenv').config();
 
 const app = express();
 const server = http.createServer(app);
+
+// Setup middleware and get CORS origins
+const corsOrigins = setupMiddleware(app);
+
+// Setup Socket.IO with CORS
 const io = new Server(server, {
   cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
+    origin: corsOrigins,
+    methods: ['GET', 'POST'],
+    credentials: true
   }
 });
 
 // Make io accessible to routes
 app.set('io', io);
 
-// Security middleware
-app.use(helmet());
-app.use(cors());
-app.use(morgan('combined'));
+// Setup Socket.IO connection handling
+setupSocketIO(io);
 
-// Body parsing middleware
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+// Setup routes
+setupRoutes(app);
 
-// Trust proxy for IP address
-app.set('trust proxy', true);
+// Error handling middleware (must be last)
+app.use(notFoundHandler);
+app.use(errorHandler);
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/location', locationRoutes);
-app.use('/api/animals', animalListingRoutes);  // NEW - Animal listing routes
-app.use('/api/buffalos', buffaloListingRoutes);  // NEW - Buffalo listing routes
-app.use('/api/horses', horseListingRoutes);  // NEW - Horse listing routes
-app.use('/api/goats', goatListingRoutes);  // NEW - Goat listing routes
-app.use('/api/cats', catListingRoutes);  // NEW - Cat listing routes
-app.use('/api/dogs', dogListingRoutes);  // NEW - Dog listing routes
-app.use('/api/other-animals', otherAnimalListingRoutes);  // NEW - Other animal listing routes
-app.use('/api/listings', combinedListingsRoutes);  // Combined listings from all categories
-app.use('/api/combined', combinedRoutes);  // Alias route for mobile app compatibility
-app.use('/api/call-logs', callLogRoutes);  // Call tracking routes
-app.use('/api/notifications', notificationRoutes);  // Notification routes
-app.use('/api/health-check', aiHealthRoutes);  // AI Health Check routes
-app.use('/api/pregnancy', pregnancyRoutes);  // Pregnancy Calendar routes
-app.use('/api/admin', adminRoutes);  // Admin Dashboard routes
-app.use('/api/veterinarians', veterinarianRoutes);  // Veterinarian routes
-app.use('/api/vet-reviews', vetReviewRoutes);  // Veterinarian review routes
-app.use('/api/vet-reports', vetReportRoutes);  // Veterinarian report routes
-app.use('/api/appointments', appointmentRoutes);  // Appointment booking routes
-app.use('/api/wishlist', wishlistRoutes);  // Wishlist routes
-
-// Serve static files for web frontend
-app.use(express.static('public'));
-
-// Health check endpoint
-app.get('/health', async (req, res) => {
-  try {
-    await require('./src/models').sequelize.authenticate();
-    res.status(200).json({ 
-      status: 'OK', 
-      message: 'Server is running',
-      database: 'Connected',
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    res.status(503).json({ 
-      status: 'ERROR', 
-      message: 'Database connection failed',
-      error: error.message 
-    });
-  }
-});
-
-// API documentation endpoint
-app.get('/api', (req, res) => {
-  res.json({
-    success: true,
-    message: 'WhatsApp OTP Authentication API with Location Services & Animal Marketplace',
-    version: '1.0.0',
-    endpoints: {
-      auth: {
-        sendOTP: 'POST /api/auth/send-otp',
-        verifyOTP: 'POST /api/auth/verify-otp',
-        resendOTP: 'POST /api/auth/resend-otp',
-        profile: 'GET /api/auth/profile'
-      },
-      location: {
-        setFromCurrent: 'POST /api/location/set/current',
-        setFromManual: 'POST /api/location/set/manual',
-        update: 'PUT /api/location/update',
-        getLocation: 'GET /api/location/me',
-        checkStatus: 'GET /api/location/status',
-        nearbyUsers: 'GET /api/location/nearby'
-      },
-      animals: {  // NEW - Animal listing endpoints
-        create: 'POST /api/animals/listings (Auth Required)',
-        getAll: 'GET /api/animals/listings (Public)',
-        getSingle: 'GET /api/animals/listings/:id (Public)',
-        getNearby: 'GET /api/animals/listings/nearby (Public)',
-        update: 'PUT /api/animals/listings/:id (Auth Required)',
-        delete: 'DELETE /api/animals/listings/:id (Auth Required)',
-        myListings: 'GET /api/animals/my-listings (Auth Required)',
-        markSold: 'PATCH /api/animals/listings/:id/sold (Auth Required)'
-      },
-      buffalos: {  // NEW - Buffalo listing endpoints
-        create: 'POST /api/buffalos/listings (Auth Required)',
-        getAll: 'GET /api/buffalos/listings (Public)',
-        getSingle: 'GET /api/buffalos/listings/:id (Public)',
-        getNearby: 'GET /api/buffalos/listings/nearby (Public)',
-        update: 'PUT /api/buffalos/listings/:id (Auth Required)',
-        delete: 'DELETE /api/buffalos/listings/:id (Auth Required)',
-        myListings: 'GET /api/buffalos/my-listings (Auth Required)',
-        markSold: 'PATCH /api/buffalos/listings/:id/sold (Auth Required)'
-      },
-      horses: {  // NEW - Horse listing endpoints
-        create: 'POST /api/horses/listings (Auth Required)',
-        getAll: 'GET /api/horses/listings (Public)',
-        getSingle: 'GET /api/horses/listings/:id (Public)',
-        getNearby: 'GET /api/horses/listings/nearby (Public)',
-        update: 'PUT /api/horses/listings/:id (Auth Required)',
-        delete: 'DELETE /api/horses/listings/:id (Auth Required)',
-        myListings: 'GET /api/horses/my-listings (Auth Required)',
-        markSold: 'PATCH /api/horses/listings/:id/sold (Auth Required)'
-      },
-      goats: {  // NEW - Goat listing endpoints
-        create: 'POST /api/goats/listings (Auth Required)',
-        getAll: 'GET /api/goats/listings (Public)',
-        getSingle: 'GET /api/goats/listings/:id (Public)',
-        getNearby: 'GET /api/goats/listings/nearby (Public)',
-        update: 'PUT /api/goats/listings/:id (Auth Required)',
-        delete: 'DELETE /api/goats/listings/:id (Auth Required)',
-        myListings: 'GET /api/goats/my-listings (Auth Required)',
-        markSold: 'PATCH /api/goats/listings/:id/sold (Auth Required)'
-      },
-      cats: {  // NEW - Cat listing endpoints
-        create: 'POST /api/cats/listings (Auth Required)',
-        getAll: 'GET /api/cats/listings (Public)',
-        getSingle: 'GET /api/cats/listings/:id (Public)',
-        getNearby: 'GET /api/cats/listings/nearby (Public)',
-        update: 'PUT /api/cats/listings/:id (Auth Required)',
-        delete: 'DELETE /api/cats/listings/:id (Auth Required)',
-        myListings: 'GET /api/cats/my-listings (Auth Required)',
-        markSold: 'PATCH /api/cats/listings/:id/sold (Auth Required)'
-      },
-      dogs: {  // NEW - Dog listing endpoints
-        create: 'POST /api/dogs/listings (Auth Required)',
-        getAll: 'GET /api/dogs/listings (Public)',
-        getSingle: 'GET /api/dogs/listings/:id (Public)',
-        getNearby: 'GET /api/dogs/listings/nearby (Public)',
-        update: 'PUT /api/dogs/listings/:id (Auth Required)',
-        delete: 'DELETE /api/dogs/listings/:id (Auth Required)',
-        myListings: 'GET /api/dogs/my-listings (Auth Required)',
-        markSold: 'PATCH /api/dogs/listings/:id/sold (Auth Required)'
-      },
-      health: {
-        status: 'GET /health'
-      }
-    },
-    notes: {
-      authentication: 'Protected endpoints require Bearer token in Authorization header',
-      publicAccess: 'Animal, Buffalo, Horse, Goat, Cat, and Dog listings can be viewed without authentication',
-      fileUploads: 'Use multipart/form-data for image and video uploads',
-      imageLimits: 'Max 5MB per image (JPEG, PNG, WebP)',
-      videoLimits: 'Max 25MB per video (MP4, MOV, AVI, WebM)'
-    }
-  });
-});
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  
-  // Handle Multer errors
-  if (err.code === 'LIMIT_FILE_SIZE') {
-    return res.status(400).json({
-      success: false,
-      message: 'File size limit exceeded'
-    });
-  }
-  
-  if (err.message && err.message.includes('Invalid file type')) {
-    return res.status(400).json({
-      success: false,
-      message: err.message
-    });
-  }
-
-  res.status(500).json({
-    success: false,
-    message: 'Something went wrong!',
-    error: process.env.NODE_ENV === 'development' ? err.message : undefined
-  });
-});
-
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Route not found'
-  });
-});
-
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 
 // Cleanup expired OTPs every 5 minutes
 setInterval(async () => {
   try {
     await otpService.cleanupExpiredOTPs();
   } catch (error) {
-    console.error('Cleanup error:', error);
+    logger.error('Cleanup error:', error);
   }
 }, 5 * 60 * 1000);
 
-// Socket.IO connection handling
-const connectedUsers = new Map(); // userId -> socketId mapping
+// ✅ FIXED: Start Twilio balance monitoring
+// Check every 60 minutes, alert when balance < $5
+if (usesTwilioProvider() && process.env.TWILIO_ACCOUNT_SID) {
+  startBalanceMonitoring(60, 5.00);
+  logger.log('✅ Twilio balance monitoring started');
+}
 
-io.on('connection', (socket) => {
-  console.log('👤 User connected:', socket.id);
-
-  // User authentication and registration
-  socket.on('register', (userId) => {
-    connectedUsers.set(userId.toString(), socket.id);
-    console.log(`✅ User ${userId} registered with socket ${socket.id}`);
-    console.log(`👥 Total connected users: ${connectedUsers.size}`);
-  });
-
-  // Handle disconnection
-  socket.on('disconnect', () => {
-    // Remove user from connected users
-    for (const [userId, socketId] of connectedUsers.entries()) {
-      if (socketId === socket.id) {
-        connectedUsers.delete(userId);
-        console.log(`❌ User ${userId} disconnected`);
-        break;
-      }
-    }
-    console.log(`👥 Total connected users: ${connectedUsers.size}`);
-  });
-});
-
-// Make connectedUsers accessible globally
-global.connectedUsers = connectedUsers;
-global.io = io;
+// ✅ NEW: Start WhatsApp auto-reactivation
+// Sends test message every 24 hours to keep WhatsApp active
+// Prevents deactivation due to inactivity
+if (otpService.getProvider() === 'local' && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_WHATSAPP_NUMBER) {
+  if (process.env.ADMIN_PHONE_NUMBER) {
+    startAutoReactivation(60); // Check every 60 minutes, reactivate every 24 hours
+    logger.log('✅ WhatsApp auto-reactivation started');
+  } else {
+    logger.log('⚠️ WhatsApp auto-reactivation disabled: ADMIN_PHONE_NUMBER not set in .env');
+    logger.log('⚠️ Add ADMIN_PHONE_NUMBER to enable automatic WhatsApp reactivation');
+  }
+}
 
 // Start server
 const startServer = async () => {
   try {
+    getJwtSecret();
     await connectDB();
-    
+
     server.listen(PORT, () => {
       console.log(`
 ╔══════════════════════════════════════════════╗

@@ -1,16 +1,12 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { useWishlist } from '../contexts/useWishlist';
+import { formatDate } from '../utils/dateUtils';
 
-const WishlistPage = ({ wishlist, removeFromWishlist, isInWishlist }) => {
+const WishlistPage = () => {
   const { t } = useTranslation();
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
+  const { wishlist, removeFromWishlist } = useWishlist();
 
   return (
     <div className="min-h-screen bg-gray-50 py-6">

@@ -3,6 +3,7 @@ const geocodingService = require('../services/geocodingService');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudinary');
 const jwt = require('jsonwebtoken');
 const db = require('../models');
+const { getJwtSecret } = require('../config/jwt');
 require('dotenv').config();
 
 class AuthController {
@@ -19,7 +20,12 @@ class AuthController {
       res.status(200).json({
         success: true,
         message: result.message,
-        expiresIn: result.expiresIn
+        expiresIn: result.expiresIn,
+        otpLength: result.otpLength,
+        channel: result.channel,
+        provider: result.provider,
+        warning: result.warning,
+        debugOtp: result.debugOtp
       });
     } catch (error) {
       console.error('Send OTP error:', error);
@@ -47,12 +53,12 @@ class AuthController {
           phoneNumber: result.user.phone_number,
           isVerified: true
         },
-        process.env.JWT_SECRET || 'default_secret_change_this',
+        getJwtSecret(),
         { expiresIn: process.env.JWT_EXPIRE || '7d' }
       );
   
       // Check if user has location and profile completed
-      const hasLocation = result.user.latitude !== null && result.user.longitude !== null;
+      const hasLocation = result.user.latitude != null && result.user.longitude != null;
       const isNewUserFlag = result.user.metadata && result.user.metadata.is_new_user === true;
       const isProfileIncomplete = !result.user.full_name || !result.user.postal_code;
       const isFirstTimeLogin = isNewUserFlag && isProfileIncomplete;
@@ -102,7 +108,12 @@ class AuthController {
       res.status(200).json({
         success: true,
         message: result.message,
-        expiresIn: result.expiresIn
+        expiresIn: result.expiresIn,
+        otpLength: result.otpLength,
+        channel: result.channel,
+        provider: result.provider,
+        warning: result.warning,
+        debugOtp: result.debugOtp
       });
     } catch (error) {
       console.error('Resend OTP error:', error);
@@ -181,11 +192,40 @@ class AuthController {
 
   async getUserStats(req, res) {
     try {
-      const { phoneNumber } = req.params;
-      
-      console.log(`Getting stats for: ${phoneNumber}`);
-      
-      const result = await otpService.getUserStats(phoneNumber);
+      const { User } = db;
+      const requestedPhoneNumber = String(req.params.phoneNumber || '').trim();
+      const userId = req.user?.userId || req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: 'User not authenticated'
+        });
+      }
+
+      const user = await User.findByPk(userId, {
+        attributes: ['phone_number']
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      const authenticatedPhoneNumber = String(user.phone_number || '').trim();
+
+      if (requestedPhoneNumber && requestedPhoneNumber !== authenticatedPhoneNumber) {
+        return res.status(403).json({
+          success: false,
+          message: 'Unauthorized to access stats for another phone number'
+        });
+      }
+
+      console.log(`Getting stats for authenticated user: ${authenticatedPhoneNumber}`);
+
+      const result = await otpService.getUserStats(authenticatedPhoneNumber);
       
       res.status(200).json({
         success: true,
@@ -276,15 +316,36 @@ class AuthController {
         metadata: updatedMetadata
       });
 
+      const userResponse = {
+        id: user.id,
+        phone_number: user.phone_number,
+        full_name: user.full_name,
+        email: user.email,
+        address: user.address,
+        postal_code: user.postal_code,
+        city: user.city,
+        state: user.state,
+        country: user.country,
+        latitude: user.latitude,
+        longitude: user.longitude,
+        profile_photo: user.profile_photo,
+        is_verified: user.is_verified,
+        metadata: user.metadata,
+        hasLocation: user.latitude != null && user.longitude != null
+      };
+
       res.status(200).json({
         success: true,
         message: 'Profile completed successfully',
+        user: userResponse,
         location: {
-          city: user.city,
-          state: user.state,
-          country: user.country,
-          postal_code: user.postal_code,
-          hasLocation: user.latitude !== null && user.longitude !== null
+          city: userResponse.city,
+          state: userResponse.state,
+          country: userResponse.country,
+          postal_code: userResponse.postal_code,
+          latitude: userResponse.latitude,
+          longitude: userResponse.longitude,
+          hasLocation: userResponse.hasLocation
         }
       });
     } catch (error) {
@@ -300,9 +361,9 @@ class AuthController {
     try {
       const { User } = db;
       const userId = req.user?.userId; // From JWT middleware
-      const { full_name, email, address, postal_code, city, state } = req.body;
+      const { full_name, email, address, postal_code, city, state, country, latitude, longitude } = req.body;
 
-      console.log('Update profile request:', { userId, full_name, email, address, postal_code, city, state });
+      console.log('Update profile request:', { userId, full_name, email, address, postal_code, city, state, country, latitude, longitude });
 
       if (!userId) {
         return res.status(401).json({
@@ -361,6 +422,20 @@ class AuthController {
         });
       }
 
+      if (latitude !== undefined && latitude !== null && latitude !== '' && Number.isNaN(Number(latitude))) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide a valid latitude'
+        });
+      }
+
+      if (longitude !== undefined && longitude !== null && longitude !== '' && Number.isNaN(Number(longitude))) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide a valid longitude'
+        });
+      }
+
       // Build update object
       const updateData = {};
 
@@ -384,6 +459,41 @@ class AuthController {
         updateData.state = state.trim() || null;
       }
 
+      if (country !== undefined) {
+        updateData.country = country.trim() || null;
+      }
+
+      if (latitude !== undefined && latitude !== null && latitude !== '') {
+        updateData.latitude = Number(latitude);
+      }
+
+      if (longitude !== undefined && longitude !== null && longitude !== '') {
+        updateData.longitude = Number(longitude);
+      }
+
+      if (updateData.latitude !== undefined && updateData.longitude !== undefined) {
+        try {
+          const locationData = await geocodingService.getLocationFromCoordinates(
+            updateData.latitude,
+            updateData.longitude
+          );
+
+          console.log('Location fetched from coordinates:', locationData);
+
+          if (!updateData.address && locationData.address) updateData.address = locationData.address;
+          if (!updateData.postal_code && locationData.postal_code) updateData.postal_code = locationData.postal_code;
+          if (!updateData.city && locationData.city) updateData.city = locationData.city;
+          if (!updateData.state && locationData.state) updateData.state = locationData.state;
+          if (!updateData.country && locationData.country) updateData.country = locationData.country;
+          updateData.location_type = 'manual';
+          updateData.location_set_at = new Date();
+        } catch (error) {
+          console.error('Reverse geocoding from coordinates failed:', error.message);
+          updateData.location_type = 'manual';
+          updateData.location_set_at = new Date();
+        }
+      }
+
       // If postal code is being updated, fetch location data
       if (postal_code && postal_code.trim() && postal_code.trim() !== user.postal_code) {
         updateData.postal_code = postal_code.trim();
@@ -395,11 +505,11 @@ class AuthController {
           );
           console.log('Location fetched from postal code:', locationData);
 
-          if (locationData.latitude) updateData.latitude = locationData.latitude;
-          if (locationData.longitude) updateData.longitude = locationData.longitude;
-          if (locationData.city) updateData.city = locationData.city;
-          if (locationData.state) updateData.state = locationData.state;
-          if (locationData.country) updateData.country = locationData.country || 'India';
+          if (locationData.latitude && updateData.latitude === undefined) updateData.latitude = locationData.latitude;
+          if (locationData.longitude && updateData.longitude === undefined) updateData.longitude = locationData.longitude;
+          if (locationData.city && !updateData.city) updateData.city = locationData.city;
+          if (locationData.state && !updateData.state) updateData.state = locationData.state;
+          if (locationData.country && !updateData.country) updateData.country = locationData.country || 'India';
           updateData.location_type = 'manual'; // Use 'manual' instead of 'geocoded'
           updateData.location_set_at = new Date();
         } catch (error) {

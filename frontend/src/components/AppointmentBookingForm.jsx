@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import toast, { Toaster } from 'react-hot-toast';
 import { API_BASE_API } from '../config/api';
+import { safeJsonParse } from '../utils/stringUtils';
 
 const AppointmentBookingForm = () => {
-  const { t } = useTranslation();
   const { vetId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -53,19 +52,23 @@ const AppointmentBookingForm = () => {
     // Get user info from localStorage
     const userStr = localStorage.getItem('user');
     if (userStr) {
-      const user = JSON.parse(userStr);
-      setFormData(prev => ({
-        ...prev,
-        farmer_name: user.full_name || '',
-        farmer_phone: user.phone_number || ''
-      }));
+      const user = safeJsonParse(userStr, {});
+      if (user) {
+        setFormData(prev => ({
+          ...prev,
+          farmer_name: user.full_name || '',
+          farmer_phone: user.phone_number || ''
+        }));
+      }
     }
 
     // Get user location
     const savedLocation = localStorage.getItem('userLocation');
     if (savedLocation) {
-      const loc = JSON.parse(savedLocation);
-      setUserLocation(loc);
+      const loc = safeJsonParse(savedLocation, null);
+      if (loc) {
+        setUserLocation(loc);
+      }
     }
   }, []);
 

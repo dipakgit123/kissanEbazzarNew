@@ -470,6 +470,31 @@ class CombinedListingsController {
             created_at
           FROM dog_listings
           WHERE status = 'active'
+
+          UNION ALL
+
+          SELECT
+            id,
+            'other' as animal_type,
+            breed_name,
+            COALESCE(age, '') as age,
+            NULL::text as milk_capacity,
+            NULL::text as pregnancy_status,
+            health_condition::text as health_condition,
+            expected_price,
+            is_negotiable,
+            front_photo,
+            side_photo,
+            city,
+            state,
+            pincode,
+            latitude,
+            longitude,
+            status::text as status,
+            user_id,
+            created_at
+          FROM other_animal_listings
+          WHERE status = 'active'
         ) AS combined_listings
         ORDER BY created_at DESC
         LIMIT $1;
@@ -693,7 +718,46 @@ class CombinedListingsController {
             attributes: ['id', 'full_name', 'phone_number', 'profile_photo', 'city', 'state']
           });
           return {
-            ...listingData,
+            id: listingData.id,
+            user_id: listingData.user_id,
+            breed_name: listingData.breedName || listingData.breed_name,
+            age: listingData.age,
+            milk_capacity: listingData.milkCapacity || listingData.milk_capacity,
+            pregnancy_status: listingData.pregnancyStatus || listingData.pregnancy_status,
+            has_horns: listingData.hasHorns !== undefined ? listingData.hasHorns : listingData.has_horns,
+            health_condition: listingData.healthCondition || listingData.health_condition,
+            expected_price: listingData.expectedPrice || listingData.expected_price,
+            is_negotiable: listingData.isNegotiable !== undefined ? listingData.isNegotiable : listingData.is_negotiable,
+            front_photo: listingData.frontPhoto || listingData.front_photo,
+            side_photo: listingData.sidePhoto || listingData.side_photo,
+            milk_scene_photo: listingData.milkScenePhoto || listingData.milk_scene_photo,
+            full_body_photo: listingData.fullBodyPhoto || listingData.full_body_photo,
+            video: listingData.video,
+            vaccination_details: listingData.vaccinationDetails || listingData.vaccination_details,
+            delivery_available: listingData.deliveryAvailable !== undefined ? listingData.deliveryAvailable : listingData.delivery_available,
+            additional_notes: listingData.additionalNotes || listingData.additional_notes,
+            latitude: listingData.latitude,
+            longitude: listingData.longitude,
+            city: listingData.city,
+            state: listingData.state,
+            pincode: listingData.pincode,
+            status: listingData.status,
+            views: listingData.views,
+            created_at: listingData.createdAt || listingData.created_at,
+            updated_at: listingData.updatedAt || listingData.updated_at,
+            gender: listingData.gender,
+            weight: listingData.weight,
+            color: listingData.color,
+            purpose: listingData.purpose,
+            vaccination_status: listingData.vaccinationStatus || listingData.vaccination_status,
+            trained: listingData.trained,
+            behavior: listingData.behavior,
+            description: listingData.description,
+            photo_1: listingData.photo1 || listingData.photo_1,
+            photo_2: listingData.photo2 || listingData.photo_2,
+            photo_3: listingData.photo3 || listingData.photo_3,
+            photo_4: listingData.photo4 || listingData.photo_4,
+            photo_5: listingData.photo5 || listingData.photo_5,
             animal_type: animalType.toLowerCase(),
             seller: seller ? {
               id: seller.id,
@@ -852,6 +916,12 @@ class CombinedListingsController {
           SELECT id, 'dog' as animal_type, breed_name, COALESCE(age, '') as age,
             expected_price, photo_1 as front_photo, city, state, user_id, created_at
           FROM dog_listings WHERE ${whereClause}
+
+          UNION ALL
+
+          SELECT id, 'other' as animal_type, breed_name, COALESCE(age, '') as age,
+            expected_price, front_photo, city, state, user_id, created_at
+          FROM other_animal_listings WHERE ${whereClause}
         ) AS combined_search
         ORDER BY created_at DESC
         LIMIT $${bindIndex}
@@ -900,7 +970,7 @@ class CombinedListingsController {
 
   /**
    * Get all listings for the authenticated user
-   * GET /api/listings/my-listings or /api/combined/my-listings
+   * GET /api/listings/my-listings
    */
   async getMyListings(req, res) {
     try {

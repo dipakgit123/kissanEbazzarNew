@@ -3,6 +3,7 @@
 const jwt = require('jsonwebtoken');
 const models = require('../models');
 const AnalyticsService = require('../services/analyticsService');
+const { getJwtSecret } = require('../config/jwt');
 
 const analyticsService = new AnalyticsService(models);
 
@@ -51,7 +52,7 @@ exports.login = async (req, res) => {
     // Generate token
     const token = jwt.sign(
       { id: admin.id, role: admin.role, isAdmin: true },
-      process.env.JWT_SECRET || 'admin-secret-key',
+      getJwtSecret(),
       { expiresIn: '24h' }
     );
 
@@ -347,7 +348,8 @@ exports.deleteListing = async (req, res) => {
       goat: models.GoatListing,
       horse: models.HorseListing,
       dog: models.DogListing,
-      cat: models.CatListing
+      cat: models.CatListing,
+      other: models.OtherAnimalListing
     };
 
     const Model = modelMap[animalType];
@@ -443,38 +445,37 @@ exports.createAdmin = async (req, res) => {
 // Initialize default super admin
 exports.initSuperAdmin = async (req, res) => {
   try {
-    const existingAdmin = await models.Admin.findOne({
-      where: { username: 'admin' }
-    });
+    const adminCount = await models.Admin.count();
+    if (adminCount > 0) {
+      return res.status(409).json({
+        success: false,
+        message: 'Admin bootstrap is only allowed before any admin account exists.'
+      });
+    }
 
-    if (existingAdmin) {
-      // Reset the password for existing admin
-      const bcrypt = require('bcrypt');
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash('admin123', salt);
+    const username = process.env.ADMIN_INIT_USERNAME || 'admin';
+    const email = process.env.ADMIN_INIT_EMAIL || 'admin@kissanebazzar.com';
+    const password = process.env.ADMIN_INIT_PASSWORD;
+    const fullName = process.env.ADMIN_INIT_NAME || 'Super Admin';
 
-      existingAdmin.password = hashedPassword;
-      existingAdmin.is_active = true;
-      await existingAdmin.save({ hooks: false }); // Skip hooks to avoid double hashing
-
-      return res.status(200).json({
-        success: true,
-        message: 'Admin password reset successfully. Username: admin, Password: admin123',
-        data: existingAdmin.toJSON()
+    if (!password || password.length < 12) {
+      return res.status(500).json({
+        success: false,
+        message: 'ADMIN_INIT_PASSWORD must be set and at least 12 characters long.'
       });
     }
 
     const admin = await models.Admin.create({
-      username: 'admin',
-      email: 'admin@kissanebazzar.com',
-      password: 'admin123', // Change this in production!
-      full_name: 'Super Admin',
+      username,
+      email,
+      password,
+      full_name: fullName,
       role: 'super_admin'
     });
 
     res.status(201).json({
       success: true,
-      message: 'Super admin created successfully. Username: admin, Password: admin123',
+      message: 'Super admin created successfully.',
       data: admin.toJSON()
     });
   } catch (error) {

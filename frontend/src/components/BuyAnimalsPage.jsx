@@ -3,10 +3,12 @@ import { useTranslation } from 'react-i18next';
 import CircleBar from './CircleBar';
 import AnimalCard from './AnimalCard';
 import DistanceToggle from './DistanceToggle';
-import CowLoader from './CowLoader';
+import AppLoader from './AppLoader';
 import { listingsService, userService } from '../services/api';
+import { useWishlist } from '../contexts/useWishlist';
 
-const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishlist }) => {
+const BuyAnimalsPage = () => {
+  const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
   const { t } = useTranslation();
   const [animalData, setAnimalData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -14,6 +16,9 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
   const [distanceMode, setDistanceMode] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedBreed, setSelectedBreed] = useState('');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
   const [isSearchSticky, setIsSearchSticky] = useState(false);
   const searchBarRef = useRef(null);
 
@@ -59,6 +64,82 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
     if (diffDays < 30) return t('time.weeksAgo', { count: Math.floor(diffDays / 7) });
     return t('time.monthsAgo', { count: Math.floor(diffDays / 30) });
   }, [t]);
+
+  const getCategoryLabel = useCallback(
+    (category) => {
+      if (!category) return '';
+      const categoryKeyMap = {
+        cow: 'cows',
+        buffalo: 'buffalo',
+        goat: 'goats',
+        bull: 'bulls',
+        horse: 'horses',
+        dog: 'dogs',
+        cat: 'cats',
+        other: 'otherAnimals'
+      };
+
+      const translationKey = categoryKeyMap[category] || category;
+
+      return t(`buyPage.${translationKey}`, {
+        defaultValue: category.charAt(0).toUpperCase() + category.slice(1)
+      });
+    },
+    [t]
+  );
+
+  const matchesSelectedCategory = useCallback((animal, category) => {
+    if (!category) return true;
+
+    const animalType = animal.animalType?.toLowerCase();
+    const normalizedCategory = category.toLowerCase();
+
+    if (normalizedCategory === 'cow' || normalizedCategory === 'bull') {
+      return animalType === 'cow' || animalType === 'bull' || animalType === 'animal';
+    }
+
+    if (normalizedCategory === 'other') {
+      return !['cow', 'bull', 'buffalo', 'goat', 'horse', 'dog', 'cat'].includes(animalType);
+    }
+
+    return animalType === normalizedCategory || animalType?.includes(normalizedCategory);
+  }, []);
+
+  const formatPriceValue = useCallback(
+    (value) => new Intl.NumberFormat('en-IN').format(Number(value) || 0),
+    []
+  );
+
+  const getPriceFilterLabel = useCallback(() => {
+    if (minPrice && maxPrice) {
+      return t('buyPage.priceFilterRange', {
+        min: formatPriceValue(minPrice),
+        max: formatPriceValue(maxPrice)
+      });
+    }
+
+    if (minPrice) {
+      return t('buyPage.priceFilterMin', {
+        min: formatPriceValue(minPrice)
+      });
+    }
+
+    if (maxPrice) {
+      return t('buyPage.priceFilterMax', {
+        max: formatPriceValue(maxPrice)
+      });
+    }
+
+    return '';
+  }, [formatPriceValue, maxPrice, minPrice, t]);
+
+  const clearAllFilters = useCallback(() => {
+    setSelectedCategory(null);
+    setSearchQuery('');
+    setSelectedBreed('');
+    setMinPrice('');
+    setMaxPrice('');
+  }, []);
 
   // Fetch user location on mount
   useEffect(() => {
@@ -150,6 +231,7 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
           listingId: listing.id,
           title: `${listing.breed_name || 'Unknown Breed'} | ${listing.animal_type.charAt(0).toUpperCase() + listing.animal_type.slice(1)}`,
           price: listing.expected_price ? Number(listing.expected_price).toLocaleString('en-IN') : '0',
+          priceValue: Number(listing.expected_price) || 0,
           location: `${listing.city || 'Unknown'}${listing.distance ? ` (${Math.round(listing.distance)} km)` : ''}`,
           datePosted: formatTimeAgo(listing.created_at),
           imageSrc: listing.front_photo || listing.side_photo || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="200"%3E%3Crect fill="%23f0f0f0" width="300" height="200"/%3E%3Ctext fill="%23999" font-family="sans-serif" font-size="16" dy="10.5" font-weight="bold" x="50%25" y="50%25" text-anchor="middle"%3ENo Image%3C/text%3E%3C/svg%3E',
@@ -175,21 +257,50 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
     fetchListings();
   }, [distanceMode, userLocation, formatTimeAgo]);
 
-  // Filter animals by category and search query
+  const animalsForSelectedCategory = useMemo(() => {
+    if (!selectedCategory) return [];
+    return animalData.filter((animal) => matchesSelectedCategory(animal, selectedCategory));
+  }, [animalData, matchesSelectedCategory, selectedCategory]);
+
+  const availableBreeds = useMemo(() => {
+    if (!selectedCategory) return [];
+
+    const uniqueBreeds = new Map();
+
+    animalsForSelectedCategory.forEach((animal) => {
+      const breed = animal.breed?.trim();
+      if (!breed) return;
+
+      const normalizedBreed = breed.toLowerCase();
+      if (!uniqueBreeds.has(normalizedBreed)) {
+        uniqueBreeds.set(normalizedBreed, breed);
+      }
+    });
+
+    return Array.from(uniqueBreeds.values()).sort((a, b) => a.localeCompare(b));
+  }, [animalsForSelectedCategory, selectedCategory]);
+
+  // Filter animals by category, breed, price, and search query
   const filteredAnimals = useMemo(() => {
     let filtered = animalData;
 
     // Filter by category
     if (selectedCategory) {
-      filtered = filtered.filter(animal => {
-        const animalType = animal.animalType?.toLowerCase();
-        const category = selectedCategory.toLowerCase();
+      filtered = filtered.filter((animal) => matchesSelectedCategory(animal, selectedCategory));
+    }
 
-        if (category === 'cow' || category === 'bull') {
-          return animalType === 'cow' || animalType === 'bull' || animalType === 'animal';
-        }
-        return animalType === category || animalType?.includes(category);
-      });
+    if (selectedBreed) {
+      filtered = filtered.filter(
+        (animal) => animal.breed?.toLowerCase() === selectedBreed.toLowerCase()
+      );
+    }
+
+    if (minPrice) {
+      filtered = filtered.filter((animal) => animal.priceValue >= Number(minPrice));
+    }
+
+    if (maxPrice) {
+      filtered = filtered.filter((animal) => animal.priceValue <= Number(maxPrice));
     }
 
     // Filter by search query
@@ -204,13 +315,19 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
     }
 
     return filtered;
-  }, [animalData, selectedCategory, searchQuery]);
+  }, [animalData, matchesSelectedCategory, maxPrice, minPrice, searchQuery, selectedBreed, selectedCategory]);
 
   const handleCategoryClick = (category) => {
+    setSelectedBreed('');
+    setMinPrice('');
+    setMaxPrice('');
     setSelectedCategory(category);
   };
 
   const clearCategoryFilter = () => {
+    setSelectedBreed('');
+    setMinPrice('');
+    setMaxPrice('');
     setSelectedCategory(null);
   };
 
@@ -585,8 +702,82 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
           </div>
         </div>
 
+        {selectedCategory && (
+          <section className="mb-8 overflow-hidden rounded-[1.75rem] border border-emerald-100 bg-white shadow-[0_18px_50px_rgba(21,187,115,0.08)]">
+            <div className="border-b border-emerald-100 bg-gradient-to-r from-emerald-50 via-white to-cyan-50 px-5 py-5 sm:px-7">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700/80">
+                    {t('buyPage.refineSelectionKicker')}
+                  </p>
+                  <h3 className="mt-2 text-2xl font-bold text-[#0f2f23]">
+                    {t('buyPage.refineSelectionTitle', { category: getCategoryLabel(selectedCategory) })}
+                  </h3>
+                  <p className="mt-2 max-w-2xl text-sm text-gray-600">
+                    {t('buyPage.refineSelectionSubtitle')}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-white/90 px-4 py-3 text-sm text-gray-600 shadow-sm ring-1 ring-emerald-100">
+                  <span className="font-semibold text-[#0f2f23]">{animalsForSelectedCategory.length}</span>{' '}
+                  {animalsForSelectedCategory.length === 1 ? t('buyPage.result') : t('buyPage.results')}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 px-5 py-5 sm:px-7 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,0.8fr)_minmax(0,0.8fr)]">
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                  {t('buyPage.breedNameFilter')}
+                </label>
+                <select
+                  value={selectedBreed}
+                  onChange={(e) => setSelectedBreed(e.target.value)}
+                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm transition-all duration-200 hover:border-emerald-200 hover:shadow-md focus:border-[#15BB73] focus:ring-2 focus:ring-[#15BB73]"
+                >
+                  <option value="">{t('buyPage.selectBreed')}</option>
+                  {availableBreeds.map((breed) => (
+                    <option key={breed} value={breed}>
+                      {breed}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                  {t('buyPage.minPrice')}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  inputMode="numeric"
+                  placeholder={t('buyPage.minPrice')}
+                  value={minPrice}
+                  onChange={(e) => setMinPrice(e.target.value)}
+                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm transition-all duration-200 hover:border-emerald-200 hover:shadow-md focus:border-[#15BB73] focus:ring-2 focus:ring-[#15BB73]"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                  {t('buyPage.maxPrice')}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  inputMode="numeric"
+                  placeholder={t('buyPage.maxPrice')}
+                  value={maxPrice}
+                  onChange={(e) => setMaxPrice(e.target.value)}
+                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm transition-all duration-200 hover:border-emerald-200 hover:shadow-md focus:border-[#15BB73] focus:ring-2 focus:ring-[#15BB73]"
+                />
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* Active Filters */}
-        {(selectedCategory || searchQuery) && (
+        {(selectedCategory || searchQuery || selectedBreed || minPrice || maxPrice) && (
           <div className="mb-6 bg-white rounded-xl p-4 shadow-sm border border-gray-100">
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-sm font-semibold text-gray-700">{t('buyPage.activeFilters')}</span>
@@ -596,7 +787,7 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
                   onClick={clearCategoryFilter}
                   className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#15BB73]/10 text-[#15BB73] rounded-lg text-sm font-medium hover:bg-[#15BB73]/20 transition-colors"
                 >
-                  <span>{selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}</span>
+                  <span>{getCategoryLabel(selectedCategory)}</span>
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -608,7 +799,34 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
                   onClick={() => setSearchQuery('')}
                   className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors"
                 >
-                  <span>Search: "{searchQuery}"</span>
+                  <span>{t('buyPage.searchFilter', { query: searchQuery })}</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+
+              {selectedBreed && (
+                <button
+                  onClick={() => setSelectedBreed('')}
+                  className="inline-flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100"
+                >
+                  <span>{t('buyPage.breedFilterChip', { breed: selectedBreed })}</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+
+              {(minPrice || maxPrice) && (
+                <button
+                  onClick={() => {
+                    setMinPrice('');
+                    setMaxPrice('');
+                  }}
+                  className="inline-flex items-center gap-2 rounded-lg bg-purple-50 px-3 py-1.5 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-100"
+                >
+                  <span>{getPriceFilterLabel()}</span>
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -616,18 +834,17 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
               )}
 
               <button
-                onClick={() => {
-                  clearCategoryFilter();
-                  setSearchQuery('');
-                }}
+                onClick={clearAllFilters}
                 className="ml-auto text-sm text-gray-600 hover:text-[#15BB73] font-medium transition-colors"
               >
-                Clear All
+                {t('buyPage.clearAll')}
               </button>
             </div>
             
             <div className="mt-2 text-sm text-gray-600">
-              Showing {filteredAnimals.length} {filteredAnimals.length === 1 ? t('buyPage.result') : t('buyPage.results')}
+              {filteredAnimals.length === 1
+                ? t('buyPage.showingResults', { count: filteredAnimals.length })
+                : t('buyPage.showingResultsPlural', { count: filteredAnimals.length })}
             </div>
           </div>
         )}
@@ -638,9 +855,11 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
             <div>
               <h3 className="text-2xl font-bold text-[#000600]">
                 {selectedCategory
-                  ? `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}s`
+                  ? getCategoryLabel(selectedCategory)
                   : searchQuery
                     ? t('buyPage.searchResults')
+                    : selectedBreed
+                      ? t('buyPage.breedResults', { breed: selectedBreed })
                     : distanceMode === 'nearby'
                       ? t('home.nearbyAnimals')
                       : t('home.allAvailableAnimals')}
@@ -662,7 +881,7 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
 
           {loading ? (
             <div className="flex justify-center items-center py-12">
-              <CowLoader message="Finding animals for you..." size="medium" />
+              <AppLoader message={t('home.findingAnimals')} size="medium" />
             </div>
           ) : filteredAnimals.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -694,27 +913,26 @@ const BuyAnimalsPage = ({ wishlist, addToWishlist, removeFromWishlist, isInWishl
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-semibold text-gray-700 mb-2">No Animals Found</h3>
+              <h3 className="text-2xl font-semibold text-gray-700 mb-2">{t('buyPage.noAnimalsFound')}</h3>
               <p className="text-gray-500 mb-6">
                 {searchQuery
-                  ? `No results found for "${searchQuery}"`
+                  ? t('buyPage.noSearchResults', { query: searchQuery })
+                  : selectedBreed
+                    ? t('buyPage.noBreedResults', { breed: selectedBreed })
                   : selectedCategory
-                    ? `No ${selectedCategory}s available at the moment`
-                    : 'Check back later for new listings'}
+                    ? t('buyPage.noCategoryResults', { category: getCategoryLabel(selectedCategory) })
+                    : t('buyPage.checkBackLater')}
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                {(selectedCategory || searchQuery) && (
+                {(selectedCategory || searchQuery || selectedBreed || minPrice || maxPrice) && (
                   <button
-                    onClick={() => {
-                      clearCategoryFilter();
-                      setSearchQuery('');
-                    }}
+                    onClick={clearAllFilters}
                     className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
-                    Clear Filters & View All
+                    {t('buyPage.clearFiltersAndViewAll')}
                   </button>
                 )}
               </div>

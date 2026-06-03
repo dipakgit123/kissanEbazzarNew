@@ -2,13 +2,12 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // API Configuration
-// For development: Use your computer's IP address with port 5000
-// For production: Use your domain name or server IP
-const DEV_API_URL = 'http://192.168.15.146:5000'; // Backend server on port 5000
-const PROD_API_URL = 'http://192.168.15.146:5000'; // Replace with your production URL/domain
+// Use environment variables or default to localhost for development
+const DEV_API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000';
+const PROD_API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000';
 
-// Set to true for production build
-const IS_PRODUCTION = false;
+// Set to true for production build (can be overridden by environment variable)
+const IS_PRODUCTION = process.env.EXPO_PUBLIC_ENV === 'production' || false;
 
 const API_URL = IS_PRODUCTION ? PROD_API_URL : DEV_API_URL;
 
@@ -168,7 +167,7 @@ export const userService = {
 
   getMyListings: async () => {
     try {
-      const response = await api.get('/api/combined/my-listings');
+      const response = await api.get('/api/listings/my-listings');
       return response.data;
     } catch (error) {
       throw error.response?.data || error;
@@ -500,6 +499,7 @@ export const veterinarianService = {
   // Send OTP for login
   sendOTP: async (phoneNumber) => {
     try {
+      // ✅ Veterinarian backend expects phone_number (snake_case)
       const response = await api.post('/api/veterinarians/send-otp', { phone_number: phoneNumber });
       return response.data;
     } catch (error) {
@@ -510,7 +510,18 @@ export const veterinarianService = {
   // Verify OTP
   verifyOTP: async (phoneNumber, otp) => {
     try {
+      // ✅ Veterinarian backend expects phone_number (snake_case)
       const response = await api.post('/api/veterinarians/verify-otp', { phone_number: phoneNumber, otp });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  // ✅ FIXED: Added missing resendOTP function
+  resendOTP: async (phoneNumber) => {
+    try {
+      const response = await api.post('/api/veterinarians/send-otp', { phone_number: phoneNumber });
       return response.data;
     } catch (error) {
       throw error.response?.data || error;

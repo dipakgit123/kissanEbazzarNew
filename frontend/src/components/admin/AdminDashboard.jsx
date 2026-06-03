@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Chart as ChartJS,
@@ -15,7 +14,10 @@ import {
   Filler
 } from 'chart.js';
 import { Line, Bar, Doughnut, Pie } from 'react-chartjs-2';
+import toast from 'react-hot-toast';
 import { API_BASE_URL } from '../../config/api';
+import BlogManagement from './BlogManagement';
+import { safeJsonParse } from '../../utils/stringUtils';
 
 // Register Chart.js components
 ChartJS.register(
@@ -32,7 +34,6 @@ ChartJS.register(
 );
 
 const AdminDashboard = () => {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [recentActivity, setRecentActivity] = useState([]);
@@ -46,27 +47,7 @@ const AdminDashboard = () => {
 
   const API_URL = API_BASE_URL;
 
-  useEffect(() => {
-    const adminData = localStorage.getItem('adminData');
-    const adminToken = localStorage.getItem('adminToken');
-
-    if (!adminToken) {
-      navigate('/admin/login');
-      return;
-    }
-
-    if (adminData) {
-      setAdmin(JSON.parse(adminData));
-    }
-
-    fetchDashboardData();
-
-    // Update time every minute
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
-    return () => clearInterval(timer);
-  }, [navigate]);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     const token = localStorage.getItem('adminToken');
 
     try {
@@ -101,7 +82,27 @@ const AdminDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [API_URL]);
+
+  useEffect(() => {
+    const adminData = localStorage.getItem('adminData');
+    const adminToken = localStorage.getItem('adminToken');
+
+    if (!adminToken) {
+      navigate('/admin/login');
+      return;
+    }
+
+    if (adminData) {
+      setAdmin(safeJsonParse(adminData, null));
+    }
+
+    fetchDashboardData();
+
+    // Update time every minute
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, [fetchDashboardData, navigate]);
 
   const handleLogout = () => {
     localStorage.removeItem('adminToken');
@@ -143,6 +144,7 @@ const AdminDashboard = () => {
     { id: 'users', label: 'Users', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
     { id: 'listings', label: 'Listings', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' },
     { id: 'veterinarians', label: 'Veterinarians', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
+    { id: 'blogs', label: 'Blogs', icon: 'M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z' },
     { id: 'reports', label: 'Reports', icon: 'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
   ];
 
@@ -175,7 +177,7 @@ const AdminDashboard = () => {
             </div>
             {!sidebarCollapsed && (
               <div>
-                <h1 className="text-lg font-bold text-white">KissanEbazzar</h1>
+                <h1 className="text-lg font-bold text-white">Animal E Bazar</h1>
                 <p className="text-xs text-slate-400">Admin Panel</p>
               </div>
             )}
@@ -282,15 +284,14 @@ const AdminDashboard = () => {
               recentActivity={recentActivity}
               topSellers={topSellers}
               locationStats={locationStats}
-              getAnimalEmoji={getAnimalEmoji}
-              formatNumber={formatNumber}
-              formatDate={formatDate}
+              formatters={{ getAnimalEmoji, formatNumber, formatDate }}
             />
           )}
           {activeTab === 'analytics' && <AnalyticsTab stats={stats} getAnimalEmoji={getAnimalEmoji} />}
           {activeTab === 'users' && <UsersTab API_URL={API_URL} />}
           {activeTab === 'listings' && <ListingsTab API_URL={API_URL} getAnimalEmoji={getAnimalEmoji} formatPrice={formatPrice} />}
           {activeTab === 'veterinarians' && <VeterinariansTab API_URL={API_URL} formatDate={formatDate} />}
+          {activeTab === 'blogs' && <BlogManagement />}
           {activeTab === 'reports' && <ReportsTab stats={stats} />}
         </main>
       </div>
@@ -299,7 +300,8 @@ const AdminDashboard = () => {
 };
 
 // Overview Tab with Charts
-const OverviewTab = ({ stats, recentActivity, topSellers, locationStats, getAnimalEmoji, formatNumber, formatDate }) => {
+const OverviewTab = ({ stats, recentActivity, topSellers, locationStats, formatters }) => {
+  const { getAnimalEmoji, formatNumber, formatDate } = formatters || {};
   // Chart data for listings by category
   const categoryData = {
     labels: stats?.listings?.byCategory ? Object.keys(stats.listings.byCategory).map(k => k.charAt(0).toUpperCase() + k.slice(1)) : [],
@@ -949,16 +951,11 @@ const AnalyticsTab = ({ stats, getAnimalEmoji }) => {
 // Users Tab Component
 const UsersTab = ({ API_URL }) => {
   const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    fetchUsers();
-  }, [page, search]);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     const token = localStorage.getItem('adminToken');
     try {
       const res = await fetch(`${API_URL}/api/admin/users?page=${page}&limit=20&search=${search}`, {
@@ -971,10 +968,12 @@ const UsersTab = ({ API_URL }) => {
       }
     } catch (error) {
       console.error('Failed to fetch users:', error);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [API_URL, page, search]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
   const toggleBlock = async (userId, blocked) => {
     const token = localStorage.getItem('adminToken');
@@ -1097,17 +1096,12 @@ const UsersTab = ({ API_URL }) => {
 // Listings Tab Component
 const ListingsTab = ({ API_URL, getAnimalEmoji, formatPrice }) => {
   const [listings, setListings] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [animalType, setAnimalType] = useState('all');
   const [status, setStatus] = useState('all');
 
-  useEffect(() => {
-    fetchListings();
-  }, [page, animalType, status]);
-
-  const fetchListings = async () => {
+  const fetchListings = useCallback(async () => {
     const token = localStorage.getItem('adminToken');
     try {
       const res = await fetch(`${API_URL}/api/admin/listings?page=${page}&limit=20&animalType=${animalType}&status=${status}`, {
@@ -1120,10 +1114,12 @@ const ListingsTab = ({ API_URL, getAnimalEmoji, formatPrice }) => {
       }
     } catch (error) {
       console.error('Failed to fetch listings:', error);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [API_URL, animalType, page, status]);
+
+  useEffect(() => {
+    fetchListings();
+  }, [fetchListings]);
 
   const deleteListing = async (type, id) => {
     if (!confirm('Are you sure you want to delete this listing?')) return;
@@ -1275,12 +1271,7 @@ const VeterinariansTab = ({ API_URL, formatDate }) => {
   const [actionLoading, setActionLoading] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
 
-  useEffect(() => {
-    fetchVeterinarians();
-    fetchStats();
-  }, [filter]);
-
-  const fetchVeterinarians = async () => {
+  const fetchVeterinarians = useCallback(async () => {
     setLoading(true);
     const token = localStorage.getItem('adminToken');
     try {
@@ -1297,9 +1288,9 @@ const VeterinariansTab = ({ API_URL, formatDate }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [API_URL, filter]);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     const token = localStorage.getItem('adminToken');
     try {
       const response = await fetch(`${API_URL}/api/admin/veterinarians/stats`, {
@@ -1312,7 +1303,12 @@ const VeterinariansTab = ({ API_URL, formatDate }) => {
     } catch (error) {
       console.error('Failed to fetch stats:', error);
     }
-  };
+  }, [API_URL]);
+
+  useEffect(() => {
+    fetchVeterinarians();
+    fetchStats();
+  }, [fetchStats, fetchVeterinarians]);
 
   const handleVerify = async (vetId) => {
     if (!confirm('Are you sure you want to verify this veterinarian? An email with login credentials will be sent.')) {
@@ -1333,17 +1329,17 @@ const VeterinariansTab = ({ API_URL, formatDate }) => {
 
       const data = await response.json();
       if (data.success) {
-        alert(data.message);
+        toast.success(data.message);
         fetchVeterinarians();
         fetchStats();
         setShowModal(false);
         setSelectedVet(null);
       } else {
-        alert('Verification failed: ' + data.message);
+        toast.error(`Verification failed: ${data.message}`);
       }
     } catch (error) {
       console.error('Verification error:', error);
-      alert('Failed to verify veterinarian');
+      toast.error('Failed to verify veterinarian');
     } finally {
       setActionLoading(false);
     }
@@ -1351,7 +1347,7 @@ const VeterinariansTab = ({ API_URL, formatDate }) => {
 
   const handleReject = async (vetId) => {
     if (!rejectReason.trim()) {
-      alert('Please provide a rejection reason');
+      toast.error('Please provide a rejection reason');
       return;
     }
 
@@ -1369,18 +1365,18 @@ const VeterinariansTab = ({ API_URL, formatDate }) => {
 
       const data = await response.json();
       if (data.success) {
-        alert('Veterinarian rejected successfully');
+        toast.success('Veterinarian rejected successfully');
         fetchVeterinarians();
         fetchStats();
         setShowModal(false);
         setSelectedVet(null);
         setRejectReason('');
       } else {
-        alert('Rejection failed: ' + data.message);
+        toast.error(`Rejection failed: ${data.message}`);
       }
     } catch (error) {
       console.error('Rejection error:', error);
-      alert('Failed to reject veterinarian');
+      toast.error('Failed to reject veterinarian');
     } finally {
       setActionLoading(false);
     }
@@ -1866,7 +1862,7 @@ const ReportsTab = ({ stats }) => {
         <div className="grid md:grid-cols-2 gap-4">
           <div className="p-4 bg-slate-800/50 rounded-xl">
             <p className="text-slate-400 text-sm">Platform Version</p>
-            <p className="text-white font-medium">KissanEbazzar v1.0.0</p>
+            <p className="text-white font-medium">Animal E Bazar v1.0.0</p>
           </div>
           <div className="p-4 bg-slate-800/50 rounded-xl">
             <p className="text-slate-400 text-sm">Last Updated</p>

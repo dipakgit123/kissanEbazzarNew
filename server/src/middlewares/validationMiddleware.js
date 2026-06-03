@@ -29,6 +29,22 @@ const validatePhone = (req, res, next) => {
 /**
  * Validate OTP format
  */
+const getExpectedOtpLength = () => {
+  const provider = (process.env.OTP_PROVIDER || 'twilio-verify').toLowerCase();
+
+  if (provider === 'messagecentral') {
+    return parseInt(process.env.MESSAGE_CENTRAL_OTP_LENGTH, 10) || 4;
+  }
+
+  if (provider === 'messagecentral-sms') {
+    return parseInt(process.env.MESSAGE_CENTRAL_SMS_OTP_LENGTH, 10)
+      || parseInt(process.env.OTP_LENGTH, 10)
+      || 4;
+  }
+
+  return parseInt(process.env.OTP_LENGTH, 10) || 6;
+};
+
 const validateOTP = (req, res, next) => {
   const { phoneNumber, otp } = req.body;
 
@@ -66,7 +82,7 @@ const validateOTP = (req, res, next) => {
   }
 
   // Check OTP length (default is 6 digits)
-  const otpLength = parseInt(process.env.OTP_LENGTH) || 6;
+  const otpLength = getExpectedOtpLength();
   
   if (otp.length !== otpLength) {
     return res.status(400).json({

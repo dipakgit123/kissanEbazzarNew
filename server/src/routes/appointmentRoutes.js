@@ -2,38 +2,8 @@ const express = require('express');
 const router = express.Router();
 const appointmentController = require('../controllers/appointmentController');
 const authMiddleware = require('../middlewares/authMiddleware');
-
-// Middleware to verify veterinarian JWT token
-const vetAuthMiddleware = (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication required'
-      });
-    }
-
-    const token = authHeader.split(' ')[1];
-    const jwt = require('jsonwebtoken');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-
-    if (decoded.type !== 'veterinarian') {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. Veterinarian account required.'
-      });
-    }
-
-    req.vet = decoded;
-    next();
-  } catch (error) {
-    return res.status(401).json({
-      success: false,
-      message: 'Invalid or expired token'
-    });
-  }
-};
+const vetAuthMiddleware = require('../middlewares/vetAuthMiddleware');
+const userOrVetAuthMiddleware = require('../middlewares/userOrVetAuthMiddleware');
 
 // ============ USER ROUTES (Protected with authMiddleware) ============
 
@@ -88,12 +58,6 @@ router.patch('/:id/status', vetAuthMiddleware, appointmentController.updateAppoi
  * @desc    Get single appointment details
  * @access  Protected (User or Veterinarian)
  */
-router.get('/:id', (req, res, next) => {
-  // Try both auth middlewares
-  authMiddleware(req, res, (err) => {
-    if (!err) return next();
-    vetAuthMiddleware(req, res, next);
-  });
-}, appointmentController.getAppointmentById.bind(appointmentController));
+router.get('/:id', userOrVetAuthMiddleware, appointmentController.getAppointmentById.bind(appointmentController));
 
 module.exports = router;

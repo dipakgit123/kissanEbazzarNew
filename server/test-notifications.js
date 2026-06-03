@@ -6,7 +6,7 @@
 const axios = require('axios');
 
 // Configuration
-const API_URL = 'http://localhost:3000/api';  // Change to your backend URL
+const API_URL = 'http://localhost:5000/api';  // Change to your backend URL
 const TEST_USER_ID = 'test-user-123';
 const TEST_TOKEN = 'ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]'; // Replace with real token
 

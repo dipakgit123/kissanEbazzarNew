@@ -2,23 +2,54 @@
 import { Link } from 'react-router-dom';
 import { pregnancyService } from '../services/api';
 import { useTranslation } from 'react-i18next';
+import toast from 'react-hot-toast';
+import {
+  FaBaby,
+  FaCalendarDays,
+  FaCalendarXmark,
+  FaCat,
+  FaChartBar,
+  FaChevronLeft,
+  FaChevronRight,
+  FaCircleInfo,
+  FaClock,
+  FaCow,
+  FaDog,
+  FaHorseHead,
+  FaPaw,
+  FaPiggyBank,
+  FaPlus,
+  FaTriangleExclamation,
+  FaXmark
+} from 'react-icons/fa6';
+import { GiAlarmClock, GiBuffaloHead, GiGoat, GiSheep } from 'react-icons/gi';
+import { MdPregnantWoman } from 'react-icons/md';
+import { FullPageLoader } from './AppLoader';
 
 // Pregnancy duration in days for different animal types
 const PREGNANCY_DURATIONS = {
-  cow: { days: 280, monthCount: 9, emoji: '🐄' },
-  buffalo: { days: 310, monthCount: 10, emoji: '🐃' },
-  goat: { days: 150, monthCount: 5, emoji: '🐐' },
-  sheep: { days: 150, monthCount: 5, emoji: '🐑' },
-  horse: { days: 340, monthCount: 11, emoji: '🐴' },
-  dog: { days: 63, monthCount: 2, emoji: '🐕' },
-  cat: { days: 65, monthCount: 2, emoji: '🐱' },
-  pig: { days: 114, monthCount: 4, emoji: '🐷' },
-  other: { days: 150, monthCount: 5, emoji: '🐾' }
+  cow: { days: 280, monthCount: 9, Icon: FaCow, iconClass: 'text-emerald-300' },
+  buffalo: { days: 310, monthCount: 10, Icon: GiBuffaloHead, iconClass: 'text-slate-300' },
+  goat: { days: 150, monthCount: 5, Icon: GiGoat, iconClass: 'text-amber-300' },
+  sheep: { days: 150, monthCount: 5, Icon: GiSheep, iconClass: 'text-zinc-200' },
+  horse: { days: 340, monthCount: 11, Icon: FaHorseHead, iconClass: 'text-violet-300' },
+  dog: { days: 63, monthCount: 2, Icon: FaDog, iconClass: 'text-orange-300' },
+  cat: { days: 65, monthCount: 2, Icon: FaCat, iconClass: 'text-rose-300' },
+  pig: { days: 114, monthCount: 4, Icon: FaPiggyBank, iconClass: 'text-pink-300' },
+  other: { days: 150, monthCount: 5, Icon: FaPaw, iconClass: 'text-sky-300' }
 };
 
-// Get animal type emoji
-const getAnimalEmoji = (type) => {
-  return PREGNANCY_DURATIONS[type?.toLowerCase()]?.emoji || '🐄';
+const getAnimalMeta = (type) => {
+  return PREGNANCY_DURATIONS[type?.toLowerCase()] || PREGNANCY_DURATIONS.cow;
+};
+
+const AnimalTypeIcon = ({ type, className = 'text-xl', containerClassName = '' }) => {
+  const { Icon, iconClass } = getAnimalMeta(type);
+  return (
+    <span className={`inline-flex items-center justify-center ${containerClassName}`}>
+      <Icon className={`${iconClass} ${className}`} />
+    </span>
+  );
 };
 
 // Format date for display
@@ -56,7 +87,6 @@ const getProgressColor = (daysRemaining, totalDays) => {
 const PregnancyCalendar = () => {
   const { t } = useTranslation();
   const [pregnancyRecords, setPregnancyRecords] = useState([]);
-  const [myAnimals, setMyAnimals] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -94,14 +124,13 @@ const PregnancyCalendar = () => {
       setLoading(true);
       setError(null);
 
-      const [recordsRes, animalsRes, statsRes] = await Promise.all([
+      const [recordsRes, , statsRes] = await Promise.all([
         pregnancyService.getRecords(),
         pregnancyService.getMyAnimals(),
         pregnancyService.getStats()
       ]);
 
       if (recordsRes.success) setPregnancyRecords(recordsRes.data || []);
-      if (animalsRes.success) setMyAnimals(animalsRes.data || []);
       if (statsRes.success) setStats(statsRes.data);
     } catch (err) {
       console.error('Error fetching pregnancy data:', err);
@@ -138,7 +167,7 @@ const PregnancyCalendar = () => {
       }
     } catch (err) {
       console.error('Error creating pregnancy record:', err);
-      alert('Failed to create pregnancy record');
+      toast.error('Failed to create pregnancy record');
     }
   };
 
@@ -154,7 +183,7 @@ const PregnancyCalendar = () => {
       }
     } catch (err) {
       console.error('Error marking as delivered:', err);
-      alert('Failed to mark as delivered');
+      toast.error('Failed to mark as delivered');
     }
   };
 
@@ -169,21 +198,8 @@ const PregnancyCalendar = () => {
       }
     } catch (err) {
       console.error('Error deleting record:', err);
-      alert('Failed to delete record');
+      toast.error('Failed to delete record');
     }
-  };
-
-  // Select animal from listing
-  const handleSelectAnimal = (animal) => {
-    setFormData({
-      ...formData,
-      listing_id: animal.id,
-      listing_type: animal.listing_type,
-      animal_type: animal.animal_type,
-      animal_name: animal.breed_name || '',
-      breed_name: animal.breed_name || '',
-      animal_photo: animal.photo
-    });
   };
 
   // Calculate expected delivery date when mating date or animal type changes
@@ -277,7 +293,10 @@ const PregnancyCalendar = () => {
             )}
           </div>
           {hasDueDate && (
-            <div className="text-xs text-red-400 font-semibold">?? {t("pregnancy.due")}</div>
+            <div className="flex items-center gap-1 text-xs text-red-400 font-semibold">
+              <FaClock className="text-[10px]" />
+              {t("pregnancy.due")}
+            </div>
           )}
         </div>
       );
@@ -294,14 +313,7 @@ const PregnancyCalendar = () => {
   });
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-300 font-medium">{t("pregnancy.loadingCalendar")}</p>
-        </div>
-      </div>
-    );
+    return <FullPageLoader message={t("pregnancy.loadingCalendar")} dark />;
   }
 
   return (
@@ -323,9 +335,9 @@ const PregnancyCalendar = () => {
                 onClick={() => setShowAddForm(true)}
                 className="px-5 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-all shadow-sm hover:shadow-md flex items-center gap-2"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>{t("pregnancy.addPregnancy")}</button>
+                <FaPlus className="w-4 h-4" />
+                {t("pregnancy.addPregnancy")}
+              </button>
             </div>
           </div>
         </div>
@@ -346,7 +358,7 @@ const PregnancyCalendar = () => {
                   <p className="text-3xl font-bold text-white">{stats.active_pregnancies || 0}</p>
                 </div>
                 <div className="w-12 h-12 bg-green-900/50 rounded-lg flex items-center justify-center border border-green-700">
-                  <span className="text-2xl">🤰</span>
+                  <MdPregnantWoman className="text-2xl text-green-300" />
                 </div>
               </div>
             </div>
@@ -358,7 +370,7 @@ const PregnancyCalendar = () => {
                   <p className="text-3xl font-bold text-white">{stats.successful_deliveries || 0}</p>
                 </div>
                 <div className="w-12 h-12 bg-blue-900/50 rounded-lg flex items-center justify-center border border-blue-700">
-                  <span className="text-2xl">🐣</span>
+                  <FaBaby className="text-2xl text-blue-300" />
                 </div>
               </div>
             </div>
@@ -370,7 +382,7 @@ const PregnancyCalendar = () => {
                   <p className="text-3xl font-bold text-white">{stats.upcoming_deliveries?.length || 0}</p>
                 </div>
                 <div className="w-12 h-12 bg-orange-900/50 rounded-lg flex items-center justify-center border border-orange-700">
-                  <span className="text-2xl">⏰</span>
+                  <GiAlarmClock className="text-2xl text-orange-300" />
                 </div>
               </div>
             </div>
@@ -382,7 +394,7 @@ const PregnancyCalendar = () => {
                   <p className="text-3xl font-bold text-white">{stats.total_records || 0}</p>
                 </div>
                 <div className="w-12 h-12 bg-purple-900/50 rounded-lg flex items-center justify-center border border-purple-700">
-                  <span className="text-2xl">📊</span>
+                  <FaChartBar className="text-2xl text-purple-300" />
                 </div>
               </div>
             </div>
@@ -391,11 +403,14 @@ const PregnancyCalendar = () => {
 
         {/* {t("pregnancy.pregnancyDurationReference")} */}
         <div className="mb-8 bg-gray-900 rounded-xl p-6 border border-gray-800 shadow-sm">
-          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><span>📅</span> {t("pregnancy.pregnancyDurationReference")}</h3>
+          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <FaCalendarDays className="text-sky-300" />
+            {t("pregnancy.pregnancyDurationReference")}
+          </h3>
           <div className="flex flex-wrap gap-2">
             {Object.entries(PREGNANCY_DURATIONS).map(([type, info]) => (
               <div key={type} className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-lg border border-gray-700 hover:border-green-600 transition-colors">
-                <span className="text-lg">{info.emoji}</span>
+                <AnimalTypeIcon type={type} className="text-lg" />
                 <span className="text-sm text-gray-300 font-medium">{t(`pregnancy.animal${type.charAt(0).toUpperCase() + type.slice(1)}`)}:</span>
                 <span className="text-sm text-green-400 font-semibold">{t(`pregnancy.months${info.monthCount}`)}</span>
               </div>
@@ -414,9 +429,7 @@ const PregnancyCalendar = () => {
                   onClick={() => navigateMonth(-1)}
                   className="p-2 rounded-lg border border-gray-700 hover:bg-gray-800 hover:border-gray-600 transition-colors"
                 >
-                  <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
+                  <FaChevronLeft className="w-5 h-5 text-gray-300" />
                 </button>
 
                 <h2 className="text-xl font-bold text-white">
@@ -427,9 +440,7 @@ const PregnancyCalendar = () => {
                   onClick={() => navigateMonth(1)}
                   className="p-2 rounded-lg border border-gray-700 hover:bg-gray-800 hover:border-gray-600 transition-colors"
                 >
-                  <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
+                  <FaChevronRight className="w-5 h-5 text-gray-300" />
                 </button>
               </div>
 
@@ -510,7 +521,7 @@ const PregnancyCalendar = () => {
                         {/* Header */}
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex items-center gap-2">
-                            <span className="text-2xl">{getAnimalEmoji(record.animal_type)}</span>
+                            <AnimalTypeIcon type={record.animal_type} className="text-2xl" />
                             <div>
                               <h4 className="text-sm font-bold text-white">{record.animal_name}</h4>
                               <p className="text-xs text-gray-400 capitalize">{record.breed_name || record.animal_type}</p>
@@ -591,7 +602,7 @@ const PregnancyCalendar = () => {
               ) : (
                 <div className="text-center py-12">
                   <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-700">
-                    <span className="text-3xl">📅</span>
+                    <FaCalendarXmark className="text-3xl text-gray-400" />
                   </div>
                   <p className="text-gray-400 text-sm mb-3">{t("pregnancy.noRecords")}</p>
                   <button
@@ -606,12 +617,14 @@ const PregnancyCalendar = () => {
             {stats?.upcoming_deliveries?.length > 0 && (
               <div className="bg-orange-900/30 rounded-xl p-4 border border-orange-700">
                 <h3 className="text-sm font-bold text-orange-300 mb-3 flex items-center gap-2">
-                  <span>⚠️</span>{t("pregnancy.dueWithin30Days")}</h3>
+                  <FaTriangleExclamation className="text-orange-300" />
+                  {t("pregnancy.dueWithin30Days")}
+                </h3>
                 <div className="space-y-2">
                   {stats.upcoming_deliveries.slice(0, 3).map((item) => (
                     <div key={item.id} className="flex items-center justify-between p-2.5 bg-gray-800 rounded-lg border border-orange-700/50">
                       <div className="flex items-center gap-2">
-                        <span className="text-lg">{getAnimalEmoji(item.animal_type)}</span>
+                        <AnimalTypeIcon type={item.animal_type} className="text-lg" />
                         <span className="text-sm text-gray-200 font-semibold">{item.animal_name}</span>
                       </div>
                       <span className="text-xs text-orange-400 font-bold">{item.days_remaining} {t("pregnancy.days")}</span>
@@ -631,14 +644,14 @@ const PregnancyCalendar = () => {
             {/* Modal Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <span>🤰</span>{t("pregnancy.addPregnancyRecord")}</h3>
+                <MdPregnantWoman className="text-green-600" />
+                {t("pregnancy.addPregnancyRecord")}
+              </h3>
               <button
                 onClick={() => setShowAddForm(false)}
                 className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <FaXmark className="w-6 h-6" />
               </button>
             </div>
 
@@ -649,6 +662,10 @@ const PregnancyCalendar = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.animalType")}</label>
+                    <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-green-50 px-3 py-1.5 text-sm font-medium text-green-700">
+                      <AnimalTypeIcon type={formData.animal_type} className="text-base" />
+                      <span>{t(`pregnancy.animal${formData.animal_type.charAt(0).toUpperCase() + formData.animal_type.slice(1)}`)}</span>
+                    </div>
                     <select
                       value={formData.animal_type}
                       onChange={(e) => setFormData({ ...formData, animal_type: e.target.value })}
@@ -657,7 +674,7 @@ const PregnancyCalendar = () => {
                     >
                       {Object.keys(PREGNANCY_DURATIONS).map(type => (
                         <option key={type} value={type}>
-                          {getAnimalEmoji(type)} {t(`pregnancy.animal${type.charAt(0).toUpperCase() + type.slice(1)}`)}
+                          {t(`pregnancy.animal${type.charAt(0).toUpperCase() + type.slice(1)}`)}
                         </option>
                       ))}
                     </select>
@@ -711,9 +728,7 @@ const PregnancyCalendar = () => {
                     required
                   />
                   <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                    </svg>
+                    <FaCircleInfo className="w-4 h-4" />
                     {t("pregnancy.expectedDelivery")}: ~{t(`pregnancy.months${PREGNANCY_DURATIONS[formData.animal_type]?.monthCount}`)} {t("pregnancy.fromMatingDate")}
                   </p>
                 </div>
@@ -765,7 +780,9 @@ const PregnancyCalendar = () => {
             {/* Modal Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <span>🐣</span>{t("pregnancy.recordDelivery")}</h3>
+                <FaBaby className="text-blue-500" />
+                {t("pregnancy.recordDelivery")}
+              </h3>
               <button
                 onClick={() => {
                   setShowDeliverModal(false);
@@ -773,9 +790,7 @@ const PregnancyCalendar = () => {
                 }}
                 className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <FaXmark className="w-6 h-6" />
               </button>
             </div>
 
@@ -783,7 +798,7 @@ const PregnancyCalendar = () => {
             <div className="p-6">
               {/* Animal Info Card */}
               <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200 flex items-center gap-3">
-                <span className="text-3xl">{getAnimalEmoji(selectedRecord.animal_type)}</span>
+                <AnimalTypeIcon type={selectedRecord.animal_type} className="text-3xl" />
                 <div>
                   <p className="text-gray-900 font-bold">{selectedRecord.animal_name}</p>
                   <p className="text-gray-600 text-sm">{selectedRecord.breed_name || selectedRecord.animal_type}</p>

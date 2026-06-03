@@ -1,13 +1,43 @@
 'use strict';
 
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
 const adminAuth = require('../middleware/adminAuth');
 
+const requireAdminInitSecret = (req, res, next) => {
+  const configuredSecret = process.env.ADMIN_INIT_SECRET;
+  if (!configuredSecret) {
+    return res.status(403).json({
+      success: false,
+      message: 'Admin bootstrap is disabled.'
+    });
+  }
+
+  const providedSecret = req.get('x-admin-init-secret') || req.body?.initSecret;
+  if (!providedSecret) {
+    return res.status(401).json({
+      success: false,
+      message: 'Admin bootstrap secret is required.'
+    });
+  }
+
+  const expected = Buffer.from(configuredSecret, 'utf8');
+  const provided = Buffer.from(String(providedSecret), 'utf8');
+  if (expected.length !== provided.length || !crypto.timingSafeEqual(expected, provided)) {
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid admin bootstrap secret.'
+    });
+  }
+
+  next();
+};
+
 // Public routes
 router.post('/login', adminController.login);
-router.post('/init', adminController.initSuperAdmin); // One-time setup
+router.post('/init', requireAdminInitSecret, adminController.initSuperAdmin); // One-time setup with explicit secret
 
 // Protected routes - require admin authentication
 router.use(adminAuth);

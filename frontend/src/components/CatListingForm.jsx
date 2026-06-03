@@ -1,16 +1,15 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
+import toast from 'react-hot-toast';
 import { API_BASE_URL } from '../config/api';
 import {
   FormInput,
   FormSelect,
-  FormCheckbox,
   FormRadioGroup,
   FormFileInput,
   FormSection,
   FormAlert,
-  InfoBanner,
   SubmitButton
 } from './common';
 import './AnimalListingPage.css';
@@ -32,9 +31,7 @@ const CatListingForm = () => {
     behavior: 'friendly',
     description: '',
     expectedPrice: '',
-    isNegotiable: 'true',
-    detailsConfirmed: false,
-    termsAccepted: false
+    isNegotiable: 'true'
   });
 
   const [files, setFiles] = useState({
@@ -124,9 +121,7 @@ const CatListingForm = () => {
           behavior: 'friendly',
           description: '',
           expectedPrice: '',
-          isNegotiable: 'true',
-          detailsConfirmed: false,
-          termsAccepted: false
+          isNegotiable: 'true'
         });
         setFiles({
           photo1: null,
@@ -137,12 +132,12 @@ const CatListingForm = () => {
           video: null
         });
 
-        alert(t('listing.createSuccess'));
+        toast.success(t('listing.createSuccess'));
       }
     } catch (err) {
       console.error('Error creating listing:', err);
       setError(err.response?.data?.message || err.message || t('listing.createError'));
-      alert(`Error: ${err.response?.data?.message || err.message || t('listing.createError')}`);
+      toast.error(err.response?.data?.message || err.message || t('listing.createError'));
     } finally {
       setLoading(false);
     }
@@ -377,28 +372,6 @@ const CatListingForm = () => {
           />
         </div>
       </FormSection>
-
-      <FormSection number="4" title={t('listing.termsConfirmation')}>
-          <FormCheckbox
-          id="cat-detailsConfirmed"
-          name="detailsConfirmed"
-          label={t('listing.confirmDetails')}
-          checked={formData.detailsConfirmed}
-          onChange={handleChange}
-          required
-        />
-
-        <FormCheckbox
-          id="cat-termsAccepted"
-          name="termsAccepted"
-          label={t('listing.agreeTerms')}
-          checked={formData.termsAccepted}
-          onChange={handleChange}
-          required
-        />
-      </FormSection>
-
-      <InfoBanner />
 
       <SubmitButton loading={loading} loadingText={t('listing.submitting')} submitText={t('listing.submit')} />
     </form>

@@ -21,6 +21,14 @@ exports.createOtherAnimalListing = async (req, res) => {
     }
 
     const userId = req.user.id;
+    const user = await User.findByPk(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
 
     // Prepare listing data
     const listingData = {
@@ -37,14 +45,11 @@ exports.createOtherAnimalListing = async (req, res) => {
       temperament: req.body.temperament || 'friendly',
       expectedPrice: req.body.expectedPrice,
       isNegotiable: req.body.isNegotiable === 'true' || req.body.isNegotiable === true,
-      vaccinationDetails: req.body.vaccinationDetails || null,
-      deliveryAvailable: req.body.deliveryAvailable === 'true' || req.body.deliveryAvailable === true,
-      additionalNotes: req.body.additionalNotes || null,
-      latitude: req.body.latitude || null,
-      longitude: req.body.longitude || null,
-      city: req.body.city || null,
-      state: req.body.state || null,
-      pincode: req.body.pincode || null,
+      latitude: user.latitude || null,
+      longitude: user.longitude || null,
+      city: user.city || null,
+      state: user.state || null,
+      pincode: user.postal_code || null,
       status: 'active',
       views: 0
     };
@@ -140,6 +145,9 @@ exports.getAllOtherAnimalListings = async (req, res) => {
       sortBy = 'createdAt',
       sortOrder = 'DESC'
     } = req.query;
+    const validSortFields = ['createdAt', 'updatedAt', 'expectedPrice', 'views'];
+    const sanitizedSortBy = validSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    const sanitizedSortOrder = String(sortOrder).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
     const offset = (page - 1) * limit;
 
@@ -153,13 +161,13 @@ exports.getAllOtherAnimalListings = async (req, res) => {
       state,
       gender,
       healthCondition,
-      temperament
+      temperament,
+      sortBy: sanitizedSortBy,
+      sortOrder: sanitizedSortOrder
     };
 
     const listings = await OtherAnimalListing.search(filters);
-    const totalCount = await OtherAnimalListing.count({
-      where: { status: 'active' }
-    });
+    const totalCount = await OtherAnimalListing.countSearch(filters);
 
     res.json({
       success: true,

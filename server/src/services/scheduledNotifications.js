@@ -1,6 +1,7 @@
 ﻿const cron = require('node-cron');
 const db = require('../models');
-const notificationService = require('../services/notificationService');
+const notificationService = require('./notificationService');
+const logger = require('../utils/logger');
 const { Op } = require('sequelize');
 
 /**
@@ -11,7 +12,7 @@ const { Op } = require('sequelize');
 // Job 1: Send appointment reminders (runs every hour)
 cron.schedule('0 * * * *', async () => {
   try {
-    console.log('🔔 Running appointment reminder job...');
+    logger.log('🔔 Running appointment reminder job...');
     
     const now = new Date();
     const tomorrow = new Date(now);
@@ -36,36 +37,46 @@ cron.schedule('0 * * * *', async () => {
       ]
     });
 
-    console.log(\Found \ appointments for tomorrow\);
+    logger.log(`Found ${appointments.length} appointments for tomorrow`);
 
     // Send reminder to each user
-    const notificationPromises = appointments.map(appointment => {
+    const notificationPromises = appointments.map(async (appointment) => {
       const appointmentTime = appointment.appointment_time || '10:00 AM';
-      return notificationService.sendPushNotification(appointment.user_id, {
-        title: '📅 Appointment Reminder',
-        body: \Your vet appointment with Dr. \ is tomorrow at \\,
-        data: {
-          type: 'appointment_reminder',
-          appointmentId: appointment.id.toString(),
-          veterinarianId: appointment.veterinarian_id.toString()
-        },
-        sound: 'default',
-        priority: 'high'
+      const vetName = appointment.veterinarian?.full_name || 'Veterinarian';
+
+      // Get user's device tokens
+      const tokens = await db.DeviceToken.findAll({
+        where: { user_id: appointment.user_id, is_active: true }
       });
+
+      if (tokens.length > 0) {
+        const pushTokens = tokens.map(t => t.token);
+        return notificationService.sendBulkPushNotifications(
+          pushTokens,
+          '📅 Appointment Reminder',
+          `Your vet appointment with Dr. ${vetName} is tomorrow at ${appointmentTime}`,
+          {
+            type: 'appointment_reminder',
+            appointmentId: appointment.id.toString(),
+            veterinarianId: appointment.veterinarian_id.toString()
+          }
+        );
+      }
+      return null;
     });
 
     await Promise.allSettled(notificationPromises);
-    console.log(\✅ Sent \ appointment reminders\);
+    logger.log(`✅ Sent ${appointments.length} appointment reminders`);
     
   } catch (error) {
-    console.error('❌ Error in appointment reminder job:', error);
+    logger.error('❌ Error in appointment reminder job:', error);
   }
 });
 
 // Job 2: Send pregnancy due date reminders (runs daily at 9 AM)
 cron.schedule('0 9 * * *', async () => {
   try {
-    console.log('🔔 Running pregnancy reminder job...');
+    logger.log('🔔 Running pregnancy reminder job...');
     
     const today = new Date();
     const weekFromNow = new Date(today);
@@ -83,32 +94,43 @@ cron.schedule('0 9 * * *', async () => {
       include: [{ model: db.User, as: 'user' }]
     });
 
-    console.log(\Found \ pregnancies due soon\);
+    logger.log(`Found ${pregnancies.length} pregnancies due soon`);
 
-    const notificationPromises = pregnancies.map(pregnancy => {
+    const notificationPromises = pregnancies.map(async (pregnancy) => {
       const daysLeft = Math.ceil((new Date(pregnancy.expected_delivery_date) - today) / (1000 * 60 * 60 * 24));
-      return notificationService.sendPushNotification(pregnancy.user_id, {
-        title: '🐄 Pregnancy Alert',
-        body: \\ is due in \ days! Be prepared.\,
-        data: {
-          type: 'pregnancy_reminder',
-          recordId: pregnancy.id.toString(),
-          daysLeft: daysLeft.toString()
-        },
-        sound: 'default'
+      const animalName = pregnancy.animal_name || 'Your animal';
+
+      // Get user's device tokens
+      const tokens = await db.DeviceToken.findAll({
+        where: { user_id: pregnancy.user_id, is_active: true }
       });
+
+      if (tokens.length > 0) {
+        const pushTokens = tokens.map(t => t.token);
+        return notificationService.sendBulkPushNotifications(
+          pushTokens,
+          '🐄 Pregnancy Alert',
+          `${animalName} is due in ${daysLeft} days! Be prepared.`,
+          {
+            type: 'pregnancy_reminder',
+            recordId: pregnancy.id.toString(),
+            daysLeft: daysLeft.toString()
+          }
+        );
+      }
+      return null;
     });
 
     await Promise.allSettled(notificationPromises);
-    console.log(\✅ Sent \ pregnancy reminders\);
+    logger.log(`✅ Sent ${pregnancies.length} pregnancy reminders`);
     
   } catch (error) {
-    console.error('❌ Error in pregnancy reminder job:', error);
+    logger.error('❌ Error in pregnancy reminder job:', error);
   }
 });
 
-console.log('✅ Scheduled notification jobs started');
-console.log('   - Appointment reminders: Every hour');
-console.log('   - Pregnancy reminders: Daily at 9 AM');
+logger.log('✅ Scheduled notification jobs started');
+logger.log('   - Appointment reminders: Every hour');
+logger.log('   - Pregnancy reminders: Daily at 9 AM');
 
 module.exports = { /* Jobs run automatically */ };

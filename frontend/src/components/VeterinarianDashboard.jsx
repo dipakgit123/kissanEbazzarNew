@@ -7,6 +7,9 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer
 } from 'recharts';
+import LanguageSwitcher from './LanguageSwitcher';
+import { safeJsonParse } from '../utils/stringUtils';
+import { FullPageLoader } from './AppLoader';
 
 // Icons
 const DashboardIcon = () => (
@@ -86,7 +89,7 @@ const VeterinarianDashboard = () => {
   const [darkMode, setDarkMode] = useState(() => {
     // Load dark mode preference from localStorage
     const saved = localStorage.getItem('vetDarkMode');
-    return saved ? JSON.parse(saved) : false;
+    return safeJsonParse(saved, false);
   });
   const [stats, setStats] = useState({
     totalPatients: 0,
@@ -95,41 +98,45 @@ const VeterinarianDashboard = () => {
     totalReviews: 0
   });
 
+  const doctorPrefix = t('vetDashboard.doctorPrefix', 'Dr.');
+  const notAvailableLabel = t('vetDashboard.notAvailable', 'N/A');
+  const translatedVeterinarianLabel = t('vetDashboard.veterinarian', 'Veterinarian');
+
   // Mock data for charts - Replace with real API data later
   const appointmentsData = [
-    { month: 'Jan', appointments: 45, revenue: 22500 },
-    { month: 'Feb', appointments: 52, revenue: 26000 },
-    { month: 'Mar', appointments: 48, revenue: 24000 },
-    { month: 'Apr', appointments: 61, revenue: 30500 },
-    { month: 'May', appointments: 55, revenue: 27500 },
-    { month: 'Jun', appointments: 67, revenue: 33500 },
+    { month: t('vetDashboard.monthJan', 'Jan'), appointments: 45, revenue: 22500 },
+    { month: t('vetDashboard.monthFeb', 'Feb'), appointments: 52, revenue: 26000 },
+    { month: t('vetDashboard.monthMar', 'Mar'), appointments: 48, revenue: 24000 },
+    { month: t('vetDashboard.monthApr', 'Apr'), appointments: 61, revenue: 30500 },
+    { month: t('vetDashboard.monthMay', 'May'), appointments: 55, revenue: 27500 },
+    { month: t('vetDashboard.monthJun', 'Jun'), appointments: 67, revenue: 33500 },
   ];
 
   const patientTypeData = [
-    { name: 'Cattle', value: 45, color: '#3B82F6' },
-    { name: 'Buffalo', value: 25, color: '#8B5CF6' },
-    { name: 'Goat', value: 15, color: '#10B981' },
-    { name: 'Dog', value: 10, color: '#F59E0B' },
-    { name: 'Cat', value: 5, color: '#EF4444' },
+    { name: t('vetDashboard.animalCattle', 'Cattle'), value: 45, color: '#3B82F6' },
+    { name: t('vetDashboard.animalBuffalo', 'Buffalo'), value: 25, color: '#8B5CF6' },
+    { name: t('vetDashboard.animalGoat', 'Goat'), value: 15, color: '#10B981' },
+    { name: t('vetDashboard.animalDog', 'Dog'), value: 10, color: '#F59E0B' },
+    { name: t('vetDashboard.animalCat', 'Cat'), value: 5, color: '#EF4444' },
   ];
 
   const weeklyAppointments = [
-    { day: 'Mon', appointments: 8, consultations: 6 },
-    { day: 'Tue', appointments: 12, consultations: 10 },
-    { day: 'Wed', appointments: 10, consultations: 8 },
-    { day: 'Thu', appointments: 15, consultations: 12 },
-    { day: 'Fri', appointments: 9, consultations: 7 },
-    { day: 'Sat', appointments: 14, consultations: 11 },
-    { day: 'Sun', appointments: 6, consultations: 5 },
+    { day: t('vetDashboard.dayMon', 'Mon'), appointments: 8, consultations: 6 },
+    { day: t('vetDashboard.dayTue', 'Tue'), appointments: 12, consultations: 10 },
+    { day: t('vetDashboard.dayWed', 'Wed'), appointments: 10, consultations: 8 },
+    { day: t('vetDashboard.dayThu', 'Thu'), appointments: 15, consultations: 12 },
+    { day: t('vetDashboard.dayFri', 'Fri'), appointments: 9, consultations: 7 },
+    { day: t('vetDashboard.daySat', 'Sat'), appointments: 14, consultations: 11 },
+    { day: t('vetDashboard.daySun', 'Sun'), appointments: 6, consultations: 5 },
   ];
 
   const revenueData = [
-    { month: 'Jan', consultation: 15000, surgery: 7500, vaccination: 3000 },
-    { month: 'Feb', consultation: 18000, surgery: 8000, vaccination: 3500 },
-    { month: 'Mar', consultation: 16000, surgery: 8000, vaccination: 3200 },
-    { month: 'Apr', consultation: 20000, surgery: 10500, vaccination: 4000 },
-    { month: 'May', consultation: 18500, surgery: 9000, vaccination: 3800 },
-    { month: 'Jun', consultation: 22000, surgery: 11500, vaccination: 4500 },
+    { month: t('vetDashboard.monthJan', 'Jan'), consultation: 15000, surgery: 7500, vaccination: 3000 },
+    { month: t('vetDashboard.monthFeb', 'Feb'), consultation: 18000, surgery: 8000, vaccination: 3500 },
+    { month: t('vetDashboard.monthMar', 'Mar'), consultation: 16000, surgery: 8000, vaccination: 3200 },
+    { month: t('vetDashboard.monthApr', 'Apr'), consultation: 20000, surgery: 10500, vaccination: 4000 },
+    { month: t('vetDashboard.monthMay', 'May'), consultation: 18500, surgery: 9000, vaccination: 3800 },
+    { month: t('vetDashboard.monthJun', 'Jun'), consultation: 22000, surgery: 11500, vaccination: 4500 },
   ];
 
   useEffect(() => {
@@ -142,8 +149,8 @@ const VeterinarianDashboard = () => {
       return;
     }
 
-    try {
-      const parsedVet = JSON.parse(vetData);
+    const parsedVet = safeJsonParse(vetData, null);
+    if (parsedVet) {
       setVeterinarian(parsedVet);
       setStats({
         totalPatients: Number(parsedVet.total_patients) || 0,
@@ -151,8 +158,7 @@ const VeterinarianDashboard = () => {
         rating: Number(parsedVet.rating) || 0,
         totalReviews: Number(parsedVet.total_reviews) || 0
       });
-    } catch (error) {
-      console.error('Error parsing vet data:', error);
+    } else {
       navigate('/veterinarian/login');
     }
 
@@ -176,15 +182,40 @@ const VeterinarianDashboard = () => {
   const handleLogout = () => {
     localStorage.removeItem('vetToken');
     localStorage.removeItem('veterinarian');
-    toast.success('Logged out successfully');
+    toast.success(t('vetDashboard.logoutSuccess', 'Logged out successfully'));
     navigate('/veterinarian/login');
   };
 
   const formatSpecialization = (spec) => {
+    const specializationMap = {
+      general: t('vetDashboard.specializationGeneral', 'General'),
+      large_animal: t('vetDashboard.specializationLargeAnimal', 'Large Animal'),
+      small_animal: t('vetDashboard.specializationSmallAnimal', 'Small Animal'),
+      livestock: t('vetDashboard.specializationLivestock', 'Livestock'),
+      surgery: t('vetDashboard.specializationSurgery', 'Surgery'),
+      emergency: t('vetDashboard.specializationEmergency', 'Emergency'),
+      reproduction: t('vetDashboard.specializationReproduction', 'Reproduction')
+    };
+
     if (!spec) return '';
-    return spec.split('_').map(word =>
+    return specializationMap[spec] || spec.split('_').map(word =>
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
+  };
+
+  const formatService = (service) => {
+    const serviceMap = {
+      checkup: t('vetDashboard.serviceCheckup', 'Checkup'),
+      vaccination: t('vetDashboard.serviceVaccination', 'Vaccination'),
+      surgery: t('vetDashboard.serviceSurgery', 'Surgery'),
+      emergency: t('vetDashboard.serviceEmergency', 'Emergency'),
+      pregnancy: t('vetDashboard.servicePregnancy', 'Pregnancy'),
+      dental: t('vetDashboard.serviceDental', 'Dental'),
+      deworming: t('vetDashboard.serviceDeworming', 'Deworming'),
+      artificial_insemination: t('vetDashboard.serviceArtificialInsemination', 'Artificial Insemination')
+    };
+
+    return serviceMap[service] || service;
   };
 
   const getVerificationBadge = (status) => {
@@ -192,19 +223,19 @@ const VeterinarianDashboard = () => {
       case 'verified':
         return (
           <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
-            Verified
+            {t('vetDashboard.verified', 'Verified')}
           </span>
         );
       case 'pending':
         return (
           <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
-            Pending
+            {t('vetDashboard.pending', 'Pending')}
           </span>
         );
       case 'rejected':
         return (
           <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">
-            Rejected
+            {t('vetDashboard.rejected', 'Rejected')}
           </span>
         );
       default:
@@ -221,22 +252,16 @@ const VeterinarianDashboard = () => {
   };
 
   const sidebarItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: <DashboardIcon /> },
-    { id: 'profile', label: 'My Profile', icon: <ProfileIcon /> },
-    { id: 'appointments', label: 'Appointments', icon: <CalendarIcon /> },
-    { id: 'patients', label: 'Patients', icon: <PatientsIcon /> },
-    { id: 'settings', label: 'Settings', icon: <SettingsIcon /> }
+    { id: 'dashboard', label: t('vetDashboard.dashboard', 'Dashboard'), icon: <DashboardIcon /> },
+    { id: 'profile', label: t('vetDashboard.myProfile', 'My Profile'), icon: <ProfileIcon /> },
+    { id: 'appointments', label: t('vetDashboard.appointments', 'Appointments'), icon: <CalendarIcon /> },
+    { id: 'patients', label: t('vetDashboard.patients', 'Patients'), icon: <PatientsIcon /> },
+    { id: 'settings', label: t('vetDashboard.settings', 'Settings'), icon: <SettingsIcon /> }
   ];
+  const activeTabLabel = sidebarItems.find((item) => item.id === activeTab)?.label || t('vetDashboard.dashboard', 'Dashboard');
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading dashboard...</p>
-        </div>
-      </div>
-    );
+    return <FullPageLoader message={t('vetDashboard.loadingDashboard', 'Loading dashboard...')} />;
   }
 
   return (
@@ -253,14 +278,13 @@ const VeterinarianDashboard = () => {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 z-50 h-full w-64 shadow-lg transform transition-all duration-300 lg:translate-x-0 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } ${darkMode ? 'bg-gray-800' : 'bg-white'}`}
+        className={`fixed top-0 left-0 z-50 h-full w-64 shadow-lg transform transition-all duration-300 lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          } ${darkMode ? 'bg-gray-800' : 'bg-white'}`}
       >
         <div className="p-4 sm:p-6">
           {/* Logo */}
           <div className="flex items-center justify-between mb-6 sm:mb-8">
-            <h1 className={`text-lg sm:text-xl font-bold ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>Vet Portal</h1>
+            <h1 className={`text-lg sm:text-xl font-bold ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>{t('vetDashboard.vetPortal', 'Vet Portal')}</h1>
             <button
               onClick={() => setSidebarOpen(false)}
               className={`lg:hidden ${darkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'}`}
@@ -287,7 +311,7 @@ const VeterinarianDashboard = () => {
               </div>
               <div>
                 <h3 className={`font-semibold text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
-                  Dr. {veterinarian?.full_name || 'Veterinarian'}
+                  {doctorPrefix} {veterinarian?.full_name || translatedVeterinarianLabel}
                 </h3>
                 <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                   {formatSpecialization(veterinarian?.specialization)}
@@ -308,13 +332,12 @@ const VeterinarianDashboard = () => {
                   setActiveTab(item.id);
                   setSidebarOpen(false);
                 }}
-                className={`w-full flex items-center space-x-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg transition-colors text-sm sm:text-base ${
-                  activeTab === item.id
-                    ? 'bg-blue-600 text-white'
-                    : darkMode 
-                      ? 'text-gray-300 hover:bg-gray-700' 
-                      : 'text-gray-600 hover:bg-gray-100'
-                }`}
+                className={`w-full flex items-center space-x-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg transition-colors text-sm sm:text-base ${activeTab === item.id
+                  ? 'bg-blue-600 text-white'
+                  : darkMode
+                    ? 'text-gray-300 hover:bg-gray-700'
+                    : 'text-gray-600 hover:bg-gray-100'
+                  }`}
               >
                 {item.icon}
                 <span className="font-medium">{item.label}</span>
@@ -325,27 +348,25 @@ const VeterinarianDashboard = () => {
           {/* Dark Mode Toggle */}
           <button
             onClick={toggleDarkMode}
-            className={`w-full flex items-center space-x-3 px-3 sm:px-4 py-2.5 sm:py-3 mt-4 rounded-lg transition-colors text-sm sm:text-base ${
-              darkMode 
-                ? 'text-yellow-400 hover:bg-gray-700' 
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
+            className={`w-full flex items-center space-x-3 px-3 sm:px-4 py-2.5 sm:py-3 mt-4 rounded-lg transition-colors text-sm sm:text-base ${darkMode
+              ? 'text-yellow-400 hover:bg-gray-700'
+              : 'text-gray-600 hover:bg-gray-100'
+              }`}
           >
             {darkMode ? <SunIcon /> : <MoonIcon />}
-            <span className="font-medium">{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
+            <span className="font-medium">{darkMode ? t('vetDashboard.lightMode', 'Light Mode') : t('vetDashboard.darkMode', 'Dark Mode')}</span>
           </button>
 
           {/* Logout Button */}
           <button
             onClick={handleLogout}
-            className={`w-full flex items-center space-x-3 px-3 sm:px-4 py-2.5 sm:py-3 mt-4 rounded-lg transition-colors text-sm sm:text-base ${
-              darkMode 
-                ? 'text-red-400 hover:bg-gray-700' 
-                : 'text-red-600 hover:bg-red-50'
-            }`}
+            className={`w-full flex items-center space-x-3 px-3 sm:px-4 py-2.5 sm:py-3 mt-4 rounded-lg transition-colors text-sm sm:text-base ${darkMode
+              ? 'text-red-400 hover:bg-gray-700'
+              : 'text-red-600 hover:bg-red-50'
+              }`}
           >
             <LogoutIcon />
-            <span className="font-medium">Logout</span>
+            <span className="font-medium">{t('vetDashboard.logout', 'Logout')}</span>
           </button>
         </div>
       </aside>
@@ -362,8 +383,8 @@ const VeterinarianDashboard = () => {
               <MenuIcon />
             </button>
 
-            <h2 className={`text-lg sm:text-xl font-semibold capitalize ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>
-              {activeTab}
+            <h2 className={`text-lg sm:text-xl font-semibold ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>
+              {activeTabLabel}
             </h2>
 
             <div className="flex items-center space-x-2 sm:space-x-4">
@@ -375,14 +396,14 @@ const VeterinarianDashboard = () => {
               </button>
               <button
                 onClick={toggleDarkMode}
-                className={`p-2 rounded-lg transition-colors ${
-                  darkMode 
-                    ? 'text-yellow-400 hover:bg-gray-700' 
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
+                className={`p-2 rounded-lg transition-colors ${darkMode
+                  ? 'text-yellow-400 hover:bg-gray-700'
+                  : 'text-gray-600 hover:bg-gray-100'
+                  }`}
               >
                 {darkMode ? <SunIcon /> : <MoonIcon />}
               </button>
+              <LanguageSwitcher />
             </div>
           </div>
         </header>
@@ -394,18 +415,17 @@ const VeterinarianDashboard = () => {
             <div className="space-y-4 sm:space-y-6">
               {/* Stats Cards with Animation */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-                <div className={`rounded-xl shadow-lg p-4 sm:p-6 transform hover:scale-105 transition-all duration-300 hover:shadow-2xl animate-fadeInUp ${
-                  darkMode ? 'bg-gradient-to-br from-blue-600 to-blue-700' : 'bg-gradient-to-br from-blue-500 to-blue-600'
-                }`}>
+                <div className={`rounded-xl shadow-lg p-4 sm:p-6 transform hover:scale-105 transition-all duration-300 hover:shadow-2xl animate-fadeInUp ${darkMode ? 'bg-gradient-to-br from-blue-600 to-blue-700' : 'bg-gradient-to-br from-blue-500 to-blue-600'
+                  }`}>
                   <div className="flex items-center justify-between">
                     <div className="text-white">
-                      <p className="text-sm text-blue-100 mb-2">Total Animals Treated</p>
+                      <p className="text-sm text-blue-100 mb-2">{t('vetDashboard.totalAnimalsTreated', 'Total Animals Treated')}</p>
                       <p className="text-2xl sm:text-3xl font-bold mb-1">{stats.totalPatients}</p>
                       <div className="flex items-center text-xs text-blue-100">
                         <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z" clipRule="evenodd" />
                         </svg>
-                        <span>+12% this month</span>
+                        <span>{t('vetDashboard.thisMonth', '+12% this month')}</span>
                       </div>
                     </div>
                     <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center animate-bounce-slow">
@@ -416,18 +436,17 @@ const VeterinarianDashboard = () => {
                   </div>
                 </div>
 
-                <div className={`rounded-xl shadow-lg p-4 sm:p-6 transform hover:scale-105 transition-all duration-300 hover:shadow-2xl animate-fadeInUp ${
-                  darkMode ? 'bg-gradient-to-br from-green-600 to-green-700' : 'bg-gradient-to-br from-green-500 to-green-600'
-                }`} style={{animationDelay: '0.1s'}}>
+                <div className={`rounded-xl shadow-lg p-4 sm:p-6 transform hover:scale-105 transition-all duration-300 hover:shadow-2xl animate-fadeInUp ${darkMode ? 'bg-gradient-to-br from-green-600 to-green-700' : 'bg-gradient-to-br from-green-500 to-green-600'
+                  }`} style={{ animationDelay: '0.1s' }}>
                   <div className="flex items-center justify-between">
                     <div className="text-white">
-                      <p className="text-sm text-green-100 mb-2">Today's Appointments</p>
+                      <p className="text-sm text-green-100 mb-2">{t('vetDashboard.todayAppointments', "Today's Appointments")}</p>
                       <p className="text-2xl sm:text-3xl font-bold mb-1">{stats.appointmentsToday || 8}</p>
                       <div className="flex items-center text-xs text-green-100">
                         <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
                         </svg>
-                        <span>3 pending</span>
+                        <span>3 {t('vetDashboard.pending', 'pending')}</span>
                       </div>
                     </div>
                     <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center animate-pulse">
@@ -438,18 +457,17 @@ const VeterinarianDashboard = () => {
                   </div>
                 </div>
 
-                <div className={`rounded-xl shadow-lg p-4 sm:p-6 transform hover:scale-105 transition-all duration-300 hover:shadow-2xl animate-fadeInUp ${
-                  darkMode ? 'bg-gradient-to-br from-yellow-600 to-orange-600' : 'bg-gradient-to-br from-yellow-500 to-orange-500'
-                }`} style={{animationDelay: '0.2s'}}>
+                <div className={`rounded-xl shadow-lg p-4 sm:p-6 transform hover:scale-105 transition-all duration-300 hover:shadow-2xl animate-fadeInUp ${darkMode ? 'bg-gradient-to-br from-yellow-600 to-orange-600' : 'bg-gradient-to-br from-yellow-500 to-orange-500'
+                  }`} style={{ animationDelay: '0.2s' }}>
                   <div className="flex items-center justify-between">
                     <div className="text-white">
-                      <p className="text-sm text-yellow-100 mb-2">Rating</p>
+                      <p className="text-sm text-yellow-100 mb-2">{t('vetDashboard.rating', 'Rating')}</p>
                       <div className="flex items-center space-x-2 mb-1">
                         <p className="text-2xl sm:text-3xl font-bold">{stats.rating.toFixed(1)}</p>
                         <div className="flex">{renderRatingStars(Math.round(stats.rating || 4))}</div>
                       </div>
                       <div className="flex items-center text-xs text-yellow-100">
-                        <span>{stats.totalReviews} reviews</span>
+                        <span>{stats.totalReviews} {t('vetDashboard.reviews', 'reviews')}</span>
                       </div>
                     </div>
                     <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center animate-bounce-slow">
@@ -460,18 +478,17 @@ const VeterinarianDashboard = () => {
                   </div>
                 </div>
 
-                <div className={`rounded-xl shadow-lg p-4 sm:p-6 transform hover:scale-105 transition-all duration-300 hover:shadow-2xl animate-fadeInUp ${
-                  darkMode ? 'bg-gradient-to-br from-purple-600 to-indigo-700' : 'bg-gradient-to-br from-purple-500 to-indigo-600'
-                }`} style={{animationDelay: '0.3s'}}>
+                <div className={`rounded-xl shadow-lg p-4 sm:p-6 transform hover:scale-105 transition-all duration-300 hover:shadow-2xl animate-fadeInUp ${darkMode ? 'bg-gradient-to-br from-purple-600 to-indigo-700' : 'bg-gradient-to-br from-purple-500 to-indigo-600'
+                  }`} style={{ animationDelay: '0.3s' }}>
                   <div className="flex items-center justify-between">
                     <div className="text-white">
-                      <p className="text-sm text-purple-100 mb-2">Monthly Revenue</p>
+                      <p className="text-sm text-purple-100 mb-2">{t('vetDashboard.monthlyRevenue', 'Monthly Revenue')}</p>
                       <p className="text-2xl sm:text-3xl font-bold mb-1">₹33.5K</p>
                       <div className="flex items-center text-xs text-purple-100">
                         <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z" clipRule="evenodd" />
                         </svg>
-                        <span>+18% from last month</span>
+                        <span>{t('vetDashboard.fromLastMonth', '+18% from last month')}</span>
                       </div>
                     </div>
                     <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center animate-pulse">
@@ -486,28 +503,28 @@ const VeterinarianDashboard = () => {
               {/* Charts Section */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                 {/* Appointments Trend Chart */}
-                <div className={`rounded-xl shadow-lg p-4 sm:p-6 animate-fadeInUp ${darkMode ? 'bg-gray-800' : 'bg-white'}`} style={{animationDelay: '0.4s'}}>
-                  <h3 className={`text-base sm:text-lg font-semibold mb-4 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Appointments & Revenue Trend</h3>
+                <div className={`rounded-xl shadow-lg p-4 sm:p-6 animate-fadeInUp ${darkMode ? 'bg-gray-800' : 'bg-white'}`} style={{ animationDelay: '0.4s' }}>
+                  <h3 className={`text-base sm:text-lg font-semibold mb-4 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>{t('vetDashboard.appointmentsRevenueTrend', 'Appointments & Revenue Trend')}</h3>
                   <ResponsiveContainer width="100%" height={250}>
                     <AreaChart data={appointmentsData}>
                       <defs>
                         <linearGradient id="colorAppointments" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                          <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8} />
+                          <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
                         </linearGradient>
                         <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10B981" stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                          <stop offset="5%" stopColor="#10B981" stopOpacity={0.8} />
+                          <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#f0f0f0'} />
-                      <XAxis dataKey="month" stroke={darkMode ? '#9CA3AF' : '#6B7280'} style={{fontSize: '12px'}} />
-                      <YAxis stroke={darkMode ? '#9CA3AF' : '#6B7280'} style={{fontSize: '12px'}} />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: darkMode ? '#1F2937' : '#fff', 
-                          border: 'none', 
-                          borderRadius: '8px', 
+                      <XAxis dataKey="month" stroke={darkMode ? '#9CA3AF' : '#6B7280'} style={{ fontSize: '12px' }} />
+                      <YAxis stroke={darkMode ? '#9CA3AF' : '#6B7280'} style={{ fontSize: '12px' }} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: darkMode ? '#1F2937' : '#fff',
+                          border: 'none',
+                          borderRadius: '8px',
                           boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
                           color: darkMode ? '#F3F4F6' : '#111827'
                         }}
@@ -520,8 +537,8 @@ const VeterinarianDashboard = () => {
                 </div>
 
                 {/* Animal Types Distribution */}
-                <div className={`rounded-xl shadow-lg p-4 sm:p-6 animate-fadeInUp ${darkMode ? 'bg-gray-800' : 'bg-white'}`} style={{animationDelay: '0.5s'}}>
-                  <h3 className={`text-base sm:text-lg font-semibold mb-4 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Animal Types Distribution</h3>
+                <div className={`rounded-xl shadow-lg p-4 sm:p-6 animate-fadeInUp ${darkMode ? 'bg-gray-800' : 'bg-white'}`} style={{ animationDelay: '0.5s' }}>
+                  <h3 className={`text-base sm:text-lg font-semibold mb-4 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>{t('vetDashboard.animalTypesDistribution', 'Animal Types Distribution')}</h3>
                   <ResponsiveContainer width="100%" height={250}>
                     <PieChart>
                       <Pie
@@ -529,7 +546,7 @@ const VeterinarianDashboard = () => {
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={({name, percent}) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                         outerRadius={100}
                         fill="#8884d8"
                         dataKey="value"
@@ -547,18 +564,18 @@ const VeterinarianDashboard = () => {
               </div>
 
               {/* Weekly Performance Chart */}
-              <div className={`rounded-xl shadow-lg p-4 sm:p-6 animate-fadeInUp ${darkMode ? 'bg-gray-800' : 'bg-white'}`} style={{animationDelay: '0.6s'}}>
-                <h3 className={`text-base sm:text-lg font-semibold mb-4 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Weekly Performance</h3>
+              <div className={`rounded-xl shadow-lg p-4 sm:p-6 animate-fadeInUp ${darkMode ? 'bg-gray-800' : 'bg-white'}`} style={{ animationDelay: '0.6s' }}>
+                <h3 className={`text-base sm:text-lg font-semibold mb-4 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>{t('vetDashboard.weeklyPerformance', 'Weekly Performance')}</h3>
                 <ResponsiveContainer width="100%" height={250}>
                   <BarChart data={weeklyAppointments}>
                     <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#f0f0f0'} />
-                    <XAxis dataKey="day" stroke={darkMode ? '#9CA3AF' : '#6B7280'} style={{fontSize: '12px'}} />
-                    <YAxis stroke={darkMode ? '#9CA3AF' : '#6B7280'} style={{fontSize: '12px'}} />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: darkMode ? '#1F2937' : '#fff', 
-                        border: 'none', 
-                        borderRadius: '8px', 
+                    <XAxis dataKey="day" stroke={darkMode ? '#9CA3AF' : '#6B7280'} style={{ fontSize: '12px' }} />
+                    <YAxis stroke={darkMode ? '#9CA3AF' : '#6B7280'} style={{ fontSize: '12px' }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: darkMode ? '#1F2937' : '#fff',
+                        border: 'none',
+                        borderRadius: '8px',
                         boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
                         color: darkMode ? '#F3F4F6' : '#111827'
                       }}
@@ -571,18 +588,18 @@ const VeterinarianDashboard = () => {
               </div>
 
               {/* Revenue Breakdown Chart */}
-              <div className={`rounded-xl shadow-lg p-4 sm:p-6 animate-fadeInUp ${darkMode ? 'bg-gray-800' : 'bg-white'}`} style={{animationDelay: '0.7s'}}>
-                <h3 className={`text-base sm:text-lg font-semibold mb-4 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Revenue Breakdown by Service</h3>
+              <div className={`rounded-xl shadow-lg p-4 sm:p-6 animate-fadeInUp ${darkMode ? 'bg-gray-800' : 'bg-white'}`} style={{ animationDelay: '0.7s' }}>
+                <h3 className={`text-base sm:text-lg font-semibold mb-4 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>{t('vetDashboard.revenueBreakdownByService', 'Revenue Breakdown by Service')}</h3>
                 <ResponsiveContainer width="100%" height={250}>
                   <LineChart data={revenueData}>
                     <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#f0f0f0'} />
-                    <XAxis dataKey="month" stroke={darkMode ? '#9CA3AF' : '#6B7280'} style={{fontSize: '12px'}} />
-                    <YAxis stroke={darkMode ? '#9CA3AF' : '#6B7280'} style={{fontSize: '12px'}} />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: darkMode ? '#1F2937' : '#fff', 
-                        border: 'none', 
-                        borderRadius: '8px', 
+                    <XAxis dataKey="month" stroke={darkMode ? '#9CA3AF' : '#6B7280'} style={{ fontSize: '12px' }} />
+                    <YAxis stroke={darkMode ? '#9CA3AF' : '#6B7280'} style={{ fontSize: '12px' }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: darkMode ? '#1F2937' : '#fff',
+                        border: 'none',
+                        borderRadius: '8px',
                         boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
                         color: darkMode ? '#F3F4F6' : '#111827'
                       }}
@@ -597,105 +614,102 @@ const VeterinarianDashboard = () => {
 
               {/* Quick Info */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                <div className={`rounded-xl shadow-lg p-4 sm:p-6 hover:shadow-xl transition-shadow duration-300 animate-fadeInUp ${darkMode ? 'bg-gray-800' : 'bg-white'}`} style={{animationDelay: '0.8s'}}>
+                <div className={`rounded-xl shadow-lg p-4 sm:p-6 hover:shadow-xl transition-shadow duration-300 animate-fadeInUp ${darkMode ? 'bg-gray-800' : 'bg-white'}`} style={{ animationDelay: '0.8s' }}>
                   <div className="flex items-center mb-4">
                     <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center mr-3 ${darkMode ? 'bg-blue-900' : 'bg-blue-100'}`}>
                       <svg className={`w-5 h-5 sm:w-6 sm:h-6 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                       </svg>
                     </div>
-                    <h3 className={`text-base sm:text-lg font-semibold ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Profile Summary</h3>
+                    <h3 className={`text-base sm:text-lg font-semibold ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>{t('vetDashboard.profileSummary', 'Profile Summary')}</h3>
                   </div>
                   <div className="space-y-3">
                     <div className={`flex justify-between items-center py-2 border-b ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
-                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Specialization</span>
+                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{t('vetDashboard.specialization', 'Specialization')}</span>
                       <span className={`font-medium text-xs sm:text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{formatSpecialization(veterinarian?.specialization)}</span>
                     </div>
                     <div className={`flex justify-between items-center py-2 border-b ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
-                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Experience</span>
-                      <span className={`font-medium text-xs sm:text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{veterinarian?.experience_years || 0} years</span>
+                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{t('vetDashboard.experience', 'Experience')}</span>
+                      <span className={`font-medium text-xs sm:text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{veterinarian?.experience_years || 0} {t('vetDashboard.years', 'years')}</span>
                     </div>
                     <div className={`flex justify-between items-center py-2 border-b ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
-                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Qualification</span>
-                      <span className={`font-medium text-xs sm:text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{veterinarian?.qualification || 'N/A'}</span>
+                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{t('vetDashboard.qualification', 'Qualification')}</span>
+                      <span className={`font-medium text-xs sm:text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{veterinarian?.qualification || notAvailableLabel}</span>
                     </div>
                     <div className={`flex justify-between items-center py-2 border-b ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
-                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Consultation Fee</span>
+                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{t('vetDashboard.consultationFee', 'Consultation Fee')}</span>
                       <span className="font-semibold text-xs sm:text-sm text-green-600">₹{veterinarian?.consultation_fee || 0}</span>
                     </div>
                     <div className="flex justify-between items-center py-2">
-                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Emergency Available</span>
+                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{t('vetDashboard.emergencyAvailable', 'Emergency Available')}</span>
                       <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold ${veterinarian?.emergency_available ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {veterinarian?.emergency_available ? 'Available' : 'Not Available'}
+                        {veterinarian?.emergency_available ? t('vetDashboard.available', 'Available') : t('vetDashboard.notAvailable', 'Not Available')}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                <div className={`rounded-xl shadow-lg p-4 sm:p-6 hover:shadow-xl transition-shadow duration-300 animate-fadeInUp ${darkMode ? 'bg-gray-800' : 'bg-white'}`} style={{animationDelay: '0.9s'}}>
+                <div className={`rounded-xl shadow-lg p-4 sm:p-6 hover:shadow-xl transition-shadow duration-300 animate-fadeInUp ${darkMode ? 'bg-gray-800' : 'bg-white'}`} style={{ animationDelay: '0.9s' }}>
                   <div className="flex items-center mb-4">
                     <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center mr-3 ${darkMode ? 'bg-purple-900' : 'bg-purple-100'}`}>
                       <svg className={`w-5 h-5 sm:w-6 sm:h-6 ${darkMode ? 'text-purple-400' : 'text-purple-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                       </svg>
                     </div>
-                    <h3 className={`text-base sm:text-lg font-semibold ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Clinic Information</h3>
+                    <h3 className={`text-base sm:text-lg font-semibold ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>{t('vetDashboard.clinicInformation', 'Clinic Information')}</h3>
                   </div>
                   <div className="space-y-3">
                     <div className={`flex justify-between items-center py-2 border-b ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
-                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Clinic Name</span>
-                      <span className={`font-medium text-xs sm:text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{veterinarian?.clinic_name || 'N/A'}</span>
+                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{t('vetDashboard.clinicName', 'Clinic Name')}</span>
+                      <span className={`font-medium text-xs sm:text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{veterinarian?.clinic_name || notAvailableLabel}</span>
                     </div>
                     <div className={`flex justify-between items-center py-2 border-b ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
-                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>City</span>
-                      <span className={`font-medium text-xs sm:text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{veterinarian?.city || 'N/A'}</span>
+                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{t('vetDashboard.city', 'City')}</span>
+                      <span className={`font-medium text-xs sm:text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{veterinarian?.city || notAvailableLabel}</span>
                     </div>
                     <div className={`flex justify-between items-center py-2 border-b ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
-                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>State</span>
-                      <span className={`font-medium text-xs sm:text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{veterinarian?.state || 'N/A'}</span>
+                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{t('vetDashboard.state', 'State')}</span>
+                      <span className={`font-medium text-xs sm:text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{veterinarian?.state || notAvailableLabel}</span>
                     </div>
                     <div className={`flex justify-between items-center py-2 border-b ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
-                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Pincode</span>
-                      <span className={`font-medium text-xs sm:text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{veterinarian?.pincode || 'N/A'}</span>
+                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{t('vetDashboard.pincode', 'Pincode')}</span>
+                      <span className={`font-medium text-xs sm:text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{veterinarian?.pincode || notAvailableLabel}</span>
                     </div>
                     <div className="flex justify-between items-center py-2">
-                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Phone</span>
-                      <span className={`font-medium text-xs sm:text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{veterinarian?.phone_number || 'N/A'}</span>
+                      <span className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{t('vetDashboard.phone', 'Phone')}</span>
+                      <span className={`font-medium text-xs sm:text-sm ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{veterinarian?.phone_number || notAvailableLabel}</span>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Quick Actions */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 animate-fadeInUp" style={{animationDelay: '1s'}}>
-                <button className={`rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 text-white ${
-                  darkMode ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800' : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700'
-                }`}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 animate-fadeInUp" style={{ animationDelay: '1s' }}>
+                <button className={`rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 text-white ${darkMode ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800' : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700'
+                  }`}>
                   <svg className="w-6 h-6 sm:w-8 sm:h-8 mb-2 sm:mb-3 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  <h4 className="font-semibold mb-1 text-sm sm:text-base">View Appointments</h4>
-                  <p className="text-xs text-blue-100">Manage your schedule</p>
+                  <h4 className="font-semibold mb-1 text-sm sm:text-base">{t('vetDashboard.viewAppointments', 'View Appointments')}</h4>
+                  <p className="text-xs text-blue-100">{t('vetDashboard.manageSchedule', 'Manage your schedule')}</p>
                 </button>
 
-                <button className={`rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 text-white ${
-                  darkMode ? 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800' : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700'
-                }`}>
+                <button className={`rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 text-white ${darkMode ? 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800' : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700'
+                  }`}>
                   <svg className="w-6 h-6 sm:w-8 sm:h-8 mb-2 sm:mb-3 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  <h4 className="font-semibold mb-1 text-sm sm:text-base">Patient Records</h4>
-                  <p className="text-xs text-green-100">Access animal history</p>
+                  <h4 className="font-semibold mb-1 text-sm sm:text-base">{t('vetDashboard.patientRecords', 'Patient Records')}</h4>
+                  <p className="text-xs text-green-100">{t('vetDashboard.accessHistory', 'Access animal history')}</p>
                 </button>
 
-                <button className={`rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 text-white ${
-                  darkMode ? 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800' : 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700'
-                }`}>
+                <button className={`rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 text-white ${darkMode ? 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800' : 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700'
+                  }`}>
                   <svg className="w-6 h-6 sm:w-8 sm:h-8 mb-2 sm:mb-3 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                   </svg>
-                  <h4 className="font-semibold mb-1 text-sm sm:text-base">Generate Report</h4>
-                  <p className="text-xs text-purple-100">Create medical reports</p>
+                  <h4 className="font-semibold mb-1 text-sm sm:text-base">{t('vetDashboard.generateReport', 'Generate Report')}</h4>
+                  <p className="text-xs text-purple-100">{t('vetDashboard.createReports', 'Create medical reports')}</p>
                 </button>
               </div>
             </div>
@@ -704,7 +718,7 @@ const VeterinarianDashboard = () => {
           {/* Profile Tab */}
           {activeTab === 'profile' && (
             <div className={`rounded-xl shadow-lg p-4 sm:p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-              <h3 className={`text-base sm:text-lg font-semibold mb-6 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>My Profile</h3>
+              <h3 className={`text-base sm:text-lg font-semibold mb-6 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>{t('vetDashboard.myProfile', 'My Profile')}</h3>
 
               <div className="flex flex-col md:flex-row gap-8">
                 {/* Profile Photo */}
@@ -728,47 +742,47 @@ const VeterinarianDashboard = () => {
                 <div className="flex-1 space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="text-sm text-gray-500">Full Name</label>
-                      <p className="font-medium text-gray-800">Dr. {veterinarian?.full_name}</p>
+                      <label className="text-sm text-gray-500">{t('vetDashboard.fullName', 'Full Name')}</label>
+                      <p className="font-medium text-gray-800">{doctorPrefix} {veterinarian?.full_name}</p>
                     </div>
                     <div>
-                      <label className="text-sm text-gray-500">Email</label>
-                      <p className="font-medium text-gray-800">{veterinarian?.email || 'N/A'}</p>
+                      <label className="text-sm text-gray-500">{t('vetDashboard.email', 'Email')}</label>
+                      <p className="font-medium text-gray-800">{veterinarian?.email || notAvailableLabel}</p>
                     </div>
                     <div>
-                      <label className="text-sm text-gray-500">Phone</label>
+                      <label className="text-sm text-gray-500">{t('vetDashboard.phone', 'Phone')}</label>
                       <p className="font-medium text-gray-800">{veterinarian?.phone_number}</p>
                     </div>
                     <div>
-                      <label className="text-sm text-gray-500">License Number</label>
+                      <label className="text-sm text-gray-500">{t('vetDashboard.licenseNumber', 'License Number')}</label>
                       <p className="font-medium text-gray-800">{veterinarian?.license_number}</p>
                     </div>
                     <div>
-                      <label className="text-sm text-gray-500">Specialization</label>
+                      <label className="text-sm text-gray-500">{t('vetDashboard.specialization', 'Specialization')}</label>
                       <p className="font-medium text-gray-800">{formatSpecialization(veterinarian?.specialization)}</p>
                     </div>
                     <div>
-                      <label className="text-sm text-gray-500">Experience</label>
-                      <p className="font-medium text-gray-800">{veterinarian?.experience_years} years</p>
+                      <label className="text-sm text-gray-500">{t('vetDashboard.experience', 'Experience')}</label>
+                      <p className="font-medium text-gray-800">{veterinarian?.experience_years} {t('vetDashboard.years', 'years')}</p>
                     </div>
                     <div>
-                      <label className="text-sm text-gray-500">Qualification</label>
+                      <label className="text-sm text-gray-500">{t('vetDashboard.qualification', 'Qualification')}</label>
                       <p className="font-medium text-gray-800">{veterinarian?.qualification}</p>
                     </div>
                     <div>
-                      <label className="text-sm text-gray-500">Consultation Fee</label>
-                      <p className="font-medium text-gray-800">₹{veterinarian?.consultation_fee}</p>
+                      <label className="text-sm text-gray-500">{t('vetDashboard.consultationFee', 'Consultation Fee')}</label>
+                      <p className="font-medium text-gray-800">{veterinarian?.consultation_fee ? `₹${veterinarian.consultation_fee}` : notAvailableLabel}</p>
                     </div>
                   </div>
 
                   {/* Services */}
                   {veterinarian?.services && veterinarian.services.length > 0 && (
                     <div>
-                      <label className="text-sm text-gray-500">Services</label>
+                      <label className="text-sm text-gray-500">{t('vetDashboard.services', 'Services')}</label>
                       <div className="flex flex-wrap gap-2 mt-2">
                         {veterinarian.services.map((service, index) => (
                           <span key={index} className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
-                            {service}
+                            {formatService(service)}
                           </span>
                         ))}
                       </div>
@@ -777,7 +791,7 @@ const VeterinarianDashboard = () => {
 
                   {/* Address */}
                   <div>
-                    <label className="text-sm text-gray-500">Clinic Address</label>
+                    <label className="text-sm text-gray-500">{t('vetDashboard.clinicAddress', 'Clinic Address')}</label>
                     <p className="font-medium text-gray-800">
                       {veterinarian?.clinic_address || veterinarian?.clinic_name}
                       {veterinarian?.city && `, ${veterinarian.city}`}
@@ -793,13 +807,13 @@ const VeterinarianDashboard = () => {
           {/* Appointments Tab */}
           {activeTab === 'appointments' && (
             <div className={`rounded-xl shadow-lg p-4 sm:p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-              <h3 className={`text-base sm:text-lg font-semibold mb-4 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Appointments</h3>
+              <h3 className={`text-base sm:text-lg font-semibold mb-4 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>{t('vetDashboard.appointments', 'Appointments')}</h3>
               <div className="text-center py-12">
                 <svg className={`w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 ${darkMode ? 'text-gray-600' : 'text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <p className={`text-sm sm:text-base ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>No appointments yet</p>
-                <p className={`text-xs sm:text-sm mt-2 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Appointment booking feature coming soon!</p>
+                <p className={`text-sm sm:text-base ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{t('vetDashboard.noAppointmentsYet', 'No appointments yet')}</p>
+                <p className={`text-xs sm:text-sm mt-2 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{t('vetDashboard.appointmentFeatureComingSoon', 'Appointment booking feature coming soon!')}</p>
               </div>
             </div>
           )}
@@ -807,13 +821,13 @@ const VeterinarianDashboard = () => {
           {/* Patients Tab */}
           {activeTab === 'patients' && (
             <div className={`rounded-xl shadow-lg p-4 sm:p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-              <h3 className={`text-base sm:text-lg font-semibold mb-4 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Patient Records</h3>
+              <h3 className={`text-base sm:text-lg font-semibold mb-4 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>{t('vetDashboard.patientRecords', 'Patient Records')}</h3>
               <div className="text-center py-12">
                 <svg className={`w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 ${darkMode ? 'text-gray-600' : 'text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
-                <p className={`text-sm sm:text-base ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>No patient records yet</p>
-                <p className={`text-xs sm:text-sm mt-2 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Patient management feature coming soon!</p>
+                <p className={`text-sm sm:text-base ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{t('vetDashboard.noPatientRecordsYet', 'No patient records yet')}</p>
+                <p className={`text-xs sm:text-sm mt-2 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>{t('vetDashboard.patientFeatureComingSoon', 'Patient management feature coming soon!')}</p>
               </div>
             </div>
           )}
@@ -821,12 +835,12 @@ const VeterinarianDashboard = () => {
           {/* Settings Tab */}
           {activeTab === 'settings' && (
             <div className={`rounded-xl shadow-lg p-4 sm:p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-              <h3 className={`text-base sm:text-lg font-semibold mb-4 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Settings</h3>
+              <h3 className={`text-base sm:text-lg font-semibold mb-4 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>{t('vetDashboard.settings', 'Settings')}</h3>
               <div className="space-y-4 sm:space-y-6">
                 <div className={`flex items-center justify-between p-3 sm:p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
                   <div className="flex-1 mr-4">
-                    <p className={`font-medium text-sm sm:text-base ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Email Notifications</p>
-                    <p className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Receive email notifications for appointments</p>
+                    <p className={`font-medium text-sm sm:text-base ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>{t('vetDashboard.emailNotifications', 'Email Notifications')}</p>
+                    <p className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{t('vetDashboard.emailNotificationsDesc', 'Receive email notifications for appointments')}</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input type="checkbox" className="sr-only peer" defaultChecked />
@@ -836,8 +850,8 @@ const VeterinarianDashboard = () => {
 
                 <div className={`flex items-center justify-between p-3 sm:p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
                   <div className="flex-1 mr-4">
-                    <p className={`font-medium text-sm sm:text-base ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>SMS Notifications</p>
-                    <p className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Receive SMS alerts for new appointments</p>
+                    <p className={`font-medium text-sm sm:text-base ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>{t('vetDashboard.smsNotifications', 'SMS Notifications')}</p>
+                    <p className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{t('vetDashboard.smsNotificationsDesc', 'Receive SMS alerts for new appointments')}</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input type="checkbox" className="sr-only peer" />
@@ -847,8 +861,8 @@ const VeterinarianDashboard = () => {
 
                 <div className={`flex items-center justify-between p-3 sm:p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
                   <div className="flex-1 mr-4">
-                    <p className={`font-medium text-sm sm:text-base ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Emergency Availability</p>
-                    <p className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Show as available for emergency calls</p>
+                    <p className={`font-medium text-sm sm:text-base ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>{t('vetDashboard.emergencyAvailability', 'Emergency Availability')}</p>
+                    <p className={`text-xs sm:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{t('vetDashboard.emergencyAvailabilityDesc', 'Show as available for emergency calls')}</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input type="checkbox" className="sr-only peer" defaultChecked={veterinarian?.emergency_available} />
@@ -857,12 +871,11 @@ const VeterinarianDashboard = () => {
                 </div>
 
                 <div className={`pt-4 sm:pt-6 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                  <button className={`px-4 py-2 rounded-lg transition-colors text-sm sm:text-base ${
-                    darkMode 
-                      ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-                      : 'bg-blue-600 hover:bg-blue-700 text-white'
-                  }`}>
-                    Change Password
+                  <button className={`px-4 py-2 rounded-lg transition-colors text-sm sm:text-base ${darkMode
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    }`}>
+                    {t('vetDashboard.changePassword', 'Change Password')}
                   </button>
                 </div>
               </div>

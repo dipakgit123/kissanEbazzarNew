@@ -1,16 +1,21 @@
 // MobileVerification.js - Updated to work with location flow
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast, { Toaster } from 'react-hot-toast';
 import { otpService } from '../services/api'; // Make sure this path is correct
 
+const DEFAULT_OTP_LENGTH = 6;
+const createEmptyOtp = (length) => Array.from({ length }, () => '');
+
 const MobileVerification = ({ onBack, onSuccess }) => {
   const { t } = useTranslation();
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [otpLength, setOtpLength] = useState(DEFAULT_OTP_LENGTH);
+  const [otp, setOtp] = useState(() => createEmptyOtp(DEFAULT_OTP_LENGTH));
   const [otpError, setOtpError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(60);
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [deliveryInfo, setDeliveryInfo] = useState(null);
 
   // Get phone number from localStorage or props
   useEffect(() => {
@@ -28,76 +33,12 @@ const MobileVerification = ({ onBack, onSuccess }) => {
     }
   }, [resendTimer]);
 
-  // Auto-read OTP from SMS (for browsers that support it)
-  useEffect(() => {
-    if ('OTPCredential' in window) {
-      const controller = new AbortController();
-      
-      navigator.credentials.get({
-        otp: { transport: ['sms'] },
-        signal: controller.signal
-      }).then(otp => {
-        if (otp && otp.code) {
-          const otpArray = otp.code.split('');
-          setOtp(otpArray);
-          handleOtpVerify(otp.code);
-        }
-      }).catch(() => {
-        // Auto-read not available or user cancelled
-      });
-      
-      return () => controller.abort();
-    }
-  }, []);
-
-  // Handle OTP input change
-  const handleOtpChange = (index, value) => {
-    if (value.length <= 1 && /^\d*$/.test(value)) {
-      const newOtp = [...otp];
-      newOtp[index] = value;
-      setOtp(newOtp);
-      setOtpError('');
-      
-      // Auto-focus next input
-      if (value && index < 5) {
-        const nextInput = document.getElementById(`otp-${index + 1}`);
-        if (nextInput) nextInput.focus();
-      }
-      
-      // Auto-submit if all 6 digits are entered
-      if (index === 5 && value && newOtp.every(digit => digit)) {
-        handleOtpVerify(newOtp.join(''));
-      }
-    }
-  };
-
-  // Handle backspace
-  const handleKeyDown = (index, e) => {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) {
-      const prevInput = document.getElementById(`otp-${index - 1}`);
-      if (prevInput) prevInput.focus();
-    }
-  };
-
-  // Handle OTP paste
-  const handleOtpPaste = (e) => {
-    e.preventDefault();
-    const pastedData = e.clipboardData.getData('text').slice(0, 6);
-    if (/^\d+$/.test(pastedData)) {
-      const newOtp = pastedData.split('').concat(Array(6).fill('')).slice(0, 6);
-      setOtp(newOtp);
-      if (pastedData.length === 6) {
-        handleOtpVerify(pastedData);
-      }
-    }
-  };
-
   // Handle OTP verification
-  const handleOtpVerify = async (otpString = null) => {
+  const handleOtpVerify = useCallback(async (otpString = null) => {
     const otpCode = otpString || otp.join('');
     
-    if (otpCode.length !== 6) {
-      setOtpError(t('auth.invalidOtpLength'));
+    if (otpCode.length !== otpLength) {
+      setOtpError(t('auth.invalidOtpLengthDynamic', { count: otpLength }));
       return;
     }
     
@@ -130,6 +71,70 @@ const MobileVerification = ({ onBack, onSuccess }) => {
     } finally {
       setIsLoading(false);
     }
+  }, [onSuccess, otp, otpLength, phoneNumber, t]);
+
+  // Auto-read OTP from SMS (for browsers that support it)
+  useEffect(() => {
+    if ('OTPCredential' in window) {
+      const controller = new AbortController();
+      
+      navigator.credentials.get({
+        otp: { transport: ['sms'] },
+        signal: controller.signal
+      }).then(otp => {
+        if (otp && otp.code) {
+          const otpArray = otp.code.split('').slice(0, otpLength).concat(createEmptyOtp(otpLength)).slice(0, otpLength);
+          setOtp(otpArray);
+          handleOtpVerify(otp.code);
+        }
+      }).catch(() => {
+        // Auto-read not available or user cancelled
+      });
+      
+      return () => controller.abort();
+    }
+  }, [handleOtpVerify, otpLength]);
+
+  // Handle OTP input change
+  const handleOtpChange = (index, value) => {
+    if (value.length <= 1 && /^\d*$/.test(value)) {
+      const newOtp = [...otp];
+      newOtp[index] = value;
+      setOtp(newOtp);
+      setOtpError('');
+      
+      // Auto-focus next input
+      if (value && index < otpLength - 1) {
+        const nextInput = document.getElementById(`otp-${index + 1}`);
+        if (nextInput) nextInput.focus();
+      }
+      
+      // Auto-submit if all digits are entered
+      if (index === otpLength - 1 && value && newOtp.every(digit => digit)) {
+        handleOtpVerify(newOtp.join(''));
+      }
+    }
+  };
+
+  // Handle backspace
+  const handleKeyDown = (index, e) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      const prevInput = document.getElementById(`otp-${index - 1}`);
+      if (prevInput) prevInput.focus();
+    }
+  };
+
+  // Handle OTP paste
+  const handleOtpPaste = (e) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text').slice(0, otpLength);
+    if (/^\d+$/.test(pastedData)) {
+      const newOtp = pastedData.split('').concat(createEmptyOtp(otpLength)).slice(0, otpLength);
+      setOtp(newOtp);
+      if (pastedData.length === otpLength) {
+        handleOtpVerify(pastedData);
+      }
+    }
   };
 
   // Handle OTP resend
@@ -142,8 +147,15 @@ const MobileVerification = ({ onBack, onSuccess }) => {
       const response = await otpService.resendOTP(phoneNumber);
       
       if (response.success) {
-        toast.success(t('auth.otpResentSuccess'));
-        setOtp(['', '', '', '', '', '']);
+        const nextOtpLength = Number(response.otpLength) || otpLength;
+        setOtpLength(nextOtpLength);
+        setDeliveryInfo(response);
+        toast.success(
+          response.debugOtp
+            ? t('auth.otpResentWithCode', { otp: response.debugOtp, channel: response.channel || 'whatsapp' })
+            : response.warning || t('auth.otpResentSuccess')
+        );
+        setOtp(createEmptyOtp(nextOtpLength));
         setOtpError('');
         setResendTimer(60);
         // Focus first OTP input
@@ -172,9 +184,22 @@ const MobileVerification = ({ onBack, onSuccess }) => {
         
         {/* OTP Input */}
         <div className="space-y-6">
+          {deliveryInfo && (deliveryInfo.warning || deliveryInfo.debugOtp || deliveryInfo.channel) && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p>
+                {deliveryInfo.debugOtp
+                  ? t('auth.devOtpNotice', { otp: deliveryInfo.debugOtp, channel: deliveryInfo.channel || 'whatsapp' })
+                  : t('auth.deliveryChannelNotice', { channel: deliveryInfo.channel || 'whatsapp' })}
+              </p>
+              {deliveryInfo.warning && (
+                <p className="mt-1">{deliveryInfo.warning}</p>
+              )}
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-4">
-              {t('auth.enter6DigitCode')}
+              {t('auth.enterDigitCode', { count: otpLength })}
             </label>
             <div className="flex space-x-3 justify-center">
               {otp.map((digit, index) => (
@@ -220,9 +245,9 @@ const MobileVerification = ({ onBack, onSuccess }) => {
           {/* Verify Button */}
           <button
             onClick={() => handleOtpVerify()}
-            disabled={isLoading || otp.join('').length !== 6}
+            disabled={isLoading || otp.join('').length !== otpLength}
             className={`w-full py-3 px-4 rounded-lg font-semibold text-white transition-all duration-300 ${
-              isLoading || otp.join('').length !== 6
+              isLoading || otp.join('').length !== otpLength
                 ? 'bg-gray-400 cursor-not-allowed'
                 : 'bg-gradient-to-r from-[#15BB73] to-[#0FA568] hover:shadow-lg transform hover:-translate-y-0.5'
             }`}

@@ -120,7 +120,7 @@ exports.getAllReports = async (req, res) => {
         {
           model: User,
           as: 'reporter',
-          attributes: ['id', 'fullname', 'phone_number']
+          attributes: ['id', 'full_name', 'phone_number']
         }
       ],
       order: [['created_at', 'DESC']],
@@ -155,7 +155,14 @@ exports.updateReportStatus = async (req, res) => {
   try {
     const { reportId } = req.params;
     const { status, admin_notes } = req.body;
-    const admin_id = req.admin ? req.admin.id : req.user.id;
+    const validStatuses = ['pending', 'under_review', 'resolved', 'dismissed'];
+
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid report status'
+      });
+    }
 
     const report = await VetReport.findByPk(reportId);
     if (!report) {
@@ -169,7 +176,10 @@ exports.updateReportStatus = async (req, res) => {
 
     if (status === 'resolved' || status === 'dismissed') {
       updateData.resolved_at = new Date();
-      updateData.resolved_by = admin_id;
+      updateData.resolved_by = null;
+    } else {
+      updateData.resolved_at = null;
+      updateData.resolved_by = null;
     }
 
     await report.update(updateData);
@@ -263,7 +273,7 @@ exports.getVetReports = async (req, res) => {
       include: [{
         model: User,
         as: 'reporter',
-        attributes: ['id', 'fullname', 'phone_number']
+        attributes: ['id', 'full_name', 'phone_number']
       }],
       order: [['created_at', 'DESC']],
       limit: parseInt(limit),

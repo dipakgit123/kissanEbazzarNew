@@ -10,6 +10,7 @@ router.get('/vaccination/:animalType', aiHealthController.getVaccinationSchedule
 router.get('/deworming/:animalType', aiHealthController.getDewormingSchedule);
 
 // Protected routes (auth required for AI analysis to prevent abuse)
+router.post('/ask', authMiddleware, aiHealthController.askHealthQuestion);
 router.post('/analyze', authMiddleware, aiHealthController.analyzeHealth);
 router.post(
   '/upload-and-analyze',

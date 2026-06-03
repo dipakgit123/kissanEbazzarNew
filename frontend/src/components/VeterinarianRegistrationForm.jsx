@@ -1,7 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
+import {
+  FaArrowLeft,
+  FaArrowRight,
+  FaCamera,
+  FaCapsules,
+  FaCheck,
+  FaCircleCheck,
+  FaDna,
+  FaEnvelope,
+  FaFileCircleCheck,
+  FaFileLines,
+  FaIdCard,
+  FaIndianRupeeSign,
+  FaLocationCrosshairs,
+  FaLocationDot,
+  FaPhone,
+  FaShieldHeart,
+  FaStethoscope,
+  FaSyringe,
+  FaTooth,
+  FaUser,
+  FaUserDoctor,
+} from 'react-icons/fa6';
 import LanguageSwitcher from './LanguageSwitcher';
 import { API_BASE_URL } from '../config/api';
 
@@ -16,6 +39,8 @@ const VeterinarianRegistrationForm = () => {
   const [success, setSuccess] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
   const [dragActive, setDragActive] = useState({});
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [submitStage, setSubmitStage] = useState('idle');
 
   const [formData, setFormData] = useState({
     // Personal Info
@@ -82,6 +107,26 @@ const VeterinarianRegistrationForm = () => {
     { value: 'Diploma', label: t('vetRegistration.qualifications.diploma') }
   ];
 
+  const stepItems = [
+    { num: 1, label: t('vetRegistration.step1'), sublabel: t('vetRegistration.step1Sub'), Icon: FaUser },
+    { num: 2, label: t('vetRegistration.step2'), sublabel: t('vetRegistration.step2Sub'), Icon: FaFileLines },
+    { num: 3, label: t('vetRegistration.step3'), sublabel: t('vetRegistration.step3Sub'), Icon: FaLocationDot }
+  ];
+
+  const serviceCards = [
+    { value: 'checkup', label: t('vetRegistration.services.checkup'), Icon: FaStethoscope },
+    { value: 'vaccination', label: t('vetRegistration.services.vaccination'), Icon: FaSyringe },
+    { value: 'surgery', label: t('vetRegistration.services.surgery'), Icon: FaFileLines },
+    { value: 'emergency', label: t('vetRegistration.services.emergency'), Icon: FaShieldHeart },
+    { value: 'pregnancy', label: t('vetRegistration.services.pregnancy'), Icon: FaUserDoctor },
+    { value: 'dental', label: t('vetRegistration.services.dental'), Icon: FaTooth },
+    { value: 'deworming', label: t('vetRegistration.services.deworming'), Icon: FaCapsules },
+    { value: 'artificial_insemination', label: t('vetRegistration.services.artificialInsemination'), Icon: FaDna }
+  ];
+
+  const getStepIcon = (stepNumber) => stepItems.find((item) => item.num === stepNumber)?.Icon || FaFileLines;
+  const getServiceIcon = (serviceValue) => serviceCards.find((item) => item.value === serviceValue)?.Icon || FaUserDoctor;
+
   // Get current location
   const getCurrentLocation = () => {
     setLocationLoading(true);
@@ -124,7 +169,7 @@ const VeterinarianRegistrationForm = () => {
 
         setLocationLoading(false);
       },
-      (error) => {
+      () => {
         setError(t('vetRegistration.locationRequired'));
         setLocationLoading(false);
       },
@@ -154,6 +199,72 @@ const VeterinarianRegistrationForm = () => {
       ...prev,
       [name]: file
     }));
+  };
+
+  const shouldCompressImage = (file) => (
+    file &&
+    file.type.startsWith('image/') &&
+    !file.type.includes('svg') &&
+    !file.type.includes('gif')
+  );
+
+  const compressImageFile = (file) => new Promise((resolve) => {
+    if (!shouldCompressImage(file) || file.size <= 1.5 * 1024 * 1024) {
+      resolve(file);
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+
+    image.onload = () => {
+      const maxDimension = 1600;
+      const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        URL.revokeObjectURL(objectUrl);
+        resolve(file);
+        return;
+      }
+
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(
+        (blob) => {
+          URL.revokeObjectURL(objectUrl);
+
+          if (!blob || blob.size >= file.size) {
+            resolve(file);
+            return;
+          }
+
+          resolve(new File([blob], file.name, {
+            type: blob.type || file.type,
+            lastModified: Date.now()
+          }));
+        },
+        'image/jpeg',
+        0.8
+      );
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(file);
+    };
+
+    image.src = objectUrl;
+  });
+
+  const prepareFilesForUpload = async () => {
+    const preparedEntries = await Promise.all(
+      Object.entries(files).map(async ([key, file]) => [key, await compressImageFile(file)])
+    );
+
+    return Object.fromEntries(preparedEntries);
   };
 
   // Handle drag and drop
@@ -233,8 +344,11 @@ const VeterinarianRegistrationForm = () => {
 
     setLoading(true);
     setError(null);
+    setUploadProgress(0);
+    setSubmitStage('preparing');
 
     try {
+      const preparedFiles = await prepareFilesForUpload();
       const formDataToSend = new FormData();
 
       // Append all form fields
@@ -247,11 +361,13 @@ const VeterinarianRegistrationForm = () => {
       });
 
       // Append files
-      Object.keys(files).forEach(key => {
-        if (files[key]) {
-          formDataToSend.append(key, files[key]);
+      Object.keys(preparedFiles).forEach(key => {
+        if (preparedFiles[key]) {
+          formDataToSend.append(key, preparedFiles[key]);
         }
       });
+
+      setSubmitStage('uploading');
 
       const response = await axios.post(
         `${API_URL}/api/veterinarians/register`,
@@ -259,11 +375,17 @@ const VeterinarianRegistrationForm = () => {
         {
           headers: {
             'Content-Type': 'multipart/form-data'
-          }
+          },
+          onUploadProgress: (progressEvent) => {
+            if (!progressEvent.total) return;
+            setUploadProgress(Math.min(100, Math.round((progressEvent.loaded * 100) / progressEvent.total)));
+          },
+          timeout: 120000
         }
       );
 
       if (response.data.success) {
+        setUploadProgress(100);
         setSuccess(true);
       }
     } catch (err) {
@@ -271,6 +393,7 @@ const VeterinarianRegistrationForm = () => {
       setError(err.response?.data?.message || t('vetRegistration.errorOccurred'));
     } finally {
       setLoading(false);
+      setSubmitStage('idle');
     }
   };
 
@@ -360,34 +483,86 @@ const VeterinarianRegistrationForm = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFF] py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-5xl mx-auto">
+    <div className="min-h-screen bg-[linear-gradient(180deg,#eef7f2_0%,#f8fbff_30%,#ffffff_100%)] py-6 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-6xl mx-auto">
         {/* Language Switcher - Top Right */}
         <div className="flex justify-end mb-4">
           <LanguageSwitcher />
         </div>
         
-        {/* Modern Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-lg mb-4">
-            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
+        <div className="mb-8 overflow-hidden rounded-[32px] border border-emerald-100 bg-[linear-gradient(135deg,#072814_0%,#0b3a20_45%,#0e5c33_100%)] text-white shadow-[0_28px_80px_rgba(8,34,19,0.20)]">
+          <div className="grid gap-8 px-6 py-8 sm:px-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)] lg:items-center lg:px-10 lg:py-10">
+            <div>
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-100">
+                <FaShieldHeart className="text-sm" />
+                {t('vetRegistration.subtitle')}
+              </span>
+              <h1 className="mt-5 text-3xl font-black leading-tight text-white sm:text-4xl lg:text-5xl">
+                {t('vetRegistration.title')}
+              </h1>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-emerald-50/85 sm:text-base">
+                {t('vetRegistration.subtitle')}
+              </p>
+
+              <div className="mt-6 flex flex-wrap gap-3">
+                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white/90">
+                  <FaFileCircleCheck className="text-emerald-300" />
+                  {t('vetRegistration.licenseInfo')}
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white/90">
+                  <FaLocationDot className="text-emerald-300" />
+                  {t('vetRegistration.locationSetup')}
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white/90">
+                  <FaCircleCheck className="text-emerald-300" />
+                  {t('vetRegistration.whatHappensNext')}
+                </span>
+              </div>
+
+              <Link
+                to="/veterinarian/login"
+                className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-emerald-100 transition hover:text-white"
+              >
+                <FaArrowLeft className="text-sm" />
+                {t('vetRegistration.backToLogin')}
+              </Link>
+            </div>
+
+            <div className="rounded-[28px] border border-white/15 bg-white/10 p-5 backdrop-blur-sm">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-100/80">
+                {t('vetRegistration.whatHappensNext')}
+              </p>
+              <div className="mt-5 space-y-4">
+                <div className="flex items-start gap-3 rounded-2xl bg-white/8 p-4">
+                  <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-400/20 text-emerald-200">
+                    <FaUserDoctor className="text-lg" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-white">{t('vetRegistration.step1Complete')}</p>
+                    <p className="mt-1 text-sm text-emerald-50/75">{t('vetRegistration.step1CompleteDesc')}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 rounded-2xl bg-white/8 p-4">
+                  <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-400/20 text-blue-100">
+                    <FaFileLines className="text-lg" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-white">{t('vetRegistration.step2Progress')}</p>
+                    <p className="mt-1 text-sm text-emerald-50/75">{t('vetRegistration.step2ProgressDesc')}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 rounded-2xl bg-white/8 p-4">
+                  <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-400/20 text-violet-100">
+                    <FaLocationCrosshairs className="text-lg" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-white">{t('vetRegistration.step3Live')}</p>
+                    <p className="mt-1 text-sm text-emerald-50/75">{t('vetRegistration.step3LiveDesc')}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">{t('vetRegistration.title')}</h1>
-          <p className="text-lg text-gray-600 mb-1">{t('vetRegistration.title')}</p>
-          <p className="text-sm text-gray-500">{t('vetRegistration.subtitle')}</p>
-          
-          {/* Back Link */}
-          <Link
-            to="/veterinarian/login"
-            className="inline-flex items-center text-gray-600 hover:text-blue-600 transition-colors text-sm font-medium mt-4"
-          >
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            {t('vetRegistration.backToLogin')}
-          </Link>
         </div>
 
         {/* Modern Progress Stepper */}
@@ -411,7 +586,7 @@ const VeterinarianRegistrationForm = () => {
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                       </svg>
                     ) : (
-                      <span className="text-2xl">{s.icon}</span>
+                      React.createElement(getStepIcon(s.num), { className: 'text-xl' })
                     )}
                   </div>
                   
@@ -449,6 +624,27 @@ const VeterinarianRegistrationForm = () => {
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
               <p className="text-sm font-medium text-red-700">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {loading && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 shadow-sm">
+            <div className="flex items-center justify-between gap-4 mb-2">
+              <p className="text-sm font-medium text-blue-700">
+                {submitStage === 'preparing'
+                  ? t('vetRegistration.optimizingFiles', 'Optimizing documents before upload...')
+                  : t('vetRegistration.uploadingDocuments', 'Uploading registration documents...')}
+              </p>
+              <span className="text-sm font-semibold text-blue-700">
+                {submitStage === 'preparing' ? '...' : `${uploadProgress}%`}
+              </span>
+            </div>
+            <div className="h-2 rounded-full bg-blue-100 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-300"
+                style={{ width: `${submitStage === 'preparing' ? 20 : Math.max(uploadProgress, 8)}%` }}
+              />
             </div>
           </div>
         )}
@@ -721,22 +917,26 @@ const VeterinarianRegistrationForm = () => {
                 <div className="h-px bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 mb-6"></div>
 
                 {/* Services - Pill Style Chips */}
-                <div className="flex flex-wrap gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   {serviceOptions.map(service => (
                     <button
                       key={service.value}
                       type="button"
                       onClick={() => handleServiceChange(service.value)}
-                      className={`inline-flex items-center px-5 py-3 rounded-full font-medium transition-all duration-200 ${
+                      className={`flex items-center gap-3 rounded-2xl border px-4 py-4 text-left font-medium transition-all duration-200 ${
                         formData.services.includes(service.value)
-                          ? 'bg-gradient-to-r from-purple-500 to-violet-600 text-white shadow-lg scale-105'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
+                          ? 'border-violet-200 bg-gradient-to-r from-purple-500 to-violet-600 text-white shadow-lg'
+                          : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-violet-200 hover:bg-violet-50'
                       }`}
                     >
-                      <span className="text-lg mr-2">{service.icon}</span>
-                      <span className="text-sm">{service.label}</span>
+                      <span className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
+                        formData.services.includes(service.value) ? 'bg-white/20 text-white' : 'bg-white text-violet-600 shadow-sm'
+                      }`}>
+                        {React.createElement(getServiceIcon(service.value), { className: 'text-lg' })}
+                      </span>
+                      <span className="min-w-0 text-sm leading-5">{service.label}</span>
                       {formData.services.includes(service.value) && (
-                        <svg className="w-4 h-4 ml-2" fill="currentColor" viewBox="0 0 20 20">
+                        <svg className="ml-auto h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
                       )}
@@ -1100,8 +1300,8 @@ const VeterinarianRegistrationForm = () => {
                     </svg>
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900">Location Details</h2>
-                    <p className="text-sm text-gray-500">Set your clinic or practice location</p>
+                    <h2 className="text-xl font-bold text-gray-900">{t('vetRegistration.locationSetup')}</h2>
+                    <p className="text-sm text-gray-500">{t('vetRegistration.locationDetails')}</p>
                   </div>
                 </div>
                 
@@ -1155,7 +1355,7 @@ const VeterinarianRegistrationForm = () => {
                           </svg>
                         </div>
                         <div className="ml-3">
-                          <p className="text-sm font-bold text-green-800">Location Captured Successfully!</p>
+                          <p className="text-sm font-bold text-green-800">{t('vetRegistration.locationCaptured')}</p>
                           <p className="text-xs text-green-700 mt-1">
                             Coordinates: {parseFloat(formData.latitude).toFixed(4)}, {parseFloat(formData.longitude).toFixed(4)}
                           </p>
@@ -1275,7 +1475,7 @@ const VeterinarianRegistrationForm = () => {
               </div>
 
               {/* Trust Element: Security Badge */}
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-200">
+              <div className="hidden bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-200">
                 <div className="flex items-start">
                   <div className="flex-shrink-0">
                     <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
@@ -1343,7 +1543,7 @@ const VeterinarianRegistrationForm = () => {
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
-                Back
+                {t('vetRegistration.previousStep')}
               </button>
             ) : (
               <div></div>
@@ -1355,7 +1555,7 @@ const VeterinarianRegistrationForm = () => {
                 onClick={nextStep}
                 className="ml-auto flex items-center px-8 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all text-sm"
               >
-                Next Step
+                {t('vetRegistration.nextStep')}
                 <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
@@ -1372,7 +1572,9 @@ const VeterinarianRegistrationForm = () => {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
-                    {t('vetRegistration.submitting')}
+                    {submitStage === 'preparing'
+                      ? t('vetRegistration.preparingUpload', 'Preparing files...')
+                      : t('vetRegistration.uploadingNow', 'Uploading...')}
                   </>
                 ) : (
                   <>
@@ -1388,7 +1590,7 @@ const VeterinarianRegistrationForm = () => {
         </form>
 
         {/* Info Box */}
-        <div className="mt-8 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-200">
+        <div className="hidden mt-8 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-200">
           <div className="flex items-start">
             <svg className="w-6 h-6 text-blue-600 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />

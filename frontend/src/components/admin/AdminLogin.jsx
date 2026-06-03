@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../../config/api';
 
 const AdminLogin = () => {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     username: '',
@@ -39,7 +37,7 @@ const AdminLogin = () => {
       } else {
         setError(data.message || 'Login failed');
       }
-    } catch (err) {
+    } catch {
       setError('Connection error. Please try again.');
     } finally {
       setLoading(false);
@@ -64,7 +62,7 @@ const AdminLogin = () => {
             </svg>
           </div>
           <h1 className="text-3xl font-bold text-white mb-2">Admin Portal</h1>
-          <p className="text-gray-400">KissanEbazzar Dashboard</p>
+          <p className="text-gray-400">Animal E Bazar Dashboard</p>
         </div>
 
         {/* Login Card */}
@@ -166,7 +164,7 @@ const AdminLogin = () => {
 
         {/* Footer */}
         <p className="text-center text-gray-500 text-sm mt-8">
-          KissanEbazzar Admin Panel v1.0
+          Animal E Bazar Admin Panel v1.0
         </p>
       </div>
     </div>

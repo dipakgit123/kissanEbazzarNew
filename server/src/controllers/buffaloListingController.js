@@ -162,6 +162,25 @@ exports.getAllBuffaloListings = async (req, res) => {
       sortBy = 'created_at',
       sortOrder = 'DESC'
     } = req.query;
+    const validPregnancyStatuses = ['pregnant', 'not_pregnant', 'recently_delivered', 'unknown'];
+    const validHealthConditions = ['excellent', 'good', 'average'];
+    const validSortFields = ['created_at', 'updated_at', 'expectedPrice', 'views'];
+    const sanitizedSortBy = validSortFields.includes(sortBy) ? sortBy : 'created_at';
+    const sanitizedSortOrder = String(sortOrder).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
+    if (pregnancyStatus && !validPregnancyStatuses.includes(pregnancyStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid pregnancy status filter'
+      });
+    }
+
+    if (healthCondition && !validHealthConditions.includes(healthCondition)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid health condition filter'
+      });
+    }
 
     // Build filter conditions
     const where = { status: 'active' };
@@ -182,7 +201,7 @@ exports.getAllBuffaloListings = async (req, res) => {
       where,
       limit: parseInt(limit),
       offset,
-      order: [[sortBy, sortOrder]],
+      order: [[sanitizedSortBy, sanitizedSortOrder]],
       include: [{
         model: db.User,
         as: 'user',
@@ -321,6 +340,14 @@ exports.getMyBuffaloListings = async (req, res) => {
   try {
     const userId = req.user.id;
     const { status = 'active' } = req.query;
+    const validStatuses = ['all', 'active', 'sold', 'expired', 'deleted'];
+
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid listing status filter'
+      });
+    }
 
     const where = { user_id: userId };
     if (status !== 'all') {

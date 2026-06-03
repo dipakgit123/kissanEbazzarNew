@@ -1,6 +1,26 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { userService } from '../services/api';
+import toast from 'react-hot-toast';
+import { locationService, userService } from '../services/api';
+
+const getMapEmbedUrl = (latitude, longitude) => {
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return '';
+  }
+
+  const delta = 0.01;
+  const bbox = [
+    (lng - delta).toFixed(6),
+    (lat - delta).toFixed(6),
+    (lng + delta).toFixed(6),
+    (lat + delta).toFixed(6)
+  ].join('%2C');
+
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat.toFixed(6)}%2C${lng.toFixed(6)}`;
+};
 
 const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, onPhotoUpdate }) => {
   const { t } = useTranslation();
@@ -9,13 +29,21 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
     phone: initialData.phone || initialData.phone_number || '',
     address: initialData.address || '',
     pincode: initialData.pincode || initialData.postal_code || '',
+    city: initialData.city || '',
+    state: initialData.state || '',
+    country: initialData.country || 'India',
+    latitude: initialData.latitude || '',
+    longitude: initialData.longitude || '',
   });
 
   const [profilePhoto, setProfilePhoto] = useState(initialData.profile_photo || null);
   const [photoPreview, setPhotoPreview] = useState(initialData.profile_photo || null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [resolvingLocation, setResolvingLocation] = useState(false);
+  const [lookingUpPincode, setLookingUpPincode] = useState(false);
   const [errors, setErrors] = useState({});
   const fileInputRef = useRef(null);
+  const lastLookupRef = useRef('');
 
   useEffect(() => {
     setForm({
@@ -23,6 +51,11 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
       phone: initialData.phone || initialData.phone_number || '',
       address: initialData.address || '',
       pincode: initialData.pincode || initialData.postal_code || '',
+      city: initialData.city || '',
+      state: initialData.state || '',
+      country: initialData.country || 'India',
+      latitude: initialData.latitude || '',
+      longitude: initialData.longitude || '',
     });
     const photo = initialData.profile_photo || null;
     setProfilePhoto(photo);
@@ -35,6 +68,11 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
     initialData.address,
     initialData.pincode,
     initialData.postal_code,
+    initialData.city,
+    initialData.state,
+    initialData.country,
+    initialData.latitude,
+    initialData.longitude,
     initialData.profile_photo
   ]);
 
@@ -51,19 +89,187 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
     fileInputRef.current?.click();
   };
 
+  const applyLocationData = (locationData) => {
+    setForm((prev) => ({
+      ...prev,
+      address: locationData.address || prev.address,
+      pincode: locationData.pincode || prev.pincode,
+      city: locationData.city || prev.city,
+      state: locationData.state || prev.state,
+      country: locationData.country || prev.country,
+      latitude: locationData.latitude || prev.latitude,
+      longitude: locationData.longitude || prev.longitude,
+    }));
+  };
+
+  const reverseGeocodeCoordinates = async (latitude, longitude) => {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`,
+      {
+        headers: {
+          Accept: 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch location details');
+    }
+
+    const data = await response.json();
+    const address = data.address || {};
+
+    return {
+      address: data.display_name || '',
+      pincode: address.postcode || '',
+      city: address.city || address.town || address.village || address.county || '',
+      state: address.state || '',
+      country: address.country || 'India',
+      latitude: String(latitude),
+      longitude: String(longitude),
+    };
+  };
+
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error(t('location.locationRequired', { defaultValue: 'Geolocation is not supported by your browser' }));
+      return;
+    }
+
+    setResolvingLocation(true);
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const locationData = await reverseGeocodeCoordinates(latitude, longitude);
+          applyLocationData(locationData);
+        } catch (error) {
+          console.error('Reverse geocoding error:', error);
+          toast.error(t('profile.locationLookupFailed', { defaultValue: 'Failed to detect your current location' }));
+        } finally {
+          setResolvingLocation(false);
+        }
+      },
+      () => {
+        setResolvingLocation(false);
+        toast.error(t('profile.locationLookupFailed', { defaultValue: 'Failed to detect your current location' }));
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  const handleFindOnMap = async () => {
+    const query = [form.address, form.pincode, form.city, form.state, form.country]
+      .map((item) => item?.trim())
+      .filter(Boolean)
+      .join(', ');
+
+    if (!query) {
+      setErrors((prev) => ({
+        ...prev,
+        address: t('profile.enterLocationToSearch', { defaultValue: 'Enter address or pincode to find the real location' }),
+      }));
+      return;
+    }
+
+    setResolvingLocation(true);
+
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`,
+        {
+          headers: {
+            Accept: 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to search location');
+      }
+
+      const data = await response.json();
+      if (!Array.isArray(data) || data.length === 0) {
+        throw new Error('Location not found');
+      }
+
+      const result = data[0];
+      const address = result.address || {};
+
+      applyLocationData({
+        address: result.display_name || form.address,
+        pincode: address.postcode || form.pincode,
+        city: address.city || address.town || address.village || address.county || form.city,
+        state: address.state || form.state,
+        country: address.country || form.country,
+        latitude: result.lat,
+        longitude: result.lon,
+      });
+    } catch (error) {
+      console.error('Location search error:', error);
+      toast.error(t('profile.locationLookupFailed', { defaultValue: 'Failed to find this location on the map' }));
+    } finally {
+      setResolvingLocation(false);
+    }
+  };
+
+  useEffect(() => {
+    const normalizedPincode = form.pincode.trim();
+
+    if (!/^\d{6}$/.test(normalizedPincode)) {
+      return;
+    }
+
+    if (lastLookupRef.current === normalizedPincode) {
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      setLookingUpPincode(true);
+      try {
+        const response = await locationService.lookupPincode(normalizedPincode);
+        if (response?.success && response?.data) {
+          const locationData = response.data;
+          applyLocationData({
+            address: locationData.address || form.address,
+            pincode: locationData.postal_code || normalizedPincode,
+            city: locationData.city || form.city,
+            state: locationData.state || form.state,
+            country: locationData.country || form.country,
+            latitude: locationData.latitude != null ? String(locationData.latitude) : form.latitude,
+            longitude: locationData.longitude != null ? String(locationData.longitude) : form.longitude,
+          });
+          setErrors((prev) => ({ ...prev, pincode: '' }));
+          lastLookupRef.current = normalizedPincode;
+        }
+      } catch (error) {
+        console.error('Pincode lookup error:', error);
+        setErrors((prev) => ({
+          ...prev,
+          pincode: t('profile.pincodeLookupFailed', { defaultValue: 'Could not fetch location from this pincode' }),
+        }));
+      } finally {
+        setLookingUpPincode(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timeoutId);
+  }, [form.address, form.city, form.country, form.latitude, form.longitude, form.pincode, form.state, t]);
+
   const handlePhotoChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      toast.error('Please select an image file');
       return;
     }
 
     // Validate file size (5MB max)
     if (file.size > 5 * 1024 * 1024) {
-      alert('Image size should be less than 5MB');
+      toast.error('Image size should be less than 5MB');
       return;
     }
 
@@ -86,12 +292,12 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
           onPhotoUpdate(newPhoto);
         }
       } else {
-        alert(response.message || 'Failed to upload photo');
+        toast.error(response.message || 'Failed to upload photo');
         setPhotoPreview(profilePhoto); // Revert preview
       }
     } catch (error) {
       console.error('Error uploading photo:', error);
-      alert(error.message || 'Failed to upload photo');
+      toast.error(error.message || 'Failed to upload photo');
       setPhotoPreview(profilePhoto); // Revert preview
     } finally {
       setUploadingPhoto(false);
@@ -111,11 +317,11 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
           onPhotoUpdate(null);
         }
       } else {
-        alert(response.message || 'Failed to remove photo');
+        toast.error(response.message || 'Failed to remove photo');
       }
     } catch (error) {
       console.error('Error removing photo:', error);
-      alert(error.message || 'Failed to remove photo');
+      toast.error(error.message || 'Failed to remove photo');
     } finally {
       setUploadingPhoto(false);
     }
@@ -136,6 +342,14 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
       newErrors.pincode = 'Please enter a valid 6-digit pincode';
     }
 
+    if (form.latitude && Number.isNaN(Number(form.latitude))) {
+      newErrors.address = 'Invalid location coordinates';
+    }
+
+    if (form.longitude && Number.isNaN(Number(form.longitude))) {
+      newErrors.address = 'Invalid location coordinates';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -147,9 +361,20 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
         full_name: form.name.trim(),
         address: form.address.trim(),
         postal_code: form.pincode.trim(),
+        city: form.city.trim(),
+        state: form.state.trim(),
+        country: form.country.trim(),
+        latitude: form.latitude ? Number(form.latitude) : null,
+        longitude: form.longitude ? Number(form.longitude) : null,
       });
     }
   };
+
+  const mapEmbedUrl = getMapEmbedUrl(form.latitude, form.longitude);
+  const isFetchingAddress = lookingUpPincode || resolvingLocation;
+  const fetchingAddressMessage = lookingUpPincode
+    ? t('profile.fetchingAddressFromPincode', { defaultValue: 'Your address is being fetched from the pincode...' })
+    : t('profile.fetchingAddressFromLocation', { defaultValue: 'Your address is being fetched from your location...' });
 
   return (
     <div className="bg-white rounded-2xl shadow-xl overflow-hidden max-h-[90vh] overflow-y-auto">
@@ -297,6 +522,61 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
           {errors.address && <p className="text-red-500 text-xs mt-1">{errors.address}</p>}
         </div>
 
+        {isFetchingAddress && (
+          <div className="rounded-2xl border border-[#15BB73]/20 bg-[#15BB73]/8 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <svg className="h-5 w-5 animate-spin text-[#15BB73]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <div>
+                <p className="text-sm font-semibold text-[#0F8F5D]">
+                  {t('profile.fetchingAddressTitle', { defaultValue: 'Fetching location details' })}
+                </p>
+                <p className="text-xs text-[#3A6E57]">
+                  {fetchingAddressMessage}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="rounded-2xl border border-[#15BB73]/20 bg-[#15BB73]/5 p-4 space-y-3">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <button
+              type="button"
+              onClick={handleFindOnMap}
+              disabled={resolvingLocation || uploadingPhoto}
+              className="flex-1 rounded-xl border border-[#15BB73]/20 bg-white px-4 py-2.5 text-sm font-semibold text-[#0F8F5D] hover:bg-[#F3FFF9] transition-colors disabled:opacity-50"
+            >
+              {resolvingLocation ? t('common.loading', { defaultValue: 'Loading...' }) : t('profile.findOnMap', { defaultValue: 'Find real location on map' })}
+            </button>
+            <button
+              type="button"
+              onClick={handleUseCurrentLocation}
+              disabled={resolvingLocation || uploadingPhoto}
+              className="flex-1 rounded-xl border border-[#15BB73]/20 bg-white px-4 py-2.5 text-sm font-semibold text-[#0F8F5D] hover:bg-[#F3FFF9] transition-colors disabled:opacity-50"
+            >
+              {t('profile.useCurrentLocation', { defaultValue: 'Use current location' })}
+            </button>
+          </div>
+
+          {mapEmbedUrl ? (
+            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+              <iframe
+                title="Selected location map"
+                src={mapEmbedUrl}
+                className="h-48 w-full border-0"
+                loading="lazy"
+              />
+            </div>
+          ) : (
+            <p className="text-xs text-gray-500">
+              {t('profile.mapHint', { defaultValue: 'Search your address or use current location to verify the real place on the map.' })}
+            </p>
+          )}
+        </div>
+
         {/* Pincode Field */}
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1">
@@ -312,8 +592,79 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
             }`}
             placeholder={t('profile.pincodePlaceholder') || 'Enter 6-digit pincode'}
           />
+          {lookingUpPincode && (
+            <p className="text-[#0F8F5D] text-xs mt-1">
+              {t('profile.pincodeLookupLoading', { defaultValue: 'Looking up address from pincode...' })}
+            </p>
+          )}
           {errors.pincode && <p className="text-red-500 text-xs mt-1">{errors.pincode}</p>}
         </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              {t('profile.city', { defaultValue: 'City' })}
+            </label>
+            <input
+              name="city"
+              value={form.city}
+              onChange={handleChange}
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all"
+              placeholder={t('profile.cityPlaceholder') || 'City'}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              {t('profile.state', { defaultValue: 'State' })}
+            </label>
+            <input
+              name="state"
+              value={form.state}
+              onChange={handleChange}
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all"
+              placeholder={t('profile.statePlaceholder') || 'State'}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1">
+            {t('footer.country', { defaultValue: 'Country' })}
+          </label>
+          <input
+            name="country"
+            value={form.country}
+            onChange={handleChange}
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all"
+            placeholder={t('footer.country', { defaultValue: 'Country' })}
+          />
+        </div>
+
+        {(form.latitude || form.longitude) && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                Latitude
+              </label>
+              <input
+                value={form.latitude}
+                readOnly
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                Longitude
+              </label>
+              <input
+                value={form.longitude}
+                readOnly
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-500"
+              />
+            </div>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="flex gap-3 pt-2">
@@ -327,7 +678,7 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
           </button>
           <button
             type="submit"
-            disabled={loading || uploadingPhoto}
+            disabled={loading || uploadingPhoto || resolvingLocation}
             className="flex-1 py-3 rounded-xl bg-gradient-to-r from-[#15BB73] to-[#0FA568] font-semibold text-white hover:from-[#0FA568] hover:to-[#15BB73] transition-all shadow-lg shadow-[#15BB73]/30 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {loading ? (

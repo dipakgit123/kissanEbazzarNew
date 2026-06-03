@@ -1,6 +1,7 @@
 // src/controllers/locationController.js
 
 const locationService = require('../services/locationService');
+const geocodingService = require('../services/geocodingService');
 const db = require('../models');
 
 class LocationController {
@@ -218,6 +219,39 @@ class LocationController {
       res.status(500).json({
         success: false,
         message: 'Failed to get location'
+      });
+    }
+  }
+
+  /**
+   * Lookup location details from pincode/postal code
+   */
+  lookupPostalCode = async (req, res) => {
+    try {
+      const { postalCode } = req.params;
+      const normalizedPostalCode = String(postalCode || '').trim();
+
+      if (!/^\d{6}$/.test(normalizedPostalCode)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide a valid 6-digit pincode'
+        });
+      }
+
+      const locationData = await geocodingService.getLocationFromPostalCode(
+        normalizedPostalCode,
+        'IN'
+      );
+
+      return res.status(200).json({
+        success: true,
+        data: locationData
+      });
+    } catch (error) {
+      console.error('Lookup postal code error:', error);
+      return res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to lookup pincode'
       });
     }
   }

@@ -1,18 +1,17 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Wrapper, Status } from '@googlemaps/react-wrapper';
+import toast from 'react-hot-toast';
 import { listingsService } from '../services/api';
+import { FullPageLoader, InlineLoader } from './AppLoader';
 
 // Google Maps API Key
 const GOOGLE_MAPS_API_KEY = 'AIzaSyAXGS_YosP1JmJL1KaLbW4ibs-rblbnUNQ';
 
 // Loading component
 const LoadingComponent = () => (
-  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#E9F0F8] to-[#F0F8FF]">
-    <div className="text-center">
-      <div className="w-16 h-16 border-4 border-[#15BB73] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-      <p className="text-gray-600 font-medium">Loading Map...</p>
-    </div>
+  <div className="w-full h-full">
+    <FullPageLoader message="Loading Map..." className="min-h-full" />
   </div>
 );
 
@@ -263,7 +262,7 @@ const MapComponent = ({ userLocation, animalData, selectedAnimal, onAnimalSelect
         map.fitBounds(bounds, { padding: 50 });
 
         // Don't zoom in too much
-        const listener = window.google.maps.event.addListenerOnce(map, 'idle', () => {
+        window.google.maps.event.addListenerOnce(map, 'idle', () => {
           if (map.getZoom() > 14) map.setZoom(14);
         });
       }
@@ -323,7 +322,7 @@ const getDistanceColor = (distance) => {
   return 'text-red-600';
 };
 
-const MapView = ({ wishlist = [], addToWishlist, removeFromWishlist, isInWishlist }) => {
+const MapView = ({ addToWishlist, removeFromWishlist, isInWishlist }) => {
   const [userLocation, setUserLocation] = useState(null);
   const [selectedAnimal, setSelectedAnimal] = useState(null);
   const [nearestAnimals, setNearestAnimals] = useState([]);
@@ -596,7 +595,10 @@ const MapView = ({ wishlist = [], addToWishlist, removeFromWishlist, isInWishlis
 
             <button
               onClick={() => {
-                alert(`Animals on Map: ${filteredAnimals.length}\n\nClick on any marker to see details.\nUse the sidebar to browse and contact sellers.`);
+                toast(`Animals on map: ${filteredAnimals.length}. Click any marker to see details and use the sidebar to browse and contact sellers.`, {
+                  icon: '📍',
+                  duration: 5000
+                });
               }}
               className="w-10 h-10 lg:w-12 lg:h-12 bg-white rounded-lg shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors"
               title="Map info"
@@ -767,8 +769,7 @@ const MapView = ({ wishlist = [], addToWishlist, removeFromWishlist, isInWishlis
               </div>
             ) : loading ? (
               <div className="text-center py-6 lg:py-8">
-                <div className="w-12 h-12 border-4 border-[#15BB73] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <p className="text-gray-500">Loading animals...</p>
+                <InlineLoader message="Loading animals..." />
               </div>
             ) : (
               <div className="text-center py-6 lg:py-8">

@@ -1,9 +1,6 @@
 {
     "development": {
-      "username": "neondb_owner",
-      "password": "npg_tmI5SqVor4hd",
-      "database": "neondb",
-      "host": "ep-holy-art-adey58zd-pooler.c-2.us-east-1.aws.neon.tech",
+      "use_env_variable": "DATABASE_URL",
       "dialect": "postgres",
       "logging": true,
       "dialectOptions": {
@@ -20,10 +17,7 @@
       }
     },
     "test": {
-      "username": "neondb_owner",
-      "password": "npg_tmI5SqVor4hd",
-      "database": "neondb",
-      "host": "ep-holy-art-adey58zd-pooler.c-2.us-east-1.aws.neon.tech",
+      "use_env_variable": "DATABASE_URL",
       "dialect": "postgres",
       "logging": false,
       "dialectOptions": {
@@ -31,6 +25,12 @@
           "require": true,
           "rejectUnauthorized": false
         }
+      },
+      "pool": {
+        "max": 5,
+        "min": 0,
+        "acquire": 30000,
+        "idle": 10000
       }
     },
     "production": {

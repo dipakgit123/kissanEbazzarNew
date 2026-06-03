@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
@@ -8,9 +8,15 @@ import { userService, listingsService } from '../services/api';
 import { API_BASE_URL } from '../config/api';
 import { SUPPORT_WHATSAPP_NUMBER, SUPPORT_WHATSAPP_MESSAGE } from '../config/support';
 import toast from 'react-hot-toast';
+import { safeJsonParse } from '../utils/stringUtils';
+import { InlineLoader } from './AppLoader';
+import { useWishlist } from '../contexts/useWishlist';
 
-const ProfilePage = ({ onBack, wishlist = [] }) => {
+const FALLBACK_ANIMAL_IMAGE = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="80" height="80"%3E%3Crect fill="%23f0f0f0" width="80" height="80"/%3E%3Ctext fill="%23999" font-family="sans-serif" font-size="10" dy="4" font-weight="bold" x="50%25" y="50%25" text-anchor="middle"%3ENo Image%3C/text%3E%3C/svg%3E';
+
+const ProfilePage = ({ onBack }) => {
   const { t } = useTranslation();
+  const { wishlist } = useWishlist();
   const [editing, setEditing] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [user, setUser] = useState({
@@ -30,22 +36,56 @@ const ProfilePage = ({ onBack, wishlist = [] }) => {
   const [dogListings, setDogListings] = useState([]);
   const [goatListings, setGoatListings] = useState([]);
   const [horseListings, setHorseListings] = useState([]);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [showMyAnimals, setShowMyAnimals] = useState(false);
   const [selectedAnimal, setSelectedAnimal] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
   const [showCallHistory, setShowCallHistory] = useState(false);
+  const [callHistoryTab, setCallHistoryTab] = useState('all');
   const [markingSoldId, setMarkingSoldId] = useState(null);
   const likedAnimals = Array.isArray(wishlist) ? wishlist : [];
 
-  useEffect(() => {
-    fetchUserProfile();
-    setTimeout(() => {
-      fetchAllListings();
-    }, 100);
-  }, []);
+  const formatProfileLocation = useCallback((userData) => {
+    const address = userData?.address?.trim();
+    const city = userData?.city?.trim();
+    const state = userData?.state?.trim();
+    const postalCode = userData?.postal_code?.trim();
 
+    const locationParts = [];
+    if (address) locationParts.push(address);
+    if (city) locationParts.push(city);
+    if (state && state !== city) locationParts.push(state);
+    if (postalCode) locationParts.push(postalCode);
 
+    return locationParts.length > 0 ? locationParts.join(', ') : t('profile.locationNotSet');
+  }, [t]);
+
+  const buildUserViewModel = useCallback((userData) => {
+    let completion = 0;
+    if (userData?.full_name) completion += 20;
+    if (userData?.phone_number) completion += 20;
+    if (userData?.address) completion += 20;
+    if (userData?.postal_code) completion += 20;
+    if (userData?.profile_photo) completion += 20;
+
+    return {
+      name: userData?.full_name || t('profile.user'),
+      full_name: userData?.full_name || '',
+      location: formatProfileLocation(userData),
+      phone: userData?.phone_number || '',
+      phone_number: userData?.phone_number || '',
+      address: userData?.address || '',
+      postal_code: userData?.postal_code || '',
+      city: userData?.city || '',
+      state: userData?.state || '',
+      country: userData?.country || 'India',
+      latitude: userData?.latitude || '',
+      longitude: userData?.longitude || '',
+      profile_photo: userData?.profile_photo || null,
+      completion,
+    };
+  }, [formatProfileLocation, t]);
 
   const getTotalListings = () => {
     return animalListings.length + buffaloListings.length + catListings.length +
@@ -62,46 +102,27 @@ const ProfilePage = ({ onBack, wishlist = [] }) => {
     window.open(whatsappUrl, '_blank');
   };
 
-  const fetchUserProfile = async () => {
+  const openCallHistory = (tab) => {
+    setCallHistoryTab(tab);
+    setShowCallHistory(true);
+  };
+
+  const fetchUserProfile = useCallback(async () => {
+    setProfileLoading(true);
     try {
       const response = await userService.getProfile();
       if (response.success && response.user) {
-        const userData = response.user;
-
-        let completion = 0;
-        if (userData.full_name) completion += 20;
-        if (userData.phone_number) completion += 20;
-        if (userData.address) completion += 20;
-        if (userData.postal_code) completion += 20;
-        if (userData.profile_photo) completion += 20;
-
-        const locationParts = [];
-        if (userData.city) locationParts.push(userData.city);
-        if (userData.state) locationParts.push(userData.state);
-        const location = locationParts.length > 0 ? locationParts.join(', ') : t('profile.locationNotSet');
-
-        setUser({
-          name: userData.full_name || t('profile.user'),
-          full_name: userData.full_name || '',
-          location: location,
-          phone: userData.phone_number || '',
-          phone_number: userData.phone_number || '',
-          address: userData.address || '',
-          postal_code: userData.postal_code || '',
-          city: userData.city || '',
-          state: userData.state || '',
-          country: userData.country || '',
-          profile_photo: userData.profile_photo || null,
-          completion: completion,
-        });
+        setUser(buildUserViewModel(response.user));
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
+    } finally {
+      setProfileLoading(false);
     }
-  };
+  }, [buildUserViewModel]);
 
 
-  const fetchAllListings = async () => {
+  const fetchAllListings = useCallback(async () => {
     setLoading(true);
     const token = localStorage.getItem('token');
 
@@ -146,7 +167,16 @@ const ProfilePage = ({ onBack, wishlist = [] }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchUserProfile();
+    const timer = setTimeout(() => {
+      fetchAllListings();
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [fetchAllListings, fetchUserProfile]);
 
   const handleSaveProfile = async (profileData) => {
     try {
@@ -155,15 +185,16 @@ const ProfilePage = ({ onBack, wishlist = [] }) => {
 
       if (response?.success && response?.user) {
         localStorage.setItem('userData', JSON.stringify(response.user));
+        setUser(buildUserViewModel(response.user));
         await fetchUserProfile();
         setEditing(false);
-        alert(t('profile.updateSuccess') || 'Profile updated successfully');
+        toast.success(t('profile.updateSuccess') || 'Profile updated successfully');
       } else {
-        alert(response?.message || t('profile.updateFailed') || 'Failed to update profile');
+        toast.error(response?.message || t('profile.updateFailed') || 'Failed to update profile');
       }
     } catch (error) {
       console.error('Error updating profile:', error);
-      alert(t('profile.updateFailed') || 'Failed to update profile');
+      toast.error(t('profile.updateFailed') || 'Failed to update profile');
     } finally {
       setSavingProfile(false);
     }
@@ -175,7 +206,7 @@ const ProfilePage = ({ onBack, wishlist = [] }) => {
       return;
     }
 
-    setUser(prev => {
+      setUser(prev => {
       const updated = { ...prev, profile_photo: photoUrl };
       const completion =
         (updated.full_name ? 20 : 0) +
@@ -188,11 +219,9 @@ const ProfilePage = ({ onBack, wishlist = [] }) => {
 
     const saved = localStorage.getItem('userData');
     if (saved) {
-      try {
-        const userData = JSON.parse(saved);
+      const userData = safeJsonParse(saved, {});
+      if (userData && typeof userData === 'object') {
         localStorage.setItem('userData', JSON.stringify({ ...userData, profile_photo: photoUrl }));
-      } catch {
-        // Ignore localStorage parse issues
       }
     }
   };
@@ -229,13 +258,13 @@ const ProfilePage = ({ onBack, wishlist = [] }) => {
           setSelectedAnimal(null);
         }
         await fetchAllListings();
-        alert(t('profile.deleteSuccess') || 'Listing deleted successfully');
+        toast.success(t('profile.deleteSuccess') || 'Listing deleted successfully');
       } else {
-        alert(response?.data?.message || t('profile.deleteFailed') || 'Failed to delete listing');
+        toast.error(response?.data?.message || t('profile.deleteFailed') || 'Failed to delete listing');
       }
     } catch (error) {
       console.error('Error deleting listing:', error);
-      alert(t('profile.deleteFailed') || 'Failed to delete listing');
+      toast.error(t('profile.deleteFailed') || 'Failed to delete listing');
     }
   };
 
@@ -262,13 +291,13 @@ const ProfilePage = ({ onBack, wishlist = [] }) => {
           setSelectedAnimal(prev => (prev ? { ...prev, status: 'sold' } : prev));
         }
         await fetchAllListings();
-        alert(t('profile.markSoldSuccess') || 'Listing marked as sold.');
+        toast.success(t('profile.markSoldSuccess') || 'Listing marked as sold.');
       } else {
-        alert(response?.message || t('profile.markSoldFailed') || 'Failed to mark as sold.');
+        toast.error(response?.message || t('profile.markSoldFailed') || 'Failed to mark as sold.');
       }
     } catch (error) {
       console.error('Error marking listing as sold:', error);
-      alert(t('profile.markSoldFailed') || 'Failed to mark as sold.');
+      toast.error(t('profile.markSoldFailed') || 'Failed to mark as sold.');
     } finally {
       setMarkingSoldId(null);
     }
@@ -301,103 +330,109 @@ const ProfilePage = ({ onBack, wishlist = [] }) => {
         
         {/* Profile Header Card */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
-            {/* Avatar */}
-            <div className="relative">
-              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white text-3xl font-bold overflow-hidden border-4 border-white shadow-lg">
-                {user.profile_photo ? (
-                  <img src={user.profile_photo} alt={user.name} className="w-full h-full object-cover" />
-                ) : (
-                  user.name ? user.name[0].toUpperCase() : '?'
-                )}
-              </div>
-              {user.completion === 100 && (
-                <div className="absolute -bottom-1 -right-1 bg-green-500 text-white rounded-full p-1.5 border-2 border-white shadow-md">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                </div>
-              )}
+          {profileLoading ? (
+            <div className="flex min-h-[220px] items-center justify-center">
+              <InlineLoader message={t('profile.loading') || 'Loading...'} size="small" />
             </div>
-
-            {/* Profile Info */}
-            <div className="flex-1 text-center sm:text-left">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
-                <h2 className="text-2xl font-bold text-gray-900">{user.name}</h2>
+          ) : (
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+              {/* Avatar */}
+              <div className="relative">
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white text-3xl font-bold overflow-hidden border-4 border-white shadow-lg">
+                  {user.profile_photo ? (
+                    <img src={user.profile_photo} alt={user.name} className="w-full h-full object-cover" />
+                  ) : (
+                    user.name ? user.name[0].toUpperCase() : 'U'
+                  )}
+                </div>
                 {user.completion === 100 && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  <div className="absolute -bottom-1 -right-1 bg-green-500 text-white rounded-full p-1.5 border-2 border-white shadow-md">
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                     </svg>
-                    {t('profile.verified') || 'Verified'}
-                  </span>
+                  </div>
                 )}
               </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3 text-sm text-gray-600 mb-4">
-                <div className="flex items-center gap-1.5 justify-center sm:justify-start">
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  <span>{user.location}</span>
+              {/* Profile Info */}
+              <div className="flex-1 text-center sm:text-left">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
+                  <h2 className="text-2xl font-bold text-gray-900">{user.name}</h2>
+                  {user.completion === 100 && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      {t('profile.verified') || 'Verified'}
+                    </span>
+                  )}
                 </div>
-                <div className="hidden sm:block text-gray-300">|</div>
-                <div className="flex items-center gap-1.5 justify-center sm:justify-start">
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                  </svg>
-                  <span>{user.phone}</span>
-                </div>
-              </div>
 
-              {/* Progress Bar */}
-              <div className="mb-4">
-                <div className="flex items-center justify-between text-sm mb-2">
-                  <span className="text-gray-600 font-medium">{t('profile.completion') || 'Profile Completion'}</span>
-                  <span className="text-green-600 font-bold">{user.completion}%</span>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 text-sm text-gray-600 mb-4">
+                  <div className="flex items-center gap-1.5 justify-center sm:justify-start">
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span>{user.location}</span>
+                  </div>
+                  <div className="hidden sm:block text-gray-300">|</div>
+                  <div className="flex items-center gap-1.5 justify-center sm:justify-start">
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                    </svg>
+                    <span>{user.phone}</span>
+                  </div>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
-                  <div
-                    className="bg-gradient-to-r from-green-500 to-green-600 h-2.5 rounded-full transition-all duration-500"
-                    style={{ width: `${user.completion}%` }}
-                  ></div>
-                </div>
-                {user.completion < 100 && (
-                  <p className="text-xs text-gray-500 mt-1.5">{t('profile.completeMessage') || 'Complete your profile to unlock all features'}</p>
-                )}
-              </div>
 
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button
-                  onClick={() => setEditing(true)}
-                  className="flex-1 sm:flex-none px-6 py-2.5 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors shadow-sm hover:shadow-md flex items-center justify-center gap-2"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
-                  {t('profile.editProfile') || 'Edit Profile'}
-                </button>
-                <button
-                  onClick={() => {
-                    if (window.confirm(t('profile.logoutConfirm') || 'Are you sure you want to logout?')) {
-                      localStorage.removeItem('token');
-                      localStorage.removeItem('userData');
-                      localStorage.removeItem('currentPage');
-                      window.location.href = '/login';
-                    }
-                  }}
-                  className="flex-1 sm:flex-none px-6 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
-                  {t('profile.logout') || 'Logout'}
-                </button>
+                {/* Progress Bar */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between text-sm mb-2">
+                    <span className="text-gray-600 font-medium">{t('profile.completion') || 'Profile Completion'}</span>
+                    <span className="text-green-600 font-bold">{user.completion}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                    <div
+                      className="bg-gradient-to-r from-green-500 to-green-600 h-2.5 rounded-full transition-all duration-500"
+                      style={{ width: `${user.completion}%` }}
+                    ></div>
+                  </div>
+                  {user.completion < 100 && (
+                    <p className="text-xs text-gray-500 mt-1.5">{t('profile.completeMessage') || 'Complete your profile to unlock all features'}</p>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={() => setEditing(true)}
+                    className="flex-1 sm:flex-none px-6 py-2.5 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors shadow-sm hover:shadow-md flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    {t('profile.editProfile') || 'Edit Profile'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(t('profile.logoutConfirm') || 'Are you sure you want to logout?')) {
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('userData');
+                        localStorage.removeItem('currentPage');
+                        window.location.href = '/login';
+                      }
+                    }}
+                    className="flex-1 sm:flex-none px-6 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    {t('profile.logout') || 'Logout'}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Stats Overview Cards */}
@@ -456,26 +491,6 @@ const ProfilePage = ({ onBack, wishlist = [] }) => {
           </div>
           <div className="divide-y divide-gray-100">
             <button
-              onClick={handleMessageUs}
-              className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors group"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200 transition-colors">
-                  <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                  </svg>
-                </div>
-                <div className="text-left">
-                  <p className="text-sm font-semibold text-gray-900">{t('profile.myListings')}</p>
-                  <p className="text-xs text-gray-500">{t('profile.myListingsDesc')}</p>
-                </div>
-              </div>
-              <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-
-            <button
               onClick={() => setShowMyAnimals(true)}
               className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors group"
             >
@@ -486,7 +501,7 @@ const ProfilePage = ({ onBack, wishlist = [] }) => {
                   </svg>
                 </div>
                 <div className="text-left">
-                  <p className="text-sm font-semibold text-gray-900">{t('profile.animals') || 'Animals'}</p>
+                  <p className="text-sm font-semibold text-gray-900">{t('profile.myListings')}</p>
                   <p className="text-xs text-gray-500">{getTotalListings()} {t('profile.animalsListed2') || 'animals listed'}</p>
                 </div>
               </div>
@@ -496,7 +511,27 @@ const ProfilePage = ({ onBack, wishlist = [] }) => {
             </button>
 
             <button
-              onClick={() => setShowCallHistory(true)}
+              onClick={() => openCallHistory('made')}
+              className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
+                  <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 3h5m0 0v5m0-5l-6 6M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z" />
+                  </svg>
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-semibold text-gray-900">{t('profile.callsMadeLabel')}</p>
+                  <p className="text-xs text-gray-500">{t('profile.callsMadeDesc')}</p>
+                </div>
+              </div>
+              <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+
+            <button
+              onClick={() => openCallHistory('received')}
               className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors group"
             >
               <div className="flex items-center gap-3">
@@ -520,27 +555,10 @@ const ProfilePage = ({ onBack, wishlist = [] }) => {
         {/* Saved & Engagement Section */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-bold text-gray-900">{t('profile.savedEngagement') || 'Saved & Engagement'}</h3>
-            <p className="text-sm text-gray-500 mt-0.5">{t('profile.savedEngagementDesc') || 'Your saved animals and interactions'}</p>
+            <h3 className="text-lg font-bold text-gray-900">{t('profile.likedAnimals') || 'Liked Animals'}</h3>
+            <p className="text-sm text-gray-500 mt-0.5">{t('profile.likedAnimalsDesc') || 'Animals you liked'}</p>
           </div>
           <div className="divide-y divide-gray-100">
-            <Link to="/wishlist" className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors group">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center group-hover:bg-yellow-200 transition-colors">
-                  <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                  </svg>
-                </div>
-                <div className="text-left">
-                  <p className="text-sm font-semibold text-gray-900">{t('profile.savedAnimals') || 'Saved Animals'}</p>
-                    <p className="text-xs text-gray-500">{likedAnimals.length} {t('profile.animalsSaved') || 'animals saved'}</p>
-                </div>
-              </div>
-              <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
-
             <div className="px-6 py-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -552,7 +570,7 @@ const ProfilePage = ({ onBack, wishlist = [] }) => {
                   <div className="text-left">
                     <p className="text-sm font-semibold text-gray-900">{t('profile.likedAnimals') || 'Liked Animals'}</p>
                     <p className="text-xs text-gray-500">
-                      {likedAnimals.length} {t('profile.animalsSaved') || 'animals saved'}
+                      {likedAnimals.length} {t('profile.likedAnimalsCount') || 'liked animals'}
                     </p>
                   </div>
                 </div>
@@ -577,7 +595,7 @@ const ProfilePage = ({ onBack, wishlist = [] }) => {
                     >
                       <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
                         <img
-                          src={animal.imageSrc || animal.photo1 || animal.front_photo || 'data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" width=\"80\" height=\"80\"%3E%3Crect fill=\"%23f0f0f0\" width=\"80\" height=\"80\"/%3E%3Ctext fill=\"%23999\" font-family=\"sans-serif\" font-size=\"10\" dy=\"4\" font-weight=\"bold\" x=\"50%25\" y=\"50%25\" text-anchor=\"middle\"%3ENo Image%3C/text%3E%3C/svg%3E'}
+                          src={animal.imageSrc || animal.photo1 || animal.front_photo || FALLBACK_ANIMAL_IMAGE}
                           alt={animal.title || 'Animal'}
                           className="w-full h-full object-cover"
                         />
@@ -595,25 +613,6 @@ const ProfilePage = ({ onBack, wishlist = [] }) => {
               )}
             </div>
 
-            <button
-              onClick={() => setShowCallHistory(true)}
-              className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors group"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
-                  <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                  </svg>
-                </div>
-                <div className="text-left">
-                  <p className="text-sm font-semibold text-gray-900">{t('profile.callsMadeLabel')}</p>
-                  <p className="text-xs text-gray-500">{t('profile.callsMadeDesc')}</p>
-                </div>
-              </div>
-              <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
           </div>
         </div>
 
@@ -624,8 +623,9 @@ const ProfilePage = ({ onBack, wishlist = [] }) => {
             <p className="text-sm text-gray-500 mt-0.5">{t('profile.supportDesc')}</p>
           </div>
           <div className="divide-y divide-gray-100">
-            <Link
-              to="/help"
+            <button
+              type="button"
+              onClick={handleMessageUs}
               className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors group"
             >
               <div className="flex items-center gap-3">
@@ -642,7 +642,7 @@ const ProfilePage = ({ onBack, wishlist = [] }) => {
               <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
-            </Link>
+            </button>
 
             <button className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors group">
               <div className="flex items-center gap-3">
@@ -700,8 +700,7 @@ const ProfilePage = ({ onBack, wishlist = [] }) => {
             <div className="flex-1 overflow-y-auto p-6">
               {loading ? (
                 <div className="text-center py-12">
-                  <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                  <p className="text-gray-600">Loading animals...</p>
+                  <InlineLoader message="Loading animals..." />
                 </div>
               ) : getTotalListings() === 0 ? (
                 <div className="text-center py-12">
@@ -802,7 +801,7 @@ const ProfilePage = ({ onBack, wishlist = [] }) => {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto">
-              <CallHistory />
+              <CallHistory initialTab={callHistoryTab} />
             </div>
           </div>
         </div>

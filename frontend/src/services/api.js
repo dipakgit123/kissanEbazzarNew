@@ -224,6 +224,22 @@ export const locationService = {
     }
 
     return response.json();
+  },
+
+  async lookupPincode(postalCode) {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/api/location/lookup/pincode/${encodeURIComponent(postalCode)}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.message || 'Failed to lookup pincode');
+    }
+
+    return response.json();
   }
 };
 
@@ -257,6 +273,17 @@ export const listingsService = {
   getListingById: async (animalType, id) => {
     try {
       const response = await api.get(`/api/listings/${animalType}/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  getListingsByType: async (animalType, limit = 20) => {
+    try {
+      const response = await api.get(`/api/listings/type/${animalType}`, {
+        params: { limit }
+      });
       return response.data;
     } catch (error) {
       throw error.response?.data || error;

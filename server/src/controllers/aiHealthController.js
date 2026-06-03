@@ -22,7 +22,7 @@ const upload = multer({
  */
 const analyzeHealth = async (req, res) => {
   try {
-    const { imageUrl, animalType, symptoms, age, additionalInfo } = req.body;
+    const { imageUrl, animalType, symptoms, age, additionalInfo, customQuestion, languageHint } = req.body;
 
     if (!imageUrl) {
       return res.status(400).json({
@@ -43,6 +43,19 @@ const analyzeHealth = async (req, res) => {
       age,
       additionalInfo,
     });
+
+    if (customQuestion?.trim()) {
+      const questionResult = await aiHealthService.answerHealthQuestion({
+        prompt: customQuestion,
+        animalType,
+        symptoms,
+        age,
+        additionalInfo: `${additionalInfo || ''}\nImage analysis summary: ${JSON.stringify(result.analysis)}`.trim(),
+        languageHint,
+      });
+      result.analysis.questionAnswer = questionResult.answer;
+      result.analysis.questionAsked = customQuestion.trim();
+    }
 
     res.json({
       success: true,
@@ -70,7 +83,7 @@ const uploadAndAnalyze = async (req, res) => {
       });
     }
 
-    const { animalType, symptoms, age, additionalInfo } = req.body;
+    const { animalType, symptoms, age, additionalInfo, customQuestion, languageHint } = req.body;
 
     if (!animalType) {
       return res.status(400).json({
@@ -103,6 +116,19 @@ const uploadAndAnalyze = async (req, res) => {
       additionalInfo,
     });
 
+    if (customQuestion?.trim()) {
+      const questionResult = await aiHealthService.answerHealthQuestion({
+        prompt: customQuestion,
+        animalType,
+        symptoms,
+        age,
+        additionalInfo: `${additionalInfo || ''}\nImage analysis summary: ${JSON.stringify(result.analysis)}`.trim(),
+        languageHint,
+      });
+      result.analysis.questionAnswer = questionResult.answer;
+      result.analysis.questionAsked = customQuestion.trim();
+    }
+
     res.json({
       success: true,
       imageUrl,
@@ -113,6 +139,45 @@ const uploadAndAnalyze = async (req, res) => {
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to process image',
+    });
+  }
+};
+
+/**
+ * Ask a direct animal health question
+ * POST /api/health-check/ask
+ */
+const askHealthQuestion = async (req, res) => {
+  try {
+    const { prompt, animalType, symptoms, age, additionalInfo, languageHint } = req.body;
+
+    if (!prompt?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Prompt is required',
+      });
+    }
+
+    const result = await aiHealthService.answerHealthQuestion({
+      prompt,
+      animalType,
+      symptoms,
+      age,
+      additionalInfo,
+      languageHint,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        answer: result.answer,
+      },
+    });
+  } catch (error) {
+    console.error('Ask health question error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to answer health question',
     });
   }
 };
@@ -206,6 +271,7 @@ const getDewormingSchedule = (req, res) => {
 module.exports = {
   analyzeHealth,
   uploadAndAnalyze,
+  askHealthQuestion,
   getCommonIssues,
   getEmergencySymptoms,
   getVaccinationSchedule,

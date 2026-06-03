@@ -8,97 +8,124 @@ import DogListingForm from './DogListingForm';
 import GoatListingForm from './GoatListingForm';
 import HorseListingForm from './HorseListingForm';
 import OtherAnimalListingForm from './OtherAnimalListingForm';
+import buffaloLogo from '../assets/images/buffelo_logo.png';
+import catLogo from '../assets/images/cat_logo.png';
+import cowLogo from '../assets/images/cow_logo.png';
+import dogLogo from '../assets/images/Dog_logo.png';
+import goatLogo from '../assets/images/goat_logo.png';
+import horseLogo from '../assets/images/horse_logo.png';
+import otherAnimalLogo from '../assets/images/other_animal.png';
 
 const AnimalListingPage = () => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('animal');
 
-  // Import animal images
-  const cowImg = '/src/assets/images/cow1.png';
-  const buffaloImg = '/src/assets/images/buffelo1.png';
-  const goatImg = '/src/assets/images/goat1.png';
-  const horseImg = '/src/assets/images/horse1.png';
-  const dogImg = '/src/assets/images/Dog1.png';
-  const catImg = '/src/assets/images/cat1.png';
+  const cowImg = cowLogo;
+  const buffaloImg = buffaloLogo;
+  const goatImg = goatLogo;
+  const horseImg = horseLogo;
+  const dogImg = dogLogo;
+  const catImg = catLogo;
 
   const tabs = [
-    { 
-      id: 'animal', 
-      label: t('animalTypes.cow'), 
+    {
+      id: 'animal',
+      label: t('animalTypes.cow'),
       image: cowImg,
       icon: '🐄',
       color: 'from-amber-500 to-amber-600',
-      bgColor: 'bg-amber-50',
-      textColor: 'text-amber-600',
-      borderColor: 'border-amber-500',
-      iconBg: 'bg-amber-100'
+      accent: 'text-amber-700',
+      borderColor: 'border-amber-300',
+      iconBg: 'bg-amber-100',
+      panelBg: 'from-amber-50 via-orange-50 to-white',
+      chipClass: 'bg-amber-100 text-amber-700',
+      category: 'Dairy',
+      summary: 'Best for high-visibility milk and breeding listings.',
     },
-    { 
-      id: 'buffalo', 
-      label: t('animalTypes.buffalo'), 
+    {
+      id: 'buffalo',
+      label: t('animalTypes.buffalo'),
       image: buffaloImg,
       icon: '🐃',
-      color: 'from-gray-600 to-gray-700',
-      bgColor: 'bg-gray-50',
-      textColor: 'text-gray-600',
-      borderColor: 'border-gray-500',
-      iconBg: 'bg-gray-100'
+      color: 'from-slate-600 to-slate-700',
+      accent: 'text-slate-700',
+      borderColor: 'border-slate-300',
+      iconBg: 'bg-slate-100',
+      panelBg: 'from-slate-50 via-gray-50 to-white',
+      chipClass: 'bg-slate-100 text-slate-700',
+      category: 'Livestock',
+      summary: 'Built for premium dairy, breeding, and working stock.',
     },
-    { 
-      id: 'goat', 
-      label: t('animalTypes.goat'), 
+    {
+      id: 'goat',
+      label: t('animalTypes.goat'),
       image: goatImg,
       icon: '🐐',
-      color: 'from-green-500 to-green-600',
-      bgColor: 'bg-green-50',
-      textColor: 'text-green-600',
-      borderColor: 'border-green-500',
-      iconBg: 'bg-green-100'
+      color: 'from-emerald-500 to-emerald-600',
+      accent: 'text-emerald-700',
+      borderColor: 'border-emerald-300',
+      iconBg: 'bg-emerald-100',
+      panelBg: 'from-emerald-50 via-green-50 to-white',
+      chipClass: 'bg-emerald-100 text-emerald-700',
+      category: 'Fast-moving',
+      summary: 'Ideal for compact, high-demand market listings.',
     },
-    { 
-      id: 'horse', 
-      label: t('animalTypes.horse'), 
+    {
+      id: 'horse',
+      label: t('animalTypes.horse'),
       image: horseImg,
-      icon: '🐴',
-      color: 'from-purple-500 to-purple-600',
-      bgColor: 'bg-purple-50',
-      textColor: 'text-purple-600',
-      borderColor: 'border-purple-500',
-      iconBg: 'bg-purple-100'
+      icon: '🐎',
+      color: 'from-violet-500 to-violet-600',
+      accent: 'text-violet-700',
+      borderColor: 'border-violet-300',
+      iconBg: 'bg-violet-100',
+      panelBg: 'from-violet-50 via-purple-50 to-white',
+      chipClass: 'bg-violet-100 text-violet-700',
+      category: 'Premium',
+      summary: 'Designed for performance, riding, and breeding animals.',
     },
-    { 
-      id: 'dog', 
-      label: t('animalTypes.dog'), 
+    {
+      id: 'dog',
+      label: t('animalTypes.dog'),
       image: dogImg,
       icon: '🐕',
       color: 'from-orange-500 to-orange-600',
-      bgColor: 'bg-orange-50',
-      textColor: 'text-orange-600',
-      borderColor: 'border-orange-500',
-      iconBg: 'bg-orange-100'
+      accent: 'text-orange-700',
+      borderColor: 'border-orange-300',
+      iconBg: 'bg-orange-100',
+      panelBg: 'from-orange-50 via-amber-50 to-white',
+      chipClass: 'bg-orange-100 text-orange-700',
+      category: 'Companion',
+      summary: 'Structured for pet, guard, and breeding sale details.',
     },
-    { 
-      id: 'cat', 
-      label: t('animalTypes.cat'), 
+    {
+      id: 'cat',
+      label: t('animalTypes.cat'),
       image: catImg,
-      icon: '🐱',
-      color: 'from-pink-500 to-pink-600',
-      bgColor: 'bg-pink-50',
-      textColor: 'text-pink-600',
-      borderColor: 'border-pink-500',
-      iconBg: 'bg-pink-100'
+      icon: '🐈',
+      color: 'from-rose-500 to-pink-600',
+      accent: 'text-rose-700',
+      borderColor: 'border-rose-300',
+      iconBg: 'bg-rose-100',
+      panelBg: 'from-rose-50 via-pink-50 to-white',
+      chipClass: 'bg-rose-100 text-rose-700',
+      category: 'Companion',
+      summary: 'Clean profile setup for pet and breed-focused listings.',
     },
-    { 
-      id: 'other', 
-      label: t('animalTypes.other') || 'Other', 
-      image: null,
+    {
+      id: 'other',
+      label: t('animalTypes.other') || 'Other',
+      image: otherAnimalLogo,
       icon: '🐾',
       color: 'from-blue-500 to-blue-600',
-      bgColor: 'bg-blue-50',
-      textColor: 'text-blue-600',
-      borderColor: 'border-blue-500',
-      iconBg: 'bg-blue-100'
-    }
+      accent: 'text-blue-700',
+      borderColor: 'border-blue-300',
+      iconBg: 'bg-blue-100',
+      panelBg: 'from-blue-50 via-sky-50 to-white',
+      chipClass: 'bg-blue-100 text-blue-700',
+      category: 'Custom',
+      summary: 'Use this when your animal does not fit the core groups.',
+    },
   ];
 
   const renderForm = () => {
@@ -122,198 +149,118 @@ const AnimalListingPage = () => {
     }
   };
 
-  const activeTabData = tabs.find(tab => tab.id === activeTab);
+  const activeTabData = tabs.find((tab) => tab.id === activeTab);
+
+  const renderAnimalCard = (tab, compact = false) => {
+    const isActive = activeTab === tab.id;
+
+    return (
+      <button
+        key={tab.id}
+        type="button"
+        aria-pressed={isActive}
+        onClick={() => setActiveTab(tab.id)}
+        className={`group relative flex flex-col items-center text-center transition-all duration-300 ${
+          compact
+            ? `w-[96px] sm:w-[108px] md:w-[124px] flex-shrink-0 ${
+                isActive
+                  ? 'text-[#15BB73]'
+                  : 'text-slate-700 hover:-translate-y-0.5'
+              }`
+            : `${
+                isActive
+                  ? 'w-[104px] text-[#15BB73]'
+                  : 'w-[104px] text-slate-700 hover:-translate-y-0.5'
+              }`
+        }`}
+      >
+        <div className={`relative ${compact ? 'space-y-2' : 'space-y-2.5'}`}>
+          <div
+            className={`relative flex items-center justify-center rounded-full border bg-gradient-to-br ${tab.panelBg} ${
+              compact ? 'h-[90px] w-[90px] sm:h-[102px] sm:w-[102px] md:h-[114px] md:w-[114px]' : 'h-[94px] w-[94px]'
+            } ${
+              isActive
+                ? 'border-[#15BB73] shadow-[0_16px_30px_-18px_rgba(21,187,115,0.7)] ring-4 ring-emerald-100'
+                : `${tab.borderColor} shadow-sm group-hover:shadow-[0_14px_28px_-20px_rgba(15,23,42,0.28)]`
+            } transition-all duration-300`}
+          >
+            {isActive && (
+              <span className="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#15BB73] text-white shadow-md sm:right-1.5 sm:top-1.5">
+                <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path
+                    fillRule="evenodd"
+                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </span>
+            )}
+
+            <div
+              className={`flex items-center justify-center overflow-hidden rounded-full ${
+                compact ? 'h-[76px] w-[76px] sm:h-[86px] sm:w-[86px] md:h-[96px] md:w-[96px]' : 'h-[78px] w-[78px]'
+              } ${isActive ? 'bg-white/85 shadow-md shadow-white/70' : tab.iconBg} transition-transform duration-300 ${
+                compact ? '' : 'group-hover:scale-105'
+              }`}
+            >
+              {tab.image ? (
+                <div
+                  className={`overflow-hidden rounded-full bg-white ${
+                    compact ? 'h-[64px] w-[64px] sm:h-[72px] sm:w-[72px] md:h-[82px] md:w-[82px]' : 'h-[62px] w-[62px]'
+                  }`}
+                >
+                  <img
+                    src={tab.image}
+                    alt={tab.label}
+                    className="h-full w-full scale-[1.08] object-cover object-center"
+                  />
+                </div>
+              ) : (
+                <span className={compact ? 'text-[3rem]' : 'text-[2.6rem]'}>{tab.icon}</span>
+              )}
+            </div>
+          </div>
+
+          <h3 className={`font-semibold tracking-tight text-slate-900 ${compact ? 'text-sm' : 'text-sm'}`}>
+            {tab.label}
+          </h3>
+        </div>
+      </button>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header Section */}
-      <div className="bg-gradient-to-r from-green-600 to-green-700 text-white">
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="text-center">
-            <h1 className="text-3xl md:text-4xl font-bold mb-2">
-              {t('listing.createListing') || 'Create Animal Listing'}
-            </h1>
-            <p className="text-green-100 text-sm md:text-base max-w-2xl mx-auto">
-              {t('listing.subtitle') || 'List your animal for sale and reach thousands of potential buyers'}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-6">
-        
-        {/* Instructions Banner */}
-        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0">
-              <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-blue-900 mb-1">
-                {t('listing.instructions.title') || 'Quick Tips'}
-              </h3>
-              <ul className="text-xs text-blue-700 space-y-1">
-                <li>• {t('listing.instructions.tip1') || 'Select the animal type below to get started'}</li>
-                <li>• {t('listing.instructions.tip2') || 'Fill in all required details accurately'}</li>
-                <li>• {t('listing.instructions.tip3') || 'Upload clear photos for better visibility'}</li>
-                <li>• {t('listing.instructions.tip4') || 'Set a competitive price to attract buyers'}</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        {/* Animal Type Selector */}
         <div className="mb-8">
           <div className="mb-5">
             <h2 className="text-xl font-bold text-gray-900 mb-2">
               {t('listing.selectAnimalType') || 'Select Animal Type'}
             </h2>
             <p className="text-sm text-gray-600">
-              Choose the type of animal you want to list for sale
+              {t('listing.selectAnimalTypeDescription') || 'Choose the type of animal you want to list for sale.'}
             </p>
           </div>
-          
-          {/* Desktop Grid View - Enhanced with Images */}
-          <div className="hidden md:grid grid-cols-7 gap-4">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`relative group overflow-hidden rounded-2xl border-3 transition-all duration-300 transform hover:-translate-y-2 ${
-                  activeTab === tab.id
-                    ? `${tab.borderColor} shadow-2xl scale-105`
-                    : 'border-gray-200 hover:border-gray-300 hover:shadow-xl bg-white'
-                }`}
-                style={{
-                  boxShadow: activeTab === tab.id ? `0 12px 35px -10px ${tab.color.includes('amber') ? '#f59e0b' : tab.color.includes('gray') ? '#6b7280' : tab.color.includes('green') ? '#10b981' : tab.color.includes('purple') ? '#8b5cf6' : tab.color.includes('orange') ? '#f97316' : tab.color.includes('pink') ? '#ec4899' : '#3b82f6'}50` : 'none'
-                }}
-              >
-                {/* Gradient Background */}
-                <div className={`absolute inset-0 bg-gradient-to-br ${tab.color} ${activeTab === tab.id ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`} />
-                
-                {/* Content */}
-                <div className="relative p-5">
-                  <div className="flex flex-col items-center gap-3">
-                    {/* Image Container with circular background */}
-                    <div className={`relative w-20 h-20 ${activeTab === tab.id ? '' : 'group-hover:scale-110'} transition-transform duration-300`}>
-                      {/* Glow effect */}
-                      <div className={`absolute inset-0 rounded-full blur-2xl ${activeTab === tab.id ? 'bg-white/40' : 'bg-transparent'} transition-all duration-300`} />
-                      
-                      {/* Circular background */}
-                      <div className={`relative w-full h-full rounded-full ${activeTab === tab.id ? 'bg-white/20' : tab.iconBg} flex items-center justify-center transition-all duration-300 ${activeTab === tab.id ? 'animate-pulse' : ''}`}>
-                        {tab.image ? (
-                          <img 
-                            src={tab.image} 
-                            alt={tab.label}
-                            className="w-16 h-16 object-contain"
-                          />
-                        ) : (
-                          <span className="text-5xl">{tab.icon}</span>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* Label */}
-                    <span className={`text-sm font-bold text-center transition-colors duration-300 ${
-                      activeTab === tab.id ? 'text-white' : 'text-gray-700 group-hover:text-gray-900'
-                    }`}>
-                      {tab.label}
-                    </span>
-                  </div>
-                </div>
 
-                {/* Active indicator checkmark */}
-                {activeTab === tab.id && (
-                  <div className="absolute -top-2 -right-2 z-20">
-                    <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-lg border-2 border-gray-100 animate-bounce">
-                      <svg className={`w-5 h-5 ${tab.textColor}`} fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                  </div>
-                )}
-
-                {/* Hover glow effect */}
-                <div className={`absolute inset-0 rounded-2xl transition-opacity duration-300 ${
-                  activeTab === tab.id ? 'opacity-0' : 'opacity-0 group-hover:opacity-100'
-                }`} style={{
-                  background: `linear-gradient(135deg, ${tab.color.includes('amber') ? '#fef3c7' : tab.color.includes('gray') ? '#f3f4f6' : tab.color.includes('green') ? '#d1fae5' : tab.color.includes('purple') ? '#ede9fe' : tab.color.includes('orange') ? '#fed7aa' : tab.color.includes('pink') ? '#fce7f3' : '#dbeafe'} 0%, transparent 100%)`
-                }} />
-              </button>
-            ))}
-          </div>
-
-          {/* Mobile Horizontal Scroll - Enhanced with Images */}
-          <div className="md:hidden overflow-x-auto pb-3 -mx-4 px-4">
-            <div className="flex gap-4 min-w-max">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`relative flex-shrink-0 w-28 overflow-hidden rounded-2xl border-3 transition-all duration-300 ${
-                    activeTab === tab.id
-                      ? `${tab.borderColor} shadow-xl`
-                      : 'border-gray-200 bg-white'
-                  }`}
-                  style={{
-                    boxShadow: activeTab === tab.id ? `0 8px 25px -8px ${tab.color.includes('amber') ? '#f59e0b' : tab.color.includes('gray') ? '#6b7280' : tab.color.includes('green') ? '#10b981' : tab.color.includes('purple') ? '#8b5cf6' : tab.color.includes('orange') ? '#f97316' : tab.color.includes('pink') ? '#ec4899' : '#3b82f6'}50` : 'none'
-                  }}
-                >
-                  <div className={`absolute inset-0 bg-gradient-to-br ${tab.color} ${activeTab === tab.id ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`} />
-                  
-                  <div className="relative p-4">
-                    <div className="flex flex-col items-center gap-2">
-                      {/* Image container */}
-                      <div className={`w-16 h-16 rounded-full ${activeTab === tab.id ? 'bg-white/20' : tab.iconBg} flex items-center justify-center ${activeTab === tab.id ? 'scale-110' : ''} transition-all duration-300`}>
-                        {tab.image ? (
-                          <img 
-                            src={tab.image} 
-                            alt={tab.label}
-                            className="w-12 h-12 object-contain"
-                          />
-                        ) : (
-                          <span className="text-3xl">{tab.icon}</span>
-                        )}
-                      </div>
-                      <span className={`text-xs font-bold text-center ${
-                        activeTab === tab.id ? 'text-white' : 'text-gray-700'
-                      }`}>
-                        {tab.label}
-                      </span>
-                    </div>
-                  </div>
-
-                  {activeTab === tab.id && (
-                    <div className="absolute -top-1 -right-1 z-20">
-                      <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-lg border border-gray-100">
-                        <svg className={`w-4 h-4 ${tab.textColor}`} fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                    </div>
-                  )}
-                </button>
-              ))}
+          <div className="overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0">
+            <div className="flex flex-nowrap items-start gap-1 min-w-max md:w-fit md:mx-auto">
+              {tabs.map((tab) => renderAnimalCard(tab, true))}
             </div>
           </div>
         </div>
 
-        {/* Form Section */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          {/* Form Header */}
           <div className={`px-6 py-4 border-b border-gray-200 bg-gradient-to-r ${activeTabData?.color}`}>
             <div className="flex items-center gap-3">
-              {/* Animal image in header */}
               <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
                 {activeTabData?.image ? (
-                  <img 
-                    src={activeTabData.image} 
-                    alt={activeTabData.label}
-                    className="w-10 h-10 object-contain"
-                  />
+                  <div className="h-11 w-11 overflow-hidden rounded-full bg-white">
+                    <img
+                      src={activeTabData.image}
+                      alt={activeTabData.label}
+                      className="h-full w-full scale-[1.08] object-cover object-center"
+                    />
+                  </div>
                 ) : (
                   <span className="text-3xl">{activeTabData?.icon}</span>
                 )}
@@ -329,60 +276,15 @@ const AnimalListingPage = () => {
             </div>
           </div>
 
-          {/* Form Body */}
           <div className="p-6">
             {renderForm()}
           </div>
         </div>
 
-        {/* Footer Tips */}
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-1">Quality Photos</h4>
-                <p className="text-xs text-gray-600">Upload clear, well-lit photos from multiple angles</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-1">Accurate Details</h4>
-                <p className="text-xs text-gray-600">Provide precise information about age, weight, and health</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-1">Fair Pricing</h4>
-                <p className="text-xs text-gray-600">Set competitive prices based on market rates</p>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
 };
 
 export default AnimalListingPage;
+

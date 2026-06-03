@@ -5,10 +5,14 @@ import logo from '../assets/images/animal_logog.jpeg';
 import AIAssistant from './AIAssistant';
 import LanguageSwitcher from './LanguageSwitcher';
 import Footer from './Footer';
+import { useWishlist } from '../contexts/useWishlist';
 
-const Layout = ({ showHeaderFooter = true, wishlistCount = 0 }) => {
+const Layout = ({ showHeaderFooter = true }) => {
   const { pathname } = useLocation();
   const { t } = useTranslation();
+  const { wishlist } = useWishlist();
+  // ✅ FIXED: Handle null/undefined wishlist safely
+  const wishlistCount = wishlist?.length || 0;
 
   // utility to check active tab for bottom nav
   const isActive = (path) => pathname === path;
@@ -27,7 +31,7 @@ const Layout = ({ showHeaderFooter = true, wishlistCount = 0 }) => {
                   <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-[#15BB73] to-[#0FA568] rounded-xl flex items-center justify-center shadow-lg transform group-hover:scale-105 transition-all duration-300 p-1 sm:p-1.5">
                     <img
                       src={logo}
-                      alt="Kissan E-Bazzar"
+                      alt="Animal E Bazar"
                       className="h-6 w-6 sm:h-8 sm:w-8 object-contain rounded-lg"
                     />
                   </div>
@@ -38,7 +42,7 @@ const Layout = ({ showHeaderFooter = true, wishlistCount = 0 }) => {
                 {/* Brand Text - Hidden on mobile and tablet, shown on xl+ */}
                 <div className="hidden xl:block">
                   <h1 className="text-lg font-bold text-[#000600] bg-gradient-to-r from-[#000600] to-[#15BB73] bg-clip-text text-transparent group-hover:from-[#15BB73] group-hover:to-[#0FA568] transition-all duration-300 whitespace-nowrap">
-                    Kissan E-Bazzar
+                    Animal E Bazar
                   </h1>
                   <p className="text-xs text-gray-600 font-medium whitespace-nowrap">Farmers Marketplace</p>
                 </div>
@@ -112,16 +116,29 @@ const Layout = ({ showHeaderFooter = true, wishlistCount = 0 }) => {
                   }`}></span>
                 </Link>
                 <Link
-                  to="/health-check"
+                  to="/ai-health-check"
                   className={`text-sm xl:text-base font-semibold transition-all duration-200 relative group whitespace-nowrap ${
-                    pathname.startsWith('/health-check')
+                    pathname.startsWith('/ai-health-check')
                       ? 'text-[#15BB73]'
                       : 'text-gray-600 hover:text-[#15BB73]'
                   }`}
                 >
                   {t('header.healthCheck')}
                   <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${
-                    pathname.startsWith('/health-check') ? 'w-full' : 'w-0 group-hover:w-full'
+                    pathname.startsWith('/ai-health-check') ? 'w-full' : 'w-0 group-hover:w-full'
+                  }`}></span>
+                </Link>
+                <Link
+                  to="/blogs"
+                  className={`text-sm xl:text-base font-semibold transition-all duration-200 relative group whitespace-nowrap ${
+                    pathname.startsWith('/blogs') || pathname.startsWith('/blog/')
+                      ? 'text-[#15BB73]'
+                      : 'text-gray-600 hover:text-[#15BB73]'
+                  }`}
+                >
+                  {t('header.blogs') || 'Blog'}
+                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${
+                    pathname.startsWith('/blogs') || pathname.startsWith('/blog/') ? 'w-full' : 'w-0 group-hover:w-full'
                   }`}></span>
                 </Link>
               </div>
@@ -166,7 +183,7 @@ const Layout = ({ showHeaderFooter = true, wishlistCount = 0 }) => {
                 {/* Profile Button - Responsive sizing */}
                 <Link
                   to="/profile"
-                  className={`relative w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-300 transform hover:scale-110 shadow-md ${
+                  className={`relative w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center overflow-hidden transition-all duration-300 transform hover:scale-110 shadow-md outline-none focus:outline-none active:outline-none ${
                     pathname.startsWith('/profile') 
                       ? 'bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white' 
                       : 'bg-gradient-to-r from-gray-100 to-gray-200 text-gray-600 hover:from-[#15BB73] hover:to-[#0FA568] hover:text-white'
@@ -184,9 +201,6 @@ const Layout = ({ showHeaderFooter = true, wishlistCount = 0 }) => {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 20.25a7.5 7.5 0 0115 0v.75H4.5v-.75z" />
                   </svg>
-                  {pathname.startsWith('/profile') && (
-                    <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-white border-2 border-[#15BB73] animate-pulse"></span>
-                  )}
                 </Link>
               </div>
             </div>
@@ -252,8 +266,8 @@ const Layout = ({ showHeaderFooter = true, wishlistCount = 0 }) => {
           </Link>
 
           <Link
-            to="/health-check"
-            className={`flex flex-col items-center p-1 sm:p-2 rounded-lg transition ${isActive('/health-check') ? 'text-green-600' : 'text-gray-700 hover:bg-green-50'}`}
+            to="/ai-health-check"
+            className={`flex flex-col items-center p-1 sm:p-2 rounded-lg transition ${isActive('/ai-health-check') ? 'text-green-600' : 'text-gray-700 hover:bg-green-50'}`}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />

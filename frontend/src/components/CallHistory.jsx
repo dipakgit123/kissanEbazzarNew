@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config/api';
+import { InlineLoader } from './AppLoader';
 
-const CallHistory = () => {
-  const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState('all'); // all, made, received
+const CallHistory = ({ initialTab = 'all' }) => {
+  const [activeTab, setActiveTab] = useState(initialTab); // all, made, received
   const [calls, setCalls] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -19,19 +18,14 @@ const CallHistory = () => {
     try {
       const data = JSON.parse(saved);
       return data?.id || data?.userId || data?.user_id || null;
-    } catch (e) {
+    } catch {
       return null;
     }
   };
   const currentUserId = getCurrentUserId();
   const normalizedCurrentUserId = currentUserId != null ? Number(currentUserId) : null;
 
-  useEffect(() => {
-    fetchCallStats();
-    fetchCalls();
-  }, [activeTab, page]);
-
-  const fetchCallStats = async () => {
+  const fetchCallStats = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
@@ -44,9 +38,9 @@ const CallHistory = () => {
     } catch (error) {
       console.error('Error fetching call stats:', error);
     }
-  };
+  }, [API_URL]);
 
-  const fetchCalls = async () => {
+  const fetchCalls = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
@@ -72,7 +66,17 @@ const CallHistory = () => {
       console.error('Error fetching calls:', error);
       setLoading(false);
     }
-  };
+  }, [API_URL, activeTab, page]);
+
+  useEffect(() => {
+    fetchCallStats();
+    fetchCalls();
+  }, [fetchCallStats, fetchCalls]);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+    setPage(1);
+  }, [initialTab]);
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -156,8 +160,7 @@ const CallHistory = () => {
       <div className="bg-white rounded-xl shadow-md overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-gray-500">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto"></div>
-            <p className="mt-4">Loading calls...</p>
+            <InlineLoader message="Loading calls..." />
           </div>
         ) : calls.length === 0 ? (
           <div className="p-8 text-center text-gray-500">

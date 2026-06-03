@@ -6,9 +6,7 @@ const config = require('./config.json')[env];
 
 let sequelize;
 
-// For Neon PostgreSQL, we can use either DATABASE_URL or individual parameters
 if (process.env.DATABASE_URL) {
-  // Use connection string for Neon
   sequelize = new Sequelize(process.env.DATABASE_URL, {
     dialect: 'postgres',
     logging: env === 'development' ? console.log : false,
@@ -34,7 +32,6 @@ if (process.env.DATABASE_URL) {
 } else if (config.use_env_variable) {
   sequelize = new Sequelize(process.env[config.use_env_variable], config);
 } else {
-  // Use individual parameters from config.json
   sequelize = new Sequelize(
     config.database,
     config.username,
@@ -69,15 +66,15 @@ if (process.env.DATABASE_URL) {
 const connectDB = async () => {
   try {
     await sequelize.authenticate();
-    console.log('✓ Neon PostgreSQL connected successfully');
-    
-    // Sync models with database
-    if (process.env.NODE_ENV === 'development') {
+    console.log('Neon PostgreSQL connected successfully');
+
+    // Only synchronize schema when explicitly enabled.
+    if (process.env.DB_SYNC_ON_START === 'true') {
       await sequelize.sync({ alter: true });
-      console.log('✓ Database synchronized');
+      console.log('Database synchronized via DB_SYNC_ON_START=true');
     }
   } catch (error) {
-    console.error('✗ Unable to connect to Neon database:', error);
+    console.error('Unable to connect to Neon database:', error);
     process.exit(1);
   }
 };

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast, { Toaster } from 'react-hot-toast';
 import { userService } from '../services/api';
+import { safeJsonParse } from '../utils/stringUtils';
+import LanguageSwitcher from './LanguageSwitcher';
 
 const UserIcon = () => (
   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -74,22 +76,24 @@ const ProfileCompletion = ({ onComplete }) => {
       if (response.success) {
         toast.success(t('profileCompletion.success'));
 
-        // Update user data in localStorage
-        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-        const updatedUser = {
-          ...currentUser,
+        const completedUser = response.user || {
           full_name: formData.full_name,
           postal_code: formData.postal_code,
           ...response.location
         };
+
+        // Update user data in localStorage
+        const currentUser = safeJsonParse(localStorage.getItem('user'), {});
+        const updatedUser = {
+          ...currentUser,
+          ...completedUser
+        };
         localStorage.setItem('user', JSON.stringify(updatedUser));
 
-        const currentUserData = JSON.parse(localStorage.getItem('userData') || '{}');
+        const currentUserData = safeJsonParse(localStorage.getItem('userData'), {});
         const updatedUserData = {
           ...currentUserData,
-          full_name: formData.full_name,
-          postal_code: formData.postal_code,
-          ...response.location
+          ...completedUser
         };
         localStorage.setItem('userData', JSON.stringify(updatedUserData));
 
@@ -109,6 +113,11 @@ const ProfileCompletion = ({ onComplete }) => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#E9F0F8] to-[#F0F8FF] p-4">
       <Toaster position="top-right" />
+
+      {/* Language Switcher - Top Right */}
+      <div className="fixed top-4 right-4 z-50">
+        <LanguageSwitcher />
+      </div>
 
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
         {/* Header */}
@@ -135,9 +144,8 @@ const ProfileCompletion = ({ onComplete }) => {
                 name="full_name"
                 value={formData.full_name}
                 onChange={handleChange}
-                className={`w-full pl-10 pr-4 py-3 border-2 ${
-                  errors.full_name ? 'border-red-400' : 'border-gray-200'
-                } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all`}
+                className={`w-full pl-10 pr-4 py-3 border-2 ${errors.full_name ? 'border-red-400' : 'border-gray-200'
+                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all`}
                 placeholder={t('profileCompletion.fullNamePlaceholder')}
                 autoFocus
               />
@@ -163,9 +171,8 @@ const ProfileCompletion = ({ onComplete }) => {
                 name="postal_code"
                 value={formData.postal_code}
                 onChange={handleChange}
-                className={`w-full pl-10 pr-4 py-3 border-2 ${
-                  errors.postal_code ? 'border-red-400' : 'border-gray-200'
-                } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all`}
+                className={`w-full pl-10 pr-4 py-3 border-2 ${errors.postal_code ? 'border-red-400' : 'border-gray-200'
+                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all`}
                 placeholder={t('profileCompletion.pincodePlaceholder')}
                 maxLength="10"
               />
@@ -201,11 +208,10 @@ const ProfileCompletion = ({ onComplete }) => {
           <button
             type="submit"
             disabled={isLoading}
-            className={`w-full py-3 px-4 rounded-lg font-semibold text-white transition-all duration-300 ${
-              isLoading
+            className={`w-full py-3 px-4 rounded-lg font-semibold text-white transition-all duration-300 ${isLoading
                 ? 'bg-gray-400 cursor-not-allowed'
                 : 'bg-gradient-to-r from-[#15BB73] to-[#0FA568] hover:shadow-lg transform hover:-translate-y-0.5'
-            }`}
+              }`}
           >
             {isLoading ? t('common.loading') : t('profileCompletion.continue')}
           </button>

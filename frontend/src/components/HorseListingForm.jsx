@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
+import toast from 'react-hot-toast';
 import { API_BASE_URL } from '../config/api';
 import {
   FormInput,
@@ -9,7 +10,6 @@ import {
   FormFileInput,
   FormSection,
   FormAlert,
-  InfoBanner,
   SubmitButton
 } from './common';
 import './AnimalListingPage.css';
@@ -31,8 +31,7 @@ const HorseListingForm = () => {
     vaccinationDetails: '',
     description: '',
     expectedPrice: '',
-    isNegotiable: 'true',
-    deliveryAvailable: false
+    isNegotiable: 'true'
   });
 
   const [files, setFiles] = useState({
@@ -120,8 +119,7 @@ const HorseListingForm = () => {
           vaccinationDetails: '',
           description: '',
           expectedPrice: '',
-          isNegotiable: 'true',
-          deliveryAvailable: false
+          isNegotiable: 'true'
         });
         setFiles({
           frontPhoto: null,
@@ -130,12 +128,12 @@ const HorseListingForm = () => {
           video: null
         });
 
-        alert(t('listing.createSuccess'));
+        toast.success(t('listing.createSuccess'));
       }
     } catch (err) {
       console.error('Error creating listing:', err);
       setError(err.response?.data?.message || err.message || t('listing.createError'));
-      alert(`Error: ${err.response?.data?.message || err.message || t('listing.createError')}`);
+      toast.error(err.response?.data?.message || err.message || t('listing.createError'));
     } finally {
       setLoading(false);
     }
@@ -347,18 +345,6 @@ const HorseListingForm = () => {
           />
         </div>
       </FormSection>
-
-      <FormSection number="4" title={t('animal.section5')}>
-          <FormCheckbox
-          id="horse-deliveryAvailable"
-          name="deliveryAvailable"
-          label={t('formLabels.deliveryAvailable')}
-          checked={formData.deliveryAvailable}
-          onChange={handleChange}
-        />
-      </FormSection>
-
-      <InfoBanner />
 
       <SubmitButton loading={loading} loadingText={t('listing.submitting')} submitText={t('listing.submit')} />
     </form>

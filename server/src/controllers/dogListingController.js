@@ -154,6 +154,9 @@ exports.getAllDogListings = async (req, res) => {
       sortBy = 'created_at',
       sortOrder = 'DESC'
     } = req.query;
+    const validSortFields = ['created_at', 'updated_at', 'expectedPrice', 'views'];
+    const sanitizedSortBy = validSortFields.includes(sortBy) ? sortBy : 'created_at';
+    const sanitizedSortOrder = String(sortOrder).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
     // Build filter conditions
     const where = { status: 'active' };
@@ -176,7 +179,7 @@ exports.getAllDogListings = async (req, res) => {
       where,
       limit: parseInt(limit),
       offset,
-      order: [[sortBy, sortOrder]],
+      order: [[sanitizedSortBy, sanitizedSortOrder]],
       include: [{
         model: db.User,
         as: 'user',
@@ -315,6 +318,14 @@ exports.getMyDogListings = async (req, res) => {
   try {
     const userId = req.user.id;
     const { status = 'active' } = req.query;
+    const validStatuses = ['all', 'active', 'sold', 'expired', 'deleted'];
+
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid listing status filter'
+      });
+    }
 
     const where = { user_id: userId };
     if (status !== 'all') {

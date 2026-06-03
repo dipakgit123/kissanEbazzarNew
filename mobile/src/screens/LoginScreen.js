@@ -140,9 +140,9 @@ const LoginScreen = ({ navigation }) => {
             ) : null}
 
             <TouchableOpacity
-              style={[styles.button, (loading || !phoneNumber) && styles.buttonDisabled]}
+              style={[styles.button, (loading || phoneNumber.length !== 10 || !validatePhone(phoneNumber)) && styles.buttonDisabled]}
               onPress={handleSendOTP}
-              disabled={loading || !phoneNumber}
+              disabled={loading || phoneNumber.length !== 10 || !validatePhone(phoneNumber)}
               activeOpacity={0.8}
             >
               {loading ? (

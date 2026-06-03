@@ -67,13 +67,23 @@ const VetOTPVerificationScreen = ({ route, navigation }) => {
       const response = await veterinarianService.verifyOTP(phoneNumber, code);
 
       if (response.success) {
-        await login(response.data.token, response.data.veterinarian);
-        // Navigation happens automatically via VetAuthProvider
+        // ✅ FIXED: Correct response structure (response.token, not response.data.token)
+        await login(response.token, response.veterinarian);
+
+        Alert.alert(
+          'Success',
+          'OTP verified successfully!',
+          [{ text: 'OK', onPress: () => navigation.replace('VetDashboard') }]
+        );
       } else {
-        Alert.alert('Error', response.message || 'Invalid OTP');
+        Alert.alert('Verification Failed', response.message || 'Invalid OTP. Please try again.');
       }
     } catch (error) {
-      Alert.alert('Error', error.message || 'Verification failed. Please try again.');
+      console.error('OTP Verification Error:', error);
+
+      // ✅ FIXED: Better error handling
+      const errorMessage = error.response?.data?.message || error.message || 'Verification failed. Please try again.';
+      Alert.alert('Error', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -84,7 +94,8 @@ const VetOTPVerificationScreen = ({ route, navigation }) => {
 
     setLoading(true);
     try {
-      const response = await veterinarianService.sendOTP(phoneNumber);
+      // ✅ FIXED: Use resendOTP function for clarity
+      const response = await veterinarianService.resendOTP(phoneNumber);
 
       if (response.success) {
         Alert.alert('Success', 'OTP resent successfully!');
@@ -95,7 +106,9 @@ const VetOTPVerificationScreen = ({ route, navigation }) => {
         Alert.alert('Error', response.message || 'Failed to resend OTP');
       }
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to resend OTP');
+      console.error('Resend OTP Error:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to resend OTP';
+      Alert.alert('Error', errorMessage);
     } finally {
       setLoading(false);
     }

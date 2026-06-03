@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
+import toast from 'react-hot-toast';
 import { API_BASE_URL } from '../config/api';
 import {
   FormInput,
@@ -10,9 +11,11 @@ import {
   FormFileInput,
   FormSection,
   FormAlert,
-  InfoBanner,
   SubmitButton
 } from './common';
+import buffaloFrontGuide from '../assets/cliparts/buffalo_front.png';
+import buffaloSideGuide from '../assets/cliparts/buffalo_side.png';
+import buffaloTeatsGuide from '../assets/cliparts/buffalo_teats.png';
 import './AnimalListingPage.css';
 
 const API_URL = API_BASE_URL;
@@ -27,10 +30,7 @@ const BuffaloListingForm = () => {
     hasHorns: 'true',
     healthCondition: 'good',
     expectedPrice: '',
-    isNegotiable: 'true',
-    vaccinationDetails: '',
-    deliveryAvailable: false,
-    additionalNotes: ''
+    isNegotiable: 'true'
   });
 
   const [files, setFiles] = useState({
@@ -113,10 +113,7 @@ const BuffaloListingForm = () => {
           hasHorns: 'true',
           healthCondition: 'good',
           expectedPrice: '',
-          isNegotiable: 'true',
-          vaccinationDetails: '',
-          deliveryAvailable: false,
-          additionalNotes: ''
+          isNegotiable: 'true'
         });
         setFiles({
           frontPhoto: null,
@@ -125,12 +122,12 @@ const BuffaloListingForm = () => {
           video: null
         });
 
-        alert(t('listing.createSuccess'));
+        toast.success(t('listing.createSuccess'));
       }
     } catch (err) {
       console.error('Error creating listing:', err);
       setError(err.response?.data?.message || err.message || t('listing.createError'));
-      alert(`Error: ${err.response?.data?.message || err.message || t('listing.createError')}`);
+      toast.error(err.response?.data?.message || err.message || t('listing.createError'));
     } finally {
       setLoading(false);
     }
@@ -231,6 +228,8 @@ const BuffaloListingForm = () => {
             accept="image/*"
             file={files.frontPhoto}
             onChange={(file) => handleFileChange('frontPhoto', file)}
+            placeholderImage={buffaloFrontGuide}
+            placeholderAlt={t('animal.frontPhoto')}
           />
 
           <FormFileInput
@@ -240,6 +239,8 @@ const BuffaloListingForm = () => {
             accept="image/*"
             file={files.sidePhoto}
             onChange={(file) => handleFileChange('sidePhoto', file)}
+            placeholderImage={buffaloSideGuide}
+            placeholderAlt={t('cowForm.sidePhoto')}
           />
         </div>
 
@@ -251,6 +252,8 @@ const BuffaloListingForm = () => {
             accept="image/*"
             file={files.milkScenePhoto}
             onChange={(file) => handleFileChange('milkScenePhoto', file)}
+            placeholderImage={buffaloTeatsGuide}
+            placeholderAlt={t('cowForm.milkScenePhoto')}
           />
 
           <FormFileInput
@@ -260,6 +263,7 @@ const BuffaloListingForm = () => {
             accept="video/*"
             file={files.video}
             onChange={(file) => handleFileChange('video', file)}
+            placeholderVariant="video"
           />
         </div>
       </FormSection>
@@ -267,7 +271,7 @@ const BuffaloListingForm = () => {
       <FormSection number="4" title={t('animal.section3')}>
           <div className="form-row">
           <FormInput
-            label={t('sellAnimal.price') + ' (₹)'}
+            label={t('sellAnimal.price')}
             name="expectedPrice"
             type="number"
             value={formData.expectedPrice}
@@ -287,38 +291,6 @@ const BuffaloListingForm = () => {
           />
         </div>
       </FormSection>
-
-      <FormSection number="5" title={t('animal.section5')}>
-          <FormInput
-          label={t('animal.vaccination')}
-          name="vaccinationDetails"
-          type="textarea"
-          value={formData.vaccinationDetails}
-          onChange={handleChange}
-          placeholder={t('formLabels.vaccinationPlaceholder')}
-          rows="3"
-        />
-
-        <FormInput
-          label={t('animal.additionalNotes')}
-          name="additionalNotes"
-          type="textarea"
-          value={formData.additionalNotes}
-          onChange={handleChange}
-          placeholder={t('formLabels.additionalNotesPlaceholder')}
-          rows="3"
-        />
-
-        <FormCheckbox
-          id="buffalo-deliveryAvailable"
-          name="deliveryAvailable"
-          label={t('formLabels.deliveryAvailable')}
-          checked={formData.deliveryAvailable}
-          onChange={handleChange}
-        />
-      </FormSection>
-
-      <InfoBanner />
 
       <SubmitButton loading={loading} loadingText={t('listing.submitting')} submitText={t('listing.submit')} />
     </form>

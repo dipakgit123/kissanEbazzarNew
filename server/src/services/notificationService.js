@@ -1,4 +1,5 @@
 const { Expo } = require('expo-server-sdk');
+const logger = require('../utils/logger');
 
 // Create a new Expo SDK client
 const expo = new Expo();
@@ -8,7 +9,7 @@ const expo = new Expo();
  */
 const sendPushNotification = async (pushToken, title, body, data = {}) => {
   if (!Expo.isExpoPushToken(pushToken)) {
-    console.error(`Push token ${pushToken} is not a valid Expo push token`);
+    logger.error(`Push token ${pushToken} is not a valid Expo push token`);
     return null;
   }
 
@@ -31,7 +32,7 @@ const sendPushNotification = async (pushToken, title, body, data = {}) => {
 
     return tickets;
   } catch (error) {
-    console.error('Error sending push notification:', error);
+    logger.error('Error sending push notification:', error);
     return null;
   }
 };
@@ -51,7 +52,7 @@ const sendBulkPushNotifications = async (tokens, title, body, data = {}) => {
     }));
 
   if (messages.length === 0) {
-    console.log('No valid push tokens to send to');
+    logger.log('No valid push tokens to send to');
     return [];
   }
 
@@ -66,7 +67,7 @@ const sendBulkPushNotifications = async (tokens, title, body, data = {}) => {
 
     return tickets;
   } catch (error) {
-    console.error('Error sending bulk push notifications:', error);
+    logger.error('Error sending bulk push notifications:', error);
     return [];
   }
 };
@@ -252,10 +253,19 @@ async function sendAppointmentNotification(recipient, appointment, type) {
     }
 
     // Send push notification if recipient has device tokens
-    await sendPushNotification(recipient, title, body, data);
+    const db = require('../models');
+    if (db.DeviceToken) {
+      const tokens = await db.DeviceToken.findAll({
+        where: { user_id: recipient.id, is_active: true }
+      });
+
+      if (tokens.length > 0) {
+        const pushTokens = tokens.map(t => t.token);
+        await sendBulkPushNotifications(pushTokens, title, body, data);
+      }
+    }
 
     // Create in-app notification
-    const db = require('../models');
     if (db.Notification) {
       await db.Notification.create({
         user_id: recipient.id,
@@ -269,7 +279,7 @@ async function sendAppointmentNotification(recipient, appointment, type) {
 
     return true;
   } catch (error) {
-    console.error('Send appointment notification error:', error);
+    logger.error('Send appointment notification error:', error);
     return false;
   }
 }
@@ -291,10 +301,20 @@ async function sendCallNotification(veterinarian, caller) {
       action: 'answer_call'
     };
 
-    await sendPushNotification(veterinarian, title, body, data);
+    // Send push notification to veterinarian's devices
+    const db = require('../models');
+    if (db.DeviceToken) {
+      const tokens = await db.DeviceToken.findAll({
+        where: { user_id: veterinarian.id, is_active: true }
+      });
+
+      if (tokens.length > 0) {
+        const pushTokens = tokens.map(t => t.token);
+        await sendBulkPushNotifications(pushTokens, title, body, data);
+      }
+    }
 
     // Create in-app notification
-    const db = require('../models');
     if (db.Notification) {
       await db.Notification.create({
         user_id: veterinarian.id,
@@ -308,7 +328,7 @@ async function sendCallNotification(veterinarian, caller) {
 
     return true;
   } catch (error) {
-    console.error('Send call notification error:', error);
+    logger.error('Send call notification error:', error);
     return false;
   }
 }
@@ -333,7 +353,7 @@ const sendRealtimeNotification = async (userId, title, body, data = {}, db = nul
           data,
           timestamp: new Date().toISOString()
         });
-        console.log(`🔔 Real-time notification sent to user ${userId} via Socket.IO`);
+        logger.log(`🔔 Real-time notification sent to user ${userId} via Socket.IO`);
       }
     }
 
@@ -358,13 +378,13 @@ const sendRealtimeNotification = async (userId, title, body, data = {}, db = nul
       if (tokens.length > 0) {
         const pushTokens = tokens.map(t => t.token);
         await sendBulkPushNotifications(pushTokens, title, body, data);
-        console.log(`📱 Expo push notification sent to user ${userId}`);
+        logger.log(`📱 Expo push notification sent to user ${userId}`);
       }
     }
 
     return true;
   } catch (error) {
-    console.error('Error sending real-time notification:', error);
+    logger.error('Error sending real-time notification:', error);
     return false;
   }
 };
@@ -383,10 +403,10 @@ const sendBulkRealtimeNotification = async (userIds, title, body, data = {}, db 
       sendRealtimeNotification(userId, title, body, data, db)
     );
     await Promise.all(promises);
-    console.log(`📢 Bulk notification sent to ${userIds.length} users`);
+    logger.log(`📢 Bulk notification sent to ${userIds.length} users`);
     return true;
   } catch (error) {
-    console.error('Error sending bulk real-time notification:', error);
+    logger.error('Error sending bulk real-time notification:', error);
     return false;
   }
 };

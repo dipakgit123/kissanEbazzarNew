@@ -47,13 +47,7 @@ const otherAnimalValidationRules = [
     .custom(value => {
       return value === true || value === false || value === 'true' || value === 'false';
     })
-    .withMessage('Training status must be true or false'),
-
-  body('deliveryAvailable')
-    .custom(value => {
-      return value === true || value === false || value === 'true' || value === 'false';
-    })
-    .withMessage('Delivery available must be true or false')
+    .withMessage('Training status must be true or false')
 ];
 
 // Multer configuration for file uploads

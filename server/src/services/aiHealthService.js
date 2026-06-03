@@ -32,6 +32,124 @@ const imageUrlToBase64 = async (imageUrl) => {
   }
 };
 
+const GEMINI_HEALTH_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isTransientGeminiError = (error) => {
+  const message = `${error?.message || ''} ${error?.status || ''}`;
+  return /503|service unavailable|temporarily overloaded|high demand|unavailable|overloaded/i.test(message);
+};
+
+const generateContentWithResilience = async (contents) => {
+  let lastError;
+
+  for (let modelIndex = 0; modelIndex < GEMINI_HEALTH_MODELS.length; modelIndex += 1) {
+    const modelName = GEMINI_HEALTH_MODELS[modelIndex];
+    const model = genAI.getGenerativeModel({ model: modelName });
+    const maxAttempts = modelIndex === 0 ? 3 : 2;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        return await model.generateContent(contents);
+      } catch (error) {
+        lastError = error;
+        const canRetry = isTransientGeminiError(error) && attempt < maxAttempts;
+        const canFallback = modelIndex < GEMINI_HEALTH_MODELS.length - 1;
+
+        console.warn(
+          `Gemini request failed on ${modelName} (attempt ${attempt}/${maxAttempts}): ${error.message}`
+        );
+
+        if (canRetry) {
+          await sleep(1000 * (2 ** (attempt - 1)));
+          continue;
+        }
+
+        if (isTransientGeminiError(error) && canFallback) {
+          break;
+        }
+
+        throw error;
+      }
+    }
+  }
+
+  throw lastError;
+};
+
+/**
+ * Answer a direct animal health question using Gemini text generation.
+ * Replies in the same language used by the user whenever possible.
+ * @param {object} options
+ * @param {string} options.prompt
+ * @param {string} [options.animalType]
+ * @param {string} [options.symptoms]
+ * @param {string} [options.age]
+ * @param {string} [options.additionalInfo]
+ * @param {string} [options.languageHint]
+ */
+const answerHealthQuestion = async ({
+  prompt,
+  animalType = 'animal',
+  symptoms = '',
+  age = '',
+  additionalInfo = '',
+  languageHint = 'en',
+} = {}) => {
+  try {
+    if (!prompt?.trim()) {
+      throw new Error('Prompt is required');
+    }
+
+    const normalizedAnimalType = animalType && animalType !== 'other' ? animalType : 'animal';
+
+    const instruction = `You are an expert veterinary and livestock health assistant for Kissan E-Bazzar.
+
+Answer the user's question in the same language used in the user's prompt. If the prompt mixes languages or is too short to detect reliably, prefer this language hint: ${languageHint}.
+
+Keep the reply practical, farmer-friendly, and focused on animal health. Use short paragraphs or bullets when helpful. Cover only relevant topics such as symptoms, first aid, feeding, prevention, home care, and when to contact a veterinarian.
+
+If the situation sounds urgent or dangerous, clearly advise the user to contact a veterinarian immediately. Do not claim certainty when you are not sure, and do not prescribe unsafe treatment.
+
+Optional context:
+- Animal type: ${normalizedAnimalType}
+- Symptoms: ${symptoms || 'Not provided'}
+- Age: ${age || 'Not provided'}
+- Additional info: ${additionalInfo || 'Not provided'}
+
+User question:
+${prompt}
+
+Return plain text only.`;
+
+    const result = await generateContentWithResilience(instruction);
+    const response = await result.response;
+    const answer = response.text()?.trim();
+
+    if (!answer) {
+      throw new Error('No answer returned from AI service');
+    }
+
+    return {
+      success: true,
+      answer,
+    };
+  } catch (error) {
+    console.error('AI Health Question Error:', error);
+
+    if (error.message?.includes('API_KEY')) {
+      throw new Error('AI service not configured. Please contact support.');
+    }
+
+    if (isTransientGeminiError(error)) {
+      throw new Error('AI service is temporarily busy. Please try again in a moment.');
+    }
+
+    throw new Error('Failed to answer health question: ' + error.message);
+  }
+};
+
 /**
  * Analyze animal health from image using Gemini Vision (FREE)
  * @param {string} imageUrl - URL of the animal image
@@ -41,9 +159,6 @@ const imageUrlToBase64 = async (imageUrl) => {
 const analyzeAnimalHealth = async (imageUrl, animalType = 'animal', options = {}) => {
   try {
     const { symptoms = '', age = '', additionalInfo = '' } = options;
-
-    // Get the Gemini model with vision capability (gemini-2.5-flash supports multimodal/vision)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     // Convert image URL to base64
     const { base64, mimeType } = await imageUrlToBase64(imageUrl);
@@ -129,7 +244,7 @@ ${additionalInfo ? `अतिरिक्त माहिती: ${additionalInf
       },
     };
 
-    const result = await model.generateContent([prompt, imagePart]);
+    const result = await generateContentWithResilience([prompt, imagePart]);
     const response = await result.response;
     const text = response.text();
 
@@ -168,6 +283,10 @@ ${additionalInfo ? `अतिरिक्त माहिती: ${additionalInf
 
     if (error.message?.includes('API_KEY')) {
       throw new Error('AI service not configured. Please contact support.');
+    }
+
+    if (isTransientGeminiError(error)) {
+      throw new Error('AI service is temporarily busy. Please try again in a moment.');
     }
 
     throw new Error('Failed to analyze image: ' + error.message);
@@ -319,6 +438,7 @@ const getDewormingSchedule = (animalType) => {
 
 module.exports = {
   analyzeAnimalHealth,
+  answerHealthQuestion,
   getCommonHealthIssues,
   getEmergencySymptoms,
   getVaccinationSchedule,

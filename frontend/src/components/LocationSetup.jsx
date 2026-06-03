@@ -1,8 +1,9 @@
 // LocationSetup.jsx - Fixed with proper API configuration
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast, { Toaster } from 'react-hot-toast';
-import { API_BASE_API } from '../config/api';
+import { locationService } from '../services/api';
+import LanguageSwitcher from './LanguageSwitcher';
 
 // Icons
 const LocationIcon = () => (
@@ -24,74 +25,11 @@ const ManualLocationIcon = () => (
   </svg>
 );
 
-// Location service with proper API URL
-const locationService = {
-  async checkStatus() {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_BASE_API}/location/status`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    
-    if (!response.ok) {
-      if (response.status === 404) {
-        // Location endpoint might not exist yet, treat as no location set
-        return { hasLocation: false };
-      }
-      throw new Error('Failed to check location status');
-    }
-    
-    return response.json();
-  },
-
-  async setCurrentLocation(latitude, longitude) {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_BASE_API}/location/set/current`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({ latitude, longitude })
-    });
-    
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to set location');
-    }
-    
-    return data;
-  },
-
-  async setManualLocation(addressData) {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_BASE_API}/location/set/manual`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify(addressData)
-    });
-    
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to set location');
-    }
-    
-    return data;
-  }
-};
-
 const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
   const { t } = useTranslation();
   const [step, setStep] = useState('choose'); // 'choose', 'current', 'manual'
   const [isLoading, setIsLoading] = useState(false);
-  const [locationPermission, setLocationPermission] = useState('unknown');
-  
+
   // Manual location state
   const [manualLocation, setManualLocation] = useState({
     address: '',
@@ -102,11 +40,7 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
   });
 
   // Check if user already has location
-  useEffect(() => {
-    checkLocationStatus();
-  }, []);
-
-  const checkLocationStatus = async () => {
+  const checkLocationStatus = useCallback(async () => {
     try {
       const data = await locationService.checkStatus();
       if (data.hasLocation) {
@@ -119,12 +53,16 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
       console.error('Failed to check location status:', error);
       // Continue anyway - user can still set location
     }
-  };
+  }, [onLocationSet]);
+
+  useEffect(() => {
+    checkLocationStatus();
+  }, [checkLocationStatus]);
 
   const getCurrentLocation = () => {
     setIsLoading(true);
     setStep('current');
-    
+
     if (!navigator.geolocation) {
       toast.error('Geolocation is not supported by your browser');
       setIsLoading(false);
@@ -140,11 +78,10 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
         setIsLoading(false);
         setStep('choose');
         let errorMessage = 'Failed to get your location';
-        
-        switch(error.code) {
+
+        switch (error.code) {
           case error.PERMISSION_DENIED:
             errorMessage = 'Location permission denied. Please enable location access.';
-            setLocationPermission('denied');
             break;
           case error.POSITION_UNAVAILABLE:
             errorMessage = 'Location information is unavailable.';
@@ -153,7 +90,7 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
             errorMessage = 'Location request timed out.';
             break;
         }
-        
+
         toast.error(errorMessage);
       },
       {
@@ -167,7 +104,7 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
   const submitCurrentLocation = async (latitude, longitude) => {
     try {
       const data = await locationService.setCurrentLocation(latitude, longitude);
-      
+
       if (data.success) {
         toast.success('Location set successfully!');
         if (onLocationSet) {
@@ -182,7 +119,7 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
           setStep('choose');
         }
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to set location. Please try again.');
       setStep('choose');
     } finally {
@@ -197,10 +134,10 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
     }
 
     setIsLoading(true);
-    
+
     try {
       const data = await locationService.setManualLocation(manualLocation);
-      
+
       if (data.success) {
         toast.success('Location set successfully!');
         if (onLocationSet) {
@@ -214,7 +151,7 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
           toast.error(data.message || 'Failed to set location');
         }
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to set location. Please try again.');
     } finally {
       setIsLoading(false);
@@ -236,15 +173,20 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#E9F0F8] to-[#F0F8FF] p-4">
       <Toaster position="top-right" />
-      
+
+      {/* Language Switcher - Top Right */}
+      <div className="fixed top-4 right-4 z-50">
+        <LanguageSwitcher />
+      </div>
+
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-[#15BB73]/10 to-[#0FA568]/20 rounded-full mb-4">
             <LocationIcon />
           </div>
-          <h2 className="text-2xl font-bold text-gray-800">Set Your Location</h2>
-          <p className="text-gray-600 mt-2">Help us connect you with nearby farmers and customers</p>
+          <h2 className="text-2xl font-bold text-gray-800">{t('location.setupLocation')}</h2>
+          <p className="text-gray-600 mt-2">{t('location.locationRequired')}</p>
         </div>
 
         {/* Choose Method */}
@@ -260,8 +202,8 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
                   <CurrentLocationIcon />
                 </div>
                 <div className="text-left">
-                  <p className="font-semibold text-gray-800">Use Current Location</p>
-                  <p className="text-sm text-gray-600">Automatically detect your location</p>
+                  <p className="font-semibold text-gray-800">{t('location.allowLocation')}</p>
+                  <p className="text-sm text-gray-600">{t('location.detectingLocation')?.replace('...', '')}</p>
                 </div>
               </div>
               <svg className="w-5 h-5 text-gray-400 group-hover:text-[#15BB73]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -278,8 +220,8 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
                   <ManualLocationIcon />
                 </div>
                 <div className="text-left">
-                  <p className="font-semibold text-gray-800">Enter Manually</p>
-                  <p className="text-sm text-gray-600">Type your address details</p>
+                  <p className="font-semibold text-gray-800">{t('location.enterManually')}</p>
+                  <p className="text-sm text-gray-600">{t('profileCompletion.address') || 'Type your address details'}</p>
                 </div>
               </div>
               <svg className="w-5 h-5 text-gray-400 group-hover:text-[#15BB73]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -292,7 +234,7 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
                 onClick={handleSkip}
                 className="w-full mt-6 text-gray-500 hover:text-gray-700 text-sm font-medium"
               >
-                Skip for now
+                {t('common.skip')}
               </button>
             )}
           </div>
@@ -307,8 +249,8 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
             </div>
-            <p className="text-gray-600 font-medium">Getting your location...</p>
-            <p className="text-sm text-gray-500 mt-2">This may take a few seconds</p>
+            <p className="text-gray-600 font-medium">{t('location.detectingLocation')}</p>
+            <p className="text-sm text-gray-500 mt-2">{t('common.loading')?.replace('...', '')}</p>
           </div>
         )}
 
@@ -317,12 +259,12 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
           <div className="space-y-4" onKeyPress={handleKeyPress}>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Address (Optional)
+                {t('profileCompletion.address') || 'Address'} ({t('vetRegistration.optional')})
               </label>
               <input
                 type="text"
                 value={manualLocation.address}
-                onChange={(e) => setManualLocation({...manualLocation, address: e.target.value})}
+                onChange={(e) => setManualLocation({ ...manualLocation, address: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73]"
                 placeholder="Street address"
               />
@@ -330,12 +272,12 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                City <span className="text-red-500">*</span>
+                {t('profileCompletion.city')} <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={manualLocation.city}
-                onChange={(e) => setManualLocation({...manualLocation, city: e.target.value})}
+                onChange={(e) => setManualLocation({ ...manualLocation, city: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73]"
                 placeholder="City name"
               />
@@ -343,12 +285,12 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                State/Province
+                {t('profileCompletion.state')}
               </label>
               <input
                 type="text"
                 value={manualLocation.state}
-                onChange={(e) => setManualLocation({...manualLocation, state: e.target.value})}
+                onChange={(e) => setManualLocation({ ...manualLocation, state: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73]"
                 placeholder="State or province"
               />
@@ -356,12 +298,12 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Country <span className="text-red-500">*</span>
+                {t('footer.country') || 'Country'} <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={manualLocation.country}
-                onChange={(e) => setManualLocation({...manualLocation, country: e.target.value})}
+                onChange={(e) => setManualLocation({ ...manualLocation, country: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73]"
                 placeholder="Country"
               />
@@ -369,12 +311,12 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Postal Code
+                {t('profileCompletion.pincode')}
               </label>
               <input
                 type="text"
                 value={manualLocation.postal_code}
-                onChange={(e) => setManualLocation({...manualLocation, postal_code: e.target.value})}
+                onChange={(e) => setManualLocation({ ...manualLocation, postal_code: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73]"
                 placeholder="ZIP/Postal code"
               />
@@ -386,16 +328,15 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
                 onClick={() => setStep('choose')}
                 className="flex-1 py-2 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
               >
-                Back
+                {t('common.back')}
               </button>
               <button
                 onClick={handleManualSubmit}
                 disabled={isLoading || !manualLocation.city || !manualLocation.country}
-                className={`flex-1 py-2 px-4 rounded-lg font-medium text-white transition-all ${
-                  isLoading || !manualLocation.city || !manualLocation.country
+                className={`flex-1 py-2 px-4 rounded-lg font-medium text-white transition-all ${isLoading || !manualLocation.city || !manualLocation.country
                     ? 'bg-gray-400 cursor-not-allowed'
                     : 'bg-gradient-to-r from-[#15BB73] to-[#0FA568] hover:shadow-lg'
-                }`}
+                  }`}
               >
                 {isLoading ? t('common.loading') : t('location.setupLocation')}
               </button>

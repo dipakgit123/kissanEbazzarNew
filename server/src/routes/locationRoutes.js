@@ -61,6 +61,9 @@ router.get('/me', locationController.getUserLocation);
 // GET /api/location/status - Check if location is set
 router.get('/status', locationController.checkLocationStatus);
 
+// GET /api/location/lookup/pincode/:postalCode - Lookup pincode details
+router.get('/lookup/pincode/:postalCode', locationController.lookupPostalCode);
+
 // GET /api/location/nearby - Get nearby users within radius
 router.get('/nearby', locationController.getNearbyUsers);
 

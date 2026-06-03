@@ -260,8 +260,8 @@
     "home":  {
                  "greeting":  "नमस्कार",
                  "subtitle":  "प्राणी बाजारात तुमचे स्वागत आहे",
-                 "heroTitle":  "तुमचे योग्य",
-                 "heroTitleHighlight":  "प्राणी शोधा",
+                 "heroTitle":  "विश्वासाने खरेदी करा",
+                 "heroTitleHighlight":  "सहज विक्री करा",
                  "heroTitle2":  "प्राणी बाजार",
                  "heroSubtitle":  "शेतकऱ्यांशी थेट संपर्क साधा आणि तुमच्या शेतासाठी सर्वोत्तम दर्जाचे प्राणी शोधा।",
                  "exploreNow":  "आता एक्सप्लोर करा",
@@ -870,7 +870,7 @@
     "animalCard":  {
                        "milk":  "दूध",
                        "call":  "कॉल करा",
-                       "whatsapp":  "व्हाट्सअॅप",
+                       "whatsapp":  "व्हॉट्सॲप",
                        "verifiedSeller":  "सत्यापित विक्रेता"
                    },
     "categories":  {
@@ -899,7 +899,7 @@
                       "years":  "वर्षे",
                       "patients":  "रुग्ण",
                       "call":  "कॉल करा",
-                      "whatsapp":  "व्हाट्सअॅप",
+                      "whatsapp":  "व्हॉट्सॲप",
                       "book":  "बुक करा",
                       "veterinarianResponse":  "पशुवैद्याचा प्रतिसाद",
                       "helpful":  "उपयुक्त",

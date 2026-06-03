@@ -33,11 +33,7 @@ const horseValidationRules = [
 
   body('isNegotiable')
     .notEmpty().withMessage('Negotiable status is required')
-    .isBoolean().withMessage('Negotiable must be true or false'),
-
-  body('deliveryAvailable')
-    .notEmpty().withMessage('Delivery availability is required')
-    .isBoolean().withMessage('Delivery available must be true or false')
+    .isBoolean().withMessage('Negotiable must be true or false')
 ];
 
 // Multer configuration for file uploads

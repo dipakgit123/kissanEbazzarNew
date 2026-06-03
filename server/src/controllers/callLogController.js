@@ -2,6 +2,19 @@ const db = require('../models');
 const CallLog = db.CallLog;
 const User = db.User;
 
+const LISTING_MODEL_MAP = {
+  animal: db.AnimalListing,
+  cow: db.AnimalListing,
+  buffalo: db.BuffaloListing,
+  goat: db.GoatListing,
+  horse: db.HorseListing,
+  cat: db.CatListing,
+  dog: db.DogListing,
+  other: db.OtherAnimalListing,
+  'other-animal': db.OtherAnimalListing,
+  'other-animals': db.OtherAnimalListing
+};
+
 /**
  * Log a new call (when user clicks call button)
  */
@@ -214,10 +227,35 @@ exports.getListingCalls = async (req, res) => {
   try {
     const userId = req.user.id;
     const { listingId, listingType } = req.params;
+    const normalizedListingType = String(listingType || '').toLowerCase();
+    const ListingModel = LISTING_MODEL_MAP[normalizedListingType];
 
-    // TODO: Verify user owns the listing
+    if (!ListingModel) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid listing type'
+      });
+    }
 
-    const calls = await CallLog.getListingCalls(listingId, listingType);
+    const listing = await ListingModel.findByPk(listingId, {
+      attributes: ['id', 'user_id']
+    });
+
+    if (!listing) {
+      return res.status(404).json({
+        success: false,
+        message: 'Listing not found'
+      });
+    }
+
+    if (Number(listing.user_id) !== Number(userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized to view calls for this listing'
+      });
+    }
+
+    const calls = await CallLog.getListingCalls(listingId, normalizedListingType);
 
     res.json({
       success: true,

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
+import toast from 'react-hot-toast';
 import { API_BASE_URL } from '../config/api';
 import {
   FormInput,
@@ -12,6 +13,9 @@ import {
   FormAlert,
   SubmitButton
 } from './common';
+import cowFrontGuide from '../assets/cliparts/cow_front.png';
+import cowSideGuide from '../assets/cliparts/cow_side.png';
+import cowTeatsGuide from '../assets/cliparts/four teats.png';
 import './AnimalListingPage.css';
 
 const API_URL = API_BASE_URL;
@@ -26,15 +30,7 @@ const AnimalListingForm = () => {
     hasHorns: 'true',
     healthCondition: '',
     expectedPrice: '',
-    isNegotiable: 'false',
-    vaccinationDetails: '',
-    deliveryAvailable: false,
-    additionalNotes: '',
-    city: '',
-    state: '',
-    pincode: '',
-    latitude: '',
-    longitude: ''
+    isNegotiable: 'false'
   });
 
   const [files, setFiles] = useState({
@@ -117,15 +113,7 @@ const AnimalListingForm = () => {
           hasHorns: 'true',
           healthCondition: '',
           expectedPrice: '',
-          isNegotiable: 'false',
-          vaccinationDetails: '',
-          deliveryAvailable: false,
-          additionalNotes: '',
-          city: '',
-          state: '',
-          pincode: '',
-          latitude: '',
-          longitude: ''
+          isNegotiable: 'false'
         });
         setFiles({
           frontPhoto: null,
@@ -134,12 +122,12 @@ const AnimalListingForm = () => {
           video: null
         });
 
-        alert(t('listing.createSuccess'));
+        toast.success(t('listing.createSuccess'));
       }
     } catch (err) {
       console.error('Error creating listing:', err);
       setError(err.response?.data?.message || err.message || t('listing.createError'));
-      alert(`Error: ${err.response?.data?.message || err.message || t('listing.createError')}`);
+      toast.error(err.response?.data?.message || err.message || t('listing.createError'));
     } finally {
       setLoading(false);
     }
@@ -241,6 +229,8 @@ const AnimalListingForm = () => {
             accept="image/*"
             file={files.frontPhoto}
             onChange={(file) => handleFileChange('frontPhoto', file)}
+            placeholderImage={cowFrontGuide}
+            placeholderAlt={t('animalListing.frontPhoto')}
           />
 
           <FormFileInput
@@ -250,6 +240,8 @@ const AnimalListingForm = () => {
             accept="image/*"
             file={files.sidePhoto}
             onChange={(file) => handleFileChange('sidePhoto', file)}
+            placeholderImage={cowSideGuide}
+            placeholderAlt={t('animalListing.sidePhoto')}
           />
         </div>
 
@@ -261,6 +253,8 @@ const AnimalListingForm = () => {
             accept="image/*"
             file={files.milkScenePhoto}
             onChange={(file) => handleFileChange('milkScenePhoto', file)}
+            placeholderImage={cowTeatsGuide}
+            placeholderAlt={t('cowForm.milkScenePhoto')}
           />
 
           <FormFileInput
@@ -270,6 +264,7 @@ const AnimalListingForm = () => {
             accept="video/*"
             file={files.video}
             onChange={(file) => handleFileChange('video', file)}
+            placeholderVariant="video"
           />
         </div>
       </FormSection>
@@ -277,7 +272,7 @@ const AnimalListingForm = () => {
       <FormSection number="3" title={t('animalListing.priceInfo')}>
         <div className="form-row">
           <FormInput
-            label={t('sellAnimal.price') + ' (₹)'}
+            label={t('sellAnimal.price')}
             name="expectedPrice"
             type="number"
             value={formData.expectedPrice}
@@ -294,65 +289,6 @@ const AnimalListingForm = () => {
             label={t('animalListing.negotiable')}
             checked={formData.isNegotiable}
             onChange={handleChange}
-          />
-        </div>
-      </FormSection>
-
-      <FormSection number="4" title={t('animal.section5')}>
-        <FormInput
-          label={t('animalListing.vaccinated')}
-          name="vaccinationDetails"
-          type="textarea"
-          value={formData.vaccinationDetails}
-          onChange={handleChange}
-          placeholder={t('formLabels.vaccinationPlaceholder')}
-          rows="3"
-        />
-
-        <FormInput
-          label={t('appointment.additionalNotes')}
-          name="additionalNotes"
-          type="textarea"
-          value={formData.additionalNotes}
-          onChange={handleChange}
-          placeholder={t('formLabels.additionalNotesPlaceholder')}
-          rows="3"
-        />
-
-        <FormCheckbox
-          id="deliveryAvailable"
-          name="deliveryAvailable"
-          label={t('formLabels.deliveryAvailable')}
-          checked={formData.deliveryAvailable}
-          onChange={handleChange}
-        />
-      </FormSection>
-
-      <FormSection number="5" title={t('profileCompletion.step2')}>
-        <div className="form-row">
-          <FormInput
-            label={t('profile.city')}
-            name="city"
-            value={formData.city}
-            onChange={handleChange}
-            placeholder={t('formLabels.enterCity')}
-          />
-
-          <FormInput
-            label={t('profile.state')}
-            name="state"
-            value={formData.state}
-            onChange={handleChange}
-            placeholder={t('formLabels.enterState')}
-          />
-
-          <FormInput
-            label={t('profile.pincode')}
-            name="pincode"
-            value={formData.pincode}
-            onChange={handleChange}
-            placeholder={t('formLabels.enterPincode')}
-            pattern="[0-9]{6}"
           />
         </div>
       </FormSection>
