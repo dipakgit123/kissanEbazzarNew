@@ -88,7 +88,7 @@ const startServer = async () => {
 ║   🐄 Animal Marketplace Active              ║
 ║   🐃 Buffalo Marketplace Active             ║
 ║   🐴 Horse Marketplace Active               ║
-║   ☁️  Cloudinary Integration Enabled        ║
+║   ☁️  AWS S3 Media Storage Enabled          ║
 ║   🗄️  Database: PostgreSQL                   ║
 ║   🔐 Environment: ${process.env.NODE_ENV || 'development'}     ║
 ║   🔌 Socket.IO Real-time Notifications      ║
@@ -177,7 +177,7 @@ Notes:
   - Public endpoints allow viewing listings without authentication
   - Protected endpoints require Bearer token in Authorization header
   - File uploads support: Images (5MB) and Videos (25MB)
-  - Cloudinary handles all media storage
+  - AWS S3 handles all media storage
       `);
     });
   } catch (error) {

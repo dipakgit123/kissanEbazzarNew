@@ -60,6 +60,7 @@ exports.createBuffaloListing = async (req, res) => {
       if (req.files.frontPhoto) {
         frontPhotoData = await uploadToCloudinary(
           req.files.frontPhoto[0],
+          'listings/buffalos/images',
           'image'
         );
       }
@@ -67,6 +68,7 @@ exports.createBuffaloListing = async (req, res) => {
       if (req.files.sidePhoto) {
         sidePhotoData = await uploadToCloudinary(
           req.files.sidePhoto[0],
+          'listings/buffalos/images',
           'image'
         );
       }
@@ -74,6 +76,7 @@ exports.createBuffaloListing = async (req, res) => {
       if (req.files.milkScenePhoto) {
         milkScenePhotoData = await uploadToCloudinary(
           req.files.milkScenePhoto[0],
+          'listings/buffalos/images',
           'image'
         );
       }
@@ -81,6 +84,7 @@ exports.createBuffaloListing = async (req, res) => {
       if (req.files.video) {
         videoData = await uploadToCloudinary(
           req.files.video[0],
+          'listings/buffalos/videos',
           'video'
         );
       }
@@ -124,12 +128,12 @@ exports.createBuffaloListing = async (req, res) => {
   } catch (error) {
     console.error('Error creating buffalo listing:', error);
 
-    // Handle Cloudinary specific errors
+    // Handle storage configuration errors
     if (error.http_code === 404) {
       return res.status(500).json({
         success: false,
-        message: 'Cloudinary upload failed - Invalid credentials or configuration',
-        error: 'Please check Cloudinary configuration'
+        message: 'Media upload failed - Invalid storage credentials or configuration',
+        error: 'Please check AWS S3 configuration'
       });
     }
 
@@ -414,6 +418,7 @@ exports.updateBuffaloListing = async (req, res) => {
         // Upload new photo
         const photoData = await uploadToCloudinary(
           req.files.frontPhoto[0],
+          'listings/buffalos/images',
           'image'
         );
         updateData.frontPhoto = photoData.secure_url;
@@ -426,6 +431,7 @@ exports.updateBuffaloListing = async (req, res) => {
         }
         const photoData = await uploadToCloudinary(
           req.files.sidePhoto[0],
+          'listings/buffalos/images',
           'image'
         );
         updateData.sidePhoto = photoData.secure_url;
@@ -438,6 +444,7 @@ exports.updateBuffaloListing = async (req, res) => {
         }
         const photoData = await uploadToCloudinary(
           req.files.milkScenePhoto[0],
+          'listings/buffalos/images',
           'image'
         );
         updateData.milkScenePhoto = photoData.secure_url;
@@ -450,6 +457,7 @@ exports.updateBuffaloListing = async (req, res) => {
         }
         const videoData = await uploadToCloudinary(
           req.files.video[0],
+          'listings/buffalos/videos',
           'video'
         );
         updateData.video = videoData.secure_url;

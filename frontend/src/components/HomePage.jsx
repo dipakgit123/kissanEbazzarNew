@@ -5,6 +5,7 @@ import AppLoader from './AppLoader';
 import { listingsService, userService } from '../services/api';
 import { useWishlist } from '../contexts/useWishlist';
 import { safeJsonParse } from '../utils/stringUtils';
+import milkReportImage from '../assets/images/milk_report.jpeg';
 
 import { Link } from 'react-router-dom';
 
@@ -469,32 +470,24 @@ const HomePage = () => {
 
           {/* Feature Cards Section */}
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* AI Assistant Card */}
-            <button
-              onClick={() => {
-                // Trigger the AI Assistant floating widget to open
-                const aiButton = document.querySelector('button[class*="fixed bottom"]');
-                if (aiButton) {
-                  aiButton.click();
-                  // Smooth scroll to show the button area
-                  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-                }
-              }}
-              className="group relative bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105 cursor-pointer"
+            {/* Milk Reports Card */}
+            <Link
+              to="/milk-reports"
+              className="group relative bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105"
             >
               <div className="relative h-44 overflow-hidden">
                 <img
-                  src="/src/assets/images/AI Assistant.png"
-                  alt="AI Assistant"
+                  src={milkReportImage}
+                  alt="Milk Reports"
                   className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-blue-900/60 via-blue-900/30 to-transparent"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-emerald-950/65 via-teal-900/30 to-transparent"></div>
               </div>
               <div className="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-black/80 to-transparent">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-xl font-bold text-white drop-shadow-lg">{t('home.aiAssistant')}</h3>
-                    <p className="text-xs text-white/80 mt-1">{t('home.aiAssistantDesc')}</p>
+                    <h3 className="text-xl font-bold text-white drop-shadow-lg">{t('home.milkReports')}</h3>
+                    <p className="text-xs text-white/80 mt-1">{t('home.milkReportsDesc')}</p>
                   </div>
                   <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
                     <svg className="w-6 h-6 text-white group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -503,7 +496,7 @@ const HomePage = () => {
                   </div>
                 </div>
               </div>
-            </button>
+            </Link>
 
             {/* Veterinarian Card */}
             <Link

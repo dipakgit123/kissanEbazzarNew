@@ -53,7 +53,7 @@ class BlogController {
 
       if (req.files && req.files.featured_image && req.files.featured_image[0]) {
         try {
-          const result = await uploadToCloudinary(req.files.featured_image[0], 'blogs/images');
+          const result = await uploadToCloudinary(req.files.featured_image[0], 'content/blogs/featured-images', 'image');
           featured_image = result.secure_url;
           featured_image_public_id = result.public_id;
         } catch (error) {
@@ -363,7 +363,7 @@ class BlogController {
 
         // Upload new image
         try {
-          const result = await uploadToCloudinary(req.files.featured_image[0], 'blogs/images');
+          const result = await uploadToCloudinary(req.files.featured_image[0], 'content/blogs/featured-images', 'image');
           updates.featured_image = result.secure_url;
           updates.featured_image_public_id = result.public_id;
         } catch (error) {

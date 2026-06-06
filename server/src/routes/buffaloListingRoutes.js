@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const buffaloListingController = require('../controllers/buffaloListingController');
 const authMiddleware = require('../middlewares/authMiddleware');
-const { uploadImages, uploadVideo } = require('../config/cloudinary');
 const { body } = require('express-validator');
 
 // Validation rules

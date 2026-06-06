@@ -15,12 +15,11 @@ const FormFileInput = ({
   placeholderVariant
 }) => {
   const [fileName, setFileName] = React.useState('');
+  const inputRef = React.useRef(null);
   const { t } = useTranslation();
 
   React.useEffect(() => {
-    if (!file) {
-      setFileName('');
-    }
+    setFileName(file?.name || '');
   }, [file]);
 
   const handleChange = (e) => {
@@ -33,6 +32,20 @@ const FormFileInput = ({
       } else {
         onChange(e);
       }
+    }
+  };
+
+  const handleRemove = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    setFileName('');
+    if (inputRef.current) {
+      inputRef.current.value = '';
+    }
+
+    if (onChange.length === 1) {
+      onChange(null);
     }
   };
 
@@ -50,10 +63,11 @@ const FormFileInput = ({
           onChange={handleChange}
           required={required}
           className="hidden"
+          ref={inputRef}
         />
         <label 
           htmlFor={id || name}
-          className={`file-input-label flex w-full border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-green-500 hover:bg-green-50 transition-all duration-200 ${
+          className={`file-input-label relative flex w-full border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-green-500 hover:bg-green-50 transition-all duration-200 ${
             placeholderImage || placeholderVariant === 'video'
               ? 'min-h-[170px] flex-col justify-center px-4 py-5 text-center'
               : 'items-center justify-center px-4 py-3'
@@ -61,6 +75,16 @@ const FormFileInput = ({
         >
           {fileName ? (
             <>
+              <button
+                type="button"
+                onClick={handleRemove}
+                className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white shadow-sm ring-1 ring-red-600 transition hover:bg-red-700"
+                aria-label={t('common.remove', { defaultValue: 'Remove' })}
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
               <svg className="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>

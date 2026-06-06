@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import aiAssistantImage from '../assets/images/ai_assistant.png';
 
 const AIAssistant = () => {
   // Add custom CSS for animations
@@ -388,26 +389,11 @@ const AIAssistant = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
               </svg>
             ) : (
-              <div className="relative">
-                {/* Robot/AI Icon */}
-                <div className="relative">
-                  <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                  {/* AI Sparkle */}
-                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-300"></span>
-                  </span>
-                </div>
-                
-                {/* Typing Indicator Dots */}
-                <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 flex space-x-0.5">
-                  <div className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                  <div className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                  <div className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                </div>
-              </div>
+              <img
+                src={aiAssistantImage}
+                alt="AI Assistant"
+                className="h-[3.75rem] w-[3.75rem] rounded-full object-cover drop-shadow-lg"
+              />
             )}
           </div>
           

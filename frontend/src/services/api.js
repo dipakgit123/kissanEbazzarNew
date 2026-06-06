@@ -316,7 +316,15 @@ export const listingsService = {
     } catch (error) {
       throw error.response?.data || error;
     }
+  },
 
+  markListingAsSold: async (animalType, id) => {
+    try {
+      const response = await api.patch(`/api/listings/${animalType}/${id}/sold`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
   }
 };
 
@@ -432,6 +440,98 @@ export const pregnancyService = {
   getStats: async () => {
     try {
       const response = await api.get('/api/pregnancy/stats');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  }
+};
+
+export const milkReportService = {
+  getCows: async (params = {}) => {
+    try {
+      const response = await api.get('/api/milk-reports/cows', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  createCow: async (data) => {
+    try {
+      const response = await api.post('/api/milk-reports/cows', data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  updateCow: async (id, data) => {
+    try {
+      const response = await api.put(`/api/milk-reports/cows/${id}`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  deleteCow: async (id) => {
+    try {
+      const response = await api.delete(`/api/milk-reports/cows/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  getReports: async (params = {}) => {
+    try {
+      const response = await api.get('/api/milk-reports/reports', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  getReport: async (id) => {
+    try {
+      const response = await api.get(`/api/milk-reports/reports/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  createReport: async (data) => {
+    try {
+      const response = await api.post('/api/milk-reports/reports', data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  updateReport: async (id, data) => {
+    try {
+      const response = await api.put(`/api/milk-reports/reports/${id}`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  deleteReport: async (id) => {
+    try {
+      const response = await api.delete(`/api/milk-reports/reports/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  getStats: async (params = {}) => {
+    try {
+      const response = await api.get('/api/milk-reports/stats', { params });
       return response.data;
     } catch (error) {
       throw error.response?.data || error;

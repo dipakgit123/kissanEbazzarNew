@@ -242,9 +242,36 @@
   gap: 1.5rem;
 }
 
+.blog-archive-row {
+  display: flex;
+  flex-direction: column;
+}
+
+.blog-archive-media {
+  min-height: 5.5rem;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+@media (min-width: 768px) {
+  .blog-archive-row {
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  .blog-archive-media {
+    width: min(8rem, 20%);
+    min-height: 6rem;
+  }
+}
+
 @media (min-width: 1024px) {
   .blog-feature-grid {
     grid-template-columns: minmax(0, 1.5fr) minmax(18rem, 0.9fr);
     align-items: stretch;
+  }
+
+  .blog-archive-media {
+    width: min(8.5rem, 18%);
   }
 }

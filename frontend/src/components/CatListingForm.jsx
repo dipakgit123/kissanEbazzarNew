@@ -12,12 +12,17 @@ import {
   FormAlert,
   SubmitButton
 } from './common';
+import { getCatBreedOptions } from '../constants/catBreeds';
 import './AnimalListingPage.css';
 
 const API_URL = API_BASE_URL;
 
 const CatListingForm = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const catBreedOptions = getCatBreedOptions(
+    i18n.resolvedLanguage || i18n.language,
+    t('common.selectOption')
+  );
   const [formData, setFormData] = useState({
     catType: 'male',
     breedName: '',
@@ -164,12 +169,12 @@ const CatListingForm = () => {
             ]}
           />
 
-          <FormInput
+          <FormSelect
             label={t('cowForm.breedName')}
             name="breedName"
             value={formData.breedName}
             onChange={handleChange}
-            placeholder={t('animal.agePlaceholder') || "e.g., Persian, Siamese, Indian, Maine Coon"}
+            options={catBreedOptions}
             required
           />
         </div>

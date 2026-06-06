@@ -54,7 +54,7 @@ class AnimalListingController {
         for (const field of imageFields) {
           if (req.files[field] && req.files[field][0]) {
             try {
-              const result = await uploadToCloudinary(req.files[field][0], 'image');
+              const result = await uploadToCloudinary(req.files[field][0], 'listings/cows/images', 'image');
               uploadedFiles[field] = result.secure_url;
               uploadedFiles[`${field}PublicId`] = result.public_id;
             } catch (error) {
@@ -66,7 +66,7 @@ class AnimalListingController {
         // Upload video
         if (req.files.video && req.files.video[0]) {
           try {
-            const result = await uploadToCloudinary(req.files.video[0], 'video');
+            const result = await uploadToCloudinary(req.files.video[0], 'listings/cows/videos', 'video');
             uploadedFiles.video = result.secure_url;
             uploadedFiles.videoPublicId = result.public_id;
           } catch (error) {
@@ -326,7 +326,7 @@ class AnimalListingController {
             }
             
             // Upload new photo
-            const result = await uploadToCloudinary(req.files[field][0], 'image');
+            const result = await uploadToCloudinary(req.files[field][0], 'listings/cows/images', 'image');
             updates[field] = result.secure_url;
             updates[publicIdField] = result.public_id;
           }
@@ -340,7 +340,7 @@ class AnimalListingController {
           }
           
           // Upload new video
-          const result = await uploadToCloudinary(req.files.video[0], 'video');
+          const result = await uploadToCloudinary(req.files.video[0], 'listings/cows/videos', 'video');
           updates.video = result.secure_url;
           updates.videoPublicId = result.public_id;
         }

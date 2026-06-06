@@ -64,6 +64,7 @@ exports.createCatListing = async (req, res) => {
           try {
             const result = await uploadToCloudinary(
               req.files[fieldName][0],
+              'listings/cats/images',
               'image'
             );
             photoData[fieldName] = result.secure_url;
@@ -79,6 +80,7 @@ exports.createCatListing = async (req, res) => {
         try {
           const result = await uploadToCloudinary(
             req.files.video[0],
+            'listings/cats/videos',
             'video'
           );
           photoData.video = result.secure_url;
@@ -392,8 +394,9 @@ exports.updateCatListing = async (req, res) => {
 
           // Upload new photo
           const result = await uploadToCloudinary(
-            req.files[fieldName][0].buffer,
-            'cat-listings/images'
+            req.files[fieldName][0],
+            'listings/cats/images',
+            'image'
           );
           updateData[fieldName] = result.secure_url;
           updateData[publicIdField] = result.public_id;
@@ -409,8 +412,8 @@ exports.updateCatListing = async (req, res) => {
 
         // Upload new video
         const result = await uploadToCloudinary(
-          req.files.video[0].buffer,
-          'cat-listings/videos',
+          req.files.video[0],
+          'listings/cats/videos',
           'video'
         );
         updateData.video = result.secure_url;

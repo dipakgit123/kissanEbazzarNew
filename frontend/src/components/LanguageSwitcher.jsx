@@ -7,11 +7,11 @@ const LanguageSwitcher = () => {
 
   const languages = [
     { code: 'en', name: 'English' },
-    { code: 'hi', name: 'हिन्दी' },
-    { code: 'mr', name: 'मराठी' }
+    { code: 'hi', name: '\u0939\u093f\u0902\u0926\u0940' },
+    { code: 'mr', name: '\u092e\u0930\u093e\u0920\u0940' }
   ];
 
-  const currentLanguage = languages.find(lang => lang.code === i18n.language) || languages[0];
+  const currentLanguage = languages.find((lang) => lang.code === i18n.language) || languages[0];
 
   const changeLanguage = (langCode) => {
     i18n.changeLanguage(langCode);
@@ -21,7 +21,6 @@ const LanguageSwitcher = () => {
 
   return (
     <div className="relative inline-block text-left z-50">
-      {/* Compact Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg group"
@@ -40,26 +39,22 @@ const LanguageSwitcher = () => {
         </svg>
       </button>
 
-      {/* Attractive Dropdown */}
       {isOpen && (
         <>
-          {/* Backdrop */}
           <div
             className="fixed inset-0 z-40"
             onClick={() => setIsOpen(false)}
           />
-          
-          {/* Dropdown Menu - Compact & Centered */}
+
           <div className="absolute left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:translate-x-0 mt-2 w-36 bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden">
-            {/* Language Options - No Header, More Compact */}
             <div className="py-0.5">
               {languages.map((lang, index) => (
                 <button
                   key={lang.code}
                   onClick={() => changeLanguage(lang.code)}
                   className={`w-full flex items-center gap-2 px-3 py-2 transition-all duration-150 ${
-                    currentLanguage.code === lang.code 
-                      ? 'bg-green-50 text-green-700 font-semibold' 
+                    currentLanguage.code === lang.code
+                      ? 'bg-green-50 text-green-700 font-semibold'
                       : 'text-gray-700 hover:bg-gray-50'
                   } ${index !== languages.length - 1 ? 'border-b border-gray-100' : ''}`}
                 >

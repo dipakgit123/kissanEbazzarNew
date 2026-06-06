@@ -65,6 +65,7 @@ exports.createDogListing = async (req, res) => {
           try {
             const result = await uploadToCloudinary(
               req.files[fieldName][0],
+              'listings/dogs/images',
               'image'
             );
             photoData[fieldName] = result.secure_url;
@@ -80,6 +81,7 @@ exports.createDogListing = async (req, res) => {
         try {
           const result = await uploadToCloudinary(
             req.files.video[0],
+            'listings/dogs/videos',
             'video'
           );
           photoData.video = result.secure_url;
@@ -397,6 +399,7 @@ exports.updateDogListing = async (req, res) => {
           // Upload new photo
           const result = await uploadToCloudinary(
             req.files[fieldName][0],
+            'listings/dogs/images',
             'image'
           );
           updateData[fieldName] = result.secure_url;
@@ -414,6 +417,7 @@ exports.updateDogListing = async (req, res) => {
         // Upload new video
         const result = await uploadToCloudinary(
           req.files.video[0],
+          'listings/dogs/videos',
           'video'
         );
         updateData.video = result.secure_url;

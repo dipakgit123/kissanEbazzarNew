@@ -248,7 +248,7 @@ class VeterinarianController {
         const uploadTasks = [
           uploadDocument(
             req.files.license_document[0],
-            'veterinarians/license-documents',
+            'veterinarians/registration/license-documents',
             'license document'
           ).then((result) => {
             uploadedFiles.license_document = result.secure_url;
@@ -261,7 +261,7 @@ class VeterinarianController {
           uploadTasks.push(
             uploadDocument(
               req.files.profile_photo[0],
-              'veterinarians/profile-photos',
+              'veterinarians/registration/profile-photos',
               'profile photo'
             ).then((result) => {
               uploadedFiles.profile_photo = result.secure_url;
@@ -275,7 +275,7 @@ class VeterinarianController {
           uploadTasks.push(
             uploadDocument(
               req.files.degree_certificate[0],
-              'veterinarians/degree-certificates',
+              'veterinarians/registration/degree-certificates',
               'degree certificate'
             ).then((result) => {
               uploadedFiles.degree_certificate = result.secure_url;
@@ -289,7 +289,7 @@ class VeterinarianController {
           uploadTasks.push(
             uploadDocument(
               req.files.aadhar_document[0],
-              'veterinarians/aadhar-documents',
+              'veterinarians/registration/aadhar-documents',
               'aadhar document'
             ).then((result) => {
               uploadedFiles.aadhar_document = result.secure_url;
@@ -935,7 +935,7 @@ class VeterinarianController {
           if (veterinarian.profile_photo_public_id) {
             await deleteFromCloudinary(veterinarian.profile_photo_public_id);
           }
-          const result = await uploadToCloudinary(req.files.profile_photo[0], 'image');
+          const result = await uploadToCloudinary(req.files.profile_photo[0], 'veterinarians/account/profile-photos', 'image');
           updates.profile_photo = result.secure_url;
           updates.profile_photo_public_id = result.public_id;
         }

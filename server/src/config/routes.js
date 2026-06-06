@@ -12,6 +12,7 @@ const callLogRoutes = require('../routes/callLogRoutes');
 const notificationRoutes = require('../routes/notificationRoutes');
 const aiHealthRoutes = require('../routes/aiHealthRoutes');
 const pregnancyRoutes = require('../routes/pregnancyRoutes');
+const milkReportRoutes = require('../routes/milkReportRoutes');
 const adminRoutes = require('../routes/adminRoutes');
 const veterinarianRoutes = require('../routes/veterinarianRoutes');
 const vetReviewRoutes = require('../routes/vetReviewRoutes');
@@ -36,6 +37,7 @@ const setupRoutes = (app) => {
   app.use('/api/notifications', notificationRoutes);
   app.use('/api/health-check', aiHealthRoutes);
   app.use('/api/pregnancy', pregnancyRoutes);
+  app.use('/api/milk-reports', milkReportRoutes);
   app.use('/api/admin', adminRoutes);
   app.use('/api/veterinarians', veterinarianRoutes);
   app.use('/api/vet-reviews', vetReviewRoutes);

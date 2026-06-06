@@ -12,12 +12,17 @@ import {
   FormAlert,
   SubmitButton
 } from './common';
+import { getGoatBreedOptions } from '../constants/goatBreeds';
 import './AnimalListingPage.css';
 
 const API_URL = API_BASE_URL;
 
 const GoatListingForm = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const goatBreedOptions = getGoatBreedOptions(
+    i18n.resolvedLanguage || i18n.language,
+    t('common.selectOption')
+  );
   const [formData, setFormData] = useState({
     goatType: 'male',
     breedName: '',
@@ -166,12 +171,12 @@ const GoatListingForm = () => {
             ]}
           />
 
-          <FormInput
+          <FormSelect
             label={t('cowForm.breedName')}
             name="breedName"
             value={formData.breedName}
             onChange={handleChange}
-            placeholder="e.g., Boer, Sirohi, Jamunapari"
+            options={goatBreedOptions}
             required
           />
         </div>

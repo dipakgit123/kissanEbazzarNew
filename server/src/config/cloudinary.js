@@ -1,50 +1,173 @@
-const cloudinary = require('cloudinary').v2;
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { Upload } = require('@aws-sdk/lib-storage');
 const multer = require('multer');
+const path = require('path');
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
-});
+const S3_REGION = process.env.AWS_REGION;
+const S3_BUCKET = process.env.AWS_S3_BUCKET;
+const S3_PUBLIC_BASE_URL = (process.env.AWS_S3_PUBLIC_BASE_URL || '').replace(/\/+$/, '');
+const S3_ENDPOINT = (process.env.AWS_S3_ENDPOINT || '').replace(/\/+$/, '');
+const S3_FORCE_PATH_STYLE = ['1', 'true', 'yes'].includes((process.env.AWS_S3_FORCE_PATH_STYLE || '').toLowerCase());
+const hasS3Credentials = Boolean(
+  S3_REGION &&
+  S3_BUCKET &&
+  process.env.AWS_ACCESS_KEY_ID &&
+  process.env.AWS_SECRET_ACCESS_KEY
+);
 
-// Log configuration status (without exposing secrets)
-if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
-  console.warn('WARNING: Cloudinary credentials are not fully configured');
+const s3 = hasS3Credentials
+  ? new S3Client({
+      region: S3_REGION,
+      endpoint: S3_ENDPOINT || undefined,
+      forcePathStyle: S3_FORCE_PATH_STYLE,
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+      }
+    })
+  : null;
+
+if (!hasS3Credentials) {
+  console.warn('WARNING: AWS S3 credentials are not fully configured');
 } else {
-  console.log(`Cloudinary configured for cloud: ${process.env.CLOUDINARY_CLOUD_NAME}`);
+  console.log(`AWS S3 storage configured for bucket: ${S3_BUCKET} (${S3_REGION})`);
 }
 
-const imageStorage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: async (req, file) => {
+const DEFAULT_FOLDER_BY_RESOURCE = {
+  image: 'animal-listings/images',
+  video: 'animal-listings/videos',
+  raw: 'animal-listings/files'
+};
+
+const MIME_EXTENSION_MAP = {
+  'image/jpeg': '.jpg',
+  'image/jpg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'image/gif': '.gif',
+  'video/mp4': '.mp4',
+  'video/webm': '.webm',
+  'video/quicktime': '.mov',
+  'video/x-msvideo': '.avi',
+  'application/pdf': '.pdf'
+};
+
+const normalizeFolder = (folder) => (folder || '')
+  .replace(/\\/g, '/')
+  .replace(/^\/+/, '')
+  .replace(/\/+$/, '');
+
+const encodeKeyForUrl = (key) => key
+  .split('/')
+  .filter(Boolean)
+  .map((segment) => encodeURIComponent(segment))
+  .join('/');
+
+const inferResourceType = (file, explicitType) => {
+  if (explicitType) {
+    return explicitType;
+  }
+
+  if (file?.mimetype?.startsWith('video/')) {
+    return 'video';
+  }
+
+  return 'image';
+};
+
+const resolveUploadOptions = (file, folderOrType, resourceType) => {
+  if (folderOrType === 'image' || folderOrType === 'video' || folderOrType === 'raw') {
+    const resolvedResourceType = folderOrType;
     return {
-      folder: 'animal-listings/images',
-      allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
-      transformation: [{ width: 1200, height: 1200, crop: 'limit', quality: 'auto' }],
-      public_id: `${Date.now()}-${Math.round(Math.random() * 1000)}`
+      resourceType: resolvedResourceType,
+      folder: DEFAULT_FOLDER_BY_RESOURCE[resolvedResourceType]
     };
   }
-});
 
-const videoStorage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: async (req, file) => {
-    return {
-      folder: 'animal-listings/videos',
-      resource_type: 'video',
-      allowed_formats: ['mp4', 'mov', 'avi', 'webm'],
-      chunk_size: 6000000,
-      public_id: `video-${Date.now()}-${Math.round(Math.random() * 1000)}`
-    };
+  const resolvedResourceType = inferResourceType(file, resourceType);
+  const resolvedFolder = normalizeFolder(folderOrType) || DEFAULT_FOLDER_BY_RESOURCE[resolvedResourceType] || DEFAULT_FOLDER_BY_RESOURCE.image;
+
+  return {
+    resourceType: resolvedResourceType,
+    folder: resolvedFolder
+  };
+};
+
+const getFileExtension = (file, resourceType) => {
+  const fromOriginalName = path.extname(file?.originalname || '').toLowerCase();
+  if (fromOriginalName) {
+    return fromOriginalName;
   }
-});
 
-// Helper function for mixed file upload
+  if (file?.mimetype && MIME_EXTENSION_MAP[file.mimetype]) {
+    return MIME_EXTENSION_MAP[file.mimetype];
+  }
+
+  return resourceType === 'video' ? '.mp4' : '.jpg';
+};
+
+const buildObjectKey = (file, folder, resourceType) => {
+  const extension = getFileExtension(file, resourceType);
+  const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${extension}`;
+  return normalizeFolder(folder) ? `${normalizeFolder(folder)}/${uniqueName}` : uniqueName;
+};
+
+const buildPublicUrl = (key) => {
+  const encodedKey = encodeKeyForUrl(key);
+
+  if (S3_PUBLIC_BASE_URL) {
+    return `${S3_PUBLIC_BASE_URL}/${encodedKey}`;
+  }
+
+  if (S3_ENDPOINT) {
+    if (S3_FORCE_PATH_STYLE) {
+      return `${S3_ENDPOINT}/${S3_BUCKET}/${encodedKey}`;
+    }
+
+    return `${S3_ENDPOINT}/${encodedKey}`;
+  }
+
+  return `https://${S3_BUCKET}.s3.${S3_REGION}.amazonaws.com/${encodedKey}`;
+};
+
+const extractKeyFromValue = (publicIdOrUrl) => {
+  if (!publicIdOrUrl) {
+    return null;
+  }
+
+  if (!String(publicIdOrUrl).startsWith('http')) {
+    return String(publicIdOrUrl).replace(/^\/+/, '');
+  }
+
+  try {
+    const parsedUrl = new URL(publicIdOrUrl);
+    const rawPath = decodeURIComponent(parsedUrl.pathname || '').replace(/^\/+/, '');
+
+    if (S3_PUBLIC_BASE_URL && publicIdOrUrl.startsWith(S3_PUBLIC_BASE_URL)) {
+      return rawPath;
+    }
+
+    if (rawPath.startsWith(`${S3_BUCKET}/`)) {
+      return rawPath.slice(S3_BUCKET.length + 1);
+    }
+
+    return rawPath;
+  } catch (error) {
+    console.error('Failed to parse storage URL for deletion:', error);
+    return null;
+  }
+};
+
+const ensureS3Configured = () => {
+  if (!s3 || !S3_BUCKET) {
+    throw new Error('AWS S3 is not configured. Set AWS_REGION, AWS_S3_BUCKET, AWS_ACCESS_KEY_ID, and AWS_SECRET_ACCESS_KEY.');
+  }
+};
+
 const uploadFields = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 25 * 1024 * 1024 // 25MB max (for videos)
+    fileSize: 25 * 1024 * 1024
   }
 }).fields([
   { name: 'frontPhoto', maxCount: 1 },
@@ -53,64 +176,72 @@ const uploadFields = multer({
   { name: 'video', maxCount: 1 }
 ]);
 
-// Process and upload files to Cloudinary
-const uploadToCloudinary = async (file, folder = 'animal-listings/images', resourceType = 'image') => {
-  return new Promise((resolve, reject) => {
-    try {
-      const uploadOptions = {
-        resource_type: resourceType,
-        folder: folder
-      };
+const uploadToCloudinary = async (file, folderOrType, resourceType) => {
+  ensureS3Configured();
 
-      if (resourceType === 'image') {
-        uploadOptions.transformation = [
-          { width: 1200, height: 1200, crop: 'limit', quality: 'auto' }
-        ];
-      }
+  const buffer = file?.buffer || file;
+  if (!Buffer.isBuffer(buffer)) {
+    throw new Error('Invalid file buffer type');
+  }
 
-      const uploadStream = cloudinary.uploader.upload_stream(
-        uploadOptions,
-        (error, result) => {
-          if (error) {
-            console.error('Cloudinary upload error:', error);
-            reject(error);
-          } else {
-            resolve(result);
-          }
-        }
-      );
+  const { folder, resourceType: resolvedResourceType } = resolveUploadOptions(file, folderOrType, resourceType);
+  const key = buildObjectKey(file, folder, resolvedResourceType);
 
-      // Handle both Buffer and file object with buffer property
-      const buffer = file.buffer || file;
-
-      // Ensure buffer is a Buffer instance
-      if (Buffer.isBuffer(buffer)) {
-        uploadStream.end(buffer);
-      } else if (buffer instanceof ArrayBuffer) {
-        uploadStream.end(Buffer.from(buffer));
-      } else {
-        reject(new Error('Invalid file buffer type'));
-      }
-    } catch (error) {
-      console.error('Error in uploadToCloudinary:', error);
-      reject(error);
+  const upload = new Upload({
+    client: s3,
+    params: {
+      Bucket: S3_BUCKET,
+      Key: key,
+      Body: buffer,
+      ContentType: file?.mimetype || (resolvedResourceType === 'video' ? 'video/mp4' : 'image/jpeg'),
+      CacheControl: resolvedResourceType === 'image'
+        ? 'public, max-age=31536000, immutable'
+        : 'public, max-age=86400'
     }
   });
+
+  const result = await upload.done();
+
+  return {
+    secure_url: buildPublicUrl(key),
+    public_id: key,
+    key,
+    bucket: S3_BUCKET,
+    resource_type: resolvedResourceType,
+    etag: result?.ETag || null
+  };
 };
 
-const deleteFromCloudinary = async (publicId, resourceType = 'image') => {
-  try {
-    const result = await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
-    return result;
-  } catch (error) {
-    console.error('Error deleting from Cloudinary:', error);
-    throw error;
+const deleteFromCloudinary = async (publicIdOrUrl, resourceType = 'image') => {
+  ensureS3Configured();
+
+  const key = extractKeyFromValue(publicIdOrUrl);
+  if (!key) {
+    return {
+      result: 'not_found',
+      deleted: null,
+      resource_type: resourceType
+    };
   }
+
+  await s3.send(new DeleteObjectCommand({
+    Bucket: S3_BUCKET,
+    Key: key
+  }));
+
+  return {
+    result: 'ok',
+    deleted: key,
+    resource_type: resourceType
+  };
 };
 
-module.exports = { 
-  cloudinary, 
-  uploadFields, 
-  uploadToCloudinary, 
-  deleteFromCloudinary 
+module.exports = {
+  cloudinary: null,
+  s3,
+  uploadFields,
+  uploadToCloudinary,
+  uploadToStorage: uploadToCloudinary,
+  deleteFromCloudinary,
+  deleteFromStorage: deleteFromCloudinary
 };

@@ -59,8 +59,9 @@ exports.createOtherAnimalListing = async (req, res) => {
       // Front Photo
       if (req.files.frontPhoto && req.files.frontPhoto[0]) {
         const frontPhotoResult = await uploadToCloudinary(
-          req.files.frontPhoto[0].buffer,
-          'other-animals/front-photos'
+          req.files.frontPhoto[0],
+          'listings/other-animals/images/front',
+          'image'
         );
         listingData.frontPhoto = frontPhotoResult.secure_url;
         listingData.frontPhotoPublicId = frontPhotoResult.public_id;
@@ -69,8 +70,9 @@ exports.createOtherAnimalListing = async (req, res) => {
       // Side Photo
       if (req.files.sidePhoto && req.files.sidePhoto[0]) {
         const sidePhotoResult = await uploadToCloudinary(
-          req.files.sidePhoto[0].buffer,
-          'other-animals/side-photos'
+          req.files.sidePhoto[0],
+          'listings/other-animals/images/side',
+          'image'
         );
         listingData.sidePhoto = sidePhotoResult.secure_url;
         listingData.sidePhotoPublicId = sidePhotoResult.public_id;
@@ -79,8 +81,9 @@ exports.createOtherAnimalListing = async (req, res) => {
       // Additional Photo
       if (req.files.additionalPhoto && req.files.additionalPhoto[0]) {
         const additionalPhotoResult = await uploadToCloudinary(
-          req.files.additionalPhoto[0].buffer,
-          'other-animals/additional-photos'
+          req.files.additionalPhoto[0],
+          'listings/other-animals/images/additional',
+          'image'
         );
         listingData.additionalPhoto = additionalPhotoResult.secure_url;
         listingData.additionalPhotoPublicId = additionalPhotoResult.public_id;
@@ -89,8 +92,8 @@ exports.createOtherAnimalListing = async (req, res) => {
       // Video
       if (req.files.video && req.files.video[0]) {
         const videoResult = await uploadToCloudinary(
-          req.files.video[0].buffer,
-          'other-animals/videos',
+          req.files.video[0],
+          'listings/other-animals/videos',
           'video'
         );
         listingData.video = videoResult.secure_url;
@@ -345,8 +348,9 @@ exports.updateOtherAnimalListing = async (req, res) => {
           await deleteFromCloudinary(listing.frontPhotoPublicId);
         }
         const frontPhotoResult = await uploadToCloudinary(
-          req.files.frontPhoto[0].buffer,
-          'other-animals/front-photos'
+          req.files.frontPhoto[0],
+          'listings/other-animals/images/front',
+          'image'
         );
         updateData.frontPhoto = frontPhotoResult.secure_url;
         updateData.frontPhotoPublicId = frontPhotoResult.public_id;
@@ -358,8 +362,9 @@ exports.updateOtherAnimalListing = async (req, res) => {
           await deleteFromCloudinary(listing.sidePhotoPublicId);
         }
         const sidePhotoResult = await uploadToCloudinary(
-          req.files.sidePhoto[0].buffer,
-          'other-animals/side-photos'
+          req.files.sidePhoto[0],
+          'listings/other-animals/images/side',
+          'image'
         );
         updateData.sidePhoto = sidePhotoResult.secure_url;
         updateData.sidePhotoPublicId = sidePhotoResult.public_id;
@@ -371,8 +376,9 @@ exports.updateOtherAnimalListing = async (req, res) => {
           await deleteFromCloudinary(listing.additionalPhotoPublicId);
         }
         const additionalPhotoResult = await uploadToCloudinary(
-          req.files.additionalPhoto[0].buffer,
-          'other-animals/additional-photos'
+          req.files.additionalPhoto[0],
+          'listings/other-animals/images/additional',
+          'image'
         );
         updateData.additionalPhoto = additionalPhotoResult.secure_url;
         updateData.additionalPhotoPublicId = additionalPhotoResult.public_id;
@@ -384,8 +390,8 @@ exports.updateOtherAnimalListing = async (req, res) => {
           await deleteFromCloudinary(listing.videoPublicId);
         }
         const videoResult = await uploadToCloudinary(
-          req.files.video[0].buffer,
-          'other-animals/videos',
+          req.files.video[0],
+          'listings/other-animals/videos',
           'video'
         );
         updateData.video = videoResult.secure_url;

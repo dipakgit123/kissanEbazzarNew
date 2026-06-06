@@ -59,6 +59,7 @@ exports.createHorseListing = async (req, res) => {
       if (req.files.frontPhoto) {
         frontPhotoData = await uploadToCloudinary(
           req.files.frontPhoto[0],
+          'listings/horses/images',
           'image'
         );
       }
@@ -66,6 +67,7 @@ exports.createHorseListing = async (req, res) => {
       if (req.files.sidePhoto) {
         sidePhotoData = await uploadToCloudinary(
           req.files.sidePhoto[0],
+          'listings/horses/images',
           'image'
         );
       }
@@ -73,6 +75,7 @@ exports.createHorseListing = async (req, res) => {
       if (req.files.fullBodyPhoto) {
         fullBodyPhotoData = await uploadToCloudinary(
           req.files.fullBodyPhoto[0],
+          'listings/horses/images',
           'image'
         );
       }
@@ -80,6 +83,7 @@ exports.createHorseListing = async (req, res) => {
       if (req.files.video) {
         videoData = await uploadToCloudinary(
           req.files.video[0],
+          'listings/horses/videos',
           'video'
         );
       }
@@ -386,6 +390,7 @@ exports.updateHorseListing = async (req, res) => {
         // Upload new photo
         const photoData = await uploadToCloudinary(
           req.files.frontPhoto[0],
+          'listings/horses/images',
           'image'
         );
         updateData.frontPhoto = photoData.secure_url;
@@ -398,6 +403,7 @@ exports.updateHorseListing = async (req, res) => {
         }
         const photoData = await uploadToCloudinary(
           req.files.sidePhoto[0],
+          'listings/horses/images',
           'image'
         );
         updateData.sidePhoto = photoData.secure_url;
@@ -410,6 +416,7 @@ exports.updateHorseListing = async (req, res) => {
         }
         const photoData = await uploadToCloudinary(
           req.files.fullBodyPhoto[0],
+          'listings/horses/images',
           'image'
         );
         updateData.fullBodyPhoto = photoData.secure_url;
@@ -422,6 +429,7 @@ exports.updateHorseListing = async (req, res) => {
         }
         const videoData = await uploadToCloudinary(
           req.files.video[0],
+          'listings/horses/videos',
           'video'
         );
         updateData.video = videoData.secure_url;

@@ -1,5 +1,5 @@
 const aiHealthService = require('../services/aiHealthService');
-const { cloudinary } = require('../config/cloudinary');
+const { uploadToCloudinary } = require('../config/cloudinary');
 const multer = require('multer');
 
 // Multer setup for image upload
@@ -92,20 +92,7 @@ const uploadAndAnalyze = async (req, res) => {
       });
     }
 
-    // Upload to Cloudinary
-    const uploadResult = await new Promise((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        {
-          folder: 'health-check',
-          resource_type: 'image',
-        },
-        (error, result) => {
-          if (error) reject(error);
-          else resolve(result);
-        }
-      );
-      uploadStream.end(req.file.buffer);
-    });
+    const uploadResult = await uploadToCloudinary(req.file, 'ai-health-check/uploads/images', 'image');
 
     const imageUrl = uploadResult.secure_url;
 

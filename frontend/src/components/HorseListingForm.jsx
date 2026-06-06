@@ -12,12 +12,17 @@ import {
   FormAlert,
   SubmitButton
 } from './common';
+import { getHorseBreedOptions } from '../constants/horseBreeds';
 import './AnimalListingPage.css';
 
 const API_URL = API_BASE_URL;
 
 const HorseListingForm = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const horseBreedOptions = getHorseBreedOptions(
+    i18n.resolvedLanguage || i18n.language,
+    t('common.selectOption')
+  );
   const [formData, setFormData] = useState({
     gender: 'male',
     breedName: '',
@@ -160,12 +165,12 @@ const HorseListingForm = () => {
             ]}
           />
 
-          <FormInput
+          <FormSelect
             label={t('cowForm.breedName')}
             name="breedName"
             value={formData.breedName}
             onChange={handleChange}
-            placeholder={t('horseForm.breedPlaceholder')}
+            options={horseBreedOptions}
             required
           />
         </div>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import logo from '../assets/images/animal_logog.jpeg';
@@ -11,11 +11,27 @@ const Layout = ({ showHeaderFooter = true }) => {
   const { pathname } = useLocation();
   const { t } = useTranslation();
   const { wishlist } = useWishlist();
+  const [desktopMenuOpen, setDesktopMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // ✅ FIXED: Handle null/undefined wishlist safely
   const wishlistCount = wishlist?.length || 0;
 
   // utility to check active tab for bottom nav
   const isActive = (path) => pathname === path;
+  const isBlogActive = pathname.startsWith('/blogs') || pathname.startsWith('/blog/');
+  const isMoreActive =
+    pathname.startsWith('/veterinarian') ||
+    pathname.startsWith('/ai-health-check') ||
+    isBlogActive;
+
+  useEffect(() => {
+    setDesktopMenuOpen(false);
+    setMobileMenuOpen(false);
+  }, [pathname]);
+
+  const navLinkClass = (active) => `text-[13px] xl:text-[14px] font-semibold transition-all duration-200 relative group whitespace-nowrap ${
+    active ? 'text-[#15BB73]' : 'text-gray-600 hover:text-[#15BB73]'
+  }`;
 
   return (
     <div className="bg-gray-50 min-h-screen flex flex-col">
@@ -23,9 +39,9 @@ const Layout = ({ showHeaderFooter = true }) => {
       {showHeaderFooter && (
         <header className="bg-white/90 backdrop-blur-md shadow-xl border-b border-white/20 sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16 sm:h-20">
+            <div className="flex items-center justify-between gap-4 h-16 sm:h-20">
               {/* Enhanced Logo Section */}
-              <div className="flex items-center space-x-2 group cursor-pointer">
+              <div className="flex shrink-0 items-center space-x-2 group cursor-pointer">
                 {/* Logo Container with Enhanced Styling */}
                 <div className="relative">
                   <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-[#15BB73] to-[#0FA568] rounded-xl flex items-center justify-center shadow-lg transform group-hover:scale-105 transition-all duration-300 p-1 sm:p-1.5">
@@ -39,112 +55,133 @@ const Layout = ({ showHeaderFooter = true }) => {
                   <div className="absolute inset-0 bg-gradient-to-br from-[#15BB73] to-[#0FA568] rounded-xl blur-lg opacity-30 -z-10 group-hover:opacity-50 transition-opacity duration-300"></div>
                 </div>
                 
-                {/* Brand Text - Hidden on mobile and tablet, shown on xl+ */}
+                {/* Brand Text */}
                 <div className="hidden xl:block">
-                  <h1 className="text-lg font-bold text-[#000600] bg-gradient-to-r from-[#000600] to-[#15BB73] bg-clip-text text-transparent group-hover:from-[#15BB73] group-hover:to-[#0FA568] transition-all duration-300 whitespace-nowrap">
+                  <h1 className="text-base xl:text-lg font-bold text-[#000600] bg-gradient-to-r from-[#000600] to-[#15BB73] bg-clip-text text-transparent group-hover:from-[#15BB73] group-hover:to-[#0FA568] transition-all duration-300 whitespace-nowrap">
                     Animal E Bazar
                   </h1>
-                  <p className="text-xs text-gray-600 font-medium whitespace-nowrap">Farmers Marketplace</p>
+                  <p className="hidden 2xl:block text-xs text-gray-600 font-medium whitespace-nowrap">Farmers Marketplace</p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen((current) => !current)}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 shadow-sm transition hover:border-green-200 hover:text-[#15BB73] lg:hidden"
+                  aria-label="Toggle navigation menu"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.8" stroke="currentColor" className="h-5 w-5">
+                    {mobileMenuOpen ? (
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    ) : (
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                    )}
+                  </svg>
+                </button>
+              </div>
+
+              {/* Desktop navigation */}
+              <div className="hidden lg:flex flex-1 items-center justify-center gap-4 xl:gap-5 px-3 min-w-0 2xl:hidden">
+                <Link to="/" className={navLinkClass(pathname === '/')}>
+                  {t('header.home')}
+                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${pathname === '/' ? 'w-full' : 'w-0 group-hover:w-full'}`}></span>
+                </Link>
+                <Link to="/buy-animals" className={navLinkClass(pathname.startsWith('/buy-animals'))}>
+                  {t('home.buyAnimals')}
+                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${pathname.startsWith('/buy-animals') ? 'w-full' : 'w-0 group-hover:w-full'}`}></span>
+                </Link>
+                <Link to="/sell-animal" className={navLinkClass(pathname.startsWith('/sell-animal'))}>
+                  {t('header.sellAnimal')}
+                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${pathname.startsWith('/sell-animal') ? 'w-full' : 'w-0 group-hover:w-full'}`}></span>
+                </Link>
+                <Link to="/pregnancy-calendar" className={navLinkClass(pathname.startsWith('/pregnancy-calendar'))}>
+                  {t('header.pregnancy')}
+                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${pathname.startsWith('/pregnancy-calendar') ? 'w-full' : 'w-0 group-hover:w-full'}`}></span>
+                </Link>
+                <Link to="/milk-reports" className={navLinkClass(pathname.startsWith('/milk-reports'))}>
+                  {t('header.milkReports')}
+                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${pathname.startsWith('/milk-reports') ? 'w-full' : 'w-0 group-hover:w-full'}`}></span>
+                </Link>
+
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setDesktopMenuOpen((current) => !current)}
+                    className={`${navLinkClass(isMoreActive)} flex items-center gap-1.5`}
+                  >
+                    <span>{t('header.more')}</span>
+                    <svg
+                      className={`h-4 w-4 transition-transform duration-200 ${desktopMenuOpen ? 'rotate-180' : ''}`}
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.51a.75.75 0 01-1.08 0l-4.25-4.51a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                    </svg>
+                    <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${isMoreActive ? 'w-full' : 'w-0 group-hover:w-full'}`}></span>
+                  </button>
+
+                  {desktopMenuOpen ? (
+                    <div className="absolute right-0 top-full z-50 mt-3 w-56 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
+                      <Link
+                        to="/veterinarian"
+                        className={`block px-4 py-3 text-sm font-medium transition ${pathname.startsWith('/veterinarian') ? 'bg-green-50 text-[#15BB73]' : 'text-gray-700 hover:bg-gray-50'}`}
+                      >
+                        {t('header.veterinarian')}
+                      </Link>
+                      <Link
+                        to="/ai-health-check"
+                        className={`block px-4 py-3 text-sm font-medium transition ${pathname.startsWith('/ai-health-check') ? 'bg-green-50 text-[#15BB73]' : 'text-gray-700 hover:bg-gray-50'}`}
+                      >
+                        {t('header.healthCheck')}
+                      </Link>
+                      <Link
+                        to="/blogs"
+                        className={`block px-4 py-3 text-sm font-medium transition ${isBlogActive ? 'bg-green-50 text-[#15BB73]' : 'text-gray-700 hover:bg-gray-50'}`}
+                      >
+                        {t('header.blogs')}
+                      </Link>
+                    </div>
+                  ) : null}
                 </div>
               </div>
 
-              {/* Navigation Links - Hidden on mobile, shown on lg+ */}
-              <div className="hidden lg:flex items-center space-x-3 xl:space-x-5">
-                <Link 
-                  to="/" 
-                  className={`text-sm xl:text-base font-semibold transition-all duration-200 relative group whitespace-nowrap ${
-                    pathname === '/' 
-                      ? 'text-[#15BB73]' 
-                      : 'text-gray-600 hover:text-[#15BB73]'
-                  }`}
-                >
+              <div className="hidden 2xl:flex flex-1 items-center justify-center gap-5 px-4 min-w-0">
+                <Link to="/" className={navLinkClass(pathname === '/')}>
                   {t('header.home')}
-                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${
-                    pathname === '/' ? 'w-full' : 'w-0 group-hover:w-full'
-                  }`}></span>
+                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${pathname === '/' ? 'w-full' : 'w-0 group-hover:w-full'}`}></span>
                 </Link>
-                <Link 
-                  to="/buy-animals" 
-                  className={`text-sm xl:text-base font-semibold transition-all duration-200 relative group whitespace-nowrap ${
-                    pathname.startsWith('/buy-animals') 
-                      ? 'text-[#15BB73]' 
-                      : 'text-gray-600 hover:text-[#15BB73]'
-                  }`}
-                >
+                <Link to="/buy-animals" className={navLinkClass(pathname.startsWith('/buy-animals'))}>
                   {t('home.buyAnimals')}
-                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${
-                    pathname.startsWith('/buy-animals') ? 'w-full' : 'w-0 group-hover:w-full'
-                  }`}></span>
+                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${pathname.startsWith('/buy-animals') ? 'w-full' : 'w-0 group-hover:w-full'}`}></span>
                 </Link>
-                <Link
-                  to="/sell-animal"
-                  className={`text-sm xl:text-base font-semibold transition-all duration-200 relative group whitespace-nowrap ${
-                    pathname.startsWith('/sell-animal')
-                      ? 'text-[#15BB73]'
-                      : 'text-gray-600 hover:text-[#15BB73]'
-                  }`}
-                >
-                  {t('header.sellAnimal') || 'Sell Animal'}
-                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${
-                    pathname.startsWith('/sell-animal') ? 'w-full' : 'w-0 group-hover:w-full'
-                  }`}></span>
+                <Link to="/sell-animal" className={navLinkClass(pathname.startsWith('/sell-animal'))}>
+                  {t('header.sellAnimal')}
+                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${pathname.startsWith('/sell-animal') ? 'w-full' : 'w-0 group-hover:w-full'}`}></span>
                 </Link>
-                <Link
-                  to="/pregnancy-calendar"
-                  className={`text-sm xl:text-base font-semibold transition-all duration-200 relative group whitespace-nowrap ${
-                    pathname.startsWith('/pregnancy-calendar')
-                      ? 'text-[#15BB73]'
-                      : 'text-gray-600 hover:text-[#15BB73]'
-                  }`}
-                >
+                <Link to="/pregnancy-calendar" className={navLinkClass(pathname.startsWith('/pregnancy-calendar'))}>
                   {t('header.pregnancy')}
-                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${
-                    pathname.startsWith('/pregnancy-calendar') ? 'w-full' : 'w-0 group-hover:w-full'
-                  }`}></span>
+                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${pathname.startsWith('/pregnancy-calendar') ? 'w-full' : 'w-0 group-hover:w-full'}`}></span>
                 </Link>
-                <Link
-                  to="/veterinarian"
-                  className={`text-sm xl:text-base font-semibold transition-all duration-200 relative group whitespace-nowrap ${
-                    pathname.startsWith('/veterinarian')
-                      ? 'text-[#15BB73]'
-                      : 'text-gray-600 hover:text-[#15BB73]'
-                  }`}
-                >
+                <Link to="/milk-reports" className={navLinkClass(pathname.startsWith('/milk-reports'))}>
+                  {t('header.milkReports')}
+                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${pathname.startsWith('/milk-reports') ? 'w-full' : 'w-0 group-hover:w-full'}`}></span>
+                </Link>
+                <Link to="/veterinarian" className={navLinkClass(pathname.startsWith('/veterinarian'))}>
                   {t('header.veterinarian')}
-                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${
-                    pathname.startsWith('/veterinarian') ? 'w-full' : 'w-0 group-hover:w-full'
-                  }`}></span>
+                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${pathname.startsWith('/veterinarian') ? 'w-full' : 'w-0 group-hover:w-full'}`}></span>
                 </Link>
-                <Link
-                  to="/ai-health-check"
-                  className={`text-sm xl:text-base font-semibold transition-all duration-200 relative group whitespace-nowrap ${
-                    pathname.startsWith('/ai-health-check')
-                      ? 'text-[#15BB73]'
-                      : 'text-gray-600 hover:text-[#15BB73]'
-                  }`}
-                >
+                <Link to="/ai-health-check" className={navLinkClass(pathname.startsWith('/ai-health-check'))}>
                   {t('header.healthCheck')}
-                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${
-                    pathname.startsWith('/ai-health-check') ? 'w-full' : 'w-0 group-hover:w-full'
-                  }`}></span>
+                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${pathname.startsWith('/ai-health-check') ? 'w-full' : 'w-0 group-hover:w-full'}`}></span>
                 </Link>
-                <Link
-                  to="/blogs"
-                  className={`text-sm xl:text-base font-semibold transition-all duration-200 relative group whitespace-nowrap ${
-                    pathname.startsWith('/blogs') || pathname.startsWith('/blog/')
-                      ? 'text-[#15BB73]'
-                      : 'text-gray-600 hover:text-[#15BB73]'
-                  }`}
-                >
-                  {t('header.blogs') || 'Blog'}
-                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${
-                    pathname.startsWith('/blogs') || pathname.startsWith('/blog/') ? 'w-full' : 'w-0 group-hover:w-full'
-                  }`}></span>
+                <Link to="/blogs" className={navLinkClass(isBlogActive)}>
+                  {t('header.blogs')}
+                  <span className={`absolute -bottom-1 left-0 h-0.5 bg-[#15BB73] transition-all duration-300 ${isBlogActive ? 'w-full' : 'w-0 group-hover:w-full'}`}></span>
                 </Link>
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center space-x-2">
+              <div className="flex shrink-0 items-center space-x-2">
                 {/* Language Switcher */}
                 <LanguageSwitcher />
                 
@@ -204,78 +241,72 @@ const Layout = ({ showHeaderFooter = true }) => {
                 </Link>
               </div>
             </div>
+
           </div>
         </header>
       )}
 
+      {showHeaderFooter ? (
+        <div className={`fixed inset-0 z-40 lg:hidden ${mobileMenuOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+          <div
+            className={`absolute inset-0 bg-black/35 transition-opacity duration-300 ${mobileMenuOpen ? 'opacity-100' : 'opacity-0'}`}
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          <aside
+            className={`absolute left-0 top-0 h-full w-[86%] max-w-[320px] border-r border-gray-200 bg-white shadow-2xl transition-transform duration-300 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
+          >
+            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-5">
+              <div>
+                <p className="text-lg font-bold text-gray-900">Animal E Bazar</p>
+                <p className="mt-1 text-xs text-gray-500">Farmers Marketplace</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(false)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 transition hover:border-green-200 hover:text-[#15BB73]"
+                aria-label="Close navigation menu"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.8" stroke="currentColor" className="h-5 w-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-2 px-4 py-4">
+              <Link to="/" className={`block rounded-xl px-4 py-3 text-sm font-semibold transition ${pathname === '/' ? 'bg-green-50 text-[#15BB73]' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}>
+                {t('header.home')}
+              </Link>
+              <Link to="/buy-animals" className={`block rounded-xl px-4 py-3 text-sm font-semibold transition ${pathname.startsWith('/buy-animals') ? 'bg-green-50 text-[#15BB73]' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}>
+                {t('home.buyAnimals')}
+              </Link>
+              <Link to="/sell-animal" className={`block rounded-xl px-4 py-3 text-sm font-semibold transition ${pathname.startsWith('/sell-animal') ? 'bg-green-50 text-[#15BB73]' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}>
+                {t('header.sellAnimal')}
+              </Link>
+              <Link to="/pregnancy-calendar" className={`block rounded-xl px-4 py-3 text-sm font-semibold transition ${pathname.startsWith('/pregnancy-calendar') ? 'bg-green-50 text-[#15BB73]' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}>
+                {t('header.pregnancy')}
+              </Link>
+              <Link to="/milk-reports" className={`block rounded-xl px-4 py-3 text-sm font-semibold transition ${pathname.startsWith('/milk-reports') ? 'bg-green-50 text-[#15BB73]' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}>
+                {t('header.milkReports')}
+              </Link>
+              <Link to="/veterinarian" className={`block rounded-xl px-4 py-3 text-sm font-semibold transition ${pathname.startsWith('/veterinarian') ? 'bg-green-50 text-[#15BB73]' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}>
+                {t('header.veterinarian')}
+              </Link>
+              <Link to="/ai-health-check" className={`block rounded-xl px-4 py-3 text-sm font-semibold transition ${pathname.startsWith('/ai-health-check') ? 'bg-green-50 text-[#15BB73]' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}>
+                {t('header.healthCheck')}
+              </Link>
+              <Link to="/blogs" className={`block rounded-xl px-4 py-3 text-sm font-semibold transition ${isBlogActive ? 'bg-green-50 text-[#15BB73]' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}>
+                {t('header.blogs')}
+              </Link>
+            </div>
+          </aside>
+        </div>
+      ) : null}
+
       {/* dynamic page content */}
-      <main className={`flex-1 ${showHeaderFooter ? 'p-4 pb-20' : 'p-0'}`}>
+      <main className={`flex-1 ${showHeaderFooter ? 'p-4 pb-6 sm:pb-8' : 'p-0'}`}>
         <Outlet />
       </main>
       {showHeaderFooter && <Footer />}
-
-      {/* Bottom Navigation - conditionally rendered */}
-      {showHeaderFooter && (
-        <footer className="fixed bottom-0 left-0 right-0 bg-white shadow-lg border-t border-gray-100 p-1 sm:p-2 flex justify-around items-center z-10">
-          <Link
-            to="/"
-            className={`flex flex-col items-center p-1 sm:p-2 rounded-lg transition ${isActive('/') ? 'text-green-600' : 'text-gray-700 hover:bg-green-50'}`}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-            </svg>
-            <span className="text-xs mt-1">{t('header.home')}</span>
-          </Link>
-
-          <Link
-            to="/buy-animals"
-            className={`flex flex-col items-center p-1 sm:p-2 rounded-lg transition ${isActive('/buy-animals') ? 'text-green-600' : 'text-gray-700 hover:bg-green-50'}`}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-            </svg>
-            <span className="text-xs mt-1">{t('home.buyAnimals')}</span>
-          </Link>
-
-          <Link
-            to="/sell-animal"
-            className={`flex flex-col items-center p-1 sm:p-2 rounded-lg transition relative ${
-              pathname.startsWith('/sell-animal') ? 'text-green-600' : 'text-gray-700 hover:bg-green-50'
-            }`}
-          >
-            {/* Prominent sell icon with badge effect */}
-            <div className={`relative ${pathname.startsWith('/sell-animal') ? 'transform scale-110' : ''}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-              {pathname.startsWith('/sell-animal') && (
-                <span className="absolute -top-1 -right-1 h-2 w-2 bg-green-500 rounded-full animate-pulse"></span>
-              )}
-            </div>
-            <span className="text-xs mt-1 font-medium">{t('header.sell') || 'Sell'}</span>
-          </Link>
-
-          <Link
-            to="/veterinarian"
-            className={`flex flex-col items-center p-1 sm:p-2 rounded-lg transition ${isActive('/veterinarian') ? 'text-green-600' : 'text-gray-700 hover:bg-green-50'}`}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-            <span className="text-xs mt-1">{t('header.vet')}</span>
-          </Link>
-
-          <Link
-            to="/ai-health-check"
-            className={`flex flex-col items-center p-1 sm:p-2 rounded-lg transition ${isActive('/ai-health-check') ? 'text-green-600' : 'text-gray-700 hover:bg-green-50'}`}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-            <span className="text-xs mt-1">{t('header.health')}</span>
-          </Link>
-        </footer>
-      )}
 
       {/* AI Assistant - Show only after login */}
       {showHeaderFooter && <AIAssistant />}

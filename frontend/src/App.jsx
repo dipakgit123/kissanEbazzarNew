@@ -11,6 +11,7 @@ import LoginForm from './components/LoginForm'; // Your LoginForm with OTP built
 import ProfileCompletion from './components/ProfileCompletion'; // Profile completion for first-time users
 import MapView from './components/MapView';
 import PregnancyCalendar from './components/PregnancyCalendar';
+import MilkReportsPage from './components/MilkReportsPage';
 import ProfilePage from './components/ProfilePage';
 import AnimalListingPage from './components/AnimalListingPage';
 import AnimalDetailPage from './components/AnimalDetailPage';
@@ -202,6 +203,7 @@ function App() {
           <Route path="/animal/:animalType/:id" element={<AnimalDetailPage />} />
           <Route path="/veterinarian" element={<VeterinarianPage />} />
           <Route path="/pregnancy-calendar" element={<PregnancyCalendar />} />
+          <Route path="/milk-reports" element={<MilkReportsPage />} />
           <Route path="/ai-health-check" element={<AIHealthCheck />} />
           <Route path="/call-history" element={<CallHistory />} />
           <Route path="/help" element={<HelpCenter />} />

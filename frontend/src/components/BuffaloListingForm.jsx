@@ -16,12 +16,17 @@ import {
 import buffaloFrontGuide from '../assets/cliparts/buffalo_front.png';
 import buffaloSideGuide from '../assets/cliparts/buffalo_side.png';
 import buffaloTeatsGuide from '../assets/cliparts/buffalo_teats.png';
+import { getBuffaloBreedOptions } from '../constants/buffaloBreeds';
 import './AnimalListingPage.css';
 
 const API_URL = API_BASE_URL;
 
 const BuffaloListingForm = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const buffaloBreedOptions = getBuffaloBreedOptions(
+    i18n.resolvedLanguage || i18n.language,
+    t('common.selectOption')
+  );
   const [formData, setFormData] = useState({
     breedName: '',
     age: '',
@@ -142,12 +147,12 @@ const BuffaloListingForm = () => {
 
       <FormSection number="1" title={t('buffaloForm.section1')}>
           <div className="form-row">
-          <FormInput
+          <FormSelect
             label={t('cowForm.breedName')}
             name="breedName"
             value={formData.breedName}
             onChange={handleChange}
-            placeholder="e.g., Murrah, Mehsana, Jaffarabadi"
+            options={buffaloBreedOptions}
             required
           />
 

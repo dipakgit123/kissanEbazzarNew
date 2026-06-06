@@ -16,12 +16,17 @@ import {
 import cowFrontGuide from '../assets/cliparts/cow_front.png';
 import cowSideGuide from '../assets/cliparts/cow_side.png';
 import cowTeatsGuide from '../assets/cliparts/four teats.png';
+import { getCowBreedOptions } from '../constants/cowBreeds';
 import './AnimalListingPage.css';
 
 const API_URL = API_BASE_URL;
 
 const AnimalListingForm = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const cowBreedOptions = getCowBreedOptions(
+    i18n.resolvedLanguage || i18n.language,
+    t('common.selectOption')
+  );
   const [formData, setFormData] = useState({
     breedName: '',
     age: '',
@@ -142,12 +147,12 @@ const AnimalListingForm = () => {
 
       <FormSection number="1" title={t('cowForm.section1')}>
         <div className="form-row">
-          <FormInput
+          <FormSelect
             label={t('sellAnimal.breed')}
             name="breedName"
             value={formData.breedName}
             onChange={handleChange}
-            placeholder={t('cowForm.breedPlaceholder')}
+            options={cowBreedOptions}
             required
           />
 

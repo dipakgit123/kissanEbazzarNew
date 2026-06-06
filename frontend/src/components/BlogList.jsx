@@ -302,36 +302,39 @@ const BlogList = () => {
             </div>
 
             {loading ? (
-              <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+              <div className="space-y-4">
                 {[1, 2, 3, 4, 5, 6].map((item) => (
-                  <div key={item} className="blog-card rounded-[1.6rem] p-5 animate-pulse">
-                    <div className="h-48 rounded-[1.2rem] bg-stone-200" />
-                    <div className="mt-5 h-3 w-24 rounded-full bg-stone-200" />
-                    <div className="mt-4 h-7 w-11/12 rounded-full bg-stone-200" />
-                    <div className="mt-3 h-7 w-3/4 rounded-full bg-stone-200" />
-                    <div className="mt-5 h-4 w-full rounded-full bg-stone-200" />
-                    <div className="mt-2 h-4 w-4/5 rounded-full bg-stone-200" />
+                  <div key={item} className="blog-card blog-archive-row overflow-hidden rounded-[1.6rem] animate-pulse">
+                    <div className="blog-archive-media bg-stone-200" />
+                    <div className="flex-1 p-5 sm:p-5">
+                      <div className="h-3 w-24 rounded-full bg-stone-200" />
+                      <div className="mt-4 h-7 w-11/12 rounded-full bg-stone-200" />
+                      <div className="mt-2 h-7 w-3/4 rounded-full bg-stone-200" />
+                      <div className="mt-4 h-4 w-full rounded-full bg-stone-200" />
+                      <div className="mt-2 h-4 w-5/6 rounded-full bg-stone-200" />
+                      <div className="mt-5 h-4 w-1/2 rounded-full bg-stone-200" />
+                    </div>
                   </div>
                 ))}
               </div>
             ) : blogs.length > 0 ? (
               <>
-                <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                <div className="space-y-4">
                   {blogs.map((blog) => (
                     <article
                       key={blog.id}
                       onClick={() => navigate(`/blog/${blog.slug}`)}
-                      className="blog-card cursor-pointer overflow-hidden rounded-[1.6rem]"
+                      className="blog-card blog-archive-row cursor-pointer overflow-hidden rounded-[1.6rem]"
                     >
-                      <div className="overflow-hidden">
+                      <div className="blog-archive-media overflow-hidden">
                         {blog.featured_image ? (
                           <img
                             src={blog.featured_image}
                             alt={blog.title}
-                            className="blog-card-image h-56 w-full object-cover"
+                            className="blog-card-image h-full w-full object-cover"
                           />
                         ) : (
-                          <div className="flex h-56 items-center justify-center bg-gradient-to-br from-stone-100 to-emerald-50">
+                          <div className="flex h-full min-h-[11rem] items-center justify-center bg-gradient-to-br from-stone-100 to-emerald-50">
                             <div className="rounded-full border border-stone-900/10 bg-white/80 px-4 py-2 text-xs uppercase tracking-[0.22em] text-stone-500">
                               {t('blog.fieldNotes')}
                             </div>
@@ -339,40 +342,40 @@ const BlogList = () => {
                         )}
                       </div>
 
-                      <div className="p-6">
-                        <span className={`inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${getCategoryColor(blog.category)}`}>
-                          {getCategoryLabel(blog.category)}
-                        </span>
+                      <div className="flex min-w-0 flex-1 flex-col justify-between p-5 sm:p-5">
+                        <div>
+                          <span className={`inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${getCategoryColor(blog.category)}`}>
+                            {getCategoryLabel(blog.category)}
+                          </span>
 
-                        <h3 className="blog-serif mt-4 text-[1.65rem] leading-tight text-[color:var(--blog-strong)] blog-line-clamp-3">
-                          {blog.title}
-                        </h3>
+                          <h3 className="blog-serif mt-3 text-[1.5rem] leading-tight text-[color:var(--blog-strong)] blog-line-clamp-2 sm:text-[1.75rem]">
+                            {blog.title}
+                          </h3>
 
-                        <p className="mt-4 text-sm leading-6 text-[color:var(--blog-body)] blog-line-clamp-3">
-                          {blog.excerpt}
-                        </p>
+                          <p className="mt-3 text-[0.95rem] leading-7 text-[color:var(--blog-body)] blog-line-clamp-2">
+                            {blog.excerpt}
+                          </p>
+                        </div>
 
-                        <div className="mt-6 border-t border-black/6 pt-4">
-                          <div className="flex flex-wrap items-center gap-3 text-xs uppercase tracking-[0.14em] text-[color:var(--blog-muted)]">
+                        <div className="mt-4 border-t border-black/6 pt-3">
+                          <div className="flex flex-wrap items-center gap-3 text-sm text-[color:var(--blog-muted)]">
                             <span>{formatDate(blog.published_at || blog.created_at)}</span>
                             <span className="blog-divider-dot" />
                             <span>{t('blog.minRead', { count: blog.reading_time || getReadingTime(blog.content) })}</span>
+                            {blog.author && (
+                              <>
+                                <span className="blog-divider-dot" />
+                                <span className="truncate">
+                                  {blog.author.full_name || blog.author.username || t('common.admin', { defaultValue: 'Admin' })}
+                                </span>
+                              </>
+                            )}
                           </div>
 
                           {blog.author && (
-                            <div className="mt-4 flex items-center gap-3">
-                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-800">
-                                {(blog.author.full_name || blog.author.username || 'A')[0].toUpperCase()}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-medium text-[color:var(--blog-strong)]">
-                                  {blog.author.full_name || blog.author.username || t('common.admin', { defaultValue: 'Admin' })}
-                                </p>
-                                <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--blog-muted)]">
-                                  {t('blog.contributor')}
-                                </p>
-                              </div>
-                            </div>
+                            <p className="mt-2 text-xs uppercase tracking-[0.18em] text-[color:var(--blog-muted)]">
+                              {t('blog.contributor')}
+                            </p>
                           )}
                         </div>
                       </div>

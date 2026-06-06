@@ -610,7 +610,7 @@ class AuthController {
       }
 
       // Upload new photo to Cloudinary
-      const result = await uploadToCloudinary(req.file, 'image');
+      const result = await uploadToCloudinary(req.file, 'users/account/profile-photos', 'image');
       console.log('Profile photo uploaded:', result.secure_url);
 
       // Update user with new photo URL
