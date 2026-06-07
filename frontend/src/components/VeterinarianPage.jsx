@@ -36,7 +36,7 @@ const VeterinarianPage = () => {
   const [selectedVet, setSelectedVet] = useState(null);
   const [viewMode, setViewMode] = useState('nearby');
 
-  const services = useMemo(() => ([
+  const ServiceCatalog = useMemo(() => ([
     {
       id: 1,
       name: t('veterinarian.emergencyCare'),
@@ -117,7 +117,7 @@ const VeterinarianPage = () => {
         if (Array.isArray(parsed)) {
           return parsed;
         }
-      } catch (error) {
+      } catch {
         // Ignore parse error and fall back to comma-separated parsing.
       }
 
@@ -247,7 +247,7 @@ const VeterinarianPage = () => {
   const handleWhatsApp = (phone, vetName) => {
     const cleanPhone = phone.replace(/[^0-9]/g, '');
     const message = encodeURIComponent(
-      `Hello Dr. ${vetName}, I found your profile on Animal Bazar and would like to inquire about veterinary services for my animal. Can we discuss further?`
+      `Hello Dr. ${vetName}, I found your profile on Animal E Bazar and would like to inquire about veterinary services for my animal. Can we discuss further?`
     );
     window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank');
   };

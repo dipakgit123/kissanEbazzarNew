@@ -68,7 +68,6 @@
                  "otpSentWithCode":  "{{channel}} साठी OTP तयार झाला आहे. हा कोड वापरा: {{otp}}",
                  "otpResentWithCode":  "{{channel}} साठी नवीन OTP तयार झाला आहे. हा कोड वापरा: {{otp}}",
                  "devOtpNotice":  "डेव्हलपमेंट मोड: OTP {{otp}} वापरा. डिलिव्हरी चॅनेल: {{channel}}.",
-                 "deliveryChannelNotice":  "डिलिव्हरी चॅनेल: {{channel}}.",
                  "resendCodeIn":  "कोड पुन्हा पाठवा",
                  "seconds":  "सेकंदांमध्ये",
                  "verifying":  "सत्यापन चालू आहे...",

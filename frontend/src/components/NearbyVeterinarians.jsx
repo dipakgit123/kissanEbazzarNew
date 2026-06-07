@@ -105,7 +105,7 @@ const NearbyVeterinarians = () => {
   const handleWhatsApp = (vet) => {
     const cleanPhone = vet.phone_number.replace(/[^0-9]/g, '');
     const message = encodeURIComponent(
-      `Hello Dr. ${vet.full_name}, I found your profile on Animal Bazar and would like to inquire about veterinary services for my animal. Can we discuss further?`
+      `Hello Dr. ${vet.full_name}, I found your profile on Animal E Bazar and would like to inquire about veterinary services for my animal. Can we discuss further?`
     );
     window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank');
   };

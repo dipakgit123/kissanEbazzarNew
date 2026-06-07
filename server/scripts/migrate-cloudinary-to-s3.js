@@ -104,7 +104,7 @@ const limit = limitArg ? Number.parseInt(limitArg, 10) : null;
 
 const isCloudinaryUrl = (value) => typeof value === 'string' && value.includes('res.cloudinary.com');
 
-const required = ['AWS_REGION', 'AWS_S3_BUCKET', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'];
+const required = ['AWS_REGION', 'AWS_S3_BUCKET'];
 const missing = required.filter((key) => !process.env[key]);
 if (missing.length > 0) {
   throw new Error(`Missing required S3 env vars: ${missing.join(', ')}`);

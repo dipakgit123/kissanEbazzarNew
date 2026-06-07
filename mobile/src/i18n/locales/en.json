@@ -1,6 +1,6 @@
 ﻿{
     "common":  {
-                   "appName":  "Animal Bazar",
+                   "appName":  "Animal E Bazar",
                    "welcome":  "Welcome",
                    "login":  "Login",
                    "logout":  "Logout",
@@ -250,7 +250,7 @@
                  "otpSent":  "OTP Sent",
                  "otpSentMessage":  "A verification code has been sent to your phone number",
                  "loginAsVet":  "Login as Veterinarian",
-                 "newUser":  "New to Animal Bazar?",
+                 "newUser":  "New to Animal E Bazar?",
                  "registerNow":  "Register Now",
                  "vetRegister":  "Are you a Veterinarian? Register here",
                  "forgotPassword":  "Forgot Password?",
@@ -261,7 +261,7 @@
              },
     "home":  {
                  "greeting":  "Hello",
-                 "subtitle":  "Welcome to Animal Bazar",
+                 "subtitle":  "Welcome to Animal E Bazar",
                  "heroTitle":  "Buy with trust",
                  "heroTitleHighlight":  "Sell with ease",
                  "heroTitle2":  "Animal Marketplace",
@@ -278,7 +278,7 @@
                  "featuredAnimals":  "Featured Animals",
                  "allAvailableAnimals":  "All Available Animals",
                  "noAnimals":  "No animals available",
-                 "whyChoose":  "Why Choose Animal Bazar?",
+                 "whyChoose":  "Why Choose Animal E Bazar?",
                  "verifiedSellers":  "Verified Sellers",
                  "verifiedSellersDesc":  "All sellers are verified for your safety",
                  "nearbyListings":  "Nearby Listings",

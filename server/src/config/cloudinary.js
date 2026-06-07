@@ -8,29 +8,34 @@ const S3_BUCKET = process.env.AWS_S3_BUCKET;
 const S3_PUBLIC_BASE_URL = (process.env.AWS_S3_PUBLIC_BASE_URL || '').replace(/\/+$/, '');
 const S3_ENDPOINT = (process.env.AWS_S3_ENDPOINT || '').replace(/\/+$/, '');
 const S3_FORCE_PATH_STYLE = ['1', 'true', 'yes'].includes((process.env.AWS_S3_FORCE_PATH_STYLE || '').toLowerCase());
-const hasS3Credentials = Boolean(
-  S3_REGION &&
-  S3_BUCKET &&
+const hasS3Config = Boolean(S3_REGION && S3_BUCKET);
+const hasStaticCredentials = Boolean(
   process.env.AWS_ACCESS_KEY_ID &&
   process.env.AWS_SECRET_ACCESS_KEY
 );
 
-const s3 = hasS3Credentials
+const s3 = hasS3Config
   ? new S3Client({
       region: S3_REGION,
       endpoint: S3_ENDPOINT || undefined,
       forcePathStyle: S3_FORCE_PATH_STYLE,
-      credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
-      }
+      ...(hasStaticCredentials
+        ? {
+            credentials: {
+              accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+              secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+            }
+          }
+        : {})
     })
   : null;
 
-if (!hasS3Credentials) {
-  console.warn('WARNING: AWS S3 credentials are not fully configured');
+if (!hasS3Config) {
+  console.warn('WARNING: AWS S3 is not configured. Set AWS_REGION and AWS_S3_BUCKET.');
+} else if (hasStaticCredentials) {
+  console.log(`AWS S3 storage configured for bucket: ${S3_BUCKET} (${S3_REGION}) using static credentials`);
 } else {
-  console.log(`AWS S3 storage configured for bucket: ${S3_BUCKET} (${S3_REGION})`);
+  console.log(`AWS S3 storage configured for bucket: ${S3_BUCKET} (${S3_REGION}) using the default AWS credential chain`);
 }
 
 const DEFAULT_FOLDER_BY_RESOURCE = {
@@ -160,7 +165,7 @@ const extractKeyFromValue = (publicIdOrUrl) => {
 
 const ensureS3Configured = () => {
   if (!s3 || !S3_BUCKET) {
-    throw new Error('AWS S3 is not configured. Set AWS_REGION, AWS_S3_BUCKET, AWS_ACCESS_KEY_ID, and AWS_SECRET_ACCESS_KEY.');
+    throw new Error('AWS S3 is not configured. Set AWS_REGION and AWS_S3_BUCKET, and provide credentials via IAM role or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY.');
   }
 };
 

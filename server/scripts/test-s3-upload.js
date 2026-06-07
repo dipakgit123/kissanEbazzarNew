@@ -8,7 +8,7 @@ const ONE_PIXEL_PNG = Buffer.from(
 );
 
 async function main() {
-  const required = ['AWS_REGION', 'AWS_S3_BUCKET', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'];
+  const required = ['AWS_REGION', 'AWS_S3_BUCKET'];
   const missing = required.filter((key) => !process.env[key]);
 
   if (missing.length > 0) {

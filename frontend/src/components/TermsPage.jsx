@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   FaArrowRight,
@@ -26,11 +26,11 @@ const TermsPage = () => {
   const whatsappUrl = getWhatsAppSupportUrl();
   const getSectionTitle = (titleKey) => t(titleKey).replace(/^\d+\.\s*/, '');
 
-  const sections = useMemo(() => ([
+  const sections = [
     {
       id: 's1',
       titleKey: 'terms.s1Title',
-      Icon: FaSignature,
+      icon: FaSignature,
       iconClass: 'text-emerald-300',
       surfaceClass: 'from-emerald-500/18 via-emerald-400/10 to-transparent',
       numberClass: 'bg-emerald-600 text-white',
@@ -40,7 +40,7 @@ const TermsPage = () => {
     {
       id: 's2',
       titleKey: 'terms.s2Title',
-      Icon: FaIdCard,
+      icon: FaIdCard,
       iconClass: 'text-sky-300',
       surfaceClass: 'from-sky-500/18 via-sky-400/10 to-transparent',
       numberClass: 'bg-sky-600 text-white',
@@ -50,7 +50,7 @@ const TermsPage = () => {
     {
       id: 's3',
       titleKey: 'terms.s3Title',
-      Icon: FaLock,
+      icon: FaLock,
       iconClass: 'text-violet-200',
       surfaceClass: 'from-violet-500/18 via-violet-400/10 to-transparent',
       numberClass: 'bg-violet-500 text-white',
@@ -60,7 +60,7 @@ const TermsPage = () => {
     {
       id: 's4',
       titleKey: 'terms.s4Title',
-      Icon: FaHandshake,
+      icon: FaHandshake,
       iconClass: 'text-amber-200',
       surfaceClass: 'from-amber-400/20 via-amber-300/10 to-transparent',
       numberClass: 'bg-amber-500 text-white',
@@ -70,7 +70,7 @@ const TermsPage = () => {
     {
       id: 's5',
       titleKey: 'terms.s5Title',
-      Icon: FaTriangleExclamation,
+      icon: FaTriangleExclamation,
       iconClass: 'text-rose-200',
       surfaceClass: 'from-rose-500/18 via-rose-400/10 to-transparent',
       numberClass: 'bg-rose-500 text-white',
@@ -80,7 +80,7 @@ const TermsPage = () => {
     {
       id: 's6',
       titleKey: 'terms.s6Title',
-      Icon: FaPenToSquare,
+      icon: FaPenToSquare,
       iconClass: 'text-teal-200',
       surfaceClass: 'from-teal-500/18 via-teal-400/10 to-transparent',
       numberClass: 'bg-teal-500 text-white',
@@ -90,7 +90,7 @@ const TermsPage = () => {
     {
       id: 's7',
       titleKey: 'terms.s7Title',
-      Icon: FaStore,
+      icon: FaStore,
       iconClass: 'text-indigo-200',
       surfaceClass: 'from-indigo-500/18 via-indigo-400/10 to-transparent',
       numberClass: 'bg-indigo-500 text-white',
@@ -100,7 +100,7 @@ const TermsPage = () => {
     {
       id: 's8',
       titleKey: 'terms.s8Title',
-      Icon: FaShieldHalved,
+      icon: FaShieldHalved,
       iconClass: 'text-pink-200',
       surfaceClass: 'from-pink-500/18 via-pink-400/10 to-transparent',
       numberClass: 'bg-pink-500 text-white',
@@ -110,7 +110,7 @@ const TermsPage = () => {
     {
       id: 's9',
       titleKey: 'terms.s9Title',
-      Icon: FaScaleBalanced,
+      icon: FaScaleBalanced,
       iconClass: 'text-cyan-200',
       surfaceClass: 'from-cyan-500/18 via-cyan-400/10 to-transparent',
       numberClass: 'bg-cyan-500 text-white',
@@ -120,7 +120,7 @@ const TermsPage = () => {
     {
       id: 's10',
       titleKey: 'terms.s10Title',
-      Icon: FaMoneyCheckDollar,
+      icon: FaMoneyCheckDollar,
       iconClass: 'text-orange-200',
       surfaceClass: 'from-orange-500/18 via-orange-400/10 to-transparent',
       numberClass: 'bg-orange-500 text-white',
@@ -130,7 +130,7 @@ const TermsPage = () => {
     {
       id: 's11',
       titleKey: 'terms.s11Title',
-      Icon: FaFileContract,
+      icon: FaFileContract,
       iconClass: 'text-lime-200',
       surfaceClass: 'from-lime-500/18 via-lime-400/10 to-transparent',
       numberClass: 'bg-lime-500 text-white',
@@ -140,34 +140,34 @@ const TermsPage = () => {
     {
       id: 's12',
       titleKey: 'terms.s12Title',
-      Icon: FaMessage,
+      icon: FaMessage,
       iconClass: 'text-emerald-200',
       surfaceClass: 'from-emerald-500/18 via-emerald-400/10 to-transparent',
       numberClass: 'bg-emerald-500 text-white',
       type: 'paragraph',
       bodyKey: 'terms.s12Body',
     },
-  ]), [t]);
+  ];
 
   const summaryCards = [
     {
       title: t('terms.summaryAccessTitle'),
       description: t('terms.summaryAccessDesc'),
-      Icon: FaSignature,
+      icon: FaSignature,
       iconClass: 'text-emerald-300',
       surfaceClass: 'from-emerald-500/18 via-emerald-400/10 to-transparent',
     },
     {
       title: t('terms.summaryUseTitle'),
       description: t('terms.summaryUseDesc'),
-      Icon: FaHandshake,
+      icon: FaHandshake,
       iconClass: 'text-sky-300',
       surfaceClass: 'from-sky-500/18 via-sky-400/10 to-transparent',
     },
     {
       title: t('terms.summaryUpdatesTitle'),
       description: t('terms.summaryUpdatesDesc'),
-      Icon: FaFileContract,
+      icon: FaFileContract,
       iconClass: 'text-amber-200',
       surfaceClass: 'from-amber-400/20 via-amber-300/10 to-transparent',
     },
@@ -203,7 +203,7 @@ const TermsPage = () => {
             </div>
 
             <div className="mt-8 grid gap-4 md:grid-cols-3">
-              {summaryCards.map(({ title, description, Icon, iconClass, surfaceClass }) => (
+              {summaryCards.map(({ title, description, icon: SummaryIcon, iconClass, surfaceClass }) => (
                 <div
                   key={title}
                   className="relative overflow-hidden rounded-[28px] border border-white/12 bg-white/[0.07] p-5 shadow-[0_18px_45px_rgba(0,0,0,0.14)] backdrop-blur"
@@ -211,7 +211,7 @@ const TermsPage = () => {
                   <div className={`absolute inset-0 bg-gradient-to-br ${surfaceClass}`} />
                   <div className="relative">
                     <div className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 ${iconClass}`}>
-                      <Icon className="text-xl" />
+                      {React.createElement(SummaryIcon, { className: 'text-xl' })}
                     </div>
                     <h2 className="mt-4 text-lg font-bold text-white">{title}</h2>
                     <p className="mt-2 text-sm leading-6 text-slate-100/90">{description}</p>
@@ -307,7 +307,7 @@ const TermsPage = () => {
             </div>
 
             {sections.map((section, index) => {
-              const { id, titleKey, Icon, iconClass, surfaceClass, numberClass, type, items, bodyKey } = section;
+              const { id, titleKey, icon: SectionIcon, iconClass, surfaceClass, numberClass, type, items, bodyKey } = section;
 
               return (
                 <section
@@ -319,7 +319,7 @@ const TermsPage = () => {
                     <div className={`absolute inset-0 bg-gradient-to-br ${surfaceClass}`} />
                     <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start">
                       <div className={`inline-flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-slate-950 ${iconClass}`}>
-                        <Icon className="text-2xl" />
+                        {React.createElement(SectionIcon, { className: 'text-2xl' })}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-3">

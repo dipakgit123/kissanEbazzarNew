@@ -34,7 +34,7 @@ const HelpCenter = () => {
       description: t('helpCenter.actionSellDesc'),
       cta: t('helpCenter.actionSellCta'),
       to: '/sell-animal',
-      Icon: FaListCheck,
+      icon: FaListCheck,
       accent: 'from-emerald-500/20 via-emerald-400/10 to-transparent',
       iconClass: 'text-emerald-300',
       borderClass: 'border-emerald-400/20',
@@ -44,7 +44,7 @@ const HelpCenter = () => {
       description: t('helpCenter.actionProfileDesc'),
       cta: t('helpCenter.actionProfileCta'),
       to: '/profile',
-      Icon: FaUserGear,
+      icon: FaUserGear,
       accent: 'from-sky-500/20 via-sky-400/10 to-transparent',
       iconClass: 'text-sky-300',
       borderClass: 'border-sky-400/20',
@@ -54,7 +54,7 @@ const HelpCenter = () => {
       description: t('helpCenter.actionSupportDesc'),
       cta: t('helpCenter.actionSupportCta'),
       href: whatsappUrl,
-      Icon: FaWhatsapp,
+      icon: FaWhatsapp,
       accent: 'from-green-500/20 via-green-400/10 to-transparent',
       iconClass: 'text-green-300',
       borderClass: 'border-green-400/20',
@@ -65,15 +65,15 @@ const HelpCenter = () => {
   const supportHighlights = [
     {
       label: t('helpCenter.highlightFaq'),
-      Icon: FaCircleCheck,
+      icon: FaCircleCheck,
     },
     {
       label: t('helpCenter.highlightSupport'),
-      Icon: FaHeadset,
+      icon: FaHeadset,
     },
     {
       label: t('helpCenter.highlightTrusted'),
-      Icon: FaShieldHeart,
+      icon: FaShieldHeart,
     },
   ];
 
@@ -100,12 +100,12 @@ const HelpCenter = () => {
               </div>
 
               <div className="flex flex-wrap gap-3">
-                {supportHighlights.map(({ label, Icon }) => (
+                {supportHighlights.map(({ label, icon: HighlightIcon }) => (
                   <div
                     key={label}
                     className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-medium text-white shadow-[0_12px_30px_rgba(0,0,0,0.12)] backdrop-blur"
                   >
-                    <Icon className="shrink-0 text-base text-emerald-300" />
+                    {React.createElement(HighlightIcon, { className: 'shrink-0 text-base text-emerald-300' })}
                     <span className="text-white">{label}</span>
                   </div>
                 ))}
@@ -152,7 +152,7 @@ const HelpCenter = () => {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {quickActions.map(({ title, description, cta, to, href, Icon, accent, iconClass, borderClass, disabled }) => {
+              {quickActions.map(({ title, description, cta, to, href, icon: ActionIcon, accent, iconClass, borderClass, disabled }) => {
                 const cardClasses = `group relative overflow-hidden rounded-[28px] border bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.08)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_65px_rgba(15,23,42,0.14)] ${borderClass}`;
 
                 const content = (
@@ -160,7 +160,7 @@ const HelpCenter = () => {
                     <div className={`absolute inset-0 bg-gradient-to-br ${accent}`} />
                     <div className="relative flex h-full flex-col">
                       <div className={`inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-950 ${iconClass}`}>
-                        <Icon className="text-2xl" />
+                        {React.createElement(ActionIcon, { className: 'text-2xl' })}
                       </div>
                       <div className="mt-5">
                         <h3 className="text-lg font-bold text-slate-900">{title}</h3>

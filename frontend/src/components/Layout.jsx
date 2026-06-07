@@ -16,8 +16,6 @@ const Layout = ({ showHeaderFooter = true }) => {
   // ✅ FIXED: Handle null/undefined wishlist safely
   const wishlistCount = wishlist?.length || 0;
 
-  // utility to check active tab for bottom nav
-  const isActive = (path) => pathname === path;
   const isBlogActive = pathname.startsWith('/blogs') || pathname.startsWith('/blog/');
   const isMoreActive =
     pathname.startsWith('/veterinarian') ||

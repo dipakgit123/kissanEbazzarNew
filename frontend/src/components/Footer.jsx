@@ -24,31 +24,31 @@ const Footer = () => {
     {
       name: 'Facebook',
       href: SUPPORT_FACEBOOK_URL,
-      Icon: FaFacebookF,
+      icon: FaFacebookF,
       hoverClass: 'hover:bg-[#1877F2] hover:border-[#1877F2]',
     },
     {
       name: 'Instagram',
       href: SUPPORT_INSTAGRAM_URL,
-      Icon: FaInstagram,
+      icon: FaInstagram,
       hoverClass: 'hover:bg-[#E1306C] hover:border-[#E1306C]',
     },
     {
       name: 'WhatsApp',
       href: whatsappUrl,
-      Icon: FaWhatsapp,
+      icon: FaWhatsapp,
       hoverClass: 'hover:bg-[#25D366] hover:border-[#25D366]',
     },
     {
       name: 'YouTube',
       href: SUPPORT_YOUTUBE_URL,
-      Icon: FaYoutube,
+      icon: FaYoutube,
       hoverClass: 'hover:bg-[#FF0000] hover:border-[#FF0000]',
     },
     {
       name: 'Telegram',
       href: SUPPORT_TELEGRAM_URL,
-      Icon: FaTelegramPlane,
+      icon: FaTelegramPlane,
       hoverClass: 'hover:bg-[#229ED9] hover:border-[#229ED9]',
     },
   ];
@@ -94,7 +94,7 @@ const Footer = () => {
           <div>
             <h4 className="text-lg font-semibold mb-4">{t('footer.connectWithUs')}</h4>
             <div className="flex flex-wrap gap-3">
-              {socialLinks.map(({ name, href, Icon, hoverClass }) => {
+              {socialLinks.map(({ name, href, icon: SocialIcon, hoverClass }) => {
                 const isActive = Boolean(href);
 
                 return (
@@ -116,7 +116,7 @@ const Footer = () => {
                         : 'cursor-not-allowed bg-gray-800/50 text-gray-500 opacity-60'
                     }`}
                   >
-                    <Icon />
+                    {React.createElement(SocialIcon)}
                   </a>
                 );
               })}

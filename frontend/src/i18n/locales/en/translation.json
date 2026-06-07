@@ -68,7 +68,6 @@
                  "otpSentWithCode":  "OTP generated for {{channel}}. Use code: {{otp}}",
                  "otpResentWithCode":  "New OTP generated for {{channel}}. Use code: {{otp}}",
                  "devOtpNotice":  "Development mode: use OTP {{otp}}. Delivery channel: {{channel}}.",
-                 "deliveryChannelNotice":  "Delivery channel: {{channel}}.",
                  "resendCodeIn":  "Resend code in",
                  "seconds":  "seconds",
                  "verifying":  "Verifying...",
@@ -79,7 +78,7 @@
                  "connectingFarmers":  "Connecting farmers directly to consumers"
              },
     "home":  {
-                 "title":  "Animal Bazaar",
+                 "title":  "AnimalE Bazar",
                  "subtitle":  "Find your perfect animal companion",
                  "searchPlaceholder":  "Search for animals...",
                  "categories":  "Categories",

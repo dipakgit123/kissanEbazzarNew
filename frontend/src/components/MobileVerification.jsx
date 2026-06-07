@@ -184,15 +184,13 @@ const MobileVerification = ({ onBack, onSuccess }) => {
         
         {/* OTP Input */}
         <div className="space-y-6">
-          {deliveryInfo && (deliveryInfo.warning || deliveryInfo.debugOtp || deliveryInfo.channel) && (
+          {deliveryInfo && (deliveryInfo.warning || deliveryInfo.debugOtp) && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              <p>
-                {deliveryInfo.debugOtp
-                  ? t('auth.devOtpNotice', { otp: deliveryInfo.debugOtp, channel: deliveryInfo.channel || 'whatsapp' })
-                  : t('auth.deliveryChannelNotice', { channel: deliveryInfo.channel || 'whatsapp' })}
-              </p>
+              {deliveryInfo.debugOtp && (
+                <p>{t('auth.devOtpNotice', { otp: deliveryInfo.debugOtp, channel: deliveryInfo.channel || 'whatsapp' })}</p>
+              )}
               {deliveryInfo.warning && (
-                <p className="mt-1">{deliveryInfo.warning}</p>
+                <p className={deliveryInfo.debugOtp ? 'mt-1' : ''}>{deliveryInfo.warning}</p>
               )}
             </div>
           )}
