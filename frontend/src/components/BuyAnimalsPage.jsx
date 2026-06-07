@@ -6,6 +6,13 @@ import DistanceToggle from './DistanceToggle';
 import AppLoader from './AppLoader';
 import { listingsService, userService } from '../services/api';
 import { useWishlist } from '../contexts/useWishlist';
+import cowCategoryImage from '../assets/images/cow1.png';
+import buffaloCategoryImage from '../assets/images/buffelo1.png';
+import goatCategoryImage from '../assets/images/goat1.png';
+import bullCategoryImage from '../assets/images/bull1.png';
+import horseCategoryImage from '../assets/images/horse1.png';
+import dogCategoryImage from '../assets/images/Dog1.png';
+import catCategoryImage from '../assets/images/cat1.png';
 
 const BuyAnimalsPage = () => {
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
@@ -469,7 +476,7 @@ const BuyAnimalsPage = () => {
               >
                 <div className="relative h-40 sm:h-48 overflow-hidden bg-gradient-to-br from-blue-50 to-green-50">
                   <img
-                    src="/src/assets/images/cow1.png"
+                    src={cowCategoryImage}
                     alt="Cows"
                     className="w-full h-full object-contain opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 p-4"
                   />
@@ -499,7 +506,7 @@ const BuyAnimalsPage = () => {
               >
                 <div className="relative h-40 sm:h-48 overflow-hidden bg-gradient-to-br from-purple-50 to-pink-50">
                   <img
-                    src="/src/assets/images/buffelo1.png"
+                    src={buffaloCategoryImage}
                     alt="Buffalo"
                     className="w-full h-full object-contain opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 p-4"
                   />
@@ -529,7 +536,7 @@ const BuyAnimalsPage = () => {
               >
                 <div className="relative h-40 sm:h-48 overflow-hidden bg-gradient-to-br from-orange-50 to-yellow-50">
                   <img
-                    src="/src/assets/images/goat1.png"
+                    src={goatCategoryImage}
                     alt="Goats"
                     className="w-full h-full object-contain opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 p-4"
                   />
@@ -559,7 +566,7 @@ const BuyAnimalsPage = () => {
               >
                 <div className="relative h-40 sm:h-48 overflow-hidden bg-gradient-to-br from-red-50 to-orange-50">
                   <img
-                    src="/src/assets/images/bull1.png"
+                    src={bullCategoryImage}
                     alt="Bulls"
                     className="w-full h-full object-contain opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 p-4"
                   />
@@ -589,7 +596,7 @@ const BuyAnimalsPage = () => {
               >
                 <div className="relative h-40 sm:h-48 overflow-hidden bg-gradient-to-br from-amber-50 to-orange-50">
                   <img
-                    src="/src/assets/images/horse1.png"
+                    src={horseCategoryImage}
                     alt="Horses"
                     className="w-full h-full object-contain opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 p-4"
                   />
@@ -619,7 +626,7 @@ const BuyAnimalsPage = () => {
               >
                 <div className="relative h-40 sm:h-48 overflow-hidden bg-gradient-to-br from-blue-50 to-cyan-50">
                   <img
-                    src="/src/assets/images/Dog1.png"
+                    src={dogCategoryImage}
                     alt="Dogs"
                     className="w-full h-full object-contain opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 p-4"
                   />
@@ -649,7 +656,7 @@ const BuyAnimalsPage = () => {
               >
                 <div className="relative h-40 sm:h-48 overflow-hidden bg-gradient-to-br from-pink-50 to-purple-50">
                   <img
-                    src="/src/assets/images/cat1.png"
+                    src={catCategoryImage}
                     alt="Cats"
                     className="w-full h-full object-contain opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 p-4"
                   />

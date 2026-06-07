@@ -6,6 +6,10 @@ import { listingsService, userService } from '../services/api';
 import { useWishlist } from '../contexts/useWishlist';
 import { safeJsonParse } from '../utils/stringUtils';
 import milkReportImage from '../assets/images/milk_report.jpeg';
+import farmerHeroImage from '../assets/images/farmer_fixed_1920x1400.png';
+import veterinarianFeatureImage from '../assets/images/veternarian.png';
+import aiHealthFeatureImage from '../assets/images/AI health.png';
+import pregnancyCalendarFeatureImage from '../assets/images/pregnancy calender.png';
 
 import { Link } from 'react-router-dom';
 
@@ -370,7 +374,7 @@ const HomePage = () => {
                 {/* Main Banner Image */}
                 <div className="relative rounded-2xl overflow-hidden shadow-2xl">
                   <img
-                    src="/src/assets/images/farmer_fixed_1920x1400.png"
+                    src={farmerHeroImage}
                     alt={t('home.heroTitle') + ' ' + t('home.heroTitleHighlight')}
                     className="w-full h-auto object-contain"
                   />
@@ -505,7 +509,7 @@ const HomePage = () => {
             >
               <div className="relative h-44 overflow-hidden">
                 <img
-                  src="/src/assets/images/veternarian.png"
+                  src={veterinarianFeatureImage}
                   alt="Veterinarian"
                   className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500"
                 />
@@ -533,7 +537,7 @@ const HomePage = () => {
             >
               <div className="relative h-44 overflow-hidden">
                 <img
-                  src="/src/assets/images/AI health.png"
+                  src={aiHealthFeatureImage}
                   alt="AI Health Check"
                   className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500"
                 />
@@ -561,7 +565,7 @@ const HomePage = () => {
             >
               <div className="relative h-44 overflow-hidden">
                 <img
-                  src="/src/assets/images/pregnancy calender.png"
+                  src={pregnancyCalendarFeatureImage}
                   alt="Pregnancy Calendar"
                   className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500"
                 />
