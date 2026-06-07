@@ -13,14 +13,9 @@ const UserAppRoute = () => {
 
   if (parsedUser) {
     const hasProfile = Boolean(parsedUser.full_name && parsedUser.postal_code);
-    const hasLocation = parsedUser.latitude != null && parsedUser.longitude != null;
 
     if (!hasProfile) {
       return <Navigate to="/profile-completion" replace />;
-    }
-
-    if (!hasLocation) {
-      return <Navigate to="/location-setup" replace />;
     }
   }
 

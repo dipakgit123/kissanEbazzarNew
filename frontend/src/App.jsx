@@ -2,11 +2,9 @@
 import { useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { safeJsonParse } from './utils/stringUtils';
-import { API_BASE_URL } from './config/api';
 import './App.css';
 import HomePage from './components/HomePage';
 import Layout from './components/Layout';
-import LocationSetup from './components/LocationSetup'; // Add location component
 import LoginForm from './components/LoginForm'; // Your LoginForm with OTP built-in
 import ProfileCompletion from './components/ProfileCompletion'; // Profile completion for first-time users
 import MapView from './components/MapView';
@@ -52,9 +50,7 @@ function App() {
         const parsedUser = safeJsonParse(savedUser, null);
         if (parsedUser) {
           const hasProfile = !!(parsedUser?.full_name && parsedUser?.postal_code);
-          const hasLocation = parsedUser?.latitude != null && parsedUser?.longitude != null;
           if (!hasProfile) return 'profile-completion';
-          if (!hasLocation) return 'location';
           return 'home';
         }
       }
@@ -69,9 +65,6 @@ function App() {
     return safeJsonParse(localStorage.getItem('userData'), null);
   });
 
-  // Derive hasLocation from userData instead of separate state
-  const hasLocation = userData?.latitude != null && userData?.longitude != null;
-
   // Handle successful login (after OTP verification in LoginForm)
   const handleLoginSuccess = (response) => {
     // Store user data if needed
@@ -81,19 +74,12 @@ function App() {
     }
 
     const hasProfile = !!(response?.user?.full_name && response?.user?.postal_code);
-    const hasLocationFromUser = response?.user?.latitude != null && response?.user?.longitude != null;
 
     // Check if user needs to complete profile (first-time login)
     if (response.requiresProfileCompletion && !hasProfile) {
       setCurrentPage('profile-completion');
       localStorage.setItem('currentPage', 'profile-completion');
       window.location.href = '/profile-completion';
-    }
-    // Check if user needs to set location
-    else if (response.requiresLocation && !hasLocationFromUser) {
-      setCurrentPage('location');
-      localStorage.setItem('currentPage', 'location');
-      window.location.href = '/location-setup';
     }
     // User is fully set up, go to home
     else {
@@ -116,38 +102,6 @@ function App() {
     localStorage.setItem('userData', JSON.stringify(updatedUser));
 
     // Profile completed, location should be set too, go to home
-    setCurrentPage('home');
-    localStorage.setItem('currentPage', 'home');
-    window.location.href = '/';
-  };
-
-  // Handle location setup completion
-  const handleLocationSet = async () => {
-    try {
-      // Fetch updated user data from backend after location is set
-      const token = localStorage.getItem('token');
-      if (token) {
-        const response = await fetch(`${API_BASE_URL}/api/auth/profile`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data.user) {
-            // Update userData with fresh data from backend
-            setUserData(data.user);
-            localStorage.setItem('userData', JSON.stringify(data.user));
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch updated user data:', error);
-      // Continue anyway - use existing data
-    }
-
-    // Navigate to home
     setCurrentPage('home');
     localStorage.setItem('currentPage', 'home');
     window.location.href = '/';
@@ -183,10 +137,6 @@ function App() {
               path="/profile-completion"
               element={<ProfileCompletion onComplete={handleProfileComplete} />}
             />
-            <Route
-              path="/location-setup"
-              element={<LocationSetup onLocationSet={handleLocationSet} skipAllowed={true} />}
-            />
           </Route>
         </Route>
 
@@ -202,10 +152,8 @@ function App() {
                   <Navigate to="/login" replace />
                 ) : currentPage === 'profile-completion' ? (
                   <Navigate to="/profile-completion" replace />
-                ) : currentPage === 'location' ? (
-                  <Navigate to="/location-setup" replace />
                 ) : (
-                  <HomePage hasLocation={hasLocation} />
+                  <HomePage />
                 )
               }
             />
