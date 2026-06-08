@@ -2,8 +2,9 @@
 node_modules/
 
 # Environment variables
-server/.env
 .env
+.env.*
+!.env.example
 
 # IDE files
 .vscode/
@@ -20,4 +21,3 @@ npm-debug.log*
 # Build output
 dist/
 build/
-

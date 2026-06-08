@@ -3,6 +3,92 @@ import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config/api';
 
 const API_URL = API_BASE_URL;
+const MAX_AI_HEALTH_IMAGE_SIZE_BYTES = 25 * 1024 * 1024;
+const TARGET_AI_HEALTH_UPLOAD_BYTES = 800 * 1024;
+const MAX_AI_HEALTH_IMAGE_DIMENSION = 1600;
+
+const loadImageElement = (file) => new Promise((resolve, reject) => {
+  const objectUrl = URL.createObjectURL(file);
+  const image = new Image();
+
+  image.onload = () => {
+    URL.revokeObjectURL(objectUrl);
+    resolve(image);
+  };
+
+  image.onerror = () => {
+    URL.revokeObjectURL(objectUrl);
+    reject(new Error('Could not read image'));
+  };
+
+  image.src = objectUrl;
+});
+
+const canvasToBlob = (canvas, type, quality) => new Promise((resolve, reject) => {
+  canvas.toBlob((blob) => {
+    if (blob) {
+      resolve(blob);
+    } else {
+      reject(new Error('Could not process image'));
+    }
+  }, type, quality);
+});
+
+const optimizeImageForUpload = async (file) => {
+  const image = await loadImageElement(file);
+  const maxDimension = Math.max(image.width, image.height);
+  const scale = maxDimension > MAX_AI_HEALTH_IMAGE_DIMENSION
+    ? MAX_AI_HEALTH_IMAGE_DIMENSION / maxDimension
+    : 1;
+
+  const targetWidth = Math.max(1, Math.round(image.width * scale));
+  const targetHeight = Math.max(1, Math.round(image.height * scale));
+  const canvas = document.createElement('canvas');
+
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+
+  const context = canvas.getContext('2d', { alpha: false });
+  if (!context) {
+    throw new Error('Could not process image');
+  }
+
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, targetWidth, targetHeight);
+  context.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+  const shouldCompress =
+    file.size > TARGET_AI_HEALTH_UPLOAD_BYTES ||
+    scale < 1 ||
+    !['image/jpeg', 'image/webp'].includes(file.type);
+
+  if (!shouldCompress) {
+    return file;
+  }
+
+  const qualities = [0.82, 0.72, 0.62, 0.52, 0.42];
+  let optimizedBlob = null;
+
+  for (const quality of qualities) {
+    const candidateBlob = await canvasToBlob(canvas, 'image/jpeg', quality);
+    optimizedBlob = candidateBlob;
+
+    if (candidateBlob.size <= TARGET_AI_HEALTH_UPLOAD_BYTES) {
+      break;
+    }
+  }
+
+  if (!optimizedBlob) {
+    throw new Error('Could not process image');
+  }
+
+  const nextFileName = file.name.replace(/\.[^.]+$/, '') || 'animal-health-image';
+
+  return new File([optimizedBlob], `${nextFileName}.jpg`, {
+    type: 'image/jpeg',
+    lastModified: Date.now()
+  });
+};
 
 const SectionCard = ({ title, icon, children, className = '' }) => (
   <section className={`rounded-2xl border border-slate-200 bg-white shadow-sm ${className}`}>
@@ -96,6 +182,7 @@ const AIHealthCheck = () => {
   const [age, setAge] = useState('');
   const [additionalInfo, setAdditionalInfo] = useState('');
   const [loading, setLoading] = useState(false);
+  const [preparingImage, setPreparingImage] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [customPrompt, setCustomPrompt] = useState('');
@@ -104,8 +191,7 @@ const AIHealthCheck = () => {
   const selectedAnimalMeta = animalTypes.find((animal) => animal.id === selectedAnimal);
   const primaryRecommendation = result?.recommendations?.[0];
 
-  const handleFileSelect = (e) => {
-    const file = e.target.files[0];
+  const setImageForAnalysis = async (file) => {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
@@ -113,39 +199,49 @@ const AIHealthCheck = () => {
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
+    if (file.size > MAX_AI_HEALTH_IMAGE_SIZE_BYTES) {
       setError(t('healthCheck.errorFileSize'));
       return;
     }
 
-    setSelectedFile(file);
-    setPreviewUrl(URL.createObjectURL(file));
+    setPreparingImage(true);
     setError(null);
+
+    try {
+      const optimizedFile = await optimizeImageForUpload(file);
+      setSelectedFile(optimizedFile);
+      setPreviewUrl((currentUrl) => {
+        if (currentUrl) {
+          URL.revokeObjectURL(currentUrl);
+        }
+        return URL.createObjectURL(optimizedFile);
+      });
+    } catch {
+      setError(t('healthCheck.errorImageProcessing'));
+    } finally {
+      setPreparingImage(false);
+    }
   };
 
-  const handleDrop = (e) => {
+  const handleFileSelect = async (e) => {
+    const file = e.target.files[0];
+    await setImageForAnalysis(file);
+  };
+
+  const handleDrop = async (e) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      setError(t('healthCheck.errorImageFile'));
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      setError(t('healthCheck.errorFileSize'));
-      return;
-    }
-
-    setSelectedFile(file);
-    setPreviewUrl(URL.createObjectURL(file));
-    setError(null);
+    await setImageForAnalysis(file);
   };
 
   const removeImage = () => {
     setSelectedFile(null);
-    setPreviewUrl(null);
+    setPreviewUrl((currentUrl) => {
+      if (currentUrl) {
+        URL.revokeObjectURL(currentUrl);
+      }
+      return null;
+    });
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -184,7 +280,16 @@ const AIHealthCheck = () => {
       if (data.success) {
         setResult(data.data);
       } else {
-        setError(data.message || t('healthCheck.errorAnalysisFailed'));
+        const isNginx413 = !contentType.includes('application/json') &&
+          response.status === 413 &&
+          typeof data.message === 'string' &&
+          data.message.includes('413 Request Entity Too Large');
+
+        setError(
+          isNginx413
+            ? t('healthCheck.errorRequestTooLarge')
+            : (data.message || t('healthCheck.errorAnalysisFailed'))
+        );
       }
     } catch {
       setError(t('healthCheck.errorConnectionFailed'));
@@ -196,7 +301,12 @@ const AIHealthCheck = () => {
   const resetForm = () => {
     setSelectedAnimal(null);
     setSelectedFile(null);
-    setPreviewUrl(null);
+    setPreviewUrl((currentUrl) => {
+      if (currentUrl) {
+        URL.revokeObjectURL(currentUrl);
+      }
+      return null;
+    });
     setSymptoms('');
     setAge('');
     setAdditionalInfo('');
@@ -285,6 +395,7 @@ const AIHealthCheck = () => {
                   </div>
                   <p className="text-sm font-semibold text-slate-800">{t('healthCheck.clickOrDrag')}</p>
                   <p className="mt-1 text-xs text-slate-500">{t('healthCheck.fileFormats')}</p>
+                  <p className="mt-2 text-[11px] text-slate-400">{t('healthCheck.autoOptimizeHint')}</p>
                 </div>
               ) : (
                 <div className="relative inline-block">
@@ -365,22 +476,32 @@ const AIHealthCheck = () => {
               </div>
             )}
 
+            {preparingImage && (
+              <div className="mb-6 flex items-start rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                <svg className="mr-2 mt-0.5 h-5 w-5 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                <span>{t('healthCheck.optimizingImage')}</span>
+              </div>
+            )}
+
             <button
               onClick={analyzeHealth}
-              disabled={!selectedAnimal || !selectedFile || loading}
+              disabled={!selectedAnimal || !selectedFile || loading || preparingImage}
               className={`flex w-full items-center justify-center rounded-xl px-4 py-4 text-sm font-semibold transition ${
-                !selectedAnimal || !selectedFile || loading
+                !selectedAnimal || !selectedFile || loading || preparingImage
                   ? 'cursor-not-allowed bg-slate-200 text-slate-400'
                   : 'bg-slate-900 text-white hover:bg-slate-800'
               }`}
             >
-              {loading ? (
+              {loading || preparingImage ? (
                 <span className="flex items-center">
                   <svg className="mr-2 h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  {t('healthCheck.analyzing')}
+                  {preparingImage ? t('healthCheck.optimizingImage') : t('healthCheck.analyzing')}
                 </span>
               ) : (
                 t('healthCheck.startHealthCheck')

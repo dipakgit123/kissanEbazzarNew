@@ -2,11 +2,13 @@ const aiHealthService = require('../services/aiHealthService');
 const { uploadToCloudinary } = require('../config/cloudinary');
 const multer = require('multer');
 
+const MAX_AI_HEALTH_IMAGE_SIZE_BYTES = 25 * 1024 * 1024;
+
 // Multer setup for image upload
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  limits: { fileSize: MAX_AI_HEALTH_IMAGE_SIZE_BYTES },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
@@ -314,4 +316,5 @@ module.exports = {
   getVaccinationSchedule,
   getDewormingSchedule,
   upload,
+  MAX_AI_HEALTH_IMAGE_SIZE_BYTES,
 };
