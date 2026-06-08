@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import toast, { Toaster } from 'react-hot-toast';
 import { API_BASE_API } from '../config/api';
 import { safeJsonParse } from '../utils/stringUtils';
+import { localizeApiMessage } from '../utils/localizeApiMessage';
 
 const AppointmentBookingForm = () => {
+  const { t, i18n } = useTranslation();
   const { vetId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -85,20 +88,20 @@ const AppointmentBookingForm = () => {
     
     // Validate required fields
     if (!formData.farmer_name || !formData.farmer_phone || !formData.appointment_date || !formData.appointment_time) {
-      toast.error('Please fill in all required fields');
+      toast.error(t('appointmentBooking.requiredFields'));
       return;
     }
 
     // Validate phone number
     if (!/^[+]?[0-9]{10,15}$/.test(formData.farmer_phone.replace(/\s/g, ''))) {
-      toast.error('Please enter a valid phone number');
+      toast.error(t('appointmentBooking.invalidPhone'));
       return;
     }
 
     // Check if date is in the future
     const appointmentDateTime = new Date(`${formData.appointment_date}T${formData.appointment_time}`);
     if (appointmentDateTime < new Date()) {
-      toast.error('Please select a future date and time');
+      toast.error(t('appointmentBooking.futureDateTime'));
       return;
     }
 
@@ -107,7 +110,7 @@ const AppointmentBookingForm = () => {
       const token = localStorage.getItem('token');
 
       if (!token) {
-        toast.error('Please login to book an appointment');
+        toast.error(t('appointmentBooking.loginRequired'));
         navigate('/login');
         return;
       }
@@ -131,16 +134,24 @@ const AppointmentBookingForm = () => {
       const data = await response.json();
 
       if (data.success) {
-        toast.success('Appointment booked successfully! The veterinarian will be notified.');
+        toast.success(t('appointmentBooking.success'));
         setTimeout(() => {
           navigate('/my-appointments');
         }, 2000);
       } else {
-        toast.error(data.message || 'Failed to book appointment');
+        toast.error(
+          localizeApiMessage(
+            i18n,
+            t,
+            data.message,
+            'appointmentBooking.failed',
+            'Failed to book appointment'
+          )
+        );
       }
     } catch (error) {
       console.error('Error booking appointment:', error);
-      toast.error('Failed to book appointment. Please try again.');
+      toast.error(t('appointmentBooking.failedRetry'));
     } finally {
       setLoading(false);
     }
@@ -165,12 +176,12 @@ const AppointmentBookingForm = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600 mb-4">Veterinarian information not available</p>
+          <p className="text-gray-600 mb-4">{t('appointmentBooking.vetUnavailable')}</p>
           <button
             onClick={() => navigate('/veterinarians')}
             className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
           >
-            Find Veterinarians
+            {t('appointmentBooking.findVeterinarians')}
           </button>
         </div>
       </div>
@@ -191,9 +202,9 @@ const AppointmentBookingForm = () => {
             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Back
+            {t('common.back')}
           </button>
-          <h1 className="text-3xl font-bold text-gray-900">Book Appointment</h1>
+          <h1 className="text-3xl font-bold text-gray-900">{t('appointmentBooking.title')}</h1>
         </div>
 
         {/* Vet Info Card */}

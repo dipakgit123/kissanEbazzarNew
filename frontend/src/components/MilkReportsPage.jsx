@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import { FullPageLoader } from './AppLoader';
 import { milkReportService } from '../services/api';
+import { localizeApiMessage } from '../utils/localizeApiMessage';
 
 const getTodayString = () => new Date().toISOString().split('T')[0];
 const getCurrentMonthString = () => new Date().toISOString().slice(0, 7);
@@ -535,7 +536,15 @@ const MilkReportsPage = () => {
       setStats(buildPeriodStats(nextReports));
     } catch (error) {
       console.error('Failed to load milk tracker data:', error);
-      toast.error(error?.message || t('milkReports.errors.loadData'));
+      toast.error(
+        localizeApiMessage(
+          i18n,
+          t,
+          error?.message,
+          'milkReports.errors.loadData',
+          'Failed to load milk tracker data'
+        )
+      );
     } finally {
       setLoading(false);
     }
@@ -802,13 +811,29 @@ const MilkReportsPage = () => {
         : await milkReportService.createCow(payload);
 
       if (response?.success) {
-        toast.success(response.message || (editingCowId ? t('milkReports.success.cowUpdated') : t('milkReports.success.cowAdded')));
+        toast.success(
+          localizeApiMessage(
+            i18n,
+            t,
+            response.message,
+            editingCowId ? 'milkReports.success.cowUpdated' : 'milkReports.success.cowAdded',
+            editingCowId ? 'Animal updated successfully' : 'Animal added successfully'
+          )
+        );
         closeCowForm();
         await fetchData();
       }
     } catch (error) {
       console.error('Failed to save cow:', error);
-      toast.error(error?.message || t('milkReports.errors.saveCow'));
+      toast.error(
+        localizeApiMessage(
+          i18n,
+          t,
+          error?.message,
+          'milkReports.errors.saveCow',
+          'Failed to save cow'
+        )
+      );
     } finally {
       setSavingCow(false);
     }
@@ -827,12 +852,28 @@ const MilkReportsPage = () => {
         if (`${selectedCowFilter}` === `${cowId}`) {
           setSelectedCowFilter('');
         }
-        toast.success(response.message || t('milkReports.success.cowDeleted'));
+        toast.success(
+          localizeApiMessage(
+            i18n,
+            t,
+            response.message,
+            'milkReports.success.cowDeleted',
+            'Animal deleted successfully'
+          )
+        );
         await fetchData();
       }
     } catch (error) {
       console.error('Failed to delete cow:', error);
-      toast.error(error?.message || t('milkReports.errors.deleteCow'));
+      toast.error(
+        localizeApiMessage(
+          i18n,
+          t,
+          error?.message,
+          'milkReports.errors.deleteCow',
+          'Failed to delete cow'
+        )
+      );
     } finally {
       setDeletingCowId(null);
     }
@@ -863,13 +904,29 @@ const MilkReportsPage = () => {
         : await milkReportService.createReport(payload);
 
       if (response?.success) {
-        toast.success(response.message || (editingReportId ? t('milkReports.success.reportUpdated') : t('milkReports.success.reportCreated')));
+        toast.success(
+          localizeApiMessage(
+            i18n,
+            t,
+            response.message,
+            editingReportId ? 'milkReports.success.reportUpdated' : 'milkReports.success.reportCreated',
+            editingReportId ? 'Milk report updated successfully' : 'Milk report created successfully'
+          )
+        );
         closeReportForm();
         await fetchData();
       }
     } catch (error) {
       console.error('Failed to save milk report:', error);
-      toast.error(error?.message || t('milkReports.errors.saveReport'));
+      toast.error(
+        localizeApiMessage(
+          i18n,
+          t,
+          error?.message,
+          'milkReports.errors.saveReport',
+          'Failed to save milk report'
+        )
+      );
     } finally {
       setSavingReport(false);
     }
@@ -885,12 +942,28 @@ const MilkReportsPage = () => {
       setDeletingReportId(reportId);
       const response = await milkReportService.deleteReport(reportId);
       if (response?.success) {
-        toast.success(response.message || t('milkReports.success.reportDeleted'));
+        toast.success(
+          localizeApiMessage(
+            i18n,
+            t,
+            response.message,
+            'milkReports.success.reportDeleted',
+            'Milk report deleted successfully'
+          )
+        );
         await fetchData();
       }
     } catch (error) {
       console.error('Failed to delete milk report:', error);
-      toast.error(error?.message || t('milkReports.errors.deleteReport'));
+      toast.error(
+        localizeApiMessage(
+          i18n,
+          t,
+          error?.message,
+          'milkReports.errors.deleteReport',
+          'Failed to delete milk report'
+        )
+      );
     } finally {
       setDeletingReportId(null);
     }
@@ -1814,8 +1887,8 @@ const MilkReportsPage = () => {
       ) : null}
 
       {showIntroModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-3xl overflow-hidden rounded-3xl border border-white/30 bg-white shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/45 p-4 backdrop-blur-sm sm:items-center">
+          <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-white/30 bg-white shadow-2xl sm:max-h-[90vh]">
             <div className="bg-gradient-to-r from-emerald-600 via-green-600 to-lime-500 px-5 py-6 text-white sm:px-8 sm:py-8">
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -1837,7 +1910,7 @@ const MilkReportsPage = () => {
               </div>
             </div>
 
-            <div className="px-5 py-5 sm:px-8 sm:py-8">
+            <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-8 sm:py-8">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5">
                   <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">1</span>
@@ -1855,8 +1928,10 @@ const MilkReportsPage = () => {
                   <p className="mt-2 text-sm leading-6 text-slate-600">{t('milkReports.step3')}</p>
                 </div>
               </div>
+            </div>
 
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+            <div className="border-t border-slate-200 bg-white px-5 py-4 sm:px-8">
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={() => setShowIntroModal(false)}

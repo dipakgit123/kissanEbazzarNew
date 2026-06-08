@@ -48,6 +48,8 @@ router.post('/verify-otp', veterinarianController.verifyOtp.bind(veterinarianCon
  * @access  Public
  */
 router.post('/login', veterinarianController.login.bind(veterinarianController));
+router.post('/forgot-password', veterinarianController.requestPasswordReset.bind(veterinarianController));
+router.post('/reset-password', veterinarianController.resetPassword.bind(veterinarianController));
 
 /**
  * @route   GET /api/veterinarians/nearby

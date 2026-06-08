@@ -132,6 +132,53 @@ class VeterinarianController {
     }
   }
 
+  getFrontendBaseUrl() {
+    return (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');
+  }
+
+  async sendPasswordResetEmail(veterinarian, resetToken) {
+    const resetUrl = `${this.getFrontendBaseUrl()}/veterinarian/reset-password?token=${encodeURIComponent(resetToken)}`;
+    const mailOptions = {
+      from: `"Animal E Bazar" <${process.env.SMTP_USER || 'noreply@kissanebazzar.com'}>`,
+      to: veterinarian.email,
+      subject: 'Reset your Animal E Bazar veterinarian password',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #3B82F6, #6366F1); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+            .btn { display: inline-block; background: #3B82F6; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin-top: 20px; }
+            .notice { background: #fff7ed; border-left: 4px solid #f97316; padding: 16px; margin-top: 20px; border-radius: 8px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Password Reset Request</h1>
+              <p>Animal E Bazar Veterinarian Portal</p>
+            </div>
+            <div class="content">
+              <p>Hello Dr. ${veterinarian.full_name},</p>
+              <p>We received a request to reset your veterinarian dashboard password.</p>
+              <p>Use the button below to set a new password. This link will expire in 1 hour.</p>
+              <a href="${resetUrl}" class="btn">Reset Password</a>
+              <div class="notice">
+                If you did not request this reset, you can safely ignore this email. Your current password will keep working.
+              </div>
+            </div>
+          </div>
+        </body>
+        </html>
+      `
+    };
+
+    await this.transporter.sendMail(mailOptions);
+  }
+
   // ============ REGISTRATION & AUTH ============
 
   /**
@@ -602,6 +649,112 @@ class VeterinarianController {
     }
   }
 
+  async requestPasswordReset(req, res) {
+    try {
+      const email = req.body?.email?.trim().toLowerCase();
+
+      if (!email) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email is required'
+        });
+      }
+
+      const genericResponse = {
+        success: true,
+        message: 'If an account exists for this email, a password reset link has been sent.'
+      };
+
+      const veterinarian = await db.Veterinarian.findOne({
+        where: { email }
+      });
+
+      if (
+        !veterinarian ||
+        veterinarian.verification_status !== 'verified' ||
+        !veterinarian.password
+      ) {
+        return res.json(genericResponse);
+      }
+
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+      veterinarian.password_reset_token = hashedToken;
+      veterinarian.password_reset_expires_at = new Date(Date.now() + 60 * 60 * 1000);
+      await veterinarian.save();
+
+      try {
+        await this.sendPasswordResetEmail(veterinarian, resetToken);
+      } catch (emailError) {
+        console.error('Failed to send veterinarian password reset email:', emailError);
+      }
+
+      return res.json(genericResponse);
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to process password reset request'
+      });
+    }
+  }
+
+  async resetPassword(req, res) {
+    try {
+      const token = req.body?.token?.trim();
+      const password = req.body?.password;
+
+      if (!token || !password) {
+        return res.status(400).json({
+          success: false,
+          message: 'Token and password are required'
+        });
+      }
+
+      if (password.length < 8) {
+        return res.status(400).json({
+          success: false,
+          message: 'Password must be at least 8 characters long'
+        });
+      }
+
+      const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+      const veterinarian = await db.Veterinarian.findOne({
+        where: {
+          password_reset_token: hashedToken,
+          password_reset_expires_at: {
+            [Op.gt]: new Date()
+          }
+        }
+      });
+
+      if (!veterinarian) {
+        return res.status(400).json({
+          success: false,
+          message: 'This password reset link is invalid or has expired'
+        });
+      }
+
+      await veterinarian.setPassword(password);
+      veterinarian.password_reset_token = null;
+      veterinarian.password_reset_expires_at = null;
+      await veterinarian.save();
+
+      return res.json({
+        success: true,
+        message: 'Password reset successful. You can now sign in.'
+      });
+    } catch (error) {
+      console.error('Reset password error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to reset password'
+      });
+    }
+  }
+
   // ============ PUBLIC ROUTES ============
 
   /**
@@ -611,6 +764,10 @@ class VeterinarianController {
   async getNearbyVeterinarians(req, res) {
     try {
       const { latitude, longitude, radius = 50, specialization } = req.query;
+      const parsedLatitude = Number.parseFloat(latitude);
+      const parsedLongitude = Number.parseFloat(longitude);
+      const parsedRadius = Number.parseFloat(radius);
+      const validSpecializations = ['large_animal', 'small_animal', 'livestock', 'surgery', 'general', 'emergency', 'reproduction'];
 
       if (!latitude || !longitude) {
         return res.status(400).json({
@@ -619,10 +776,38 @@ class VeterinarianController {
         });
       }
 
+      if (
+        !Number.isFinite(parsedLatitude) ||
+        !Number.isFinite(parsedLongitude) ||
+        parsedLatitude < -90 ||
+        parsedLatitude > 90 ||
+        parsedLongitude < -180 ||
+        parsedLongitude > 180
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide valid latitude and longitude coordinates'
+        });
+      }
+
+      if (!Number.isFinite(parsedRadius) || parsedRadius <= 0 || parsedRadius > 500) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide a valid nearby search radius'
+        });
+      }
+
+      if (specialization && !validSpecializations.includes(specialization)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid veterinarian specialization filter'
+        });
+      }
+
       let veterinarians = await db.Veterinarian.findNearby(
-        parseFloat(latitude),
-        parseFloat(longitude),
-        parseFloat(radius)
+        parsedLatitude,
+        parsedLongitude,
+        parsedRadius
       );
 
       // Filter by specialization if provided

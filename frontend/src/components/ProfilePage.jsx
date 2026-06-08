@@ -11,11 +11,12 @@ import toast from 'react-hot-toast';
 import { safeJsonParse } from '../utils/stringUtils';
 import { InlineLoader } from './AppLoader';
 import { useWishlist } from '../contexts/useWishlist';
+import { localizeApiMessage } from '../utils/localizeApiMessage';
 
 const FALLBACK_ANIMAL_IMAGE = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="80" height="80"%3E%3Crect fill="%23f0f0f0" width="80" height="80"/%3E%3Ctext fill="%23999" font-family="sans-serif" font-size="10" dy="4" font-weight="bold" x="50%25" y="50%25" text-anchor="middle"%3ENo Image%3C/text%3E%3C/svg%3E';
 
 const ProfilePage = ({ onBack }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { wishlist } = useWishlist();
   const [editing, setEditing] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -190,7 +191,15 @@ const ProfilePage = ({ onBack }) => {
         setEditing(false);
         toast.success(t('profile.updateSuccess') || 'Profile updated successfully');
       } else {
-        toast.error(response?.message || t('profile.updateFailed') || 'Failed to update profile');
+        toast.error(
+          localizeApiMessage(
+            i18n,
+            t,
+            response?.message,
+            'profile.updateFailed',
+            'Failed to update profile.'
+          )
+        );
       }
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -260,7 +269,15 @@ const ProfilePage = ({ onBack }) => {
         await fetchAllListings();
         toast.success(t('profile.deleteSuccess') || 'Listing deleted successfully');
       } else {
-        toast.error(response?.data?.message || t('profile.deleteFailed') || 'Failed to delete listing');
+        toast.error(
+          localizeApiMessage(
+            i18n,
+            t,
+            response?.data?.message,
+            'profile.deleteFailed',
+            'Failed to delete listing'
+          )
+        );
       }
     } catch (error) {
       console.error('Error deleting listing:', error);
@@ -293,7 +310,15 @@ const ProfilePage = ({ onBack }) => {
         await fetchAllListings();
         toast.success(t('profile.markSoldSuccess') || 'Listing marked as sold.');
       } else {
-        toast.error(response?.message || t('profile.markSoldFailed') || 'Failed to mark as sold.');
+        toast.error(
+          localizeApiMessage(
+            i18n,
+            t,
+            response?.message,
+            'profile.markSoldFailed',
+            'Failed to mark as sold.'
+          )
+        );
       }
     } catch (error) {
       console.error('Error marking listing as sold:', error);
@@ -552,47 +577,6 @@ const ProfilePage = ({ onBack }) => {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-bold text-gray-900">Farm Tools</h3>
-            <p className="text-sm text-gray-500 mt-0.5">Quick access to planning and profitability tools for your animals.</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6">
-            <Link
-              to="/pregnancy-calendar"
-              className="rounded-xl border border-pink-200 bg-pink-50 p-5 transition hover:shadow-md"
-            >
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-semibold text-pink-700">Pregnancy Calendar</p>
-                  <p className="mt-2 text-sm text-gray-600">Track breeding dates, expected delivery, and upcoming reminders.</p>
-                </div>
-                <span className="text-pink-600">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </span>
-              </div>
-            </Link>
-
-            <Link
-              to="/milk-reports"
-              className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 transition hover:shadow-md"
-            >
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-semibold text-emerald-700">Milk Reports</p>
-                  <p className="mt-2 text-sm text-gray-600">Add morning and afternoon liters, costs, and see daily profit or loss for each cow.</p>
-                </div>
-                <span className="text-emerald-600">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </span>
-              </div>
-            </Link>
-          </div>
-        </div>
 
         {/* Saved & Engagement Section */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">

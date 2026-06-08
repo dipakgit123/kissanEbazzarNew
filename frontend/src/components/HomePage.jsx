@@ -10,6 +10,7 @@ import farmerHeroImage from '../assets/images/farmer_fixed_1920x1400.png';
 import veterinarianFeatureImage from '../assets/images/veternarian.png';
 import aiHealthFeatureImage from '../assets/images/AI health.png';
 import pregnancyCalendarFeatureImage from '../assets/images/pregnancy calender.png';
+import playStoreBannerImage from '../assets/images/playstore.png';
 
 import { Link } from 'react-router-dom';
 
@@ -77,7 +78,7 @@ const HomePage = () => {
 
   // Helper function to format time ago - defined before useEffect
   const formatTimeAgo = useCallback((dateString) => {
-    if (!dateString) return 'Recently';
+    if (!dateString) return t('time.recently');
 
     const date = new Date(dateString);
     const now = new Date();
@@ -86,13 +87,13 @@ const HomePage = () => {
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 60) return `${diffMins} minutes ago`;
-    if (diffHours < 24) return `${diffHours} hours ago`;
-    if (diffDays === 1) return '1 day ago';
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-    return `${Math.floor(diffDays / 30)} months ago`;
-  }, []);
+    if (diffMins < 60) return t('time.minutesAgo', { count: diffMins });
+    if (diffHours < 24) return t('time.hoursAgo', { count: diffHours });
+    if (diffDays === 1) return t('time.dayAgo');
+    if (diffDays < 7) return t('time.daysAgo', { count: diffDays });
+    if (diffDays < 30) return t('time.weeksAgo', { count: Math.floor(diffDays / 7) });
+    return t('time.monthsAgo', { count: Math.floor(diffDays / 30) });
+  }, [t]);
 
   // Fetch user location on mount
   useEffect(() => {
@@ -151,7 +152,7 @@ const HomePage = () => {
     listingId: listing.id,
     title: `${listing.breed_name || 'Unknown Breed'} | ${listing.animal_type?.charAt(0).toUpperCase() + listing.animal_type?.slice(1)}`,
     price: listing.expected_price ? Number(listing.expected_price).toLocaleString('en-IN') : '0',
-    location: `${listing.city || 'Unknown'}${listing.distance ? ` (${Math.round(listing.distance)} km)` : ''}`,
+    location: listing.city || 'Unknown',
     datePosted: formatTimeAgo(listing.created_at),
     imageSrc: listing.front_photo || listing.side_photo || listing.photo_1 || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="200"%3E%3Crect fill="%23f0f0f0" width="300" height="200"/%3E%3Ctext fill="%23999" font-family="sans-serif" font-size="16" dy="10.5" font-weight="bold" x="50%25" y="50%25" text-anchor="middle"%3ENo Image%3C/text%3E%3C/svg%3E',
     sellerName: listing.seller?.name || 'Unknown Seller',
@@ -161,6 +162,8 @@ const HomePage = () => {
     animalType: listing.animal_type?.charAt(0).toUpperCase() + listing.animal_type?.slice(1),
     milkProduction: listing.milk_capacity ? `${listing.milk_capacity}L` : 'N/A',
     distance: listing.distance,
+    latitude: listing.latitude,
+    longitude: listing.longitude,
     status: listing.status,
     sellerPhoto: listing.seller?.profile_photo,
     createdAt: listing.created_at
@@ -451,14 +454,8 @@ const HomePage = () => {
                   <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
                 </Link>
 
-                <button
-                  onClick={() => {
-                    // Scroll to animal listings section
-                    const listingsSection = document.querySelector('#animal-listings');
-                    if (listingsSection) {
-                      listingsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }
-                  }}
+                <Link
+                  to="/buy-animals"
                   className="flex-1 group relative overflow-hidden bg-white text-[#15BB73] border-2 border-[#15BB73] px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold text-sm shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 hover:bg-[#15BB73] hover:text-white"
                 >
                   <div className="relative z-10 flex items-center justify-center gap-2">
@@ -467,7 +464,7 @@ const HomePage = () => {
                     </svg>
                     <span>{t('home.buyAnimals')}</span>
                   </div>
-                </button>
+                </Link>
               </div>
             </div>
           </div>
@@ -623,14 +620,18 @@ const HomePage = () => {
                     datePosted={animal.datePosted}
                     imageSrc={animal.imageSrc}
                     sellerName={animal.sellerName}
-                    sellerId={animal.sellerId}
-                    phoneNumber={animal.phoneNumber}
-                    breed={animal.breed}
-                    animalType={animal.animalType}
-                    milkProduction={animal.milkProduction}
-                    isInWishlist={isInWishlist(animal.id)}
-                    onToggleWishlist={handleToggleWishlist}
-                  />
+                  sellerId={animal.sellerId}
+                  phoneNumber={animal.phoneNumber}
+                  breed={animal.breed}
+                  animalType={animal.animalType}
+                  milkProduction={animal.milkProduction}
+                  latitude={animal.latitude}
+                  longitude={animal.longitude}
+                  distance={animal.distance}
+                  userLocation={userLocation}
+                  isInWishlist={isInWishlist(animal.id)}
+                  onToggleWishlist={handleToggleWishlist}
+                />
                 ))}
               </div>
             ) : (
@@ -656,7 +657,7 @@ const HomePage = () => {
           className="block rounded-xl overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
         >
           <img 
-            src="/src/assets/images/playstore.png" 
+            src={playStoreBannerImage}
             alt={t('home.downloadApp')} 
             className="w-full h-auto object-cover"
           />
@@ -763,6 +764,10 @@ const HomePage = () => {
                       breed={animal.breed}
                       animalType={animal.animalType}
                       milkProduction={animal.milkProduction}
+                      latitude={animal.latitude}
+                      longitude={animal.longitude}
+                      distance={animal.distance}
+                      userLocation={userLocation}
                       isInWishlist={isInWishlist(animal.id)}
                       onToggleWishlist={handleToggleWishlist}
                     />

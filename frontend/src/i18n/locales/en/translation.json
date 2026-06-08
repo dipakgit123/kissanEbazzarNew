@@ -51,8 +51,8 @@
                  "enterOTP":  "Enter the OTP sent to",
                  "resendOTP":  "Resend OTP",
                  "welcomeBack":  "Welcome Back!",
-                 "loginToContinue":  "Login to continue to Animal Bazaar",
-                 "invalidPhone":  "Please enter a valid 10-digit phone number",
+                 "loginToContinue":  "Login to continue to Animal E Bazaar",
+                 "invalidPhone":  "Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9",
                  "otpSent":  "OTP sent successfully",
                  "otpSendFailed":  "Failed to send OTP",
                  "loginSuccess":  "Login successful",
@@ -160,13 +160,13 @@
                        "ageUnit":  "Age Unit",
                        "years":  "Years",
                        "months":  "Months",
-                       "price":  "Price (â‚¹)",
+                       "price":  "Price ",
                        "description":  "Description",
                        "photos":  "Photos",
                        "uploadPhotos":  "Upload Photos",
                        "location":  "Location",
                        "contactDetails":  "Contact Details",
-                       "submitListing":  "सबमिट करा",
+                       "submitListing":  "Submit Listing",
                        "listingSuccess":  "Animal listed successfully",
                        "daysToSell":  "Days to Sell",
                        "lactation":  "Lactation",
@@ -221,6 +221,11 @@
                          "allVerifiedVets":  "All Verified Veterinarians",
                          "farmerLocationHint":  "Showing veterinarians within {{radius}} km of the logged-in farmer location.",
                          "allVerifiedHint":  "Browse every verified veterinarian profile available on the platform.",
+                         "enableLocation":  "Please enable location services to find nearby veterinarians",
+                         "fetchFailed":  "Failed to fetch veterinarians",
+                         "fetchNearbyFailed":  "Failed to fetch nearby veterinarians",
+                         "findingNearby":  "Finding nearby veterinarians...",
+                         "generalVeterinary":  "General Veterinary",
                          "within10km":  "Within 10 km",
                          "within25km":  "Within 25 km",
                          "within50km":  "Within 50 km",
@@ -317,6 +322,8 @@
                       "breedingDate":  "Breeding Date",
                       "count":  "Count",
                       "genderMixed":  "⚥ Mixed",
+                      "earBadgeNumber":  "Ear Badge Number",
+                      "earBadgeNumberShort":  "Ear badge",
                       "bullSireDetails":  "Bull/Sire Details",
                       "genderFemale":  "♀ Female",
                       "breedName":  "Breed Name",
@@ -330,6 +337,10 @@
                       "noRecords":  "No pregnancy records yet",
                       "cancel":  "Cancel",
                       "recordAdded":  "Pregnancy record successfully added",
+                      "loadFailed":  "Failed to load pregnancy data. Please try again.",
+                      "createFailed":  "Failed to create pregnancy record",
+                      "markDeliveredFailed":  "Failed to mark as delivered",
+                      "deleteFailed":  "Failed to delete record",
                       "loadingCalendar":  "Loading pregnancy calendar...",
                       "addPregnancyRecord":  "Add Pregnancy Record",
                       "statusFalsePregnancy":  "False Pregnancy",
@@ -363,6 +374,7 @@
                       "deliveryDateLabel":  "Delivery Date",
                       "statusDelivered":  "Delivered on",
                       "markDelivered":  "Mark Delivered",
+                      "placeholderEarBadge":  "e.g., A-17",
                       "placeholderBreed":  "e.g., Gir",
                       "offspringDetails":  "Offspring Details",
                       "animalCow":  "Cow",
@@ -485,7 +497,19 @@
                      "enterManually":  "Enter Location Manually",
                      "detectingLocation":  "Detecting your location...",
                      "locationDetected":  "Location detected successfully",
-                     "currentLocation":  "Current Location"
+                     "currentLocation":  "Current Location",
+                     "geolocationUnsupported":  "Geolocation is not supported by your browser",
+                     "locationSetSuccess":  "Location set successfully!",
+                     "locationAlreadySet":  "Location already set. Redirecting...",
+                     "errors":  {
+                                    "getLocationFailed":  "Failed to get your location",
+                                    "permissionDenied":  "Location permission denied. Please enable location access.",
+                                    "positionUnavailable":  "Location information is unavailable.",
+                                    "timeout":  "Location request timed out.",
+                                    "setLocationFailed":  "Failed to set location",
+                                    "setLocationRetry":  "Failed to set location. Please try again.",
+                                    "cityCountryRequired":  "Please fill in at least city and country"
+                                }
                  },
     "notifications":  {
                           "success":  "Success",
@@ -794,7 +818,7 @@
                             "clinicNameOptional":  "Clinic Name (Optional)",
                             "clinicAddress":  "Clinic Address",
                             "consultationFee":  "Consultation Fee",
-                            "consultationFeeOptional":  "Consultation Fee (â‚¹)",
+                            "consultationFeeOptional":  "Consultation Fee ",
                             "availableDays":  "Available Days",
                             "availableHours":  "Available Hours",
                             "uploadCertificate":  "Upload Certificate",
@@ -1019,7 +1043,7 @@
                        "add":  "Add",
                        "addMore":  "Add More",
                        "priceInfo":  "Price Information",
-                       "priceLabel":  "Price (â‚¹)",
+                       "priceLabel":  "Price ",
                        "pricePlaceholder":  "e.g., 50000",
                        "priceNegotiable":  "Price Negotiable",
                        "vaccinationHistory":  "Vaccination History",
@@ -1079,7 +1103,7 @@
                    "healthExcellent":  "Excellent",
                    "healthGood":  "Good",
                    "healthAverage":  "Average",
-                   "expectedPrice":  "Expected Price (â‚¹)",
+                   "expectedPrice":  "Expected Price",
                    "negotiable":  "Price is negotiable",
                    "frontPhoto":  "Front Photo",
                    "sidePhoto":  "Side Photo",
@@ -1102,10 +1126,11 @@
                    "additionalInfoPlaceholder":  "Any additional information..."
                },
     "listing":  {
-                    "submit":  "सबमिट करा",
+                    "submit":  "Submit",
                     "submitting":  "Creating Listing...",
                     "createSuccess":  "Listing created successfully!",
                     "createError":  "Failed to create listing. Please try again.",
+                    "photoRequired":  "Please upload at least one photo.",
                     "createListing":  "Create Animal Listing",
                     "subtitle":  "List your animal for sale and reach thousands of potential buyers",
                     "instructions":  {
@@ -1194,7 +1219,11 @@
                        "addedToWishlist":  "Added to wishlist!",
                        "removedFromWishlist":  "Removed from wishlist",
                        "removeFromWishlist":  "Remove from wishlist",
-                       "addToWishlist":  "Add to wishlist"
+                       "addToWishlist":  "Add to wishlist",
+                       "viewOnMap":  "View exact location on map",
+                       "distanceAway":  "{{distance}} km away",
+                       "addedByYou":  "Added by you",
+                       "sameCity":  "Same city"
                    },
     "time":  {
                  "recently":  "Recently",
@@ -1408,8 +1437,56 @@
                     "fetchingAddressFromPincode":  "Your address is being fetched from the pincode...",
                     "fetchingAddressFromLocation":  "Your address is being fetched from your location...",
                     "updateProfile":  "Update Profile",
-                    "saving":  "Saving..."
+                    "saving":  "Saving...",
+                    "photoFileType":  "Please select an image file",
+                    "photoSizeLimit":  "Image size should be less than 5MB",
+                    "photoUploadFailed":  "Failed to upload photo",
+                    "photoRemoveFailed":  "Failed to remove photo",
+                    "validation":  {
+                                       "nameMin":  "Name must be at least 2 characters",
+                                       "addressValid":  "Please enter a valid address",
+                                       "pincodeValid":  "Please enter a valid 6-digit pincode",
+                                       "invalidCoordinates":  "Invalid location coordinates"
+                                   }
                 },
+    "appointmentBooking":  {
+                               "title":  "Book Appointment",
+                               "requiredFields":  "Please fill in all required fields",
+                               "invalidPhone":  "Please enter a valid phone number",
+                               "futureDateTime":  "Please select a future date and time",
+                               "loginRequired":  "Please login to book an appointment",
+                               "success":  "Appointment booked successfully! The veterinarian will be notified.",
+                               "failed":  "Failed to book appointment",
+                               "failedRetry":  "Failed to book appointment. Please try again.",
+                               "vetUnavailable":  "Veterinarian information not available",
+                               "findVeterinarians":  "Find Veterinarians"
+                           },
+    "blogAdmin":  {
+                      "created":  "Blog created successfully!",
+                      "updated":  "Blog updated successfully!",
+                      "deleted":  "Blog deleted successfully!",
+                      "operationFailed":  "Operation failed",
+                      "retryError":  "An error occurred. Please try again.",
+                      "deleteConfirm":  "Are you sure you want to delete this blog?",
+                      "deleteFailed":  "Failed to delete blog"
+                  },
+    "adminListings":  {
+                          "deleteConfirm":  "Are you sure you want to delete this listing?"
+                      },
+    "adminVeterinarians":  {
+                               "verifyConfirm":  "Are you sure you want to verify this veterinarian? An email with login credentials will be sent.",
+                               "verifySuccess":  "Veterinarian verified successfully",
+                               "verifyFailed":  "Failed to verify veterinarian",
+                               "rejectReasonRequired":  "Please provide a rejection reason",
+                               "rejectSuccess":  "Veterinarian rejected successfully",
+                               "rejectFailed":  "Failed to reject veterinarian"
+                           },
+    "vetForgotPassword":  {
+                              "success":  "If the email exists, a reset link has been sent."
+                          },
+    "vetResetPassword":  {
+                             "success":  "Password reset successfully."
+                         },
     "helpCenter":  {
                       "title":  "Help Center",
                       "subtitle":  "Find answers, manage your account, and get support without the confusion.",
@@ -1626,6 +1703,32 @@
                     "s9Body":  "We may update this policy from time to time. Continued use of the Service means you accept the updated policy.",
                     "s10Title":  "10. Contact",
                     "s10Body":  "For privacy questions, please use the WhatsApp support option in your Profile or contact us via your official support channels."
+                },
+    "mapView":  {
+                    "loadingMap":  "Loading map...",
+                    "mapLoadingErrorTitle":  "Map loading error",
+                    "mapLoadingErrorBody":  "Unable to load the map. Please check your internet connection and try again.",
+                    "title":  "Animal Map",
+                    "subtitle":  "Find animals near you",
+                    "yourLocationTitle":  "Your location",
+                    "yourLocationSubtitle":  "Animals are shown relative to this point.",
+                    "refreshMap":  "Refresh map",
+                    "mapInfo":  "Map information",
+                    "mapInfoToast":  "Animals on map: {{count}}. Tap any marker to focus it and use the side panel to contact sellers.",
+                    "animalsCount":  "{{count}} Animals",
+                    "onMap":  "on map",
+                    "nearestAnimals":  "Nearest Animals",
+                    "allFilter":  "All ({{count}})",
+                    "fetchAnimalsFailed":  "Failed to fetch animals. Please try again.",
+                    "unknownBreed":  "Unknown Breed",
+                    "unknownSeller":  "Unknown Seller",
+                    "unknownLocation":  "Unknown",
+                    "milkPerDay":  "{{count}}L milk/day",
+                    "sellerLabel":  "Seller",
+                    "loadingAnimals":  "Loading animals...",
+                    "noAnimalsFoundNearby":  "No animals found nearby",
+                    "tryRefreshing":  "Try refreshing",
+                    "whatsAppMessage":  "Hi! I'm interested in your {{animalType}} listing: \"{{title}}\" (₹{{price}}). Is it still available?"
                 },
     "milkReports":  {
                         "eyebrow":  "Milk Tracking",

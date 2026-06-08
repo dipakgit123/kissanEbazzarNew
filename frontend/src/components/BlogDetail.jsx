@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import DOMPurify from 'dompurify';
@@ -71,6 +71,42 @@ const BlogDetail = () => {
   }, [fetchBlog]);
 
   const locale = i18n.resolvedLanguage === 'mr' ? 'mr-IN' : i18n.resolvedLanguage === 'hi' ? 'hi-IN' : 'en-IN';
+
+  const sanitizedBlogContent = useMemo(() => {
+    const rawContent = blog?.content ? blog.content.replace(/\n/g, '<br />') : '';
+    const sanitized = DOMPurify.sanitize(rawContent, {
+      USE_PROFILES: { html: true },
+      ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'a', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre', 'img'],
+      ALLOWED_ATTR: ['href', 'src', 'alt', 'title'],
+      FORBID_TAGS: ['style', 'script', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'textarea', 'select'],
+      FORBID_ATTR: ['style']
+    });
+
+    const container = document.createElement('div');
+    container.innerHTML = sanitized;
+
+    container.querySelectorAll('a').forEach((link) => {
+      const href = link.getAttribute('href') || '';
+      const isExternal = /^(https?:)?\/\//i.test(href);
+
+      if (isExternal) {
+        link.setAttribute('target', '_blank');
+        link.setAttribute('rel', 'noopener noreferrer nofollow');
+      } else {
+        link.removeAttribute('target');
+        link.setAttribute('rel', 'nofollow');
+      }
+    });
+
+    container.querySelectorAll('img').forEach((image) => {
+      image.removeAttribute('srcset');
+      image.removeAttribute('sizes');
+      image.setAttribute('loading', 'lazy');
+      image.setAttribute('decoding', 'async');
+    });
+
+    return container.innerHTML;
+  }, [blog?.content]);
 
   const formatDate = (date) =>
     new Date(date).toLocaleDateString(locale, {
@@ -266,10 +302,7 @@ const BlogDetail = () => {
               <div
                 className="blog-prose"
                 dangerouslySetInnerHTML={{
-                  __html: DOMPurify.sanitize(blog.content?.replace(/\n/g, '<br />') || blog.content, {
-                    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'a', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre', 'img', 'div', 'span'],
-                    ALLOWED_ATTR: ['href', 'src', 'alt', 'class', 'id', 'target', 'rel', 'title']
-                  })
+                  __html: sanitizedBlogContent
                 }}
               />
             </div>

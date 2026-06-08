@@ -9,15 +9,26 @@ class GeocodingService {
    */
   async getLocationFromPostalCode(postalCode, country = 'IN') {
     try {
+      let indiaResult = null;
+
       // Try India Post API first (for Indian pincodes)
       if (country === 'IN' && /^\d{6}$/.test(postalCode)) {
-        const indiaResult = await this.getIndianPostalCode(postalCode);
-        if (indiaResult) return indiaResult;
+        indiaResult = await this.getIndianPostalCode(postalCode);
       }
 
-      // Fallback to Nominatim (OpenStreetMap)
-      const nominatimResult = await this.getNominatimLocation(postalCode, country);
-      if (nominatimResult) return nominatimResult;
+      // Try to resolve usable coordinates with Nominatim.
+      const nominatimResult = await this.getNominatimLocation(postalCode, country, indiaResult);
+      if (nominatimResult) {
+        return {
+          ...indiaResult,
+          ...nominatimResult,
+          postal_code: postalCode
+        };
+      }
+
+      if (indiaResult) {
+        return indiaResult;
+      }
 
       throw new Error('Location not found for the provided postal code');
     } catch (error) {
@@ -64,36 +75,62 @@ class GeocodingService {
    * @param {string} postalCode - Postal code
    * @param {string} country - Country code
    */
-  async getNominatimLocation(postalCode, country) {
+  async getNominatimLocation(postalCode, country, indiaResult = null) {
     try {
-      const response = await axios.get('https://nominatim.openstreetmap.org/search', {
-        params: {
+      const queries = [
+        {
           postalcode: postalCode,
-          country: country,
+          country,
           format: 'json',
           addressdetails: 1,
           limit: 1
-        },
-        headers: {
-          'User-Agent': 'KissanEBazzar/1.0'
-        },
-        timeout: 5000
-      });
+        }
+      ];
 
-      if (response.data && response.data.length > 0) {
-        const result = response.data[0];
-        const address = result.address || {};
+      if (indiaResult?.city || indiaResult?.state) {
+        queries.push({
+          q: [postalCode, indiaResult.city, indiaResult.state, country === 'IN' ? 'India' : country]
+            .filter(Boolean)
+            .join(', '),
+          format: 'json',
+          addressdetails: 1,
+          limit: 1
+        });
 
-        return {
-          latitude: parseFloat(result.lat),
-          longitude: parseFloat(result.lon),
-          city: address.city || address.town || address.village || address.county,
-          state: address.state,
-          country: address.country,
-          postal_code: postalCode,
-          address: result.display_name,
-          location_type: 'manual'
-        };
+        queries.push({
+          q: [indiaResult.city, indiaResult.state, country === 'IN' ? 'India' : country]
+            .filter(Boolean)
+            .join(', '),
+          format: 'json',
+          addressdetails: 1,
+          limit: 1
+        });
+      }
+
+      for (const params of queries) {
+        const response = await axios.get('https://nominatim.openstreetmap.org/search', {
+          params,
+          headers: {
+            'User-Agent': 'KissanEBazzar/1.0'
+          },
+          timeout: 5000
+        });
+
+        if (response.data && response.data.length > 0) {
+          const result = response.data[0];
+          const address = result.address || {};
+
+          return {
+            latitude: parseFloat(result.lat),
+            longitude: parseFloat(result.lon),
+            city: address.city || address.town || address.village || address.county || indiaResult?.city,
+            state: address.state || indiaResult?.state,
+            country: address.country || indiaResult?.country,
+            postal_code: postalCode,
+            address: result.display_name || indiaResult?.address,
+            location_type: 'manual'
+          };
+        }
       }
 
       return null;

@@ -48,6 +48,11 @@ module.exports = (sequelize) => {
       allowNull: false,
       field: 'animal_name'
     },
+    ear_badge_number: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+      field: 'ear_badge_number'
+    },
     breed_name: {
       type: DataTypes.STRING(100),
       allowNull: true,

@@ -5,6 +5,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import loginImage from '../assets/images/login1.png';
 import { otpService } from '../services/api';
 import LanguageSwitcher from './LanguageSwitcher';
+import { localizeApiMessage } from '../utils/localizeApiMessage';
 
 const DEFAULT_OTP_LENGTH = 6;
 const createEmptyOtp = (length) => Array.from({ length }, () => '');
@@ -23,7 +24,7 @@ const LockIcon = () => (
 );
 
 const LoginForm = ({ onLoginSuccess }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   
   // States
   const [step, setStep] = useState(1); // 1: Phone, 2: OTP
@@ -82,8 +83,9 @@ const LoginForm = ({ onLoginSuccess }) => {
         }
       }
     } catch (error) {
-      setOtpError(error.message || t('auth.invalidOtp'));
-      toast.error(error.message || t('auth.invalidOtp'));
+      const nextMessage = localizeApiMessage(i18n, t, error.message, 'auth.invalidOtp', 'Invalid OTP');
+      setOtpError(nextMessage);
+      toast.error(nextMessage);
     } finally {
       setIsLoading(false);
     }
@@ -141,7 +143,7 @@ const LoginForm = ({ onLoginSuccess }) => {
 
     // ✅ FIXED: Use proper validation
     if (!validatePhoneNumber(phoneNumber)) {
-      toast.error('Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9');
+      toast.error(t('auth.invalidPhone'));
       return;
     }
 
@@ -167,7 +169,7 @@ const LoginForm = ({ onLoginSuccess }) => {
         setResendTimer(OTP_RESEND_DELAY);
       }
     } catch (error) {
-      toast.error(error.message || t('auth.otpSendFailed'));
+      toast.error(localizeApiMessage(i18n, t, error.message, 'auth.otpSendFailed', 'Failed to send OTP'));
     } finally {
       setIsLoading(false);
     }
@@ -241,7 +243,7 @@ const LoginForm = ({ onLoginSuccess }) => {
         if (firstInput) firstInput.focus();
       }
     } catch (error) {
-      toast.error(error.message || t('auth.otpResentFailed'));
+      toast.error(localizeApiMessage(i18n, t, error.message, 'auth.otpResentFailed', 'Failed to resend OTP'));
     } finally {
       setIsLoading(false);
     }

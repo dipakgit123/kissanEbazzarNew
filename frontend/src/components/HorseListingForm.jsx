@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -14,11 +15,13 @@ import {
 } from './common';
 import { getHorseBreedOptions } from '../constants/horseBreeds';
 import './AnimalListingPage.css';
+import { localizeApiMessage } from '../utils/localizeApiMessage';
 
 const API_URL = API_BASE_URL;
 
 const HorseListingForm = () => {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const horseBreedOptions = getHorseBreedOptions(
     i18n.resolvedLanguage || i18n.language,
     t('common.selectOption')
@@ -36,7 +39,7 @@ const HorseListingForm = () => {
     vaccinationDetails: '',
     description: '',
     expectedPrice: '',
-    isNegotiable: 'true'
+    isNegotiable: true
   });
 
   const [files, setFiles] = useState({
@@ -67,6 +70,14 @@ const HorseListingForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!files.frontPhoto && !files.sidePhoto && !files.fullBodyPhoto) {
+      const message = t('listing.photoRequired');
+      setError(message);
+      toast.error(message);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setSuccess(false);
@@ -124,7 +135,7 @@ const HorseListingForm = () => {
           vaccinationDetails: '',
           description: '',
           expectedPrice: '',
-          isNegotiable: 'true'
+          isNegotiable: true
         });
         setFiles({
           frontPhoto: null,
@@ -134,11 +145,19 @@ const HorseListingForm = () => {
         });
 
         toast.success(t('listing.createSuccess'));
+        navigate('/buy-animals');
       }
     } catch (err) {
       console.error('Error creating listing:', err);
-      setError(err.response?.data?.message || err.message || t('listing.createError'));
-      toast.error(err.response?.data?.message || err.message || t('listing.createError'));
+      const nextMessage = localizeApiMessage(
+        i18n,
+        t,
+        err.response?.data?.message || err.message,
+        'listing.createError',
+        'Failed to create listing'
+      );
+      setError(nextMessage);
+      toast.error(nextMessage);
     } finally {
       setLoading(false);
     }
@@ -294,6 +313,7 @@ const HorseListingForm = () => {
             accept="image/*"
             file={files.frontPhoto}
             onChange={(file) => handleFileChange('frontPhoto', file)}
+            required
           />
 
           <FormFileInput

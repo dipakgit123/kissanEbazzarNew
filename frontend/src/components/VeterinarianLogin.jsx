@@ -5,6 +5,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import vetLoginImage from '../assets/images/login2.png';
 import LanguageSwitcher from './LanguageSwitcher';
 import { API_BASE_API } from '../config/api';
+import { localizeApiMessage } from '../utils/localizeApiMessage';
 
 // Icons
 const EmailIcon = () => (
@@ -34,7 +35,7 @@ const EyeOffIcon = () => (
 
 const VeterinarianLogin = () => {
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -107,7 +108,15 @@ const VeterinarianLogin = () => {
           navigate('/veterinarian/dashboard');
         }, 1000);
       } else {
-        toast.error(data.message || t('vetLogin.loginFailed'));
+        toast.error(
+          localizeApiMessage(
+            i18n,
+            t,
+            data.message,
+            'vetLogin.loginFailed',
+            'Login failed'
+          )
+        );
 
         if (data.message === 'Your account is pending verification') {
           setErrors({ general: t('vetLogin.accountPending') });

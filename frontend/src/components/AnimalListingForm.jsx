@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -18,11 +19,13 @@ import cowSideGuide from '../assets/cliparts/cow_side.png';
 import cowTeatsGuide from '../assets/cliparts/four teats.png';
 import { getCowBreedOptions } from '../constants/cowBreeds';
 import './AnimalListingPage.css';
+import { localizeApiMessage } from '../utils/localizeApiMessage';
 
 const API_URL = API_BASE_URL;
 
 const AnimalListingForm = () => {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const cowBreedOptions = getCowBreedOptions(
     i18n.resolvedLanguage || i18n.language,
     t('common.selectOption')
@@ -35,7 +38,7 @@ const AnimalListingForm = () => {
     hasHorns: 'true',
     healthCondition: '',
     expectedPrice: '',
-    isNegotiable: 'false'
+    isNegotiable: false
   });
 
   const [files, setFiles] = useState({
@@ -66,6 +69,14 @@ const AnimalListingForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!files.frontPhoto && !files.sidePhoto && !files.milkScenePhoto) {
+      const message = t('listing.photoRequired');
+      setError(message);
+      toast.error(message);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setSuccess(false);
@@ -118,7 +129,7 @@ const AnimalListingForm = () => {
           hasHorns: 'true',
           healthCondition: '',
           expectedPrice: '',
-          isNegotiable: 'false'
+          isNegotiable: false
         });
         setFiles({
           frontPhoto: null,
@@ -128,11 +139,19 @@ const AnimalListingForm = () => {
         });
 
         toast.success(t('listing.createSuccess'));
+        navigate('/buy-animals');
       }
     } catch (err) {
       console.error('Error creating listing:', err);
-      setError(err.response?.data?.message || err.message || t('listing.createError'));
-      toast.error(err.response?.data?.message || err.message || t('listing.createError'));
+      const nextMessage = localizeApiMessage(
+        i18n,
+        t,
+        err.response?.data?.message || err.message,
+        'listing.createError',
+        'Failed to create listing'
+      );
+      setError(nextMessage);
+      toast.error(nextMessage);
     } finally {
       setLoading(false);
     }
@@ -234,6 +253,7 @@ const AnimalListingForm = () => {
             accept="image/*"
             file={files.frontPhoto}
             onChange={(file) => handleFileChange('frontPhoto', file)}
+            required
             placeholderImage={cowFrontGuide}
             placeholderAlt={t('animalListing.frontPhoto')}
           />

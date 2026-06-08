@@ -4,11 +4,12 @@ import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { API_BASE_API } from '../config/api';
+import { localizeApiMessage } from '../utils/localizeApiMessage';
 
 const API_URL = API_BASE_API;
 
 const SellAnimalForm = ({ onCancel, onSubmit }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
@@ -104,16 +105,39 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
       });
 
       if (response.data.success) {
+        setForm({
+          animalType: '',
+          lactation: '',
+          milkToday: '',
+          rate: '',
+          sellDays: '',
+          photos: { side: null, udder: null, video: null },
+          addInfoOpen: false,
+          milkCapacity: '',
+          delivered: '',
+          pregnant: '',
+          calf: '',
+          negotiation: false,
+          details: '',
+        });
         toast.success(t('sellAnimal.listingSuccess') || 'Listing created successfully!');
         if (onSubmit) {
           onSubmit(response.data.data);
         } else {
-          navigate('/profile');
+          navigate('/buy-animals');
         }
       }
     } catch (error) {
       console.error('Error creating listing:', error);
-      toast.error(error.response?.data?.message || t('listing.createError') || 'Failed to create listing. Please try again.');
+      toast.error(
+        localizeApiMessage(
+          i18n,
+          t,
+          error.response?.data?.message || error.message,
+          'listing.createError',
+          'Failed to create listing. Please try again.'
+        )
+      );
     } finally {
       setLoading(false);
     }
@@ -249,9 +273,9 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
             <SectionHeader icon="📷" title={t('sellAnimal.uploadPhotos')} required />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[
-                { key: 'side', label: t('sellAnimal.uploadSidePhoto') },
+                { key: 'side', label: t('sellAnimal.uploadSidePhoto'), required: true },
                 { key: 'udder', label: t('sellAnimal.uploadUdderPhoto') }
-              ].map(({ key, label }) => (
+              ].map(({ key, label, required }) => (
                 <label
                   key={key}
                   className={`relative border-2 border-dashed rounded-xl flex flex-col items-center justify-center h-48 cursor-pointer transition-all ${
@@ -284,7 +308,9 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                         </svg>
                       </div>
-                      <span className="block text-sm font-semibold text-gray-700">{label}</span>
+                      <span className="block text-sm font-semibold text-gray-700">
+                        {label} {required && <span className="text-red-500">*</span>}
+                      </span>
                       <span className="text-xs text-gray-500">JPEG, PNG (max 5MB)</span>
                     </div>
                   )}

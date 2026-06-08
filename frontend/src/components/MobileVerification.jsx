@@ -3,12 +3,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast, { Toaster } from 'react-hot-toast';
 import { otpService } from '../services/api'; // Make sure this path is correct
+import { localizeApiMessage } from '../utils/localizeApiMessage';
 
 const DEFAULT_OTP_LENGTH = 6;
 const createEmptyOtp = (length) => Array.from({ length }, () => '');
 
 const MobileVerification = ({ onBack, onSuccess }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [otpLength, setOtpLength] = useState(DEFAULT_OTP_LENGTH);
   const [otp, setOtp] = useState(() => createEmptyOtp(DEFAULT_OTP_LENGTH));
   const [otpError, setOtpError] = useState('');
@@ -66,8 +67,9 @@ const MobileVerification = ({ onBack, onSuccess }) => {
         }, 1000);
       }
     } catch (error) {
-      setOtpError(error.message || t('auth.invalidOtp'));
-      toast.error(error.message || t('auth.invalidOtp'));
+      const nextMessage = localizeApiMessage(i18n, t, error.message, 'auth.invalidOtp', 'Invalid OTP');
+      setOtpError(nextMessage);
+      toast.error(nextMessage);
     } finally {
       setIsLoading(false);
     }
@@ -163,7 +165,7 @@ const MobileVerification = ({ onBack, onSuccess }) => {
         if (firstInput) firstInput.focus();
       }
     } catch (error) {
-      toast.error(error.message || t('auth.otpResentFailed'));
+      toast.error(localizeApiMessage(i18n, t, error.message, 'auth.otpResentFailed', 'Failed to resend OTP'));
     } finally {
       setIsLoading(false);
     }

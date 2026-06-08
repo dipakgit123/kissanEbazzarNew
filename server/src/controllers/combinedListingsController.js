@@ -1,6 +1,205 @@
 'use strict';
 
 const db = require('../models');
+const jwt = require('jsonwebtoken');
+const geocodingService = require('../services/geocodingService');
+const { getJwtSecret } = require('../config/jwt');
+
+const ANIMAL_TABLE_MAP = {
+  cow: { table: 'animal_listings', model: 'AnimalListing', type: 'cow' },
+  buffalo: { table: 'buffalo_listings', model: 'BuffaloListing', type: 'buffalo' },
+  horse: { table: 'horse_listings', model: 'HorseListing', type: 'horse' },
+  goat: { table: 'goat_listings', model: 'GoatListing', type: 'goat' },
+  cat: { table: 'cat_listings', model: 'CatListing', type: 'cat' },
+  dog: { table: 'dog_listings', model: 'DogListing', type: 'dog' },
+  other: { table: 'other_animal_listings', model: 'OtherAnimalListing', type: 'other' }
+};
+
+const parsePositiveInt = (value, fallback, max = 100) => {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+
+  return Math.min(parsed, max);
+};
+
+const parseOptionalPositiveFloat = (value) => {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+};
+
+const parseCoordinate = (value) => {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const normalizePostalCode = (value) => String(value || '').trim();
+
+const calculateDistanceKm = (fromLatitude, fromLongitude, toLatitude, toLongitude) => {
+  const lat1 = parseCoordinate(fromLatitude);
+  const lon1 = parseCoordinate(fromLongitude);
+  const lat2 = parseCoordinate(toLatitude);
+  const lon2 = parseCoordinate(toLongitude);
+
+  if ([lat1, lon1, lat2, lon2].some((value) => value === null)) {
+    return null;
+  }
+
+  const toRadians = (degrees) => (degrees * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+  const dLat = toRadians(lat2 - lat1);
+  const dLon = toRadians(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRadians(lat1)) *
+      Math.cos(toRadians(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+
+  return earthRadiusKm * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+};
+
+const getAuthUserIdFromRequest = (req) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return null;
+  }
+
+  const [scheme, token] = authHeader.split(' ');
+  if (scheme !== 'Bearer' || !token) {
+    return null;
+  }
+
+  try {
+    const decoded = jwt.verify(token, getJwtSecret());
+    return decoded?.userId || null;
+  } catch (error) {
+    return null;
+  }
+};
+
+const getCoordinatesForPostalCode = async (postalCode, cache) => {
+  const normalizedPostalCode = normalizePostalCode(postalCode);
+  if (!normalizedPostalCode) {
+    return null;
+  }
+
+  if (cache.has(normalizedPostalCode)) {
+    return cache.get(normalizedPostalCode);
+  }
+
+  try {
+    const location = await geocodingService.getLocationFromPostalCode(normalizedPostalCode, 'IN');
+    const coordinates =
+      parseCoordinate(location?.latitude) !== null && parseCoordinate(location?.longitude) !== null
+        ? {
+            latitude: parseCoordinate(location.latitude),
+            longitude: parseCoordinate(location.longitude)
+          }
+        : null;
+
+    cache.set(normalizedPostalCode, coordinates);
+    return coordinates;
+  } catch (error) {
+    cache.set(normalizedPostalCode, null);
+    return null;
+  }
+};
+
+const getRequesterLocation = async (req) => {
+  const queryLatitude = parseCoordinate(req.query.latitude ?? req.query.userLatitude);
+  const queryLongitude = parseCoordinate(req.query.longitude ?? req.query.userLongitude);
+  const queryPostalCode = normalizePostalCode(req.query.postalCode);
+  const authUserId = getAuthUserIdFromRequest(req);
+
+  if (!authUserId) {
+    return {
+      userId: null,
+      latitude: queryLatitude,
+      longitude: queryLongitude,
+      postalCode: queryPostalCode
+    };
+  }
+
+  const user = await db.User.findByPk(authUserId, {
+    attributes: ['id', 'latitude', 'longitude', 'postal_code']
+  });
+
+  return {
+    userId: user?.id || authUserId,
+    latitude: queryLatitude ?? parseCoordinate(user?.latitude),
+    longitude: queryLongitude ?? parseCoordinate(user?.longitude),
+    postalCode: queryPostalCode || normalizePostalCode(user?.postal_code)
+  };
+};
+
+const attachAccurateDistances = async (listings, requesterLocation) => {
+  if (!Array.isArray(listings) || listings.length === 0) {
+    return listings;
+  }
+
+  let originLatitude = parseCoordinate(requesterLocation?.latitude);
+  let originLongitude = parseCoordinate(requesterLocation?.longitude);
+  const originPostalCode = normalizePostalCode(requesterLocation?.postalCode);
+  const postalCodeCache = new Map();
+
+  if ((originLatitude === null || originLongitude === null) && originPostalCode) {
+    const originCoordinates = await getCoordinatesForPostalCode(originPostalCode, postalCodeCache);
+    originLatitude = parseCoordinate(originCoordinates?.latitude);
+    originLongitude = parseCoordinate(originCoordinates?.longitude);
+  }
+
+  return Promise.all(
+    listings.map(async (listing) => {
+      const listingPostalCode = normalizePostalCode(listing.pincode || listing.postal_code);
+
+      if (
+        requesterLocation?.userId &&
+        listing.user_id &&
+        String(requesterLocation.userId) === String(listing.user_id)
+      ) {
+        return { ...listing, distance: 0 };
+      }
+
+      if (originPostalCode && listingPostalCode && originPostalCode === listingPostalCode) {
+        return { ...listing, distance: 0 };
+      }
+
+      let destinationLatitude = null;
+      let destinationLongitude = null;
+
+      if (listingPostalCode) {
+        const listingCoordinates = await getCoordinatesForPostalCode(listingPostalCode, postalCodeCache);
+        destinationLatitude = parseCoordinate(listingCoordinates?.latitude);
+        destinationLongitude = parseCoordinate(listingCoordinates?.longitude);
+      }
+
+      if (destinationLatitude === null || destinationLongitude === null) {
+        destinationLatitude = parseCoordinate(listing.latitude);
+        destinationLongitude = parseCoordinate(listing.longitude);
+      }
+
+      const distance = calculateDistanceKm(
+        originLatitude,
+        originLongitude,
+        destinationLatitude,
+        destinationLongitude
+      );
+
+      if (distance === null) {
+        const existingDistance = parseCoordinate(listing.distance);
+        return existingDistance === null ? listing : { ...listing, distance: existingDistance };
+      }
+
+      return { ...listing, distance };
+    })
+  );
+};
 
 class CombinedListingsController {
   /**
@@ -294,10 +493,26 @@ class CombinedListingsController {
         })
       );
 
+      const listingsWithAccurateDistance = await attachAccurateDistances(listingsWithSeller, {
+        latitude: lat,
+        longitude: lng,
+        postalCode: normalizePostalCode(req.query.postalCode),
+        userId: getAuthUserIdFromRequest(req)
+      });
+      listingsWithAccurateDistance.sort((a, b) => {
+        const firstDistance = parseCoordinate(a.distance);
+        const secondDistance = parseCoordinate(b.distance);
+
+        if (firstDistance === null && secondDistance === null) return 0;
+        if (firstDistance === null) return 1;
+        if (secondDistance === null) return -1;
+        return firstDistance - secondDistance;
+      });
+
       res.json({
         success: true,
-        count: listingsWithSeller.length,
-        data: listingsWithSeller
+        count: listingsWithAccurateDistance.length,
+        data: listingsWithAccurateDistance
       });
     } catch (error) {
       console.error('Get all nearby listings error:', error);
@@ -525,10 +740,16 @@ class CombinedListingsController {
         })
       );
 
+      const requesterLocation = await getRequesterLocation(req);
+      const listingsWithAccurateDistance = await attachAccurateDistances(
+        listingsWithSeller,
+        requesterLocation
+      );
+
       res.json({
         success: true,
-        count: listingsWithSeller.length,
-        data: listingsWithSeller
+        count: listingsWithAccurateDistance.length,
+        data: listingsWithAccurateDistance
       });
     } catch (error) {
       console.error('Get featured listings error:', error);
@@ -673,20 +894,9 @@ class CombinedListingsController {
     try {
       const { animalType } = req.params;
       const { limit = 50 } = req.query;
-      const lim = parseInt(limit);
+      const lim = parsePositiveInt(limit, 50, 100);
 
-      // Map animal type to table name and model
-      const tableMap = {
-        cow: { table: 'animal_listings', model: 'AnimalListing' },
-        buffalo: { table: 'buffalo_listings', model: 'BuffaloListing' },
-        horse: { table: 'horse_listings', model: 'HorseListing' },
-        goat: { table: 'goat_listings', model: 'GoatListing' },
-        cat: { table: 'cat_listings', model: 'CatListing' },
-        dog: { table: 'dog_listings', model: 'DogListing' },
-        other: { table: 'other_animal_listings', model: 'OtherAnimalListing' }
-      };
-
-      const tableInfo = tableMap[animalType.toLowerCase()];
+      const tableInfo = ANIMAL_TABLE_MAP[animalType.toLowerCase()];
       if (!tableInfo) {
         return res.status(400).json({
           success: false,
@@ -771,10 +981,16 @@ class CombinedListingsController {
         })
       );
 
+      const requesterLocation = await getRequesterLocation(req);
+      const listingsWithAccurateDistance = await attachAccurateDistances(
+        listingsWithSeller,
+        requesterLocation
+      );
+
       res.json({
         success: true,
-        count: listingsWithSeller.length,
-        data: listingsWithSeller
+        count: listingsWithAccurateDistance.length,
+        data: listingsWithAccurateDistance
       });
     } catch (error) {
       console.error('Get listings by type error:', error);
@@ -793,8 +1009,24 @@ class CombinedListingsController {
   async searchListings(req, res) {
     try {
       const { query = '', animalType, minPrice, maxPrice, limit = 50 } = req.query;
-      const lim = parseInt(limit);
+      const lim = parsePositiveInt(limit, 50, 100);
       const searchQuery = query.toLowerCase().trim();
+      const minimumPrice = parseOptionalPositiveFloat(minPrice);
+      const maximumPrice = parseOptionalPositiveFloat(maxPrice);
+
+      if (minPrice && minimumPrice === null) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid minimum price'
+        });
+      }
+
+      if (maxPrice && maximumPrice === null) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid maximum price'
+        });
+      }
 
       // Build WHERE conditions
       let whereClause = "status = 'active'";
@@ -807,32 +1039,22 @@ class CombinedListingsController {
         bindIndex++;
       }
 
-      if (minPrice) {
+      if (minimumPrice !== null) {
         whereClause += ` AND expected_price >= $${bindIndex}`;
-        bindings.push(parseFloat(minPrice));
+        bindings.push(minimumPrice);
         bindIndex++;
       }
 
-      if (maxPrice) {
+      if (maximumPrice !== null) {
         whereClause += ` AND expected_price <= $${bindIndex}`;
-        bindings.push(parseFloat(maxPrice));
+        bindings.push(maximumPrice);
         bindIndex++;
       }
 
       // If specific animal type is requested
       if (animalType && animalType !== 'all') {
-        const tableMap = {
-          cow: 'animal_listings',
-          buffalo: 'buffalo_listings',
-          horse: 'horse_listings',
-          goat: 'goat_listings',
-          cat: 'cat_listings',
-          dog: 'dog_listings',
-          other: 'other_animal_listings'
-        };
-
-        const tableName = tableMap[animalType.toLowerCase()];
-        if (!tableName) {
+        const tableInfo = ANIMAL_TABLE_MAP[animalType.toLowerCase()];
+        if (!tableInfo) {
           return res.status(400).json({
             success: false,
             message: 'Invalid animal type'
@@ -840,8 +1062,8 @@ class CombinedListingsController {
         }
 
         const singleQuery = `
-          SELECT *, '${animalType.toLowerCase()}' as animal_type
-          FROM ${tableName}
+          SELECT *, '${tableInfo.type}' as animal_type
+          FROM ${tableInfo.table}
           WHERE ${whereClause}
           ORDER BY created_at DESC
           LIMIT $${bindIndex}
@@ -873,10 +1095,16 @@ class CombinedListingsController {
           })
         );
 
+        const requesterLocation = await getRequesterLocation(req);
+        const listingsWithAccurateDistance = await attachAccurateDistances(
+          listingsWithSeller,
+          requesterLocation
+        );
+
         return res.json({
           success: true,
-          count: listingsWithSeller.length,
-          data: listingsWithSeller
+          count: listingsWithAccurateDistance.length,
+          data: listingsWithAccurateDistance
         });
       }
 
@@ -884,43 +1112,43 @@ class CombinedListingsController {
       const searchAllQuery = `
         SELECT * FROM (
           SELECT id, 'cow' as animal_type, breed_name, age::text as age,
-            expected_price, front_photo, city, state, user_id, created_at
+            expected_price, front_photo, city, state, pincode, latitude, longitude, user_id, created_at
           FROM animal_listings WHERE ${whereClause}
 
           UNION ALL
 
           SELECT id, 'buffalo' as animal_type, breed_name, age::text as age,
-            expected_price, front_photo, city, state, user_id, created_at
+            expected_price, front_photo, city, state, pincode, latitude, longitude, user_id, created_at
           FROM buffalo_listings WHERE ${whereClause}
 
           UNION ALL
 
           SELECT id, 'horse' as animal_type, breed_name, COALESCE(age, '') as age,
-            expected_price, front_photo, city, state, user_id, created_at
+            expected_price, front_photo, city, state, pincode, latitude, longitude, user_id, created_at
           FROM horse_listings WHERE ${whereClause}
 
           UNION ALL
 
           SELECT id, 'goat' as animal_type, breed_name, COALESCE(age, '') as age,
-            expected_price, photo_1 as front_photo, city, state, user_id, created_at
+            expected_price, photo_1 as front_photo, city, state, pincode, latitude, longitude, user_id, created_at
           FROM goat_listings WHERE ${whereClause}
 
           UNION ALL
 
           SELECT id, 'cat' as animal_type, breed_name, COALESCE(age, '') as age,
-            expected_price, photo_1 as front_photo, city, state, user_id, created_at
+            expected_price, photo_1 as front_photo, city, state, pincode, latitude, longitude, user_id, created_at
           FROM cat_listings WHERE ${whereClause}
 
           UNION ALL
 
           SELECT id, 'dog' as animal_type, breed_name, COALESCE(age, '') as age,
-            expected_price, photo_1 as front_photo, city, state, user_id, created_at
+            expected_price, photo_1 as front_photo, city, state, pincode, latitude, longitude, user_id, created_at
           FROM dog_listings WHERE ${whereClause}
 
           UNION ALL
 
           SELECT id, 'other' as animal_type, breed_name, COALESCE(age, '') as age,
-            expected_price, front_photo, city, state, user_id, created_at
+            expected_price, front_photo, city, state, pincode, latitude, longitude, user_id, created_at
           FROM other_animal_listings WHERE ${whereClause}
         ) AS combined_search
         ORDER BY created_at DESC
@@ -953,10 +1181,16 @@ class CombinedListingsController {
         })
       );
 
+      const requesterLocation = await getRequesterLocation(req);
+      const listingsWithAccurateDistance = await attachAccurateDistances(
+        listingsWithSeller,
+        requesterLocation
+      );
+
       res.json({
         success: true,
-        count: listingsWithSeller.length,
-        data: listingsWithSeller
+        count: listingsWithAccurateDistance.length,
+        data: listingsWithAccurateDistance
       });
     } catch (error) {
       console.error('Search listings error:', error);
@@ -1101,18 +1335,7 @@ class CombinedListingsController {
         });
       }
 
-      // Map animal type to model
-      const tableMap = {
-        cow: { table: 'animal_listings', model: 'AnimalListing' },
-        buffalo: { table: 'buffalo_listings', model: 'BuffaloListing' },
-        horse: { table: 'horse_listings', model: 'HorseListing' },
-        goat: { table: 'goat_listings', model: 'GoatListing' },
-        cat: { table: 'cat_listings', model: 'CatListing' },
-        dog: { table: 'dog_listings', model: 'DogListing' },
-        other: { table: 'other_animal_listings', model: 'OtherAnimalListing' }
-      };
-
-      const tableInfo = tableMap[animalType.toLowerCase()];
+      const tableInfo = ANIMAL_TABLE_MAP[animalType.toLowerCase()];
       if (!tableInfo) {
         return res.status(400).json({
           success: false,

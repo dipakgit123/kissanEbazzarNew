@@ -16,6 +16,8 @@ import AnimalDetailPage from './components/AnimalDetailPage';
 import VeterinarianPage from './components/VeterinarianPage';
 import VeterinarianRegistrationForm from './components/VeterinarianRegistrationForm';
 import VeterinarianLogin from './components/VeterinarianLogin';
+import VeterinarianForgotPassword from './components/VeterinarianForgotPassword';
+import VeterinarianResetPassword from './components/VeterinarianResetPassword';
 import VeterinarianDashboard from './components/VeterinarianDashboard';
 import NearbyVeterinarians from './components/NearbyVeterinarians';
 import AppointmentBookingForm from './components/AppointmentBookingForm';
@@ -34,6 +36,7 @@ import AuthenticatedRoute from './components/AuthenticatedRoute';
 import UserAppRoute from './components/UserAppRoute';
 import AdminAppRoute from './components/AdminAppRoute';
 import VeterinarianAppRoute from './components/VeterinarianAppRoute';
+import ScrollToTop from './components/ScrollToTop';
 import { WishlistProvider } from './contexts/WishlistContext.jsx';
 
 function App() {
@@ -109,6 +112,7 @@ function App() {
 
   return (
     <WishlistProvider>
+      <ScrollToTop />
       <Routes>
         {/* Admin Routes - No Layout */}
         <Route path="/admin/login" element={<AdminLogin />} />
@@ -119,6 +123,8 @@ function App() {
         {/* Veterinarian Routes - No Layout (Separate Auth Flow) */}
         <Route path="/veterinarian/login" element={<VeterinarianLogin />} />
         <Route path="/veterinarian/register" element={<VeterinarianRegistrationForm />} />
+        <Route path="/veterinarian/forgot-password" element={<VeterinarianForgotPassword />} />
+        <Route path="/veterinarian/reset-password" element={<VeterinarianResetPassword />} />
         <Route element={<VeterinarianAppRoute />}>
           <Route path="/veterinarian/dashboard" element={<VeterinarianDashboard />} />
         </Route>

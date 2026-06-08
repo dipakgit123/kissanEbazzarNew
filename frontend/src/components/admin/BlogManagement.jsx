@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { API_BASE_URL } from '../../config/api';
+import { localizeApiMessage } from '../../utils/localizeApiMessage';
 
 const serializeTags = (tagsInput) => {
   return JSON.stringify(
@@ -12,6 +14,7 @@ const serializeTags = (tagsInput) => {
 };
 
 const BlogManagement = () => {
+  const { t, i18n } = useTranslation();
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -182,20 +185,22 @@ const BlogManagement = () => {
         handleCloseModal();
         fetchBlogs();
         fetchStats();
-        toast.success(editingBlog ? 'Blog updated successfully!' : 'Blog created successfully!');
+        toast.success(t(editingBlog ? 'blogAdmin.updated' : 'blogAdmin.created'));
       } else {
-        toast.error(data.message || 'Operation failed');
+        toast.error(
+          localizeApiMessage(i18n, t, data.message, 'blogAdmin.operationFailed', 'Operation failed')
+        );
       }
     } catch (error) {
       console.error('Error submitting blog:', error);
-      toast.error('An error occurred. Please try again.');
+      toast.error(t('blogAdmin.retryError'));
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this blog?')) return;
+    if (!confirm(t('blogAdmin.deleteConfirm'))) return;
 
     const token = localStorage.getItem('adminToken');
     try {
@@ -208,11 +213,11 @@ const BlogManagement = () => {
       if (data.success) {
         fetchBlogs();
         fetchStats();
-        toast.success('Blog deleted successfully!');
+        toast.success(t('blogAdmin.deleted'));
       }
     } catch (error) {
       console.error('Error deleting blog:', error);
-      toast.error('Failed to delete blog');
+      toast.error(t('blogAdmin.deleteFailed'));
     }
   };
 
@@ -531,7 +536,7 @@ const BlogManagement = () => {
                 </div>
 
                 {/* Category and Status */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">Category</label>
                     <select

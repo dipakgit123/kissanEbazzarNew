@@ -239,7 +239,7 @@ const BuyAnimalsPage = () => {
           title: `${listing.breed_name || 'Unknown Breed'} | ${listing.animal_type.charAt(0).toUpperCase() + listing.animal_type.slice(1)}`,
           price: listing.expected_price ? Number(listing.expected_price).toLocaleString('en-IN') : '0',
           priceValue: Number(listing.expected_price) || 0,
-          location: `${listing.city || 'Unknown'}${listing.distance ? ` (${Math.round(listing.distance)} km)` : ''}`,
+          location: listing.city || 'Unknown',
           datePosted: formatTimeAgo(listing.created_at),
           imageSrc: listing.front_photo || listing.side_photo || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="200"%3E%3Crect fill="%23f0f0f0" width="300" height="200"/%3E%3Ctext fill="%23999" font-family="sans-serif" font-size="16" dy="10.5" font-weight="bold" x="50%25" y="50%25" text-anchor="middle"%3ENo Image%3C/text%3E%3C/svg%3E',
           sellerName: listing.seller?.name || 'Unknown Seller',
@@ -249,6 +249,8 @@ const BuyAnimalsPage = () => {
           animalType: listing.animal_type.charAt(0).toUpperCase() + listing.animal_type.slice(1),
           milkProduction: listing.milk_capacity ? `${listing.milk_capacity}L` : 'N/A',
           distance: listing.distance,
+          latitude: listing.latitude,
+          longitude: listing.longitude,
           status: listing.status,
           sellerPhoto: listing.seller?.profile_photo
         }));
@@ -908,6 +910,10 @@ const BuyAnimalsPage = () => {
                   breed={animal.breed}
                   animalType={animal.animalType}
                   milkProduction={animal.milkProduction}
+                  latitude={animal.latitude}
+                  longitude={animal.longitude}
+                  distance={animal.distance}
+                  userLocation={userLocation}
                   isInWishlist={isInWishlist(animal.id)}
                   onToggleWishlist={handleToggleWishlist}
                 />

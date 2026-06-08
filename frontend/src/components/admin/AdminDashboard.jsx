@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -18,6 +19,7 @@ import toast from 'react-hot-toast';
 import { API_BASE_URL } from '../../config/api';
 import BlogManagement from './BlogManagement';
 import { safeJsonParse } from '../../utils/stringUtils';
+import { localizeApiMessage } from '../../utils/localizeApiMessage';
 
 // Register Chart.js components
 ChartJS.register(
@@ -43,6 +45,7 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [admin, setAdmin] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
   const API_URL = API_BASE_URL;
@@ -104,6 +107,17 @@ const AdminDashboard = () => {
     return () => clearInterval(timer);
   }, [fetchDashboardData, navigate]);
 
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        setMobileSidebarOpen(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const handleLogout = () => {
     localStorage.removeItem('adminToken');
     localStorage.removeItem('adminData');
@@ -164,9 +178,22 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#0f172a] flex">
+    <div className="min-h-screen bg-[#0f172a] flex overflow-x-hidden">
+      {mobileSidebarOpen && (
+        <button
+          type="button"
+          aria-label="Close sidebar"
+          onClick={() => setMobileSidebarOpen(false)}
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className={`${sidebarCollapsed ? 'w-20' : 'w-64'} bg-[#1e293b] border-r border-slate-700/50 flex flex-col transition-all duration-300 fixed h-full z-50`}>
+      <aside
+        className={`${sidebarCollapsed ? 'lg:w-20' : 'lg:w-64'} w-64 bg-[#1e293b] border-r border-slate-700/50 flex flex-col fixed inset-y-0 left-0 z-50 transform transition-all duration-300 ${
+          mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        } lg:translate-x-0`}
+      >
         {/* Logo */}
         <div className="p-4 border-b border-slate-700/50">
           <div className="flex items-center space-x-3">
@@ -189,7 +216,10 @@ const AdminDashboard = () => {
           {menuItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => {
+                setActiveTab(item.id);
+                setMobileSidebarOpen(false);
+              }}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
                 activeTab === item.id
                   ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/10 text-emerald-400 shadow-lg shadow-emerald-500/5'
@@ -208,7 +238,7 @@ const AdminDashboard = () => {
         </nav>
 
         {/* Sidebar Toggle */}
-        <div className="p-4 border-t border-slate-700/50">
+        <div className="hidden lg:block p-4 border-t border-slate-700/50">
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             className="w-full flex items-center justify-center p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors"
@@ -221,19 +251,31 @@ const AdminDashboard = () => {
       </aside>
 
       {/* Main Content */}
-      <div className={`flex-1 ${sidebarCollapsed ? 'ml-20' : 'ml-64'} transition-all duration-300`}>
+      <div className={`flex-1 min-w-0 ml-0 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'} transition-all duration-300`}>
         {/* Header */}
         <header className="bg-[#1e293b]/80 backdrop-blur-xl border-b border-slate-700/50 sticky top-0 z-40">
-          <div className="px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-white capitalize">{activeTab === 'overview' ? 'Dashboard' : activeTab}</h2>
-                <p className="text-sm text-slate-400 mt-1">
+          <div className="px-4 sm:px-6 py-4">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex items-start gap-3 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setMobileSidebarOpen(true)}
+                  className="lg:hidden p-2 rounded-xl bg-slate-700/50 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
+                  aria-label="Open sidebar"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+                <div className="min-w-0">
+                <h2 className="text-xl sm:text-2xl font-bold text-white capitalize break-words">{activeTab === 'overview' ? 'Dashboard' : activeTab}</h2>
+                <p className="text-xs sm:text-sm text-slate-400 mt-1">
                   {currentTime.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                 </p>
+                </div>
               </div>
 
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto justify-end">
                 {/* Refresh Button */}
                 <button
                   onClick={fetchDashboardData}
@@ -253,7 +295,7 @@ const AdminDashboard = () => {
                 </button>
 
                 {/* Admin Profile */}
-                <div className="flex items-center space-x-3 pl-4 border-l border-slate-700/50">
+                <div className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-4 border-l border-slate-700/50 min-w-0">
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold">
                     {(admin?.full_name || admin?.username)?.[0]?.toUpperCase() || 'A'}
                   </div>
@@ -277,7 +319,7 @@ const AdminDashboard = () => {
         </header>
 
         {/* Page Content */}
-        <main className="p-6">
+        <main className="p-4 sm:p-6">
           {activeTab === 'overview' && (
             <OverviewTab
               stats={stats}
@@ -787,7 +829,7 @@ const AnalyticsTab = ({ stats, getAnimalEmoji }) => {
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-[#1e293b] rounded-2xl p-6 border border-slate-700/50">
           <div className="flex items-center justify-between">
             <div>
@@ -1095,6 +1137,7 @@ const UsersTab = ({ API_URL }) => {
 
 // Listings Tab Component
 const ListingsTab = ({ API_URL, getAnimalEmoji, formatPrice }) => {
+  const { t } = useTranslation();
   const [listings, setListings] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -1122,7 +1165,7 @@ const ListingsTab = ({ API_URL, getAnimalEmoji, formatPrice }) => {
   }, [fetchListings]);
 
   const deleteListing = async (type, id) => {
-    if (!confirm('Are you sure you want to delete this listing?')) return;
+    if (!confirm(t('adminListings.deleteConfirm'))) return;
 
     const token = localStorage.getItem('adminToken');
     try {
@@ -1262,6 +1305,7 @@ const ListingsTab = ({ API_URL, getAnimalEmoji, formatPrice }) => {
 // Reports Tab Component
 // Veterinarians Tab Component
 const VeterinariansTab = ({ API_URL, formatDate }) => {
+  const { t, i18n } = useTranslation();
   const [veterinarians, setVeterinarians] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1311,7 +1355,7 @@ const VeterinariansTab = ({ API_URL, formatDate }) => {
   }, [fetchStats, fetchVeterinarians]);
 
   const handleVerify = async (vetId) => {
-    if (!confirm('Are you sure you want to verify this veterinarian? An email with login credentials will be sent.')) {
+    if (!confirm(t('adminVeterinarians.verifyConfirm'))) {
       return;
     }
 
@@ -1329,17 +1373,25 @@ const VeterinariansTab = ({ API_URL, formatDate }) => {
 
       const data = await response.json();
       if (data.success) {
-        toast.success(data.message);
+        toast.success(
+          localizeApiMessage(
+            i18n,
+            t,
+            data.message,
+            'adminVeterinarians.verifySuccess',
+            'Veterinarian verified successfully'
+          )
+        );
         fetchVeterinarians();
         fetchStats();
         setShowModal(false);
         setSelectedVet(null);
       } else {
-        toast.error(`Verification failed: ${data.message}`);
+        toast.error(t('adminVeterinarians.verifyFailed'));
       }
     } catch (error) {
       console.error('Verification error:', error);
-      toast.error('Failed to verify veterinarian');
+      toast.error(t('adminVeterinarians.verifyFailed'));
     } finally {
       setActionLoading(false);
     }
@@ -1347,7 +1399,7 @@ const VeterinariansTab = ({ API_URL, formatDate }) => {
 
   const handleReject = async (vetId) => {
     if (!rejectReason.trim()) {
-      toast.error('Please provide a rejection reason');
+      toast.error(t('adminVeterinarians.rejectReasonRequired'));
       return;
     }
 
@@ -1365,18 +1417,18 @@ const VeterinariansTab = ({ API_URL, formatDate }) => {
 
       const data = await response.json();
       if (data.success) {
-        toast.success('Veterinarian rejected successfully');
+        toast.success(t('adminVeterinarians.rejectSuccess'));
         fetchVeterinarians();
         fetchStats();
         setShowModal(false);
         setSelectedVet(null);
         setRejectReason('');
       } else {
-        toast.error(`Rejection failed: ${data.message}`);
+        toast.error(t('adminVeterinarians.rejectFailed'));
       }
     } catch (error) {
       console.error('Rejection error:', error);
-      toast.error('Failed to reject veterinarian');
+      toast.error(t('adminVeterinarians.rejectFailed'));
     } finally {
       setActionLoading(false);
     }
@@ -1395,7 +1447,7 @@ const VeterinariansTab = ({ API_URL, formatDate }) => {
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
         <div className="bg-[#1e293b] rounded-xl p-4 border border-slate-700/50">
           <p className="text-sm text-slate-400 mb-1">Total</p>
           <p className="text-3xl font-bold text-white">{stats?.total || 0}</p>
@@ -1584,7 +1636,7 @@ const VeterinariansTab = ({ API_URL, formatDate }) => {
                   </svg>
                   Personal Information
                 </h4>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <p className="text-xs text-slate-400 mb-1">Full Name</p>
                     <p className="text-white font-medium">{selectedVet.full_name}</p>
@@ -1612,7 +1664,7 @@ const VeterinariansTab = ({ API_URL, formatDate }) => {
                   </svg>
                   Professional Details
                 </h4>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <p className="text-xs text-slate-400 mb-1">License Number</p>
                     <p className="text-white font-medium font-mono">{selectedVet.license_number}</p>
@@ -1651,7 +1703,7 @@ const VeterinariansTab = ({ API_URL, formatDate }) => {
                   </svg>
                   Location & Clinic
                 </h4>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <p className="text-xs text-slate-400 mb-1">Clinic Name</p>
                     <p className="text-white font-medium">{selectedVet.clinic_name || 'Not provided'}</p>
@@ -1675,7 +1727,7 @@ const VeterinariansTab = ({ API_URL, formatDate }) => {
                   </svg>
                   Uploaded Documents
                 </h4>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {selectedVet.license_document && (
                     <a href={selectedVet.license_document} target="_blank" rel="noopener noreferrer" className="block p-4 bg-slate-700/50 rounded-lg hover:bg-slate-700 transition-colors">
                       <p className="text-sm text-white font-medium mb-1">License Document</p>

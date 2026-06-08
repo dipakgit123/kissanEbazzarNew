@@ -39,27 +39,26 @@ const Layout = ({ showHeaderFooter = true }) => {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between gap-4 h-16 sm:h-20">
               {/* Enhanced Logo Section */}
-              <div className="flex shrink-0 items-center space-x-2 group cursor-pointer">
-                {/* Logo Container with Enhanced Styling */}
-                <div className="relative">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-[#15BB73] to-[#0FA568] rounded-xl flex items-center justify-center shadow-lg transform group-hover:scale-105 transition-all duration-300 p-1 sm:p-1.5">
-                    <img
-                      src={logo}
-                      alt="Animal E Bazar"
-                      className="h-6 w-6 sm:h-8 sm:w-8 object-contain rounded-lg"
-                    />
+              <div className="flex shrink-0 items-center space-x-2">
+                <Link to="/" className="group flex items-center space-x-2">
+                  <div className="relative">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-[#15BB73] to-[#0FA568] rounded-xl flex items-center justify-center shadow-lg transform group-hover:scale-105 transition-all duration-300 p-1 sm:p-1.5">
+                      <img
+                        src={logo}
+                        alt="Animal E Bazar"
+                        className="h-6 w-6 sm:h-8 sm:w-8 object-contain rounded-lg"
+                      />
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-br from-[#15BB73] to-[#0FA568] rounded-xl blur-lg opacity-30 -z-10 group-hover:opacity-50 transition-opacity duration-300"></div>
                   </div>
-                  {/* Glow Effect */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-[#15BB73] to-[#0FA568] rounded-xl blur-lg opacity-30 -z-10 group-hover:opacity-50 transition-opacity duration-300"></div>
-                </div>
-                
-                {/* Brand Text */}
-                <div className="hidden xl:block">
-                  <h1 className="text-base xl:text-lg font-bold text-[#000600] bg-gradient-to-r from-[#000600] to-[#15BB73] bg-clip-text text-transparent group-hover:from-[#15BB73] group-hover:to-[#0FA568] transition-all duration-300 whitespace-nowrap">
-                    Animal E Bazar
-                  </h1>
-                  <p className="hidden 2xl:block text-xs text-gray-600 font-medium whitespace-nowrap">Farmers Marketplace</p>
-                </div>
+
+                  <div className="hidden xl:block">
+                    <h1 className="text-base xl:text-lg font-bold text-[#000600] bg-gradient-to-r from-[#000600] to-[#15BB73] bg-clip-text text-transparent group-hover:from-[#15BB73] group-hover:to-[#0FA568] transition-all duration-300 whitespace-nowrap">
+                      Animal E Bazar
+                    </h1>
+                    <p className="hidden 2xl:block text-xs text-gray-600 font-medium whitespace-nowrap">Farmers Marketplace</p>
+                  </div>
+                </Link>
 
                 <button
                   type="button"

@@ -17,7 +17,6 @@ import {
   FaDog,
   FaHorseHead,
   FaPaw,
-  FaPiggyBank,
   FaPlus,
   FaTriangleExclamation,
   FaXmark
@@ -35,7 +34,6 @@ const PREGNANCY_DURATIONS = {
   horse: { days: 340, monthCount: 11, Icon: FaHorseHead, iconClass: 'text-violet-300' },
   dog: { days: 63, monthCount: 2, Icon: FaDog, iconClass: 'text-orange-300' },
   cat: { days: 65, monthCount: 2, Icon: FaCat, iconClass: 'text-rose-300' },
-  pig: { days: 114, monthCount: 4, Icon: FaPiggyBank, iconClass: 'text-pink-300' },
   other: { days: 150, monthCount: 5, Icon: FaPaw, iconClass: 'text-sky-300' }
 };
 
@@ -103,10 +101,8 @@ const PregnancyCalendar = () => {
     listing_type: '',
     animal_type: 'cow',
     animal_name: '',
-    breed_name: '',
+    ear_badge_number: '',
     mating_date: new Date().toISOString().split('T')[0],
-    bull_sire_details: '',
-    mating_type: 'natural',
     notes: ''
   });
 
@@ -134,11 +130,11 @@ const PregnancyCalendar = () => {
       if (statsRes.success) setStats(statsRes.data);
     } catch (err) {
       console.error('Error fetching pregnancy data:', err);
-      setError('Failed to load pregnancy data. Please try again.');
+      setError(t('pregnancy.loadFailed'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchData();
@@ -157,17 +153,15 @@ const PregnancyCalendar = () => {
           listing_type: '',
           animal_type: 'cow',
           animal_name: '',
-          breed_name: '',
+          ear_badge_number: '',
           mating_date: new Date().toISOString().split('T')[0],
-          bull_sire_details: '',
-          mating_type: 'natural',
           notes: ''
         });
         fetchData();
       }
     } catch (err) {
       console.error('Error creating pregnancy record:', err);
-      toast.error('Failed to create pregnancy record');
+      toast.error(t('pregnancy.createFailed'));
     }
   };
 
@@ -183,7 +177,7 @@ const PregnancyCalendar = () => {
       }
     } catch (err) {
       console.error('Error marking as delivered:', err);
-      toast.error('Failed to mark as delivered');
+      toast.error(t('pregnancy.markDeliveredFailed'));
     }
   };
 
@@ -198,7 +192,7 @@ const PregnancyCalendar = () => {
       }
     } catch (err) {
       console.error('Error deleting record:', err);
-      toast.error('Failed to delete record');
+      toast.error(t('pregnancy.deleteFailed'));
     }
   };
 
@@ -524,7 +518,11 @@ const PregnancyCalendar = () => {
                             <AnimalTypeIcon type={record.animal_type} className="text-2xl" />
                             <div>
                               <h4 className="text-sm font-bold text-white">{record.animal_name}</h4>
-                              <p className="text-xs text-gray-400 capitalize">{record.breed_name || record.animal_type}</p>
+                              <p className="text-xs text-gray-400 capitalize">
+                                {record.ear_badge_number
+                                  ? `${t("pregnancy.earBadgeNumberShort")}: ${record.ear_badge_number}`
+                                  : (record.breed_name || record.animal_type)}
+                              </p>
                             </div>
                           </div>
                           <span className={`text-xs px-2 py-1 rounded-full font-semibold ${statusBadge.bg} ${statusBadge.text}`}>
@@ -658,8 +656,7 @@ const PregnancyCalendar = () => {
             {/* Modal Body */}
             <div className="overflow-y-auto flex-1 p-6">
               <form onSubmit={handleSubmit} className="space-y-5">
-                {/* Row 1: Animal Type & Mating Type */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.animalType")}</label>
                     <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-green-50 px-3 py-1.5 text-sm font-medium text-green-700">
@@ -679,21 +676,9 @@ const PregnancyCalendar = () => {
                       ))}
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.matingType")}</label>
-                    <select
-                      value={formData.mating_type}
-                      onChange={(e) => setFormData({ ...formData, mating_type: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    >
-                      <option value="natural">{t("pregnancy.natural")}</option>
-                      <option value="artificial_insemination">{t("pregnancy.artificialInsemination")}</option>
-                    </select>
-                  </div>
                 </div>
 
-                {/* Row 2: Animal Name & Breed */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.animalName")}</label>
                     <input
@@ -706,13 +691,13 @@ const PregnancyCalendar = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.breedName")}</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.earBadgeNumber")}</label>
                     <input
                       type="text"
-                      value={formData.breed_name}
-                      onChange={(e) => setFormData({ ...formData, breed_name: e.target.value })}
+                      value={formData.ear_badge_number}
+                      onChange={(e) => setFormData({ ...formData, ear_badge_number: e.target.value })}
                       className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      placeholder={t("pregnancy.placeholderBreed")}
+                      placeholder={t("pregnancy.placeholderEarBadge")}
                     />
                   </div>
                 </div>
@@ -731,18 +716,6 @@ const PregnancyCalendar = () => {
                     <FaCircleInfo className="w-4 h-4" />
                     {t("pregnancy.expectedDelivery")}: ~{t(`pregnancy.months${PREGNANCY_DURATIONS[formData.animal_type]?.monthCount}`)} {t("pregnancy.fromMatingDate")}
                   </p>
-                </div>
-
-                {/* Bull/Sire Details */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.bullSireDetails")}</label>
-                  <input
-                    type="text"
-                    value={formData.bull_sire_details}
-                    onChange={(e) => setFormData({ ...formData, bull_sire_details: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    placeholder={t("pregnancy.placeholderBullSire")}
-                  />
                 </div>
 
                 {/* Notes */}
@@ -801,7 +774,11 @@ const PregnancyCalendar = () => {
                 <AnimalTypeIcon type={selectedRecord.animal_type} className="text-3xl" />
                 <div>
                   <p className="text-gray-900 font-bold">{selectedRecord.animal_name}</p>
-                  <p className="text-gray-600 text-sm">{selectedRecord.breed_name || selectedRecord.animal_type}</p>
+                  <p className="text-gray-600 text-sm">
+                    {selectedRecord.ear_badge_number
+                      ? `${t("pregnancy.earBadgeNumberShort")}: ${selectedRecord.ear_badge_number}`
+                      : (selectedRecord.breed_name || selectedRecord.animal_type)}
+                  </p>
                 </div>
               </div>
 

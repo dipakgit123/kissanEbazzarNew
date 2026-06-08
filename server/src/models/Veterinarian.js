@@ -217,6 +217,16 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       comment: 'Hashed password - set after admin verification'
     },
+    password_reset_token: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: 'password_reset_token'
+    },
+    password_reset_expires_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'password_reset_expires_at'
+    },
     otp: {
       type: DataTypes.STRING(255),
       allowNull: true
@@ -305,6 +315,8 @@ module.exports = (sequelize, DataTypes) => {
     delete values.otp;
     delete values.otp_expiry;
     delete values.password;
+    delete values.password_reset_token;
+    delete values.password_reset_expires_at;
     return values;
   };
 

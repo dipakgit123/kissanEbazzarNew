@@ -298,7 +298,7 @@
                      "aiHealthCheck":  "AI आरोग्य तपासणी",
                      "aiHealthCheckDesc":  "प्राणी आरोग्य तपासा",
                      "pregnancy":  "गर्भधारणा",
-                     "pregnancyDesc":  "गर्भधारणा ट्रॅक करा",
+                     "pregnancyDesc":  "गर्भधारणा नोंद करा",
                      "aiAssistant":  "AI सहाय्यक",
                      "aiAssistantDesc":  "तज्ञ सल्ला मिळवा"
                  },
@@ -667,9 +667,9 @@
                       "healthCheckups":  "आरोग्य तपासणी",
                       "reminders":  "स्मरणपत्रे",
                       "noRecords":  "गर्भधारणा रेकॉर्ड नाही",
-                      "noRecordsDesc":  "गर्भधारणा ट्रॅकिंग सुरू करण्यासाठी नवीन रेकॉर्ड जोडा",
+                      "noRecordsDesc":  "गर्भधारणा नोंद सुरू करण्यासाठी नवीन रेकॉर्ड जोडा",
                       "title":  "गर्भधारणा दिनदर्शिका",
-                      "subtitle":  "तुमच्या प्राण्यांची गर्भधारणा ट्रॅक करा",
+                      "subtitle":  "तुमच्या प्राण्यांची गर्भधारणा नोंद करा",
                       "loadingCalendar":  "दिनदर्शिका लोड होत आहे...",
                       "cow":  "गाय",
                       "buffalo":  "म्हैस",
@@ -865,7 +865,7 @@
                        "instantAiSupport":  "तत्काल AI सहाय्य",
                        "expertVetCare":  "तज्ञ पशुवैद्य काळजी",
                        "healthMonitoring":  "आरोग्य निरीक्षण",
-                       "trackPregnancy":  "गर्भधारणा ट्रॅक करा"
+                       "trackPregnancy":  "गर्भधारणा नोंद करा"
                    },
     "animalCard":  {
                        "milk":  "दूध",

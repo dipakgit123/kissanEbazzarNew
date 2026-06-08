@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { API_BASE_URL } from '../config/api';
+import { safeJsonParse } from '../utils/stringUtils';
 
 /*
   Props
@@ -42,13 +43,141 @@ const AnimalCard = ({
   id,
   animalType,
   listingId,
-  sellerId
+  sellerId,
+  latitude,
+  longitude,
+  distance,
+  userLocation
 }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [isWishlistLoading, setIsWishlistLoading] = useState(false);
+  const currentUser = safeJsonParse(localStorage.getItem('userData'), null);
+  const currentUserId = currentUser?.id ?? currentUser?.user_id ?? null;
+  const currentUserCity = userLocation?.city || currentUser?.city || '';
 
   const displayImage = images.find((img) => img && img.trim() !== '') || imageSrc;
+
+  const normalizedLatitude = Number(latitude);
+  const normalizedLongitude = Number(longitude);
+  const hasExactLocation = Number.isFinite(normalizedLatitude) && Number.isFinite(normalizedLongitude);
+  const normalizedUserLatitude = Number(userLocation?.latitude);
+  const normalizedUserLongitude = Number(userLocation?.longitude);
+  const hasUserCoordinates = Number.isFinite(normalizedUserLatitude) && Number.isFinite(normalizedUserLongitude);
+
+  const normalizePlace = (value) => String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+
+  const getEditDistance = (source, target) => {
+    if (source === target) {
+      return 0;
+    }
+
+    const rows = source.length + 1;
+    const cols = target.length + 1;
+    const matrix = Array.from({ length: rows }, () => Array(cols).fill(0));
+
+    for (let row = 0; row < rows; row += 1) {
+      matrix[row][0] = row;
+    }
+
+    for (let col = 0; col < cols; col += 1) {
+      matrix[0][col] = col;
+    }
+
+    for (let row = 1; row < rows; row += 1) {
+      for (let col = 1; col < cols; col += 1) {
+        const cost = source[row - 1] === target[col - 1] ? 0 : 1;
+        matrix[row][col] = Math.min(
+          matrix[row - 1][col] + 1,
+          matrix[row][col - 1] + 1,
+          matrix[row - 1][col - 1] + cost
+        );
+      }
+    }
+
+    return matrix[source.length][target.length];
+  };
+
+  const isSameCity = useMemo(() => {
+    if (!currentUserCity || !location) {
+      return false;
+    }
+
+    const normalizedCurrentCity = normalizePlace(currentUserCity);
+    const normalizedListingCity = normalizePlace(location);
+
+    if (!normalizedCurrentCity || !normalizedListingCity) {
+      return false;
+    }
+
+    if (
+      normalizedCurrentCity === normalizedListingCity ||
+      normalizedCurrentCity.includes(normalizedListingCity) ||
+      normalizedListingCity.includes(normalizedCurrentCity)
+    ) {
+      return true;
+    }
+
+    return getEditDistance(normalizedCurrentCity, normalizedListingCity) <= 2;
+  }, [currentUserCity, location]);
+
+  const computedDistance = useMemo(() => {
+    const serverDistance = Number(distance);
+    if (Number.isFinite(serverDistance) && serverDistance >= 0) {
+      return serverDistance;
+    }
+
+    const toRadians = (value) => (value * Math.PI) / 180;
+    const earthRadiusKm = 6371;
+
+    if (hasExactLocation && hasUserCoordinates) {
+      const dLat = toRadians(normalizedLatitude - normalizedUserLatitude);
+      const dLon = toRadians(normalizedLongitude - normalizedUserLongitude);
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRadians(normalizedUserLatitude)) *
+          Math.cos(toRadians(normalizedLatitude)) *
+          Math.sin(dLon / 2) *
+          Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+      return earthRadiusKm * c;
+    }
+
+    return null;
+  }, [
+    distance,
+    hasExactLocation,
+    hasUserCoordinates,
+    normalizedLatitude,
+    normalizedLongitude,
+    normalizedUserLatitude,
+    normalizedUserLongitude
+  ]);
+
+  const formattedDistance = useMemo(() => {
+    if (!Number.isFinite(computedDistance)) {
+      return null;
+    }
+
+    if (isSameCity && computedDistance > 100) {
+      return t('animalCard.sameCity');
+    }
+
+    return computedDistance < 10
+      ? computedDistance.toFixed(1)
+      : Math.round(computedDistance).toString();
+  }, [computedDistance, isSameCity, t]);
+
+  const isOwnListing = useMemo(() => {
+    if (!currentUserId || !sellerId) {
+      return false;
+    }
+
+    return String(currentUserId) === String(sellerId);
+  }, [currentUserId, sellerId]);
   // Handle call action
   const handleCall = async () => {
     // Log the call in backend first
@@ -116,6 +245,23 @@ const AnimalCard = ({
     if (animalType && listingId) {
       navigate(`/animal/${animalType.toLowerCase()}/${listingId}`);
     }
+  };
+
+  const handleLocationClick = (e) => {
+    e.stopPropagation();
+
+    if (!hasExactLocation) {
+      navigate('/map');
+      return;
+    }
+
+    const params = new URLSearchParams({
+      listingId: String(listingId || ''),
+      lat: String(normalizedLatitude),
+      lng: String(normalizedLongitude)
+    });
+
+    navigate(`/map?${params.toString()}`);
   };
 
   // Handle call with stop propagation
@@ -220,14 +366,41 @@ const AnimalCard = ({
         </h3>
         
         {/* Location & Date */}
-        <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
-          <div className="flex items-center gap-1">
-            <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="flex items-center justify-between gap-3 text-xs text-gray-500 mb-3">
+          <button
+            type="button"
+            onClick={handleLocationClick}
+            className="flex items-center gap-1 min-w-0 text-left text-gray-600 hover:text-green-600 transition-colors"
+            title={hasExactLocation ? t('animalCard.viewOnMap') : location}
+          >
+            <svg className="w-3.5 h-3.5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
             </svg>
             <span className="truncate max-w-[120px]">{location}</span>
-          </div>
-          <div className="flex items-center gap-1">
+            {isOwnListing ? (
+              <span className="hidden sm:inline text-[11px] text-green-700 whitespace-nowrap">
+                · {t('animalCard.addedByYou')}
+              </span>
+            ) : formattedDistance && (
+              <span className="hidden sm:inline text-[11px] text-green-700 whitespace-nowrap">
+                · {formattedDistance === t('animalCard.sameCity')
+                  ? formattedDistance
+                  : t('animalCard.distanceAway', { distance: formattedDistance })}
+              </span>
+            )}
+          </button>
+          {isOwnListing ? (
+            <span className="sm:hidden text-[11px] font-medium text-green-700 whitespace-nowrap">
+              {t('animalCard.addedByYou')}
+            </span>
+          ) : formattedDistance && (
+            <span className="sm:hidden text-[11px] font-medium text-green-700 whitespace-nowrap">
+              {formattedDistance === t('animalCard.sameCity')
+                ? formattedDistance
+                : t('animalCard.distanceAway', { distance: formattedDistance })}
+            </span>
+          )}
+          <div className="flex items-center gap-1 whitespace-nowrap">
             <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>

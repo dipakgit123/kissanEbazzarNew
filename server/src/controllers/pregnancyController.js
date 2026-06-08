@@ -125,6 +125,7 @@ class PregnancyController {
         listing_type,
         animal_type,
         animal_name,
+        ear_badge_number,
         breed_name,
         animal_photo,
         mating_date,
@@ -152,6 +153,7 @@ class PregnancyController {
         listing_type: listing_type || null,
         animal_type: animal_type.toLowerCase(),
         animal_name,
+        ear_badge_number: ear_badge_number || null,
         breed_name: breed_name || null,
         animal_photo: animal_photo || null,
         mating_date,
@@ -300,7 +302,7 @@ class PregnancyController {
 
       // Update allowed fields
       const allowedFields = [
-        'animal_name', 'breed_name', 'animal_photo', 'mating_date',
+        'animal_name', 'ear_badge_number', 'breed_name', 'animal_photo', 'mating_date',
         'expected_delivery_date', 'bull_sire_details', 'mating_type',
         'health_status', 'notes', 'vet_checkup_dates', 'vaccination_dates',
         'reminder_enabled'
@@ -509,6 +511,7 @@ class PregnancyController {
           calendarData[expectedDate].push({
             id: pregnancy.id,
             animal_name: pregnancy.animal_name,
+            ear_badge_number: pregnancy.ear_badge_number,
             animal_type: pregnancy.animal_type,
             breed_name: pregnancy.breed_name,
             days_remaining: pregnancy.getDaysRemaining(),
@@ -534,6 +537,7 @@ class PregnancyController {
         all_active: pregnancies.map(p => ({
           id: p.id,
           animal_name: p.animal_name,
+          ear_badge_number: p.ear_badge_number,
           animal_type: p.animal_type,
           breed_name: p.breed_name,
           expected_delivery_date: p.expected_delivery_date,

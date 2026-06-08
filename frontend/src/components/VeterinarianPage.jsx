@@ -17,8 +17,8 @@ import { GiHealthCapsule, GiMedicines } from 'react-icons/gi';
 import { MdClose, MdOutlinePets } from 'react-icons/md';
 import { API_BASE_URL } from '../config/api';
 import veterinarianHeroImage from '../assets/images/veternarian.png';
-import { safeJsonParse } from '../utils/stringUtils';
 import { InlineLoader } from './AppLoader';
+import { resolveUserLocation } from '../utils/userLocation';
 
 const API_URL = API_BASE_URL;
 const SPECIALIZATION_OPTIONS = ['general', 'large_animal', 'small_animal', 'livestock', 'surgery', 'emergency', 'reproduction'];
@@ -136,34 +136,29 @@ const VeterinarianPage = () => {
   };
 
   useEffect(() => {
-    const savedLocation = localStorage.getItem('userData');
-    if (savedLocation) {
-      const userData = safeJsonParse(savedLocation, null);
-      if (userData && userData.latitude && userData.longitude) {
-        setUserLocation({
-          latitude: userData.latitude,
-          longitude: userData.longitude,
-        });
+    let isMounted = true;
+
+    const loadUserLocation = async () => {
+      const resolvedLocation = await resolveUserLocation();
+
+      if (!isMounted) {
         return;
       }
-    }
 
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-          });
-        },
-        () => {
-          setUserLocation({
-            latitude: 18.5204,
-            longitude: 73.8567,
-          });
-        }
-      );
-    }
+      if (resolvedLocation) {
+        setUserLocation(resolvedLocation);
+        return;
+      }
+
+      setUserLocation(null);
+      setViewMode('all');
+    };
+
+    loadUserLocation();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {

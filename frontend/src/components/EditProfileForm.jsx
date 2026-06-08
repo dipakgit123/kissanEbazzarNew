@@ -263,13 +263,13 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
+      toast.error(t('profile.photoFileType'));
       return;
     }
 
     // Validate file size (5MB max)
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size should be less than 5MB');
+      toast.error(t('profile.photoSizeLimit'));
       return;
     }
 
@@ -292,12 +292,12 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
           onPhotoUpdate(newPhoto);
         }
       } else {
-        toast.error(response.message || 'Failed to upload photo');
+        toast.error(t('profile.photoUploadFailed'));
         setPhotoPreview(profilePhoto); // Revert preview
       }
     } catch (error) {
       console.error('Error uploading photo:', error);
-      toast.error(error.message || 'Failed to upload photo');
+      toast.error(t('profile.photoUploadFailed'));
       setPhotoPreview(profilePhoto); // Revert preview
     } finally {
       setUploadingPhoto(false);
@@ -317,11 +317,11 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
           onPhotoUpdate(null);
         }
       } else {
-        toast.error(response.message || 'Failed to remove photo');
+        toast.error(t('profile.photoRemoveFailed'));
       }
     } catch (error) {
       console.error('Error removing photo:', error);
-      toast.error(error.message || 'Failed to remove photo');
+      toast.error(t('profile.photoRemoveFailed'));
     } finally {
       setUploadingPhoto(false);
     }
@@ -331,23 +331,23 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
     const newErrors = {};
 
     if (!form.name || form.name.trim().length < 2) {
-      newErrors.name = 'Name must be at least 2 characters';
+      newErrors.name = t('profile.validation.nameMin');
     }
 
     if (!form.address || form.address.trim().length < 5) {
-      newErrors.address = 'Please enter a valid address';
+      newErrors.address = t('profile.validation.addressValid');
     }
 
     if (!form.pincode || !/^\d{6}$/.test(form.pincode.trim())) {
-      newErrors.pincode = 'Please enter a valid 6-digit pincode';
+      newErrors.pincode = t('profile.validation.pincodeValid');
     }
 
     if (form.latitude && Number.isNaN(Number(form.latitude))) {
-      newErrors.address = 'Invalid location coordinates';
+      newErrors.address = t('profile.validation.invalidCoordinates');
     }
 
     if (form.longitude && Number.isNaN(Number(form.longitude))) {
-      newErrors.address = 'Invalid location coordinates';
+      newErrors.address = t('profile.validation.invalidCoordinates');
     }
 
     setErrors(newErrors);

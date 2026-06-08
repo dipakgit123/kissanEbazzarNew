@@ -1,11 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { API_BASE_API } from '../config/api';
-import { safeJsonParse } from '../utils/stringUtils';
 import { FullPageLoader } from './AppLoader';
+import { localizeApiMessage } from '../utils/localizeApiMessage';
+import { resolveUserLocation } from '../utils/userLocation';
 
 const NearbyVeterinarians = () => {
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [veterinarians, setVeterinarians] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -13,51 +16,29 @@ const NearbyVeterinarians = () => {
   const [radius, setRadius] = useState(100); // Default 100km
   const [selectedSpecialization, setSelectedSpecialization] = useState('');
 
-  const specializations = [
-    { value: '', label: 'All Specializations' },
-    { value: 'general', label: 'General Veterinary' },
-    { value: 'cattle', label: 'Cattle Specialist' },
-    { value: 'dairy', label: 'Dairy Specialist' },
-    { value: 'poultry', label: 'Poultry Specialist' },
-    { value: 'equine', label: 'Equine Specialist' },
-    { value: 'small_animals', label: 'Small Animals' },
-    { value: 'surgery', label: 'Veterinary Surgery' },
-    { value: 'reproduction', label: 'Animal Reproduction' }
-  ];
+  const specializations = useMemo(() => ([
+    { value: '', label: t('veterinarian.allSpecializations') },
+    { value: 'general', label: t('veterinarian.specializationGeneral') },
+    { value: 'large_animal', label: t('veterinarian.specializationLargeAnimal') },
+    { value: 'small_animal', label: t('veterinarian.specializationSmallAnimal') },
+    { value: 'livestock', label: t('veterinarian.specializationLivestock') },
+    { value: 'surgery', label: t('veterinarian.specializationSurgery') },
+    { value: 'emergency', label: t('veterinarian.specializationEmergency') },
+    { value: 'reproduction', label: t('veterinarian.specializationReproduction') }
+  ]), [t]);
 
-  const getUserLocation = useCallback(() => {
-    // Try to get from localStorage first
-    const savedLocation = localStorage.getItem('userLocation');
-    if (savedLocation) {
-      const location = safeJsonParse(savedLocation, null);
-      if (location) {
-        setUserLocation(location);
-        return;
-      }
+  const getUserLocation = useCallback(async () => {
+    setLoading(true);
+    const location = await resolveUserLocation();
+
+    if (location) {
+      setUserLocation(location);
+      return;
     }
 
-    // Get current location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const location = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude
-          };
-          setUserLocation(location);
-          localStorage.setItem('userLocation', JSON.stringify(location));
-        },
-        (error) => {
-          console.error('Error getting location:', error);
-          toast.error('Please enable location services to find nearby veterinarians');
-          setLoading(false);
-        }
-      );
-    } else {
-      toast.error('Geolocation is not supported by your browser');
-      setLoading(false);
-    }
-  }, []);
+    toast.error(t('veterinarian.enableLocation'));
+    setLoading(false);
+  }, [t]);
 
   const fetchNearbyVeterinarians = useCallback(async () => {
     try {
@@ -65,7 +46,7 @@ const NearbyVeterinarians = () => {
       const params = new URLSearchParams({
         latitude: userLocation.latitude,
         longitude: userLocation.longitude,
-        radius: radius
+        radius: String(radius)
       });
 
       if (selectedSpecialization) {
@@ -78,15 +59,23 @@ const NearbyVeterinarians = () => {
       if (data.success) {
         setVeterinarians(data.data);
       } else {
-        toast.error(data.message || 'Failed to fetch veterinarians');
+        toast.error(
+          localizeApiMessage(
+            i18n,
+            t,
+            data.message,
+            'veterinarian.fetchFailed',
+            'Failed to fetch veterinarians'
+          )
+        );
       }
     } catch (error) {
       console.error('Error fetching veterinarians:', error);
-      toast.error('Failed to fetch nearby veterinarians');
+      toast.error(t('veterinarian.fetchNearbyFailed'));
     } finally {
       setLoading(false);
     }
-  }, [radius, selectedSpecialization, userLocation]);
+  }, [i18n, radius, selectedSpecialization, t, userLocation]);
 
   useEffect(() => {
     getUserLocation();
@@ -116,14 +105,21 @@ const NearbyVeterinarians = () => {
   };
 
   const formatSpecialization = (spec) => {
-    if (!spec) return 'General Veterinary';
-    return spec.split('_').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
+    const specializationLabelMap = {
+      general: t('veterinarian.specializationGeneral'),
+      large_animal: t('veterinarian.specializationLargeAnimal'),
+      small_animal: t('veterinarian.specializationSmallAnimal'),
+      livestock: t('veterinarian.specializationLivestock'),
+      surgery: t('veterinarian.specializationSurgery'),
+      emergency: t('veterinarian.specializationEmergency'),
+      reproduction: t('veterinarian.specializationReproduction')
+    };
+
+    return specializationLabelMap[spec] || t('veterinarian.specializationGeneral');
   };
 
   if (loading && !veterinarians.length) {
-    return <FullPageLoader message="Finding nearby veterinarians..." />;
+    return <FullPageLoader message={t('veterinarian.findingNearby')} />;
   }
 
   return (
@@ -131,8 +127,8 @@ const NearbyVeterinarians = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Nearby Veterinarians</h1>
-          <p className="text-gray-600">Find and book appointments with veterinarians near you</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">{t('veterinarian.nearbyVets')}</h1>
+          <p className="text-gray-600">{t('veterinarian.pageDescription')}</p>
         </div>
 
         {/* Filters */}
@@ -141,7 +137,7 @@ const NearbyVeterinarians = () => {
             {/* Radius Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Search Radius: {radius} km
+                {t('veterinarian.showNearby')}: {radius} km
               </label>
               <input
                 type="range"
@@ -161,7 +157,7 @@ const NearbyVeterinarians = () => {
             {/* Specialization Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Specialization
+                {t('veterinarian.allSpecializations')}
               </label>
               <select
                 value={selectedSpecialization}
@@ -179,9 +175,9 @@ const NearbyVeterinarians = () => {
             {/* Results Count */}
             <div className="flex items-end">
               <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2 w-full">
-                <p className="text-sm text-gray-600">Found</p>
+                <p className="text-sm text-gray-600">{t('common.found', { defaultValue: 'Found' })}</p>
                 <p className="text-2xl font-bold text-green-600">{veterinarians.length}</p>
-                <p className="text-xs text-gray-500">Veterinarians</p>
+                <p className="text-xs text-gray-500">{t('veterinarian.profilesFound')}</p>
               </div>
             </div>
           </div>
@@ -193,13 +189,13 @@ const NearbyVeterinarians = () => {
             <svg className="w-24 h-24 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <h3 className="text-xl font-semibold text-gray-700 mb-2">No veterinarians found</h3>
-            <p className="text-gray-500 mb-4">Try increasing the search radius or changing filters</p>
+            <h3 className="text-xl font-semibold text-gray-700 mb-2">{t('veterinarian.noVetsFound')}</h3>
+            <p className="text-gray-500 mb-4">{t('veterinarian.noVetsMessage')}</p>
             <button
               onClick={() => setRadius(200)}
               className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
             >
-              Expand Search to 200 km
+              {t('veterinarian.expandSearch', { defaultValue: 'Expand search to 200 km' })}
             </button>
           </div>
         ) : (

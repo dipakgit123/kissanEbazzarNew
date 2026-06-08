@@ -4,6 +4,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import { userService } from '../services/api';
 import { safeJsonParse } from '../utils/stringUtils';
 import LanguageSwitcher from './LanguageSwitcher';
+import { localizeApiMessage } from '../utils/localizeApiMessage';
 
 const UserIcon = () => (
   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -19,7 +20,7 @@ const LocationIcon = () => (
 );
 
 const ProfileCompletion = ({ onComplete }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [formData, setFormData] = useState({
     full_name: '',
     postal_code: ''
@@ -104,7 +105,15 @@ const ProfileCompletion = ({ onComplete }) => {
       }
     } catch (error) {
       console.error('Profile completion error:', error);
-      toast.error(error.message || t('profileCompletion.failed'));
+      toast.error(
+        localizeApiMessage(
+          i18n,
+          t,
+          error.message,
+          'profileCompletion.failed',
+          'Failed to complete profile'
+        )
+      );
     } finally {
       setIsLoading(false);
     }

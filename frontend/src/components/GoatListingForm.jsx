@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -14,11 +15,13 @@ import {
 } from './common';
 import { getGoatBreedOptions } from '../constants/goatBreeds';
 import './AnimalListingPage.css';
+import { localizeApiMessage } from '../utils/localizeApiMessage';
 
 const API_URL = API_BASE_URL;
 
 const GoatListingForm = () => {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const goatBreedOptions = getGoatBreedOptions(
     i18n.resolvedLanguage || i18n.language,
     t('common.selectOption')
@@ -70,6 +73,14 @@ const GoatListingForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!files.photo1 && !files.photo2 && !files.photo3 && !files.photo4 && !files.photo5) {
+      const message = t('listing.photoRequired');
+      setError(message);
+      toast.error(message);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setSuccess(false);
@@ -140,11 +151,19 @@ const GoatListingForm = () => {
         });
 
         toast.success(t('listing.createSuccess'));
+        navigate('/buy-animals');
       }
     } catch (err) {
       console.error('Error creating listing:', err);
-      setError(err.response?.data?.message || err.message || t('listing.createError'));
-      toast.error(err.response?.data?.message || err.message || t('listing.createError'));
+      const nextMessage = localizeApiMessage(
+        i18n,
+        t,
+        err.response?.data?.message || err.message,
+        'listing.createError',
+        'Failed to create listing'
+      );
+      setError(nextMessage);
+      toast.error(nextMessage);
     } finally {
       setLoading(false);
     }

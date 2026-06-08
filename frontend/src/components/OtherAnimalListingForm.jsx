@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -13,9 +14,11 @@ import {
   SubmitButton
 } from './common';
 import './AnimalListingPage.css';
+import { localizeApiMessage } from '../utils/localizeApiMessage';
 
 const OtherAnimalListingForm = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
   const [errorMessage, setErrorMessage] = useState(null);
@@ -116,12 +119,21 @@ const OtherAnimalListingForm = () => {
       newErrors.expectedPrice = 'Price must be greater than 0';
     }
 
+    if (!formData.frontPhoto && !formData.sidePhoto && !formData.additionalPhoto) {
+      newErrors.photos = t('listing.photoRequired');
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!formData.frontPhoto && !formData.sidePhoto && !formData.additionalPhoto) {
+      toast.error(t('listing.photoRequired'));
+      return;
+    }
 
     if (!validateForm()) {
       toast.error(t('validation.fillRequired') || 'Please fill all required fields');
@@ -165,14 +177,18 @@ const OtherAnimalListingForm = () => {
         setSuccess(true);
         toast.success(t('listing.createSuccess') || 'Other animal listing created successfully!');
         resetForm();
+        navigate('/buy-animals');
       }
     } catch (error) {
       console.error('Error creating listing:', error);
       const nextErrorMessage =
-        error.response?.data?.message ||
-        error.response?.data?.error ||
-        t('listing.createError') ||
-        'Failed to create listing. Please try again.';
+        localizeApiMessage(
+          i18n,
+          t,
+          error.response?.data?.message || error.response?.data?.error || error.message,
+          'listing.createError',
+          'Failed to create listing. Please try again.'
+        );
 
       setErrorMessage(nextErrorMessage);
       toast.error(nextErrorMessage);
@@ -311,6 +327,7 @@ const OtherAnimalListingForm = () => {
           accept="image/*"
           file={formData.frontPhoto}
           onChange={(file) => handleFileChange('frontPhoto', file)}
+          required
         />
 
         <FormFileInput

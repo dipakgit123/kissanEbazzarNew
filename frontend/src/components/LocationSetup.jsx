@@ -64,7 +64,7 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
     setStep('current');
 
     if (!navigator.geolocation) {
-      toast.error('Geolocation is not supported by your browser');
+      toast.error(t('location.geolocationUnsupported'));
       setIsLoading(false);
       setStep('choose');
       return;
@@ -77,17 +77,17 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
       (error) => {
         setIsLoading(false);
         setStep('choose');
-        let errorMessage = 'Failed to get your location';
+        let errorMessage = t('location.errors.getLocationFailed');
 
         switch (error.code) {
           case error.PERMISSION_DENIED:
-            errorMessage = 'Location permission denied. Please enable location access.';
+            errorMessage = t('location.errors.permissionDenied');
             break;
           case error.POSITION_UNAVAILABLE:
-            errorMessage = 'Location information is unavailable.';
+            errorMessage = t('location.errors.positionUnavailable');
             break;
           case error.TIMEOUT:
-            errorMessage = 'Location request timed out.';
+            errorMessage = t('location.errors.timeout');
             break;
         }
 
@@ -106,21 +106,21 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
       const data = await locationService.setCurrentLocation(latitude, longitude);
 
       if (data.success) {
-        toast.success('Location set successfully!');
+        toast.success(t('location.locationSetSuccess'));
         if (onLocationSet) {
           setTimeout(() => onLocationSet(), 1500);
         }
       } else {
         if (data.hasLocation) {
-          toast.error('Location already set. Redirecting...');
+          toast.error(t('location.locationAlreadySet'));
           setTimeout(() => onLocationSet(), 1500);
         } else {
-          toast.error(data.message || 'Failed to set location');
+          toast.error(t('location.errors.setLocationFailed'));
           setStep('choose');
         }
       }
     } catch {
-      toast.error('Failed to set location. Please try again.');
+      toast.error(t('location.errors.setLocationRetry'));
       setStep('choose');
     } finally {
       setIsLoading(false);
@@ -129,7 +129,7 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
 
   const handleManualSubmit = async () => {
     if (!manualLocation.city || !manualLocation.country) {
-      toast.error('Please fill in at least city and country');
+      toast.error(t('location.errors.cityCountryRequired'));
       return;
     }
 
@@ -139,20 +139,20 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
       const data = await locationService.setManualLocation(manualLocation);
 
       if (data.success) {
-        toast.success('Location set successfully!');
+        toast.success(t('location.locationSetSuccess'));
         if (onLocationSet) {
           setTimeout(() => onLocationSet(), 1500);
         }
       } else {
         if (data.hasLocation) {
-          toast.error('Location already set. Redirecting...');
+          toast.error(t('location.locationAlreadySet'));
           setTimeout(() => onLocationSet(), 1500);
         } else {
-          toast.error(data.message || 'Failed to set location');
+          toast.error(t('location.errors.setLocationFailed'));
         }
       }
     } catch {
-      toast.error('Failed to set location. Please try again.');
+      toast.error(t('location.errors.setLocationRetry'));
     } finally {
       setIsLoading(false);
     }

@@ -16,6 +16,62 @@ const upload = multer({
   },
 });
 
+const buildQuestionContext = (analysis, additionalInfo = '') => {
+  const summaryParts = [
+    analysis?.animalType ? `Detected animal: ${analysis.animalType}` : '',
+    analysis?.overallHealth ? `Overall health: ${analysis.overallHealth}` : '',
+    analysis?.healthScore != null ? `Health score: ${analysis.healthScore}/10` : '',
+    analysis?.urgencyLevel ? `Urgency: ${analysis.urgencyLevel}` : '',
+    Array.isArray(analysis?.visibleSigns) && analysis.visibleSigns.length
+      ? `Visible signs: ${analysis.visibleSigns.slice(0, 4).join(', ')}`
+      : '',
+    Array.isArray(analysis?.potentialIssues) && analysis.potentialIssues.length
+      ? `Potential issues: ${analysis.potentialIssues
+          .slice(0, 3)
+          .map((issue) => issue.condition || issue.conditionEnglish)
+          .filter(Boolean)
+          .join(', ')}`
+      : '',
+    Array.isArray(analysis?.recommendations) && analysis.recommendations.length
+      ? `Recommendations: ${analysis.recommendations.slice(0, 3).join(', ')}`
+      : '',
+  ].filter(Boolean);
+
+  return [additionalInfo, summaryParts.join('\n')].filter(Boolean).join('\n\n').trim();
+};
+
+const appendQuestionAnswer = async ({
+  analysis,
+  customQuestion,
+  animalType,
+  symptoms,
+  age,
+  additionalInfo,
+  languageHint,
+}) => {
+  if (!customQuestion?.trim()) {
+    return;
+  }
+
+  analysis.questionAsked = customQuestion.trim();
+
+  try {
+    const questionResult = await aiHealthService.answerHealthQuestion({
+      prompt: customQuestion,
+      animalType,
+      symptoms,
+      age,
+      additionalInfo: buildQuestionContext(analysis, additionalInfo),
+      languageHint,
+    });
+
+    analysis.questionAnswer = questionResult.answer;
+  } catch (error) {
+    console.error('AI health follow-up question failed:', error);
+    analysis.questionError = error.message || 'Could not get an AI answer right now.';
+  }
+};
+
 /**
  * Analyze animal health from uploaded image
  * POST /api/health-check/analyze
@@ -44,18 +100,15 @@ const analyzeHealth = async (req, res) => {
       additionalInfo,
     });
 
-    if (customQuestion?.trim()) {
-      const questionResult = await aiHealthService.answerHealthQuestion({
-        prompt: customQuestion,
-        animalType,
-        symptoms,
-        age,
-        additionalInfo: `${additionalInfo || ''}\nImage analysis summary: ${JSON.stringify(result.analysis)}`.trim(),
-        languageHint,
-      });
-      result.analysis.questionAnswer = questionResult.answer;
-      result.analysis.questionAsked = customQuestion.trim();
-    }
+    await appendQuestionAnswer({
+      analysis: result.analysis,
+      customQuestion,
+      animalType,
+      symptoms,
+      age,
+      additionalInfo,
+      languageHint,
+    });
 
     res.json({
       success: true,
@@ -103,18 +156,15 @@ const uploadAndAnalyze = async (req, res) => {
       additionalInfo,
     });
 
-    if (customQuestion?.trim()) {
-      const questionResult = await aiHealthService.answerHealthQuestion({
-        prompt: customQuestion,
-        animalType,
-        symptoms,
-        age,
-        additionalInfo: `${additionalInfo || ''}\nImage analysis summary: ${JSON.stringify(result.analysis)}`.trim(),
-        languageHint,
-      });
-      result.analysis.questionAnswer = questionResult.answer;
-      result.analysis.questionAsked = customQuestion.trim();
-    }
+    await appendQuestionAnswer({
+      analysis: result.analysis,
+      customQuestion,
+      animalType,
+      symptoms,
+      age,
+      additionalInfo,
+      languageHint,
+    });
 
     res.json({
       success: true,

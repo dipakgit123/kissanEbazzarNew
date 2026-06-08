@@ -52,7 +52,7 @@
                  "resendOTP":  "OTP पुनः भेजें",
                  "welcomeBack":  "वापसी पर स्वागत है!",
                  "loginToContinue":  "पशु बाज़ार में जारी रखने के लिए लॉगिन करें",
-                 "invalidPhone":  "कृपया एक वैध 10-अंकीय फ़ोन नंबर दर्ज करें",
+                 "invalidPhone":  "कृपया 6, 7, 8 या 9 से शुरू होने वाला वैध 10-अंकीय भारतीय मोबाइल नंबर दर्ज करें",
                  "otpSent":  "OTP सफलतापूर्वक भेजा गया",
                  "otpSendFailed":  "OTP भेजने में विफल",
                  "loginSuccess":  "लॉगिन सफल",
@@ -166,7 +166,7 @@
                        "uploadPhotos":  "फोटो अपलोड करें",
                        "location":  "स्थान",
                        "contactDetails":  "संपर्क विवरण",
-                       "submitListing":  "सबमिट करा",
+                       "submitListing":  "लिस्टिंग सबमिट करें",
                        "listingSuccess":  "पशु सफलतापूर्वक सूचीबद्ध किया गया",
                        "daysToSell":  "बेचने के दिन",
                        "lactation":  "स्तनपान",
@@ -221,6 +221,11 @@
                          "allVerifiedVets":  "सभी सत्यापित पशु चिकित्सक",
                          "farmerLocationHint":  "लॉग-इन किसान के स्थान से {{radius}} किमी के भीतर के पशु चिकित्सक दिखाए जा रहे हैं।",
                          "allVerifiedHint":  "प्लेटफ़ॉर्म पर उपलब्ध सभी सत्यापित पशु चिकित्सकों की प्रोफ़ाइल देखें।",
+                         "enableLocation":  "आस-पास के पशु चिकित्सक खोजने के लिए लोकेशन सेवा चालू करें",
+                         "fetchFailed":  "पशु चिकित्सकों को प्राप्त नहीं किया जा सका",
+                         "fetchNearbyFailed":  "आस-पास के पशु चिकित्सकों को प्राप्त नहीं किया जा सका",
+                         "findingNearby":  "आस-पास के पशु चिकित्सक खोजे जा रहे हैं...",
+                         "generalVeterinary":  "सामान्य पशु चिकित्सा",
                          "within10km":  "10 किमी के भीतर",
                          "within25km":  "25 किमी के भीतर",
                          "within50km":  "50 किमी के भीतर",
@@ -317,6 +322,8 @@
                       "breedingDate":  "प्रजनन तिथि",
                       "count":  "संख्या",
                       "genderMixed":  "⚥ मिश्रित",
+                      "earBadgeNumber":  "कान टैग नंबर",
+                      "earBadgeNumberShort":  "कान टैग",
                       "bullSireDetails":  "सांड/पिता विवरण",
                       "genderFemale":  "♀ मादा",
                       "breedName":  "नस्ल का नाम",
@@ -330,6 +337,10 @@
                       "noRecords":  "अभी गर्भावस्था रिकॉर्ड नहीं",
                       "cancel":  "रद्द करें",
                       "recordAdded":  "गर्भावस्था रिकॉर्ड सफलतापूर्वक जोड़ा गया",
+                      "loadFailed":  "गर्भावस्था डेटा लोड नहीं हो सका। कृपया फिर से प्रयास करें।",
+                      "createFailed":  "गर्भावस्था रिकॉर्ड बनाया नहीं जा सका",
+                      "markDeliveredFailed":  "डिलीवर के रूप में चिह्नित नहीं किया जा सका",
+                      "deleteFailed":  "रिकॉर्ड हटाया नहीं जा सका",
                       "loadingCalendar":  "गर्भावस्था कैलेंडर लोड हो रहा है...",
                       "addPregnancyRecord":  "गर्भावस्था रिकॉर्ड जोड़ें",
                       "statusFalsePregnancy":  "झूठी गर्भावस्था",
@@ -363,6 +374,7 @@
                       "deliveryDateLabel":  "प्रसव तिथि",
                       "statusDelivered":  "प्रसव हुआ था",
                       "markDelivered":  "प्रसव चिह्नित करें",
+                      "placeholderEarBadge":  "उदा., A-17",
                       "placeholderBreed":  "उदा., गिर",
                       "offspringDetails":  "संतान विवरण",
                       "animalCow":  "गाय",
@@ -422,7 +434,19 @@
                      "enterManually":  "मैन्युअल रूप से स्थान दर्ज करें",
                      "detectingLocation":  "आपका स्थान पता लगाया जा रहा है...",
                      "locationDetected":  "स्थान सफलतापूर्वक पता लगाया गया",
-                     "currentLocation":  "वर्तमान स्थान"
+                     "currentLocation":  "वर्तमान स्थान",
+                     "geolocationUnsupported":  "आपके ब्राउज़र में जियोलोकेशन समर्थित नहीं है",
+                     "locationSetSuccess":  "स्थान सफलतापूर्वक सेट हो गया!",
+                     "locationAlreadySet":  "स्थान पहले से सेट है। रीडायरेक्ट किया जा रहा है...",
+                     "errors":  {
+                                    "getLocationFailed":  "आपका स्थान प्राप्त नहीं हो सका",
+                                    "permissionDenied":  "लोकेशन अनुमति अस्वीकृत है। कृपया लोकेशन एक्सेस सक्षम करें।",
+                                    "positionUnavailable":  "स्थान की जानकारी उपलब्ध नहीं है।",
+                                    "timeout":  "लोकेशन अनुरोध का समय समाप्त हो गया।",
+                                    "setLocationFailed":  "स्थान सेट नहीं हो सका",
+                                    "setLocationRetry":  "स्थान सेट नहीं हो सका। कृपया फिर से प्रयास करें।",
+                                    "cityCountryRequired":  "कृपया कम से कम शहर और देश भरें"
+                                }
                  },
     "notifications":  {
                           "success":  "सफलता",
@@ -1038,10 +1062,11 @@
                    "additionalInfoPlaceholder":  "कोई अतिरिक्त जानकारी..."
                },
     "listing":  {
-                    "submit":  "सबमिट करा",
+                    "submit":  "सबमिट करें",
                     "submitting":  "सूची बनाई जा रही है...",
                     "createSuccess":  "सूची सफलतापूर्वक बनाई गई!",
                     "createError":  "सूची बनाने में विफल। कृपया पुनः प्रयास करें।",
+                    "photoRequired":  "कृपया कम से कम एक फोटो अपलोड करें।",
                     "createListing":  "पशु सूची बनाएं",
                     "subtitle":  "अपने पशु को बिक्री के लिए सूचीबद्ध करें और हजारों संभावित खरीदारों तक पहुंचें",
                     "instructions":  {
@@ -1130,7 +1155,11 @@
                        "addedToWishlist":  "विशलिस्ट में जोड़ा गया!",
                        "removedFromWishlist":  "विशलिस्ट से हटाया गया",
                        "removeFromWishlist":  "विशलिस्ट से हटाएं",
-                       "addToWishlist":  "विशलिस्ट में जोड़ें"
+                       "addToWishlist":  "विशलिस्ट में जोड़ें",
+                       "viewOnMap":  "मानचित्र पर सटीक स्थान देखें",
+                       "distanceAway":  "{{distance}} किमी दूर",
+                       "addedByYou":  "आपके द्वारा जोड़ा गया",
+                       "sameCity":  "उसी शहर में"
                    },
     "time":  {
                  "recently":  "हाल ही में",
@@ -1343,8 +1372,56 @@
                     "fetchingAddressFromPincode":  "आपका पता पिनकोड से प्राप्त किया जा रहा है...",
                     "fetchingAddressFromLocation":  "आपका पता आपकी लोकेशन से प्राप्त किया जा रहा है...",
                     "updateProfile":  "प्रोफ़ाइल अपडेट करें",
-                    "saving":  "सहेज रहे हैं..."
+                    "saving":  "सहेज रहे हैं...",
+                    "photoFileType":  "कृपया एक इमेज फ़ाइल चुनें",
+                    "photoSizeLimit":  "इमेज का आकार 5MB से कम होना चाहिए",
+                    "photoUploadFailed":  "फ़ोटो अपलोड नहीं हो सकी",
+                    "photoRemoveFailed":  "फ़ोटो हटाई नहीं जा सकी",
+                    "validation":  {
+                                       "nameMin":  "नाम कम से कम 2 अक्षरों का होना चाहिए",
+                                       "addressValid":  "कृपया एक वैध पता दर्ज करें",
+                                       "pincodeValid":  "कृपया वैध 6-अंकीय पिनकोड दर्ज करें",
+                                       "invalidCoordinates":  "अमान्य लोकेशन निर्देशांक"
+                                   }
                 },
+    "appointmentBooking":  {
+                               "title":  "अपॉइंटमेंट बुक करें",
+                               "requiredFields":  "कृपया सभी आवश्यक फ़ील्ड भरें",
+                               "invalidPhone":  "कृपया एक वैध फ़ोन नंबर दर्ज करें",
+                               "futureDateTime":  "कृपया भविष्य की तारीख और समय चुनें",
+                               "loginRequired":  "अपॉइंटमेंट बुक करने के लिए कृपया लॉगिन करें",
+                               "success":  "अपॉइंटमेंट सफलतापूर्वक बुक हो गया! पशु चिकित्सक को सूचित किया जाएगा।",
+                               "failed":  "अपॉइंटमेंट बुक नहीं हो सकी",
+                               "failedRetry":  "अपॉइंटमेंट बुक नहीं हो सकी। कृपया फिर से प्रयास करें।",
+                               "vetUnavailable":  "पशु चिकित्सक की जानकारी उपलब्ध नहीं है",
+                               "findVeterinarians":  "पशु चिकित्सक खोजें"
+                           },
+    "blogAdmin":  {
+                      "created":  "ब्लॉग सफलतापूर्वक बनाया गया!",
+                      "updated":  "ब्लॉग सफलतापूर्वक अपडेट किया गया!",
+                      "deleted":  "ब्लॉग सफलतापूर्वक हटाया गया!",
+                      "operationFailed":  "कार्य पूरा नहीं हो सका",
+                      "retryError":  "एक त्रुटि हुई। कृपया फिर से प्रयास करें।",
+                      "deleteConfirm":  "क्या आप वाकई इस ब्लॉग को हटाना चाहते हैं?",
+                      "deleteFailed":  "ब्लॉग हटाया नहीं जा सका"
+                  },
+    "adminListings":  {
+                          "deleteConfirm":  "क्या आप वाकई इस लिस्टिंग को हटाना चाहते हैं?"
+                      },
+    "adminVeterinarians":  {
+                               "verifyConfirm":  "क्या आप वाकई इस पशु चिकित्सक को सत्यापित करना चाहते हैं? लॉगिन क्रेडेंशियल्स वाला ईमेल भेजा जाएगा।",
+                               "verifySuccess":  "पशु चिकित्सक सफलतापूर्वक सत्यापित हुआ",
+                               "verifyFailed":  "पशु चिकित्सक का सत्यापन नहीं हो सका",
+                               "rejectReasonRequired":  "कृपया अस्वीकृति का कारण दें",
+                               "rejectSuccess":  "पशु चिकित्सक सफलतापूर्वक अस्वीकृत हुआ",
+                               "rejectFailed":  "पशु चिकित्सक को अस्वीकृत नहीं किया जा सका"
+                           },
+    "vetForgotPassword":  {
+                              "success":  "यदि यह ईमेल मौजूद है, तो रीसेट लिंक भेज दिया गया है।"
+                          },
+    "vetResetPassword":  {
+                             "success":  "पासवर्ड सफलतापूर्वक रीसेट हो गया।"
+                         },
     "helpCenter":  {
                       "title":  "हेल्प सेंटर",
                       "subtitle":  "उत्तर खोजें, अपना अकाउंट संभालें और बिना उलझन के सहायता पाएं।",
@@ -1561,6 +1638,32 @@
                     "s9Body":  "हम समय-समय पर इस नीति को अपडेट कर सकते हैं। सेवा का निरंतर उपयोग अद्यतन नीति की स्वीकृति है।",
                     "s10Title":  "10. संपर्क",
                     "s10Body":  "गोपनीयता संबंधी प्रश्नों के लिए कृपया प्रोफ़ाइल में व्हॉट्सऐप सपोर्ट विकल्प का उपयोग करें या हमारे आधिकारिक सपोर्ट चैनलों से संपर्क करें।"
+                },
+    "mapView":  {
+                    "loadingMap":  "मैप लोड हो रहा है...",
+                    "mapLoadingErrorTitle":  "मैप लोडिंग में समस्या",
+                    "mapLoadingErrorBody":  "मैप लोड नहीं हो सका। कृपया अपना इंटरनेट कनेक्शन जांचें और फिर से प्रयास करें।",
+                    "title":  "पशु मानचित्र",
+                    "subtitle":  "अपने आसपास के पशु देखें",
+                    "yourLocationTitle":  "आपका स्थान",
+                    "yourLocationSubtitle":  "पशु इसी स्थान के अनुसार दिखाए जा रहे हैं।",
+                    "refreshMap":  "मैप रीफ्रेश करें",
+                    "mapInfo":  "मैप जानकारी",
+                    "mapInfoToast":  "मैप पर पशु: {{count}}। किसी भी मार्कर पर टैप करें और विक्रेताओं से संपर्क करने के लिए साइड पैनल का उपयोग करें।",
+                    "animalsCount":  "{{count}} पशु",
+                    "onMap":  "मैप पर",
+                    "nearestAnimals":  "नजदीकी पशु",
+                    "allFilter":  "सभी ({{count}})",
+                    "fetchAnimalsFailed":  "पशुओं को लोड नहीं किया जा सका। कृपया फिर से प्रयास करें।",
+                    "unknownBreed":  "अज्ञात नस्ल",
+                    "unknownSeller":  "अज्ञात विक्रेता",
+                    "unknownLocation":  "अज्ञात",
+                    "milkPerDay":  "{{count}} लीटर दूध/दिन",
+                    "sellerLabel":  "विक्रेता",
+                    "loadingAnimals":  "पशु लोड हो रहे हैं...",
+                    "noAnimalsFoundNearby":  "आसपास कोई पशु नहीं मिला",
+                    "tryRefreshing":  "फिर से रीफ्रेश करें",
+                    "whatsAppMessage":  "नमस्ते! मुझे आपकी {{animalType}} लिस्टिंग \"{{title}}\" (₹{{price}}) में रुचि है। क्या यह अभी उपलब्ध है?"
                 },
     "milkReports":  {
                         "eyebrow":  "दूध ट्रैकिंग",
