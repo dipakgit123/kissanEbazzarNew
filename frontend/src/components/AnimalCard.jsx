@@ -124,14 +124,10 @@ const AnimalCard = ({
   }, [currentUserCity, location]);
 
   const computedDistance = useMemo(() => {
-    const serverDistance = Number(distance);
-    if (Number.isFinite(serverDistance) && serverDistance >= 0) {
-      return serverDistance;
-    }
-
     const toRadians = (value) => (value * Math.PI) / 180;
     const earthRadiusKm = 6371;
 
+    let liveCalculatedDistance = null;
     if (hasExactLocation && hasUserCoordinates) {
       const dLat = toRadians(normalizedLatitude - normalizedUserLatitude);
       const dLon = toRadians(normalizedLongitude - normalizedUserLongitude);
@@ -143,10 +139,23 @@ const AnimalCard = ({
           Math.sin(dLon / 2);
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-      return earthRadiusKm * c;
+      liveCalculatedDistance = earthRadiusKm * c;
     }
 
-    return null;
+    const serverDistance = Number(distance);
+    if (Number.isFinite(serverDistance) && serverDistance >= 0) {
+      if (
+        Number.isFinite(liveCalculatedDistance) &&
+        serverDistance > 300 &&
+        liveCalculatedDistance < 300
+      ) {
+        return liveCalculatedDistance;
+      }
+
+      return serverDistance;
+    }
+
+    return liveCalculatedDistance;
   }, [
     distance,
     hasExactLocation,

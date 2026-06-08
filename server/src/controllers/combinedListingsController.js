@@ -64,6 +64,66 @@ const calculateDistanceKm = (fromLatitude, fromLongitude, toLatitude, toLongitud
   return earthRadiusKm * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 };
 
+const COORDINATE_MISMATCH_THRESHOLD_KM = 250;
+
+const chooseTrustedCoordinates = async (
+  {
+    latitude,
+    longitude,
+    postalCode,
+    preferStoredCoordinates = false
+  },
+  postalCodeCache
+) => {
+  const storedLatitude = parseCoordinate(latitude);
+  const storedLongitude = parseCoordinate(longitude);
+  const normalizedPostalCode = normalizePostalCode(postalCode);
+
+  let geocodedLatitude = null;
+  let geocodedLongitude = null;
+
+  if (normalizedPostalCode) {
+    const geocodedCoordinates = await getCoordinatesForPostalCode(normalizedPostalCode, postalCodeCache);
+    geocodedLatitude = parseCoordinate(geocodedCoordinates?.latitude);
+    geocodedLongitude = parseCoordinate(geocodedCoordinates?.longitude);
+  }
+
+  const hasStoredCoordinates = storedLatitude !== null && storedLongitude !== null;
+  const hasGeocodedCoordinates = geocodedLatitude !== null && geocodedLongitude !== null;
+
+  if (hasStoredCoordinates && !hasGeocodedCoordinates) {
+    return { latitude: storedLatitude, longitude: storedLongitude };
+  }
+
+  if (!hasStoredCoordinates && hasGeocodedCoordinates) {
+    return { latitude: geocodedLatitude, longitude: geocodedLongitude };
+  }
+
+  if (!hasStoredCoordinates && !hasGeocodedCoordinates) {
+    return { latitude: null, longitude: null };
+  }
+
+  if (preferStoredCoordinates) {
+    return { latitude: storedLatitude, longitude: storedLongitude };
+  }
+
+  const mismatchDistance = calculateDistanceKm(
+    storedLatitude,
+    storedLongitude,
+    geocodedLatitude,
+    geocodedLongitude
+  );
+
+  if (
+    mismatchDistance !== null &&
+    mismatchDistance > COORDINATE_MISMATCH_THRESHOLD_KM
+  ) {
+    return { latitude: geocodedLatitude, longitude: geocodedLongitude };
+  }
+
+  return { latitude: storedLatitude, longitude: storedLongitude };
+};
+
 const getAuthUserIdFromRequest = (req) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) {
@@ -116,13 +176,15 @@ const getRequesterLocation = async (req) => {
   const queryLongitude = parseCoordinate(req.query.longitude ?? req.query.userLongitude);
   const queryPostalCode = normalizePostalCode(req.query.postalCode);
   const authUserId = getAuthUserIdFromRequest(req);
+  const hasExplicitQueryCoordinates = queryLatitude !== null && queryLongitude !== null;
 
   if (!authUserId) {
     return {
       userId: null,
       latitude: queryLatitude,
       longitude: queryLongitude,
-      postalCode: queryPostalCode
+      postalCode: queryPostalCode,
+      hasExplicitCoordinates: hasExplicitQueryCoordinates
     };
   }
 
@@ -134,7 +196,8 @@ const getRequesterLocation = async (req) => {
     userId: user?.id || authUserId,
     latitude: queryLatitude ?? parseCoordinate(user?.latitude),
     longitude: queryLongitude ?? parseCoordinate(user?.longitude),
-    postalCode: queryPostalCode || normalizePostalCode(user?.postal_code)
+    postalCode: queryPostalCode || normalizePostalCode(user?.postal_code),
+    hasExplicitCoordinates: hasExplicitQueryCoordinates
   };
 };
 
@@ -143,16 +206,19 @@ const attachAccurateDistances = async (listings, requesterLocation) => {
     return listings;
   }
 
-  let originLatitude = parseCoordinate(requesterLocation?.latitude);
-  let originLongitude = parseCoordinate(requesterLocation?.longitude);
-  const originPostalCode = normalizePostalCode(requesterLocation?.postalCode);
   const postalCodeCache = new Map();
-
-  if ((originLatitude === null || originLongitude === null) && originPostalCode) {
-    const originCoordinates = await getCoordinatesForPostalCode(originPostalCode, postalCodeCache);
-    originLatitude = parseCoordinate(originCoordinates?.latitude);
-    originLongitude = parseCoordinate(originCoordinates?.longitude);
-  }
+  const originCoordinates = await chooseTrustedCoordinates(
+    {
+      latitude: requesterLocation?.latitude,
+      longitude: requesterLocation?.longitude,
+      postalCode: requesterLocation?.postalCode,
+      preferStoredCoordinates: requesterLocation?.hasExplicitCoordinates
+    },
+    postalCodeCache
+  );
+  const originLatitude = parseCoordinate(originCoordinates?.latitude);
+  const originLongitude = parseCoordinate(originCoordinates?.longitude);
+  const originPostalCode = normalizePostalCode(requesterLocation?.postalCode);
 
   return Promise.all(
     listings.map(async (listing) => {
@@ -170,19 +236,17 @@ const attachAccurateDistances = async (listings, requesterLocation) => {
         return { ...listing, distance: 0 };
       }
 
-      let destinationLatitude = null;
-      let destinationLongitude = null;
-
-      if (listingPostalCode) {
-        const listingCoordinates = await getCoordinatesForPostalCode(listingPostalCode, postalCodeCache);
-        destinationLatitude = parseCoordinate(listingCoordinates?.latitude);
-        destinationLongitude = parseCoordinate(listingCoordinates?.longitude);
-      }
-
-      if (destinationLatitude === null || destinationLongitude === null) {
-        destinationLatitude = parseCoordinate(listing.latitude);
-        destinationLongitude = parseCoordinate(listing.longitude);
-      }
+      const destinationCoordinates = await chooseTrustedCoordinates(
+        {
+          latitude: listing.latitude,
+          longitude: listing.longitude,
+          postalCode: listingPostalCode,
+          preferStoredCoordinates: false
+        },
+        postalCodeCache
+      );
+      const destinationLatitude = parseCoordinate(destinationCoordinates?.latitude);
+      const destinationLongitude = parseCoordinate(destinationCoordinates?.longitude);
 
       const distance = calculateDistanceKm(
         originLatitude,

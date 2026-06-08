@@ -190,6 +190,21 @@ const AIHealthCheck = () => {
 
   const selectedAnimalMeta = animalTypes.find((animal) => animal.id === selectedAnimal);
   const primaryRecommendation = result?.recommendations?.[0];
+  const questionResponseMessage = useMemo(() => {
+    if (!result?.questionErrorCode) {
+      return result?.questionError || t('healthCheck.errorPromptFailed');
+    }
+
+    if (result.questionErrorCode === 'AI_RATE_LIMITED') {
+      return t('healthCheck.errorPromptRateLimited');
+    }
+
+    if (result.questionErrorCode === 'AI_TEMPORARILY_BUSY') {
+      return t('healthCheck.errorPromptConnectionFailed');
+    }
+
+    return result.questionError || t('healthCheck.errorPromptFailed');
+  }, [result?.questionError, result?.questionErrorCode, t]);
 
   const setImageForAnalysis = async (file) => {
     if (!file) return;
@@ -568,13 +583,13 @@ const AIHealthCheck = () => {
                       <p className="mt-3 text-sm leading-7 text-slate-700 font-devanagari">{result.questionAsked}</p>
                     </div>
                   )}
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <p className="whitespace-pre-line text-sm leading-7 text-slate-700 font-devanagari">
-                      {result.questionAnswer || result.questionError || t('healthCheck.errorPromptFailed')}
-                    </p>
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <p className="whitespace-pre-line text-sm leading-7 text-slate-700 font-devanagari">
+                        {result.questionAnswer || questionResponseMessage}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              </SectionCard>
+                </SectionCard>
             )}
 
             <div className="grid gap-5 xl:grid-cols-[1.1fr,0.9fr]">

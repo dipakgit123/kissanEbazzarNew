@@ -246,10 +246,16 @@ export const locationService = {
 // Listings Service - Combined listings from all categories
 export const listingsService = {
   // Get nearby listings from all animal categories (sorted by distance)
-  getNearbyListings: async (latitude, longitude, radius = 100, limit = 20) => {
+  getNearbyListings: async (latitude, longitude, radius = 100, limit = 20, options = {}) => {
     try {
       const response = await api.get(`/api/listings/nearby`, {
-        params: { latitude, longitude, radius, limit }
+        params: {
+          latitude,
+          longitude,
+          radius,
+          limit,
+          ...(options.postalCode ? { postalCode: options.postalCode } : {})
+        }
       });
       return response.data;
     } catch (error) {
@@ -258,10 +264,15 @@ export const listingsService = {
   },
 
   // Get featured listings (most recent from all categories)
-  getFeaturedListings: async (limit = 20) => {
+  getFeaturedListings: async (limit = 20, options = {}) => {
     try {
       const response = await api.get(`/api/listings/featured`, {
-        params: { limit }
+        params: {
+          limit,
+          ...(options.latitude !== undefined && options.latitude !== null ? { latitude: options.latitude } : {}),
+          ...(options.longitude !== undefined && options.longitude !== null ? { longitude: options.longitude } : {}),
+          ...(options.postalCode ? { postalCode: options.postalCode } : {})
+        }
       });
       return response.data;
     } catch (error) {
@@ -279,10 +290,15 @@ export const listingsService = {
     }
   },
 
-  getListingsByType: async (animalType, limit = 20) => {
+  getListingsByType: async (animalType, limit = 20, options = {}) => {
     try {
       const response = await api.get(`/api/listings/type/${animalType}`, {
-        params: { limit }
+        params: {
+          limit,
+          ...(options.latitude !== undefined && options.latitude !== null ? { latitude: options.latitude } : {}),
+          ...(options.longitude !== undefined && options.longitude !== null ? { longitude: options.longitude } : {}),
+          ...(options.postalCode ? { postalCode: options.postalCode } : {})
+        }
       });
       return response.data;
     } catch (error) {
@@ -293,14 +309,17 @@ export const listingsService = {
   // Search listings across all categories
   searchListings: async (query, options = {}) => {
     try {
-      const { animalType, minPrice, maxPrice, limit = 50 } = options;
+      const { animalType, minPrice, maxPrice, limit = 50, latitude, longitude, postalCode } = options;
       const response = await api.get(`/api/listings/search`, {
         params: {
           query,
           animalType,
           minPrice,
           maxPrice,
-          limit
+          limit,
+          ...(latitude !== undefined && latitude !== null ? { latitude } : {}),
+          ...(longitude !== undefined && longitude !== null ? { longitude } : {}),
+          ...(postalCode ? { postalCode } : {})
         }
       });
       return response.data;

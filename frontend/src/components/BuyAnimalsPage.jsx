@@ -166,7 +166,8 @@ const BuyAnimalsPage = () => {
                 latitude: lat,
                 longitude: lng,
                 city: profileResponse.user.city,
-                state: profileResponse.user.state
+                state: profileResponse.user.state,
+                postalCode: profileResponse.user.postal_code
               });
               return;
             }
@@ -207,7 +208,11 @@ const BuyAnimalsPage = () => {
         let listings = [];
 
         if (distanceMode === 'all') {
-          const response = await listingsService.getFeaturedListings(100);
+          const response = await listingsService.getFeaturedListings(100, {
+            latitude: userLocation?.latitude,
+            longitude: userLocation?.longitude,
+            postalCode: userLocation?.postalCode
+          });
           if (response.success && response.data) {
             listings = response.data;
           }
@@ -217,7 +222,8 @@ const BuyAnimalsPage = () => {
               userLocation.latitude,
               userLocation.longitude,
               100,
-              50
+              50,
+              { postalCode: userLocation.postalCode }
             );
             if (response.success && response.data && response.data.length > 0) {
               listings = response.data;
@@ -225,7 +231,11 @@ const BuyAnimalsPage = () => {
           }
 
           if (listings.length === 0) {
-            const response = await listingsService.getFeaturedListings(50);
+            const response = await listingsService.getFeaturedListings(50, {
+              latitude: userLocation?.latitude,
+              longitude: userLocation?.longitude,
+              postalCode: userLocation?.postalCode
+            });
             if (response.success) {
               listings = response.data;
             }

@@ -126,6 +126,7 @@ class PregnancyController {
         animal_type,
         animal_name,
         ear_badge_number,
+        pregnancy_duration_days,
         breed_name,
         animal_photo,
         mating_date,
@@ -142,16 +143,33 @@ class PregnancyController {
         });
       }
 
+      const normalizedAnimalType = animal_type.toLowerCase();
+      const customDurationDays = Number(pregnancy_duration_days);
+
+      if (
+        normalizedAnimalType === 'other' &&
+        (!Number.isFinite(customDurationDays) || customDurationDays <= 0)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'pregnancy_duration_days is required for animal_type "other"'
+        });
+      }
+
       // Calculate pregnancy duration and expected delivery date
-      const pregnancyDuration = db.PregnancyRecord.getPregnancyDuration(animal_type);
-      const expectedDeliveryDate = db.PregnancyRecord.calculateExpectedDeliveryDate(mating_date, animal_type);
+      const pregnancyDuration = db.PregnancyRecord.getPregnancyDuration(normalizedAnimalType, customDurationDays);
+      const expectedDeliveryDate = db.PregnancyRecord.calculateExpectedDeliveryDate(
+        mating_date,
+        normalizedAnimalType,
+        customDurationDays
+      );
 
       // Create the pregnancy record
       const pregnancyRecord = await db.PregnancyRecord.create({
         user_id: userId,
         listing_id: listing_id || null,
         listing_type: listing_type || null,
-        animal_type: animal_type.toLowerCase(),
+        animal_type: normalizedAnimalType,
         animal_name,
         ear_badge_number: ear_badge_number || null,
         breed_name: breed_name || null,

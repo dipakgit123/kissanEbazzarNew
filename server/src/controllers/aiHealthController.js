@@ -69,7 +69,10 @@ const appendQuestionAnswer = async ({
 
     analysis.questionAnswer = questionResult.answer;
   } catch (error) {
-    console.error('AI health follow-up question failed:', error);
+    console.warn('AI health follow-up question failed:', error.message);
+    if (error.code) {
+      analysis.questionErrorCode = error.code;
+    }
     analysis.questionError = error.message || 'Could not get an AI answer right now.';
   }
 };

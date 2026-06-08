@@ -12,7 +12,7 @@ const PREGNANCY_DURATION = {
   dog: 63,       // ~2 months (58-68 days)
   cat: 65,       // ~2 months (63-67 days)
   pig: 114,      // ~4 months (112-115 days)
-  other: 150     // Default to goat duration
+  other: 150     // Fallback when custom duration is not provided
 };
 
 module.exports = (sequelize) => {
@@ -174,13 +174,20 @@ module.exports = (sequelize) => {
   };
 
   // Static method to get pregnancy duration for animal type
-  PregnancyRecord.getPregnancyDuration = function(animalType) {
-    return PREGNANCY_DURATION[animalType?.toLowerCase()] || PREGNANCY_DURATION.other;
+  PregnancyRecord.getPregnancyDuration = function(animalType, customDurationDays) {
+    const normalizedType = animalType?.toLowerCase();
+    const parsedCustomDuration = Number(customDurationDays);
+
+    if (normalizedType === 'other' && Number.isFinite(parsedCustomDuration) && parsedCustomDuration > 0) {
+      return Math.round(parsedCustomDuration);
+    }
+
+    return PREGNANCY_DURATION[normalizedType] || PREGNANCY_DURATION.other;
   };
 
   // Static method to calculate expected delivery date
-  PregnancyRecord.calculateExpectedDeliveryDate = function(matingDate, animalType) {
-    const duration = this.getPregnancyDuration(animalType);
+  PregnancyRecord.calculateExpectedDeliveryDate = function(matingDate, animalType, customDurationDays) {
+    const duration = this.getPregnancyDuration(animalType, customDurationDays);
     const date = new Date(matingDate);
     date.setDate(date.getDate() + duration);
     return date.toISOString().split('T')[0];

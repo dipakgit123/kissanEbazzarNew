@@ -33,12 +33,40 @@ const imageUrlToBase64 = async (imageUrl) => {
 };
 
 const GEMINI_HEALTH_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+const AI_RATE_LIMITED_ERROR_CODE = 'AI_RATE_LIMITED';
+const AI_TEMPORARILY_BUSY_ERROR_CODE = 'AI_TEMPORARILY_BUSY';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const isTransientGeminiError = (error) => {
   const message = `${error?.message || ''} ${error?.status || ''}`;
   return /503|service unavailable|temporarily overloaded|high demand|unavailable|overloaded/i.test(message);
+};
+
+const isGeminiRateLimitError = (error) => {
+  const message = `${error?.message || ''} ${error?.status || ''}`;
+  return /429|too many requests|quota exceeded|rate limit/i.test(message);
+};
+
+const getRetryDelayMs = (error) => {
+  const message = `${error?.message || ''}`;
+  const decimalSecondsMatch = message.match(/Please retry in\s+(\d+(?:\.\d+)?)s/i);
+  if (decimalSecondsMatch) {
+    return Math.max(1000, Math.ceil(Number(decimalSecondsMatch[1]) * 1000));
+  }
+
+  const wholeSecondsMatch = message.match(/retryDelay":"(\d+)s"/i);
+  if (wholeSecondsMatch) {
+    return Math.max(1000, Number(wholeSecondsMatch[1]) * 1000);
+  }
+
+  return 12000;
+};
+
+const createAiServiceError = (message, code) => {
+  const error = new Error(message);
+  error.code = code;
+  return error;
 };
 
 const generateContentWithResilience = async (contents) => {
@@ -55,18 +83,24 @@ const generateContentWithResilience = async (contents) => {
       } catch (error) {
         lastError = error;
         const canRetry = isTransientGeminiError(error) && attempt < maxAttempts;
+        const canRetryAfterDelay = isGeminiRateLimitError(error) && attempt < maxAttempts;
         const canFallback = modelIndex < GEMINI_HEALTH_MODELS.length - 1;
 
         console.warn(
           `Gemini request failed on ${modelName} (attempt ${attempt}/${maxAttempts}): ${error.message}`
         );
 
+        if (canRetryAfterDelay) {
+          await sleep(getRetryDelayMs(error));
+          continue;
+        }
+
         if (canRetry) {
           await sleep(1000 * (2 ** (attempt - 1)));
           continue;
         }
 
-        if (isTransientGeminiError(error) && canFallback) {
+        if ((isTransientGeminiError(error) || isGeminiRateLimitError(error)) && canFallback) {
           break;
         }
 
@@ -142,8 +176,18 @@ Return plain text only.`;
       throw new Error('AI service not configured. Please contact support.');
     }
 
+    if (isGeminiRateLimitError(error)) {
+      throw createAiServiceError(
+        'AI follow-up is temporarily unavailable due to usage limits. Please try again in a few seconds.',
+        AI_RATE_LIMITED_ERROR_CODE
+      );
+    }
+
     if (isTransientGeminiError(error)) {
-      throw new Error('AI service is temporarily busy. Please try again in a moment.');
+      throw createAiServiceError(
+        'AI service is temporarily busy. Please try again in a moment.',
+        AI_TEMPORARILY_BUSY_ERROR_CODE
+      );
     }
 
     throw new Error('Failed to answer health question: ' + error.message);
@@ -285,8 +329,18 @@ ${additionalInfo ? `अतिरिक्त माहिती: ${additionalInf
       throw new Error('AI service not configured. Please contact support.');
     }
 
+    if (isGeminiRateLimitError(error)) {
+      throw createAiServiceError(
+        'AI analysis is temporarily unavailable due to usage limits. Please try again in a few seconds.',
+        AI_RATE_LIMITED_ERROR_CODE
+      );
+    }
+
     if (isTransientGeminiError(error)) {
-      throw new Error('AI service is temporarily busy. Please try again in a moment.');
+      throw createAiServiceError(
+        'AI service is temporarily busy. Please try again in a moment.',
+        AI_TEMPORARILY_BUSY_ERROR_CODE
+      );
     }
 
     throw new Error('Failed to analyze image: ' + error.message);
@@ -443,4 +497,6 @@ module.exports = {
   getEmergencySymptoms,
   getVaccinationSchedule,
   getDewormingSchedule,
+  AI_RATE_LIMITED_ERROR_CODE,
+  AI_TEMPORARILY_BUSY_ERROR_CODE,
 };
