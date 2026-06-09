@@ -4,6 +4,7 @@ const db = require('../models');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudinary');
 const { Op } = require('sequelize');
 const notificationService = require('../services/notificationService');
+const listingLocationService = require('../services/listingLocationService');
 
 class AnimalListingController {
   // CREATE - Requires authentication
@@ -37,13 +38,7 @@ class AnimalListingController {
       }
 
       // Use location from user's profile
-      const locationData = {
-        latitude: user.latitude,
-        longitude: user.longitude,
-        city: user.city,
-        state: user.state,
-        pincode: user.postal_code
-      };
+      const locationData = await listingLocationService.resolveLocationFromUser(user);
 
       // Process uploaded files
       const uploadedFiles = {};

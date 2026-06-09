@@ -2,6 +2,7 @@ const db = require('../models');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudinary');
 const { validationResult } = require('express-validator');
 const { Op } = require('sequelize');
+const listingLocationService = require('../services/listingLocationService');
 
 /**
  * Create a new goat listing
@@ -49,11 +50,7 @@ exports.createGoatListing = async (req, res) => {
     }
 
     // Use location from user's profile
-    const latitude = user.latitude ? parseFloat(user.latitude) : null;
-    const longitude = user.longitude ? parseFloat(user.longitude) : null;
-    const city = user.city;
-    const state = user.state;
-    const pincode = user.postal_code;
+    const locationData = await listingLocationService.resolveLocationFromUser(user);
 
     // Upload photos to Cloudinary (up to 5 photos)
     const photoData = {};
@@ -112,11 +109,11 @@ exports.createGoatListing = async (req, res) => {
       detailsConfirmed: detailsConfirmed === 'true' || detailsConfirmed === true,
       termsAccepted: termsAccepted === 'true' || termsAccepted === true,
       ...photoData,
-      latitude,
-      longitude,
-      city,
-      state,
-      pincode,
+      latitude: locationData.latitude,
+      longitude: locationData.longitude,
+      city: locationData.city,
+      state: locationData.state,
+      pincode: locationData.pincode,
       status: 'active'
     });
 

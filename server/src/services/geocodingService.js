@@ -1,6 +1,34 @@
 const axios = require('axios');
 
 class GeocodingService {
+  async searchNominatim(params) {
+    const response = await axios.get('https://nominatim.openstreetmap.org/search', {
+      params,
+      headers: {
+        'User-Agent': 'KissanEBazzar/1.0'
+      },
+      timeout: 5000
+    });
+
+    if (!response.data || response.data.length === 0) {
+      return null;
+    }
+
+    const result = response.data[0];
+    const address = result.address || {};
+
+    return {
+      latitude: parseFloat(result.lat),
+      longitude: parseFloat(result.lon),
+      city: address.city || address.town || address.village || address.county || null,
+      state: address.state || null,
+      country: address.country || null,
+      postal_code: address.postcode || null,
+      address: result.display_name || null,
+      location_type: 'manual'
+    };
+  }
+
   /**
    * Fetch location details from postal code using multiple geocoding APIs
    * @param {string} postalCode - The postal code to lookup
@@ -108,26 +136,15 @@ class GeocodingService {
       }
 
       for (const params of queries) {
-        const response = await axios.get('https://nominatim.openstreetmap.org/search', {
-          params,
-          headers: {
-            'User-Agent': 'KissanEBazzar/1.0'
-          },
-          timeout: 5000
-        });
-
-        if (response.data && response.data.length > 0) {
-          const result = response.data[0];
-          const address = result.address || {};
-
+        const result = await this.searchNominatim(params);
+        if (result) {
           return {
-            latitude: parseFloat(result.lat),
-            longitude: parseFloat(result.lon),
-            city: address.city || address.town || address.village || address.county || indiaResult?.city,
-            state: address.state || indiaResult?.state,
-            country: address.country || indiaResult?.country,
+            ...result,
+            city: result.city || indiaResult?.city,
+            state: result.state || indiaResult?.state,
+            country: result.country || indiaResult?.country,
             postal_code: postalCode,
-            address: result.display_name || indiaResult?.address,
+            address: result.address || indiaResult?.address,
             location_type: 'manual'
           };
         }
@@ -179,6 +196,38 @@ class GeocodingService {
     } catch (error) {
       console.error('Reverse geocoding error:', error.message);
       throw new Error(`Failed to fetch location from coordinates: ${error.message}`);
+    }
+  }
+
+  async getLocationFromPlace({ city, state, country = 'India' }) {
+    try {
+      const queries = [
+        [city, state, country].filter(Boolean).join(', '),
+        [city, country].filter(Boolean).join(', ')
+      ].filter(Boolean);
+
+      for (const query of queries) {
+        const result = await this.searchNominatim({
+          q: query,
+          format: 'json',
+          addressdetails: 1,
+          limit: 1
+        });
+
+        if (result) {
+          return {
+            ...result,
+            city: result.city || city || null,
+            state: result.state || state || null,
+            country: result.country || country || null
+          };
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Place geocoding error:', error.message);
+      return null;
     }
   }
 }

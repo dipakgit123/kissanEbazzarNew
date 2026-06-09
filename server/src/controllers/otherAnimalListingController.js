@@ -1,6 +1,7 @@
 const db = require('../models');
 const { validationResult } = require('express-validator');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudinary');
+const listingLocationService = require('../services/listingLocationService');
 
 const OtherAnimalListing = db.OtherAnimalListing;
 const User = db.User;
@@ -31,6 +32,8 @@ exports.createOtherAnimalListing = async (req, res) => {
     }
 
     // Prepare listing data
+    const locationData = await listingLocationService.resolveLocationFromUser(user);
+
     const listingData = {
       user_id: userId,
       animalType: req.body.animalType,
@@ -45,11 +48,11 @@ exports.createOtherAnimalListing = async (req, res) => {
       temperament: req.body.temperament || 'friendly',
       expectedPrice: req.body.expectedPrice,
       isNegotiable: req.body.isNegotiable === 'true' || req.body.isNegotiable === true,
-      latitude: user.latitude || null,
-      longitude: user.longitude || null,
-      city: user.city || null,
-      state: user.state || null,
-      pincode: user.postal_code || null,
+      latitude: locationData.latitude,
+      longitude: locationData.longitude,
+      city: locationData.city,
+      state: locationData.state,
+      pincode: locationData.pincode,
       status: 'active',
       views: 0
     };

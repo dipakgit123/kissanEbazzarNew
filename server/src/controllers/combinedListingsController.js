@@ -3,6 +3,7 @@
 const db = require('../models');
 const jwt = require('jsonwebtoken');
 const geocodingService = require('../services/geocodingService');
+const listingLocationService = require('../services/listingLocationService');
 const { getJwtSecret } = require('../config/jwt');
 
 const ANIMAL_TABLE_MAP = {
@@ -39,6 +40,7 @@ const parseCoordinate = (value) => {
 };
 
 const normalizePostalCode = (value) => String(value || '').trim();
+const normalizeText = (value) => String(value || '').trim();
 
 const calculateDistanceKm = (fromLatitude, fromLongitude, toLatitude, toLongitude) => {
   const lat1 = parseCoordinate(fromLatitude);
@@ -71,9 +73,11 @@ const chooseTrustedCoordinates = async (
     latitude,
     longitude,
     postalCode,
+    city,
+    state,
     preferStoredCoordinates = false
   },
-  postalCodeCache
+  geocodeCache
 ) => {
   const storedLatitude = parseCoordinate(latitude);
   const storedLongitude = parseCoordinate(longitude);
@@ -83,7 +87,20 @@ const chooseTrustedCoordinates = async (
   let geocodedLongitude = null;
 
   if (normalizedPostalCode) {
-    const geocodedCoordinates = await getCoordinatesForPostalCode(normalizedPostalCode, postalCodeCache);
+    const geocodedCoordinates = await getCoordinatesForPostalCode(normalizedPostalCode, geocodeCache);
+    geocodedLatitude = parseCoordinate(geocodedCoordinates?.latitude);
+    geocodedLongitude = parseCoordinate(geocodedCoordinates?.longitude);
+  }
+
+  if ((geocodedLatitude === null || geocodedLongitude === null) && (city || state)) {
+    const geocodedCoordinates = await getCoordinatesForLocality(
+      {
+        city,
+        state,
+        country: 'India'
+      },
+      geocodeCache
+    );
     geocodedLatitude = parseCoordinate(geocodedCoordinates?.latitude);
     geocodedLongitude = parseCoordinate(geocodedCoordinates?.longitude);
   }
@@ -144,17 +161,18 @@ const getAuthUserIdFromRequest = (req) => {
 };
 
 const getCoordinatesForPostalCode = async (postalCode, cache) => {
-  const normalizedPostalCode = normalizePostalCode(postalCode);
-  if (!normalizedPostalCode) {
+  const normalized = normalizePostalCode(postalCode);
+  if (!normalized) {
     return null;
   }
 
-  if (cache.has(normalizedPostalCode)) {
-    return cache.get(normalizedPostalCode);
+  const cacheKey = `postal:${normalized}`;
+  if (cache.has(cacheKey)) {
+    return cache.get(cacheKey);
   }
 
   try {
-    const location = await geocodingService.getLocationFromPostalCode(normalizedPostalCode, 'IN');
+    const location = await geocodingService.getLocationFromPostalCode(normalized, 'IN');
     const coordinates =
       parseCoordinate(location?.latitude) !== null && parseCoordinate(location?.longitude) !== null
         ? {
@@ -163,10 +181,41 @@ const getCoordinatesForPostalCode = async (postalCode, cache) => {
           }
         : null;
 
-    cache.set(normalizedPostalCode, coordinates);
+    cache.set(cacheKey, coordinates);
     return coordinates;
   } catch (error) {
-    cache.set(normalizedPostalCode, null);
+    cache.set(cacheKey, null);
+    return null;
+  }
+};
+
+const getCoordinatesForLocality = async ({ city, state, country = 'India' }, cache) => {
+  const normalizedCity = normalizeText(city).toLowerCase();
+  const normalizedState = normalizeText(state).toLowerCase();
+
+  if (!normalizedCity && !normalizedState) {
+    return null;
+  }
+
+  const cacheKey = `locality:${normalizedCity}|${normalizedState}|${String(country || '').toLowerCase()}`;
+  if (cache.has(cacheKey)) {
+    return cache.get(cacheKey);
+  }
+
+  try {
+    const location = await geocodingService.getLocationFromPlace({ city, state, country });
+    const coordinates =
+      parseCoordinate(location?.latitude) !== null && parseCoordinate(location?.longitude) !== null
+        ? {
+            latitude: parseCoordinate(location.latitude),
+            longitude: parseCoordinate(location.longitude)
+          }
+        : null;
+
+    cache.set(cacheKey, coordinates);
+    return coordinates;
+  } catch (error) {
+    cache.set(cacheKey, null);
     return null;
   }
 };
@@ -189,7 +238,7 @@ const getRequesterLocation = async (req) => {
   }
 
   const user = await db.User.findByPk(authUserId, {
-    attributes: ['id', 'latitude', 'longitude', 'postal_code']
+    attributes: ['id', 'latitude', 'longitude', 'postal_code', 'city', 'state']
   });
 
   return {
@@ -197,6 +246,8 @@ const getRequesterLocation = async (req) => {
     latitude: queryLatitude ?? parseCoordinate(user?.latitude),
     longitude: queryLongitude ?? parseCoordinate(user?.longitude),
     postalCode: queryPostalCode || normalizePostalCode(user?.postal_code),
+    city: normalizeText(user?.city),
+    state: normalizeText(user?.state),
     hasExplicitCoordinates: hasExplicitQueryCoordinates
   };
 };
@@ -206,15 +257,17 @@ const attachAccurateDistances = async (listings, requesterLocation) => {
     return listings;
   }
 
-  const postalCodeCache = new Map();
+  const geocodeCache = new Map();
   const originCoordinates = await chooseTrustedCoordinates(
     {
       latitude: requesterLocation?.latitude,
       longitude: requesterLocation?.longitude,
       postalCode: requesterLocation?.postalCode,
+      city: requesterLocation?.city,
+      state: requesterLocation?.state,
       preferStoredCoordinates: requesterLocation?.hasExplicitCoordinates
     },
-    postalCodeCache
+    geocodeCache
   );
   const originLatitude = parseCoordinate(originCoordinates?.latitude);
   const originLongitude = parseCoordinate(originCoordinates?.longitude);
@@ -222,28 +275,57 @@ const attachAccurateDistances = async (listings, requesterLocation) => {
 
   return Promise.all(
     listings.map(async (listing) => {
-      const listingPostalCode = normalizePostalCode(listing.pincode || listing.postal_code);
+      const normalizedListingLocation = await listingLocationService.normalizeListingLocation(
+        {
+          city: listing.city,
+          state: listing.state,
+          pincode: listing.pincode || listing.postal_code,
+          latitude: listing.latitude,
+          longitude: listing.longitude
+        },
+        listing.seller
+      );
+
+      const listingPostalCode = normalizePostalCode(
+        normalizedListingLocation.pincode || listing.pincode || listing.postal_code
+      );
 
       if (
         requesterLocation?.userId &&
         listing.user_id &&
         String(requesterLocation.userId) === String(listing.user_id)
       ) {
-        return { ...listing, distance: 0 };
+        return {
+          ...listing,
+          city: normalizedListingLocation.city,
+          state: normalizedListingLocation.state,
+          latitude: normalizedListingLocation.latitude ?? listing.latitude,
+          longitude: normalizedListingLocation.longitude ?? listing.longitude,
+          distance: 0
+        };
       }
 
       if (originPostalCode && listingPostalCode && originPostalCode === listingPostalCode) {
-        return { ...listing, distance: 0 };
+        return {
+          ...listing,
+          city: normalizedListingLocation.city,
+          state: normalizedListingLocation.state,
+          latitude: normalizedListingLocation.latitude ?? listing.latitude,
+          longitude: normalizedListingLocation.longitude ?? listing.longitude,
+          distance: 0
+        };
       }
 
       const destinationCoordinates = await chooseTrustedCoordinates(
         {
-          latitude: listing.latitude,
-          longitude: listing.longitude,
+          latitude: normalizedListingLocation.latitude ?? listing.latitude,
+          longitude: normalizedListingLocation.longitude ?? listing.longitude,
           postalCode: listingPostalCode,
+          city: normalizedListingLocation.city,
+          state: normalizedListingLocation.state,
           preferStoredCoordinates: false
         },
-        postalCodeCache
+        geocodeCache
       );
       const destinationLatitude = parseCoordinate(destinationCoordinates?.latitude);
       const destinationLongitude = parseCoordinate(destinationCoordinates?.longitude);
@@ -257,10 +339,26 @@ const attachAccurateDistances = async (listings, requesterLocation) => {
 
       if (distance === null) {
         const existingDistance = parseCoordinate(listing.distance);
-        return existingDistance === null ? listing : { ...listing, distance: existingDistance };
+        const normalizedListing = {
+          ...listing,
+          city: normalizedListingLocation.city,
+          state: normalizedListingLocation.state,
+          latitude: normalizedListingLocation.latitude ?? listing.latitude,
+          longitude: normalizedListingLocation.longitude ?? listing.longitude
+        };
+        return existingDistance === null
+          ? normalizedListing
+          : { ...normalizedListing, distance: existingDistance };
       }
 
-      return { ...listing, distance };
+      return {
+        ...listing,
+        city: normalizedListingLocation.city,
+        state: normalizedListingLocation.state,
+        latitude: normalizedListingLocation.latitude ?? listing.latitude,
+        longitude: normalizedListingLocation.longitude ?? listing.longitude,
+        distance
+      };
     })
   );
 };
