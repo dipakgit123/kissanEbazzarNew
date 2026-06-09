@@ -52,7 +52,6 @@ const AIAssistant = () => {
 
   const handleLanguageSelection = (langCode) => {
     setSelectedLanguage(langCode);
-    i18n.changeLanguage(langCode);
     setLanguageSelected(true);
     
     // Add welcome message in selected language
@@ -199,6 +198,36 @@ const AIAssistant = () => {
     }
   };
 
+  const getMilkReportQuickReply = (lang) => {
+    if (lang === 'hi') {
+      return 'दूध अहवाल कैसे उपयोग करें?';
+    }
+    if (lang === 'mr') {
+      return 'दूध अहवाल कसे वापरायचे?';
+    }
+    return 'How to use milk reports?';
+  };
+
+  const getMilkReportResponse = (lang) => {
+    if (lang === 'hi') {
+      return "🥛 **Milk Reports फीचर कैसे उपयोग करें:**\n\n• पहले अपने पशु को रिकॉर्ड सूची में जोड़ें।\n• हर दिन उसके लिए दूध की मात्रा दर्ज करें।\n• चाहें तो पूरे समूह का रिकॉर्ड भी भर सकते हैं।\n• सिस्टम कुल दूध, आमदनी, खर्च और लाभ/हानि का सार दिखाता है।\n• पुराने रिकॉर्ड देखकर किस पशु का प्रदर्शन बेहतर है यह समझ सकते हैं।\n• नियमित डेटा भरने से आहार, स्वास्थ्य और बिक्री निर्णय बेहतर होते हैं।\n\n💡 सुझाव: एक ही समय पर रोज़ रिकॉर्ड भरें, तब रिपोर्ट सबसे उपयोगी बनती है।";
+    }
+    if (lang === 'mr') {
+      return "🥛 **दूध अहवाल फीचर कसे वापरायचे:**\n\n• आधी तुमचा प्राणी नोंद यादीत जोडा.\n• दररोज त्या प्राण्यासाठी दूधाचे प्रमाण भरा.\n• हवे असल्यास संपूर्ण कळपाची नोंदही करू शकता.\n• सिस्टम एकूण दूध, उत्पन्न, खर्च आणि नफा/तोट्याचा सारांश दाखवते.\n• जुने अहवाल पाहून कोणता प्राणी जास्त चांगले उत्पादन देतो ते समजू शकते.\n• नियमित नोंदीमुळे खाद्य, आरोग्य आणि विक्रीचे निर्णय अधिक अचूक होतात.\n\n💡 सूचना: रोज शक्यतो एकाच वेळी नोंद भरा, त्यामुळे अहवाल जास्त उपयुक्त ठरतात.";
+    }
+    return "🥛 **How to use the Milk Reports feature:**\n\n• First add your animal to the milk record list.\n• Enter the daily milk quantity for that animal.\n• You can also record data for the whole herd if needed.\n• The system shows total milk, income, expenses, and profit/loss summary.\n• Review past reports to compare which animals are performing better.\n• Regular entries help with feeding, health, and selling decisions.\n\n💡 Tip: Update the report at the same time each day so the trends stay reliable.";
+  };
+
+  const isMilkReportQuery = (lowerMessage) => (
+    lowerMessage.includes('milk report') ||
+    lowerMessage.includes('milk reports') ||
+    lowerMessage.includes('milk record') ||
+    lowerMessage.includes('milk entry') ||
+    lowerMessage.includes('दूध अहवाल') ||
+    lowerMessage.includes('दूध रिपोर्ट') ||
+    lowerMessage.includes('दूध रिकॉर्ड')
+  );
+
   const getAIResponse = (message) => {
     const lowerMessage = message.toLowerCase();
     const lang = selectedLanguage || 'en';
@@ -208,7 +237,9 @@ const AIAssistant = () => {
     };
     
     // Check for keywords in multiple languages
-    if (
+    if (isMilkReportQuery(lowerMessage)) {
+      return getMilkReportResponse(lang);
+    } else if (
       lowerMessage.includes('listing') ||
       lowerMessage.includes('list my animal') ||
       lowerMessage.includes('post animal') ||
@@ -356,50 +387,35 @@ const AIAssistant = () => {
   return (
     <>
       {/* Floating AI Assistant Button */}
-      <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-50">
-        {/* Outer Glow Ring */}
-        {!isOpen && (
-          <div className="absolute -inset-3 rounded-full bg-gradient-to-r from-[#15BB73] via-[#0FA568] to-[#15BB73] animate-spin-slow opacity-30 blur-xl"></div>
-        )}
-        
-        {/* Pulsing Ring */}
-        {!isOpen && (
-          <div className="absolute -inset-2 rounded-full bg-gradient-to-r from-[#15BB73] to-[#0FA568] animate-ping opacity-20"></div>
-        )}
-        
+      <div className="group fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-50">
         {/* Main Button */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className={`relative w-16 h-16 rounded-full shadow-2xl transition-all duration-500 transform hover:scale-110 active:scale-95 ${
+          aria-label={isOpen ? 'Close AI Assistant' : 'Open AI Assistant'}
+          className={`group relative flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full border-4 border-white shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 sm:h-[5rem] sm:w-[5rem] ${
             isOpen 
               ? 'bg-gradient-to-br from-red-500 via-red-600 to-red-700 hover:from-red-600 hover:to-red-800 rotate-90' 
-              : 'bg-gradient-to-br from-[#15BB73] via-[#12A665] to-[#0FA568] hover:shadow-green-500/50'
-          } border-4 border-white`}
+              : 'bg-gradient-to-br from-[#15BB73] via-[#12A665] to-[#0FA568] hover:shadow-green-500/30'
+          }`}
         >
-          {/* Shimmer Effect */}
-          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-transparent via-white/30 to-transparent transform translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
-          
-          {/* Inner Glow */}
-          <div className="absolute inset-2 rounded-full bg-white/10 backdrop-blur-sm"></div>
-          
           {/* Button Content */}
-          <div className="relative flex items-center justify-center h-full">
+          <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-full">
             {isOpen ? (
-              <svg className="w-7 h-7 text-white transition-transform duration-500 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-7 w-7 rotate-90 text-white transition-transform duration-300 sm:h-8 sm:w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
               </svg>
             ) : (
               <img
                 src={aiAssistantImage}
                 alt="AI Assistant"
-                className="h-[3.75rem] w-[3.75rem] rounded-full object-cover drop-shadow-lg"
+                className="h-[4rem] w-[4rem] rounded-full object-cover sm:h-[4.5rem] sm:w-[4.5rem]"
               />
             )}
           </div>
           
           {/* Badge */}
           {!isOpen && (
-            <div className="absolute -top-1 -right-1 bg-gradient-to-br from-yellow-400 to-orange-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-white">
+            <div className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-gradient-to-br from-yellow-400 to-orange-500 text-[10px] font-bold text-white shadow-md">
               AI
             </div>
           )}
@@ -407,7 +423,7 @@ const AIAssistant = () => {
 
         {/* Helper Text */}
         {!isOpen && (
-          <div className="absolute right-20 top-1/2 transform -translate-y-1/2 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <div className="pointer-events-none absolute right-[5.5rem] top-1/2 hidden -translate-y-1/2 opacity-0 transition-opacity duration-200 group-hover:opacity-100 sm:block">
             <div className="bg-gray-900 text-white text-sm px-4 py-2 rounded-lg shadow-xl whitespace-nowrap">
               Ask AI Assistant
               <div className="absolute right-0 top-1/2 transform translate-x-2 -translate-y-1/2 rotate-45 w-2 h-2 bg-gray-900"></div>
@@ -612,6 +628,7 @@ const AIAssistant = () => {
                 <div className="flex flex-wrap gap-2">
                   {[
                     ...(quickReplies[selectedLanguage] || quickReplies.en),
+                    getMilkReportQuickReply(selectedLanguage),
                     ...(projectQuickReplies[selectedLanguage] || projectQuickReplies.en)
                   ].map((reply, index) => (
                     <button

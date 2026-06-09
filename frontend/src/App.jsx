@@ -27,6 +27,7 @@ import CallHistory from './components/CallHistory';
 import HelpCenter from './components/HelpCenter';
 import TermsPage from './components/TermsPage';
 import PrivacyPage from './components/PrivacyPage';
+import AboutPage from './components/AboutPage';
 import AdminLogin from './components/admin/AdminLogin';
 import AdminDashboard from './components/admin/AdminDashboard';
 import BuyAnimalsPage from './components/BuyAnimalsPage';
@@ -179,6 +180,7 @@ function App() {
 
         {/* Public routes with header/footer */}
         <Route element={<Layout showHeaderFooter={true} />}>
+          <Route path="/about" element={<AboutPage />} />
           <Route path="/help" element={<HelpCenter />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />

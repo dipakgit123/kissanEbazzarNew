@@ -130,6 +130,39 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
     };
   };
 
+  const searchLocationOnMap = async (query) => {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=1&q=${encodeURIComponent(query)}`,
+      {
+        headers: {
+          Accept: 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to search location');
+    }
+
+    const data = await response.json();
+    if (!Array.isArray(data) || data.length === 0) {
+      return null;
+    }
+
+    const result = data[0];
+    const address = result.address || {};
+
+    return {
+      address: result.display_name || '',
+      pincode: address.postcode || '',
+      city: address.city || address.town || address.village || address.county || '',
+      state: address.state || '',
+      country: address.country || 'India',
+      latitude: result.lat,
+      longitude: result.lon,
+    };
+  };
+
   const handleUseCurrentLocation = () => {
     if (!navigator.geolocation) {
       toast.error(t('location.locationRequired', { defaultValue: 'Geolocation is not supported by your browser' }));
@@ -160,8 +193,13 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
   };
 
   const handleFindOnMap = async () => {
-    const query = [form.address, form.pincode, form.city, form.state, form.country]
-      .map((item) => item?.trim())
+    const normalizedAddress = form.address.trim();
+    const normalizedPincode = form.pincode.trim();
+    const normalizedCity = form.city.trim();
+    const normalizedState = form.state.trim();
+    const normalizedCountry = (form.country || 'India').trim();
+
+    const query = [normalizedAddress, normalizedPincode, normalizedCity, normalizedState, normalizedCountry]
       .filter(Boolean)
       .join(', ');
 
@@ -176,36 +214,60 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
     setResolvingLocation(true);
 
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`,
-        {
-          headers: {
-            Accept: 'application/json',
-          },
+      if (/^\d{6}$/.test(normalizedPincode)) {
+        try {
+          const pincodeResponse = await locationService.lookupPincode(normalizedPincode);
+          if (pincodeResponse?.success && pincodeResponse?.data) {
+            const locationData = pincodeResponse.data;
+            if (locationData.latitude != null && locationData.longitude != null) {
+              applyLocationData({
+                address: locationData.address || normalizedAddress,
+                pincode: locationData.postal_code || normalizedPincode,
+                city: locationData.city || normalizedCity,
+                state: locationData.state || normalizedState,
+                country: locationData.country || normalizedCountry,
+                latitude: String(locationData.latitude),
+                longitude: String(locationData.longitude),
+              });
+              setErrors((prev) => ({ ...prev, address: '', pincode: '' }));
+              return;
+            }
+          }
+        } catch (error) {
+          console.warn('Pincode lookup fallback failed during map search:', error);
         }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to search location');
       }
 
-      const data = await response.json();
-      if (!Array.isArray(data) || data.length === 0) {
+      const queryCandidates = [
+        query,
+        [normalizedPincode, normalizedCity, normalizedState, normalizedCountry].filter(Boolean).join(', '),
+        [normalizedAddress, normalizedCity, normalizedState, normalizedCountry].filter(Boolean).join(', '),
+        [normalizedCity, normalizedState, normalizedCountry].filter(Boolean).join(', '),
+        [normalizedPincode, normalizedCountry].filter(Boolean).join(', ')
+      ].filter((value, index, array) => value && array.indexOf(value) === index);
+
+      let resolvedLocation = null;
+      for (const queryCandidate of queryCandidates) {
+        resolvedLocation = await searchLocationOnMap(queryCandidate);
+        if (resolvedLocation) {
+          break;
+        }
+      }
+
+      if (!resolvedLocation) {
         throw new Error('Location not found');
       }
 
-      const result = data[0];
-      const address = result.address || {};
-
       applyLocationData({
-        address: result.display_name || form.address,
-        pincode: address.postcode || form.pincode,
-        city: address.city || address.town || address.village || address.county || form.city,
-        state: address.state || form.state,
-        country: address.country || form.country,
-        latitude: result.lat,
-        longitude: result.lon,
+        address: resolvedLocation.address || normalizedAddress,
+        pincode: resolvedLocation.pincode || normalizedPincode,
+        city: resolvedLocation.city || normalizedCity,
+        state: resolvedLocation.state || normalizedState,
+        country: resolvedLocation.country || normalizedCountry,
+        latitude: resolvedLocation.latitude,
+        longitude: resolvedLocation.longitude,
       });
+      setErrors((prev) => ({ ...prev, address: '', pincode: '' }));
     } catch (error) {
       console.error('Location search error:', error);
       toast.error(t('profile.locationLookupFailed', { defaultValue: 'Failed to find this location on the map' }));
