@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const geocodingService = require('../services/geocodingService');
 const listingLocationService = require('../services/listingLocationService');
 const { getJwtSecret } = require('../config/jwt');
+const { Op } = db.Sequelize;
 
 const ANIMAL_TABLE_MAP = {
   cow: { table: 'animal_listings', model: 'AnimalListing', type: 'cow' },
@@ -250,6 +251,54 @@ const getRequesterLocation = async (req) => {
     state: normalizeText(user?.state),
     hasExplicitCoordinates: hasExplicitQueryCoordinates
   };
+};
+
+const SELLER_ATTRIBUTES = ['id', 'full_name', 'phone_number', 'profile_photo', 'city', 'state', 'latitude', 'longitude', 'postal_code'];
+
+const serializeSeller = (seller) => (seller ? {
+  id: seller.id,
+  name: seller.full_name,
+  phone: seller.phone_number,
+  profile_photo: seller.profile_photo,
+  city: seller.city,
+  state: seller.state,
+  latitude: seller.latitude,
+  longitude: seller.longitude,
+  postal_code: seller.postal_code
+} : null);
+
+const attachSellersToListings = async (listings) => {
+  if (!Array.isArray(listings) || listings.length === 0) {
+    return listings;
+  }
+
+  const userIds = [...new Set(
+    listings
+      .map((listing) => listing.user_id)
+      .filter((userId) => userId !== undefined && userId !== null)
+  )];
+
+  if (userIds.length === 0) {
+    return listings.map((listing) => ({ ...listing, seller: null }));
+  }
+
+  const sellers = await db.User.findAll({
+    where: {
+      id: {
+        [Op.in]: userIds
+      }
+    },
+    attributes: SELLER_ATTRIBUTES
+  });
+
+  const sellersById = new Map(
+    sellers.map((seller) => [String(seller.id), serializeSeller(seller)])
+  );
+
+  return listings.map((listing) => ({
+    ...listing,
+    seller: sellersById.get(String(listing.user_id)) || null
+  }));
 };
 
 const attachAccurateDistances = async (listings, requesterLocation) => {
@@ -635,25 +684,7 @@ class CombinedListingsController {
         type: db.sequelize.QueryTypes.SELECT
       });
 
-      // Fetch seller info for each listing
-      const listingsWithSeller = await Promise.all(
-        listings.map(async (listing) => {
-          const seller = await db.User.findByPk(listing.user_id, {
-            attributes: ['id', 'full_name', 'phone_number', 'profile_photo', 'city', 'state']
-          });
-          return {
-            ...listing,
-            seller: seller ? {
-              id: seller.id,
-              name: seller.full_name,
-              phone: seller.phone_number,
-              profile_photo: seller.profile_photo,
-              city: seller.city,
-              state: seller.state
-            } : null
-          };
-        })
-      );
+      const listingsWithSeller = await attachSellersToListings(listings);
 
       const listingsWithAccurateDistance = await attachAccurateDistances(listingsWithSeller, {
         latitude: lat,
@@ -882,25 +913,7 @@ class CombinedListingsController {
         type: db.sequelize.QueryTypes.SELECT
       });
 
-      // Fetch seller info for each listing
-      const listingsWithSeller = await Promise.all(
-        listings.map(async (listing) => {
-          const seller = await db.User.findByPk(listing.user_id, {
-            attributes: ['id', 'full_name', 'phone_number', 'profile_photo', 'city', 'state']
-          });
-          return {
-            ...listing,
-            seller: seller ? {
-              id: seller.id,
-              name: seller.full_name,
-              phone: seller.phone_number,
-              profile_photo: seller.profile_photo,
-              city: seller.city,
-              state: seller.state
-            } : null
-          };
-        })
-      );
+      const listingsWithSeller = await attachSellersToListings(listings);
 
       const requesterLocation = await getRequesterLocation(req);
       const listingsWithAccurateDistance = await attachAccurateDistances(
@@ -974,7 +987,7 @@ class CombinedListingsController {
 
       // Fetch seller info
       const seller = await db.User.findByPk(listingData.user_id, {
-        attributes: ['id', 'full_name', 'phone_number', 'profile_photo', 'city', 'state']
+        attributes: SELLER_ATTRIBUTES
       });
 
       // Increment views
@@ -1024,14 +1037,7 @@ class CombinedListingsController {
         photo_4: listingData.photo4 || listingData.photo_4,
         photo_5: listingData.photo5 || listingData.photo_5,
         animal_type: animalType.toLowerCase(),
-        seller: seller ? {
-          id: seller.id,
-          name: seller.full_name,
-          phone: seller.phone_number,
-          profile_photo: seller.profile_photo,
-          city: seller.city,
-          state: seller.state
-        } : null
+        seller: serializeSeller(seller)
       };
 
       res.json({
@@ -1082,66 +1088,54 @@ class CombinedListingsController {
         limit: lim
       });
 
-      // Fetch seller info for each listing
-      const listingsWithSeller = await Promise.all(
-        listings.map(async (listing) => {
-          const listingData = listing.toJSON();
-          const seller = await db.User.findByPk(listingData.user_id, {
-            attributes: ['id', 'full_name', 'phone_number', 'profile_photo', 'city', 'state']
-          });
-          return {
-            id: listingData.id,
-            user_id: listingData.user_id,
-            breed_name: listingData.breedName || listingData.breed_name,
-            age: listingData.age,
-            milk_capacity: listingData.milkCapacity || listingData.milk_capacity,
-            pregnancy_status: listingData.pregnancyStatus || listingData.pregnancy_status,
-            has_horns: listingData.hasHorns !== undefined ? listingData.hasHorns : listingData.has_horns,
-            health_condition: listingData.healthCondition || listingData.health_condition,
-            expected_price: listingData.expectedPrice || listingData.expected_price,
-            is_negotiable: listingData.isNegotiable !== undefined ? listingData.isNegotiable : listingData.is_negotiable,
-            front_photo: listingData.frontPhoto || listingData.front_photo,
-            side_photo: listingData.sidePhoto || listingData.side_photo,
-            milk_scene_photo: listingData.milkScenePhoto || listingData.milk_scene_photo,
-            full_body_photo: listingData.fullBodyPhoto || listingData.full_body_photo,
-            video: listingData.video,
-            vaccination_details: listingData.vaccinationDetails || listingData.vaccination_details,
-            delivery_available: listingData.deliveryAvailable !== undefined ? listingData.deliveryAvailable : listingData.delivery_available,
-            additional_notes: listingData.additionalNotes || listingData.additional_notes,
-            latitude: listingData.latitude,
-            longitude: listingData.longitude,
-            city: listingData.city,
-            state: listingData.state,
-            pincode: listingData.pincode,
-            status: listingData.status,
-            views: listingData.views,
-            created_at: listingData.createdAt || listingData.created_at,
-            updated_at: listingData.updatedAt || listingData.updated_at,
-            gender: listingData.gender,
-            weight: listingData.weight,
-            color: listingData.color,
-            purpose: listingData.purpose,
-            vaccination_status: listingData.vaccinationStatus || listingData.vaccination_status,
-            trained: listingData.trained,
-            behavior: listingData.behavior,
-            description: listingData.description,
-            photo_1: listingData.photo1 || listingData.photo_1,
-            photo_2: listingData.photo2 || listingData.photo_2,
-            photo_3: listingData.photo3 || listingData.photo_3,
-            photo_4: listingData.photo4 || listingData.photo_4,
-            photo_5: listingData.photo5 || listingData.photo_5,
-            animal_type: animalType.toLowerCase(),
-            seller: seller ? {
-              id: seller.id,
-              name: seller.full_name,
-              phone: seller.phone_number,
-              profile_photo: seller.profile_photo,
-              city: seller.city,
-              state: seller.state
-            } : null
-          };
-        })
-      );
+      const normalizedListings = listings.map((listing) => {
+        const listingData = listing.toJSON();
+        return {
+          id: listingData.id,
+          user_id: listingData.user_id,
+          breed_name: listingData.breedName || listingData.breed_name,
+          age: listingData.age,
+          milk_capacity: listingData.milkCapacity || listingData.milk_capacity,
+          pregnancy_status: listingData.pregnancyStatus || listingData.pregnancy_status,
+          has_horns: listingData.hasHorns !== undefined ? listingData.hasHorns : listingData.has_horns,
+          health_condition: listingData.healthCondition || listingData.health_condition,
+          expected_price: listingData.expectedPrice || listingData.expected_price,
+          is_negotiable: listingData.isNegotiable !== undefined ? listingData.isNegotiable : listingData.is_negotiable,
+          front_photo: listingData.frontPhoto || listingData.front_photo,
+          side_photo: listingData.sidePhoto || listingData.side_photo,
+          milk_scene_photo: listingData.milkScenePhoto || listingData.milk_scene_photo,
+          full_body_photo: listingData.fullBodyPhoto || listingData.full_body_photo,
+          video: listingData.video,
+          vaccination_details: listingData.vaccinationDetails || listingData.vaccination_details,
+          delivery_available: listingData.deliveryAvailable !== undefined ? listingData.deliveryAvailable : listingData.delivery_available,
+          additional_notes: listingData.additionalNotes || listingData.additional_notes,
+          latitude: listingData.latitude,
+          longitude: listingData.longitude,
+          city: listingData.city,
+          state: listingData.state,
+          pincode: listingData.pincode,
+          status: listingData.status,
+          views: listingData.views,
+          created_at: listingData.createdAt || listingData.created_at,
+          updated_at: listingData.updatedAt || listingData.updated_at,
+          gender: listingData.gender,
+          weight: listingData.weight,
+          color: listingData.color,
+          purpose: listingData.purpose,
+          vaccination_status: listingData.vaccinationStatus || listingData.vaccination_status,
+          trained: listingData.trained,
+          behavior: listingData.behavior,
+          description: listingData.description,
+          photo_1: listingData.photo1 || listingData.photo_1,
+          photo_2: listingData.photo2 || listingData.photo_2,
+          photo_3: listingData.photo3 || listingData.photo_3,
+          photo_4: listingData.photo4 || listingData.photo_4,
+          photo_5: listingData.photo5 || listingData.photo_5,
+          animal_type: animalType.toLowerCase()
+        };
+      });
+
+      const listingsWithSeller = await attachSellersToListings(normalizedListings);
 
       const requesterLocation = await getRequesterLocation(req);
       const listingsWithAccurateDistance = await attachAccurateDistances(
@@ -1238,24 +1232,7 @@ class CombinedListingsController {
         });
 
         // Fetch seller info
-        const listingsWithSeller = await Promise.all(
-          listings.map(async (listing) => {
-            const seller = await db.User.findByPk(listing.user_id, {
-              attributes: ['id', 'full_name', 'phone_number', 'profile_photo', 'city', 'state']
-            });
-            return {
-              ...listing,
-              seller: seller ? {
-                id: seller.id,
-                name: seller.full_name,
-                phone: seller.phone_number,
-                profile_photo: seller.profile_photo,
-                city: seller.city,
-                state: seller.state
-              } : null
-            };
-          })
-        );
+        const listingsWithSeller = await attachSellersToListings(listings);
 
         const requesterLocation = await getRequesterLocation(req);
         const listingsWithAccurateDistance = await attachAccurateDistances(
@@ -1324,24 +1301,7 @@ class CombinedListingsController {
       });
 
       // Fetch seller info
-      const listingsWithSeller = await Promise.all(
-        listings.map(async (listing) => {
-          const seller = await db.User.findByPk(listing.user_id, {
-            attributes: ['id', 'full_name', 'phone_number', 'profile_photo', 'city', 'state']
-          });
-          return {
-            ...listing,
-            seller: seller ? {
-              id: seller.id,
-              name: seller.full_name,
-              phone: seller.phone_number,
-              profile_photo: seller.profile_photo,
-              city: seller.city,
-              state: seller.state
-            } : null
-          };
-        })
-      );
+      const listingsWithSeller = await attachSellersToListings(listings);
 
       const requesterLocation = await getRequesterLocation(req);
       const listingsWithAccurateDistance = await attachAccurateDistances(

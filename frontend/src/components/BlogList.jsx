@@ -184,11 +184,11 @@ const BlogList = () => {
             </div>
 
             <div className="mx-auto flex w-full max-w-[38rem] lg:mx-0 lg:h-full lg:justify-self-end">
-              <div className="flex w-full items-center overflow-hidden rounded-[1.9rem] shadow-[0_30px_80px_rgba(0,0,0,0.18)]">
+              <div className="w-full overflow-hidden rounded-[1.9rem] bg-[rgba(7,55,42,0.12)] shadow-[0_30px_80px_rgba(0,0,0,0.18)]">
                   <img
                     src={blogHeroImage}
                     alt={t('blog.heroImageAlt')}
-                    className="h-[24rem] w-full object-cover sm:h-[27rem] lg:h-[31rem]"
+                    className="h-auto w-full object-contain object-center sm:h-[27rem] sm:object-cover lg:h-[31rem]"
                   />
               </div>
             </div>

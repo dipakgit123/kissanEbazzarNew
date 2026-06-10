@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import AnimalCard from './AnimalCard';
 import AppLoader from './AppLoader';
@@ -38,8 +38,11 @@ const HomePage = () => {
   const [animalData, setAnimalData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState(null);
+  const [locationResolved, setLocationResolved] = useState(false);
   const distanceMode = 'all';
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const isFetchingListingsRef = useRef(false);
+  const lastListingsFetchAtRef = useRef(0);
 
   // Search-related states
   const [isSearching, setIsSearching] = useState(false);
@@ -141,6 +144,8 @@ const HomePage = () => {
         }
       } catch (error) {
         console.error('Error fetching user location:', error);
+      } finally {
+        setLocationResolved(true);
       }
     };
 
@@ -175,6 +180,11 @@ const HomePage = () => {
   ), []);
 
   const fetchListings = useCallback(async ({ showLoader = false } = {}) => {
+    if (!locationResolved || isFetchingListingsRef.current) {
+      return;
+    }
+
+    isFetchingListingsRef.current = true;
     if (showLoader) {
       setLoading(true);
     }
@@ -218,28 +228,39 @@ const HomePage = () => {
       }
 
       setAnimalData(sortAnimalsByLatest(listings.map(transformListing)));
+      lastListingsFetchAtRef.current = Date.now();
     } catch (error) {
       console.error('Error fetching listings:', error);
     } finally {
+      isFetchingListingsRef.current = false;
       setLoading(false);
     }
-  }, [distanceMode, sortAnimalsByLatest, transformListing, userLocation]);
+  }, [distanceMode, locationResolved, sortAnimalsByLatest, transformListing, userLocation]);
 
   // Fetch latest listings for home page
   useEffect(() => {
-    fetchListings({ showLoader: animalData.length === 0 });
-  }, [animalData.length, fetchListings]);
+    fetchListings({ showLoader: true });
+  }, [fetchListings]);
 
   // Refresh latest listings when the user comes back to the tab/page
   useEffect(() => {
+    const maybeRefreshListings = () => {
+      const now = Date.now();
+      if (now - lastListingsFetchAtRef.current < 15000) {
+        return;
+      }
+
+      fetchListings();
+    };
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        fetchListings();
+        maybeRefreshListings();
       }
     };
 
     const handleWindowFocus = () => {
-      fetchListings();
+      maybeRefreshListings();
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);

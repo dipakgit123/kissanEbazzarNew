@@ -7,6 +7,11 @@ const parseCoordinate = (value) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const hasUsableCoordinates = (value) => (
+  parseCoordinate(value?.latitude) !== null &&
+  parseCoordinate(value?.longitude) !== null
+);
+
 const looksVerboseLocation = (value) => {
   const normalized = normalizeText(value);
   if (!normalized) {
@@ -49,6 +54,12 @@ class ListingLocationService {
       pincode: user?.postal_code
     };
 
+    const hasCoordinates = hasUsableCoordinates(base);
+    const hasPlaceDetails = normalizeText(base.city) && normalizeText(base.state);
+    if (hasCoordinates && hasPlaceDetails) {
+      return mergeLocation(base, null);
+    }
+
     const postalCode = normalizeText(user?.postal_code);
     if (postalCode) {
       try {
@@ -76,19 +87,24 @@ class ListingLocationService {
 
   async normalizeListingLocation(location, seller = null) {
     const base = {
-      latitude: location?.latitude,
-      longitude: location?.longitude,
+      latitude: location?.latitude ?? seller?.latitude,
+      longitude: location?.longitude ?? seller?.longitude,
       city: location?.city || seller?.city,
       state: location?.state || seller?.state,
-      pincode: location?.pincode || location?.postal_code
+      pincode: location?.pincode || location?.postal_code || seller?.postal_code
     };
 
-    const shouldResolve =
+    const hasCoordinates = hasUsableCoordinates(base);
+    const shouldResolvePlaceDetails =
       !normalizeText(base.city) ||
       looksVerboseLocation(base.city) ||
       !normalizeText(base.state);
 
-    if (normalizeText(base.pincode)) {
+    if (hasCoordinates && !shouldResolvePlaceDetails) {
+      return mergeLocation(base, null);
+    }
+
+    if (normalizeText(base.pincode) && (!hasCoordinates || shouldResolvePlaceDetails)) {
       try {
         const resolved = await geocodingService.getLocationFromPostalCode(base.pincode, 'IN');
         return mergeLocation(base, resolved);
@@ -97,7 +113,7 @@ class ListingLocationService {
       }
     }
 
-    if (shouldResolve && (normalizeText(base.city) || normalizeText(base.state))) {
+    if ((!hasCoordinates || shouldResolvePlaceDetails) && (normalizeText(base.city) || normalizeText(base.state))) {
       const resolved = await geocodingService.getLocationFromPlace({
         city: extractSimpleCity(base.city),
         state: normalizeText(base.state),

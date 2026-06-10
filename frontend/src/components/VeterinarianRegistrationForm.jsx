@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import {
-  FaArrowLeft,
   FaArrowRight,
   FaCamera,
   FaCapsules,
@@ -33,10 +32,9 @@ const API_URL = API_BASE_URL;
 const VeterinarianRegistrationForm = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(false);
+  const success = false;
   const [locationLoading, setLocationLoading] = useState(false);
   const [dragActive, setDragActive] = useState({});
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -107,12 +105,6 @@ const VeterinarianRegistrationForm = () => {
     { value: 'Diploma', label: t('vetRegistration.qualifications.diploma') }
   ];
 
-  const stepItems = [
-    { num: 1, label: t('vetRegistration.step1'), sublabel: t('vetRegistration.step1Sub'), Icon: FaUser },
-    { num: 2, label: t('vetRegistration.step2'), sublabel: t('vetRegistration.step2Sub'), Icon: FaFileLines },
-    { num: 3, label: t('vetRegistration.step3'), sublabel: t('vetRegistration.step3Sub'), Icon: FaLocationDot }
-  ];
-
   const serviceCards = [
     { value: 'checkup', label: t('vetRegistration.services.checkup'), Icon: FaStethoscope },
     { value: 'vaccination', label: t('vetRegistration.services.vaccination'), Icon: FaSyringe },
@@ -124,8 +116,18 @@ const VeterinarianRegistrationForm = () => {
     { value: 'artificial_insemination', label: t('vetRegistration.services.artificialInsemination'), Icon: FaDna }
   ];
 
-  const getStepIcon = (stepNumber) => stepItems.find((item) => item.num === stepNumber)?.Icon || FaFileLines;
   const getServiceIcon = (serviceValue) => serviceCards.find((item) => item.value === serviceValue)?.Icon || FaUserDoctor;
+  const personalSectionComplete = Boolean(formData.full_name && formData.phone_number);
+  const licenseSectionComplete = Boolean(formData.license_number && files.license_document);
+  const locationSectionComplete = Boolean(
+    formData.latitude &&
+    formData.longitude &&
+    formData.city &&
+    formData.state &&
+    formData.pincode
+  );
+  const optionalDocumentsCount = [files.profile_photo, files.degree_certificate, files.aadhar_document].filter(Boolean).length;
+  const completedRequiredSections = [personalSectionComplete, licenseSectionComplete, locationSectionComplete].filter(Boolean).length;
 
   // Get current location
   const getCurrentLocation = () => {
@@ -288,60 +290,46 @@ const VeterinarianRegistrationForm = () => {
     }
   };
 
-  const validateStep = (stepNumber) => {
-    switch (stepNumber) {
-      case 1:
-        if (!formData.full_name || !formData.phone_number) {
-          setError(t('vetRegistration.fillAllRequired'));
-          return false;
-        }
-        if (!/^\+91[0-9]{10}$/.test(formData.phone_number)) {
-          setError(t('vetRegistration.phoneFormat'));
-          return false;
-        }
-        break;
-      case 2:
-        if (!formData.license_number) {
-          setError(t('vetRegistration.licenseRequired'));
-          return false;
-        }
-        if (!files.license_document) {
-          setError(t('vetRegistration.licenseDocRequired'));
-          return false;
-        }
-        break;
-      case 3:
-        if (!formData.latitude || !formData.longitude) {
-          setError(t('vetRegistration.locationRequired'));
-          return false;
-        }
-        if (!formData.city || !formData.state || !formData.pincode) {
-          setError(t('vetRegistration.locationDetailsRequired'));
-          return false;
-        }
-        break;
-      default:
-        break;
+  const validateForm = () => {
+    if (!formData.full_name || !formData.phone_number) {
+      setError(t('vetRegistration.fillAllRequired'));
+      return false;
     }
+
+    if (!/^\+91[0-9]{10}$/.test(formData.phone_number)) {
+      setError(t('vetRegistration.phoneFormat'));
+      return false;
+    }
+
+    if (!formData.license_number) {
+      setError(t('vetRegistration.licenseRequired'));
+      return false;
+    }
+
+    if (!files.license_document) {
+      setError(t('vetRegistration.licenseDocRequired'));
+      return false;
+    }
+
+    if (!formData.latitude || !formData.longitude) {
+      setError(t('vetRegistration.locationRequired'));
+      return false;
+    }
+
+    if (!formData.city || !formData.state || !formData.pincode) {
+      setError(t('vetRegistration.locationDetailsRequired'));
+      return false;
+    }
+
     setError(null);
     return true;
   };
 
-  const nextStep = () => {
-    if (validateStep(step)) {
-      setStep(prev => prev + 1);
-    }
-  };
-
-  const prevStep = () => {
-    setStep(prev => prev - 1);
-    setError(null);
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validateStep(3)) return;
+    if (!validateForm()) return;
 
+    let shouldRedirectToLogin = false;
     setLoading(true);
     setError(null);
     setUploadProgress(0);
@@ -386,14 +374,23 @@ const VeterinarianRegistrationForm = () => {
 
       if (response.data.success) {
         setUploadProgress(100);
-        setSuccess(true);
+        setSubmitStage('success');
+        shouldRedirectToLogin = true;
       }
     } catch (err) {
       console.error('Registration error:', err);
       setError(err.response?.data?.message || t('vetRegistration.errorOccurred'));
     } finally {
-      setLoading(false);
-      setSubmitStage('idle');
+      if (!shouldRedirectToLogin) {
+        setLoading(false);
+        setSubmitStage('idle');
+      }
+    }
+
+    if (shouldRedirectToLogin) {
+      window.setTimeout(() => {
+        navigate('/veterinarian/login');
+      }, 700);
     }
   };
 
@@ -484,135 +481,54 @@ const VeterinarianRegistrationForm = () => {
 
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#eef7f2_0%,#f8fbff_30%,#ffffff_100%)] py-6 px-4 sm:px-6 lg:px-8">
+      {loading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 backdrop-blur-[2px]">
+          <div className="mx-4 w-full max-w-sm rounded-2xl border border-white/70 bg-white p-6 shadow-2xl">
+            <div className="flex items-center gap-4">
+              <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                <svg className="h-6 w-6 animate-spin" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <p className="text-base font-semibold text-slate-900">
+                  {submitStage === 'success'
+                    ? t('vetRegistration.successTitle')
+                    : t('vetRegistration.submitting')}
+                </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  {submitStage === 'preparing'
+                    ? t('vetRegistration.optimizingFiles', 'Optimizing documents before upload...')
+                    : submitStage === 'success'
+                      ? t('vetRegistration.goToLogin')
+                      : t('vetRegistration.uploadingDocuments', 'Uploading registration documents...')}
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-green-600 transition-all duration-300"
+                style={{ width: `${submitStage === 'preparing' ? 20 : submitStage === 'success' ? 100 : Math.max(uploadProgress, 8)}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-6xl mx-auto">
         {/* Language Switcher - Top Right */}
         <div className="flex justify-end mb-4">
           <LanguageSwitcher />
         </div>
         
-        <div className="mb-8 overflow-hidden rounded-[32px] border border-emerald-100 bg-[linear-gradient(135deg,#072814_0%,#0b3a20_45%,#0e5c33_100%)] text-white shadow-[0_28px_80px_rgba(8,34,19,0.20)]">
-          <div className="grid gap-8 px-6 py-8 sm:px-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)] lg:items-center lg:px-10 lg:py-10">
+        <div className="mx-auto mb-6 max-w-4xl rounded-2xl border border-emerald-100 bg-[#0b4a28] text-white shadow-sm">
+          <div className="px-6 py-5 sm:px-8">
             <div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-100">
-                <FaShieldHeart className="text-sm" />
-                {t('vetRegistration.subtitle')}
-              </span>
-              <h1 className="mt-5 text-3xl font-black leading-tight text-white sm:text-4xl lg:text-5xl">
+              <h1 className="text-2xl font-semibold leading-tight text-white sm:text-3xl">
                 {t('vetRegistration.title')}
               </h1>
-              <p className="mt-4 max-w-2xl text-sm leading-7 text-emerald-50/85 sm:text-base">
-                {t('vetRegistration.subtitle')}
-              </p>
-
-              <div className="mt-6 flex flex-wrap gap-3">
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white/90">
-                  <FaFileCircleCheck className="text-emerald-300" />
-                  {t('vetRegistration.licenseInfo')}
-                </span>
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white/90">
-                  <FaLocationDot className="text-emerald-300" />
-                  {t('vetRegistration.locationSetup')}
-                </span>
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white/90">
-                  <FaCircleCheck className="text-emerald-300" />
-                  {t('vetRegistration.whatHappensNext')}
-                </span>
-              </div>
-
-              <Link
-                to="/veterinarian/login"
-                className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-emerald-100 transition hover:text-white"
-              >
-                <FaArrowLeft className="text-sm" />
-                {t('vetRegistration.backToLogin')}
-              </Link>
             </div>
-
-            <div className="rounded-[28px] border border-white/15 bg-white/10 p-5 backdrop-blur-sm">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-100/80">
-                {t('vetRegistration.whatHappensNext')}
-              </p>
-              <div className="mt-5 space-y-4">
-                <div className="flex items-start gap-3 rounded-2xl bg-white/8 p-4">
-                  <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-400/20 text-emerald-200">
-                    <FaUserDoctor className="text-lg" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-white">{t('vetRegistration.step1Complete')}</p>
-                    <p className="mt-1 text-sm text-emerald-50/75">{t('vetRegistration.step1CompleteDesc')}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 rounded-2xl bg-white/8 p-4">
-                  <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-400/20 text-blue-100">
-                    <FaFileLines className="text-lg" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-white">{t('vetRegistration.step2Progress')}</p>
-                    <p className="mt-1 text-sm text-emerald-50/75">{t('vetRegistration.step2ProgressDesc')}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 rounded-2xl bg-white/8 p-4">
-                  <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-400/20 text-violet-100">
-                    <FaLocationCrosshairs className="text-lg" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-white">{t('vetRegistration.step3Live')}</p>
-                    <p className="mt-1 text-sm text-emerald-50/75">{t('vetRegistration.step3LiveDesc')}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Modern Progress Stepper */}
-        <div className="bg-white rounded-2xl shadow-sm p-6 sm:p-8 mb-8 border border-gray-100">
-          <div className="flex items-center justify-between max-w-2xl mx-auto">
-            {[
-              { num: 1, label: t('vetRegistration.step1'), sublabel: t('vetRegistration.step1Sub'), icon: '👤' },
-              { num: 2, label: t('vetRegistration.step2'), sublabel: t('vetRegistration.step2Sub'), icon: '📄' },
-              { num: 3, label: t('vetRegistration.step3'), sublabel: t('vetRegistration.step3Sub'), icon: '📍' }
-            ].map((s, index) => (
-              <React.Fragment key={s.num}>
-                <div className="flex flex-col items-center flex-1">
-                  {/* Step Circle */}
-                  <div className={`relative w-14 h-14 rounded-2xl flex items-center justify-center font-bold transition-all duration-300 ${
-                    step >= s.num
-                      ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg scale-110'
-                      : 'bg-gray-100 text-gray-400'
-                  }`}>
-                    {step > s.num ? (
-                      <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    ) : (
-                      React.createElement(getStepIcon(s.num), { className: 'text-xl' })
-                    )}
-                  </div>
-                  
-                  {/* Step Label */}
-                  <div className="mt-3 text-center">
-                    <p className={`text-sm font-bold ${
-                      step >= s.num ? 'text-blue-600' : 'text-gray-400'
-                    }`}>
-                      {s.label}
-                    </p>
-                    <p className={`text-xs ${
-                      step >= s.num ? 'text-gray-600' : 'text-gray-400'
-                    }`}>
-                      {s.sublabel}
-                    </p>
-                  </div>
-                </div>
-                
-                {/* Connector Line */}
-                {index < 2 && (
-                  <div className={`h-1 w-full max-w-[100px] mx-4 rounded-full transition-all duration-500 -mt-8 ${
-                    step > s.num ? 'bg-gradient-to-r from-blue-500 to-indigo-600' : 'bg-gray-200'
-                  }`} />
-                )}
-              </React.Fragment>
-            ))}
           </div>
         </div>
 
@@ -628,7 +544,7 @@ const VeterinarianRegistrationForm = () => {
           </div>
         )}
 
-        {loading && (
+        {!loading && (
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 shadow-sm">
             <div className="flex items-center justify-between gap-4 mb-2">
               <p className="text-sm font-medium text-blue-700">
@@ -650,13 +566,12 @@ const VeterinarianRegistrationForm = () => {
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6 xl:grid xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start xl:gap-6 xl:space-y-0">
 
-          {/* Step 1: Personal & Professional Info */}
-          {step === 1 && (
-            <div className="space-y-6">
+          <div className="space-y-6 xl:min-w-0">
+          <div className="space-y-6">
               {/* Section Card: Personal Information */}
-              <div className="bg-white rounded-2xl shadow-sm p-6 sm:p-8 border border-gray-100">
+              <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm sm:p-6">
                 <div className="flex items-center mb-6">
                   <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center mr-3">
                     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -747,7 +662,7 @@ const VeterinarianRegistrationForm = () => {
               </div>
 
               {/* Section Card: Professional Information */}
-              <div className="bg-white rounded-2xl shadow-sm p-6 sm:p-8 border border-gray-100">
+              <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm sm:p-6">
                 <div className="flex items-center mb-6">
                   <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center mr-3">
                     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -901,7 +816,7 @@ const VeterinarianRegistrationForm = () => {
               </div>
 
               {/* Section Card: Services Offered */}
-              <div className="bg-white rounded-2xl shadow-sm p-6 sm:p-8 border border-gray-100">
+              <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm sm:p-6">
                 <div className="flex items-center mb-6">
                   <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl flex items-center justify-center mr-3">
                     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -946,8 +861,8 @@ const VeterinarianRegistrationForm = () => {
               </div>
 
               {/* Emergency Available & Profile Photo */}
-              <div className="bg-white rounded-2xl shadow-sm p-6 sm:p-8 border border-gray-100">
-                <div className="space-y-5">
+              <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm sm:p-6">
+                <div className="space-y-5 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-5 lg:space-y-0">
                   {/* Emergency Toggle */}
                   <div className="flex items-start p-4 bg-gradient-to-r from-red-50 to-orange-50 rounded-xl border border-red-200">
                     <input
@@ -1020,14 +935,11 @@ const VeterinarianRegistrationForm = () => {
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+          </div>
 
-          {/* Step 2: Documents & License */}
-          {step === 2 && (
-            <div className="space-y-6">
+          <div className="space-y-6">
               {/* Section Card: License Information */}
-              <div className="bg-white rounded-2xl shadow-sm p-6 sm:p-8 border border-gray-100">
+              <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm sm:p-6">
                 <div className="flex items-center mb-6">
                   <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center mr-3">
                     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1078,7 +990,7 @@ const VeterinarianRegistrationForm = () => {
                       {t('vetRegistration.licenseDocument')} <span className="text-red-500">*</span>
                     </label>
                     <div 
-                      className={`relative border-2 border-dashed rounded-2xl p-8 text-center transition-all ${
+                      className={`relative rounded-2xl border-2 border-dashed p-5 text-center transition-all sm:p-6 ${
                         dragActive.license_document 
                           ? 'border-amber-500 bg-amber-50' 
                           : files.license_document 
@@ -1139,7 +1051,7 @@ const VeterinarianRegistrationForm = () => {
               </div>
 
               {/* Section Card: Additional Documents */}
-              <div className="bg-white rounded-2xl shadow-sm p-6 sm:p-8 border border-gray-100">
+              <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm sm:p-6">
                 <div className="flex items-center mb-6">
                   <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-xl flex items-center justify-center mr-3">
                     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1161,7 +1073,7 @@ const VeterinarianRegistrationForm = () => {
                       {t('vetRegistration.degreeOptional')}
                     </label>
                     <div 
-                      className={`relative border-2 border-dashed rounded-2xl p-8 text-center transition-all ${
+                      className={`relative rounded-2xl border-2 border-dashed p-5 text-center transition-all sm:p-6 ${
                         dragActive.degree_certificate 
                           ? 'border-teal-500 bg-teal-50' 
                           : files.degree_certificate 
@@ -1225,7 +1137,7 @@ const VeterinarianRegistrationForm = () => {
                       {t('vetRegistration.aadharOptional')}
                     </label>
                     <div 
-                      className={`relative border-2 border-dashed rounded-2xl p-8 text-center transition-all ${
+                      className={`relative rounded-2xl border-2 border-dashed p-5 text-center transition-all sm:p-6 ${
                         dragActive.aadhar_document 
                           ? 'border-teal-500 bg-teal-50' 
                           : files.aadhar_document 
@@ -1284,14 +1196,11 @@ const VeterinarianRegistrationForm = () => {
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+          </div>
 
-          {/* Step 3: Location */}
-          {step === 3 && (
-            <div className="space-y-6">
+          <div className="space-y-6">
               {/* Section Card: Location Setup */}
-              <div className="bg-white rounded-2xl shadow-sm p-6 sm:p-8 border border-gray-100">
+              <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm sm:p-6">
                 <div className="flex items-center mb-6">
                   <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center mr-3">
                     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1308,7 +1217,7 @@ const VeterinarianRegistrationForm = () => {
                 <div className="h-px bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 mb-6"></div>
 
                 {/* Get Current Location - Prominent Action Card */}
-                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-6 border-2 border-indigo-200 mb-6">
+                <div className="mb-6 rounded-2xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-5 sm:p-6">
                   <div className="flex items-start mb-4">
                     <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center mr-4 flex-shrink-0">
                       <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1529,42 +1438,58 @@ const VeterinarianRegistrationForm = () => {
                   </div>
                 </div>
               )}
-            </div>
-          )}
+          </div>
 
-          {/* Navigation Buttons */}
-          <div className="flex justify-between items-center mt-8 pt-6 gap-4">
-            {step > 1 ? (
-              <button
-                type="button"
-                onClick={prevStep}
-                className="flex items-center px-6 py-2.5 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg font-semibold transition-all text-sm"
-              >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                {t('vetRegistration.previousStep')}
-              </button>
-            ) : (
-              <div></div>
-            )}
+          </div>
 
-            {step < 3 ? (
-              <button
-                type="button"
-                onClick={nextStep}
-                className="ml-auto flex items-center px-8 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all text-sm"
-              >
-                {t('vetRegistration.nextStep')}
-                <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-            ) : (
+          <aside className="hidden xl:block xl:sticky xl:top-6">
+            <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+              <div className="flex items-start gap-3">
+                <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                  <FaFileCircleCheck className="text-lg" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">{t('vetRegistration.registrationChecklist')}</h3>
+                  <p className="mt-1 text-sm text-gray-500">{t('vetRegistration.requiredSections')}</p>
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                {[
+                  { done: personalSectionComplete, label: t('vetRegistration.personalProfessionalDetails') },
+                  { done: licenseSectionComplete, label: t('vetRegistration.licenseInfo') },
+                  { done: locationSectionComplete, label: t('vetRegistration.locationSetup') }
+                ].map((item) => (
+                  <div
+                    key={item.label}
+                    className={`flex items-center justify-between rounded-xl border px-3 py-3 ${
+                      item.done ? 'border-emerald-200 bg-emerald-50' : 'border-gray-200 bg-gray-50'
+                    }`}
+                  >
+                    <span className={`text-sm font-medium ${item.done ? 'text-emerald-800' : 'text-gray-700'}`}>
+                      {item.label}
+                    </span>
+                    <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full ${
+                      item.done ? 'bg-emerald-500 text-white' : 'border border-gray-200 bg-white text-gray-400'
+                    }`}>
+                      <FaCheck className="text-xs" />
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-5 rounded-xl bg-slate-50 p-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-semibold text-slate-700">{t('vetRegistration.additionalDocuments')}</span>
+                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">{optionalDocumentsCount}</span>
+                </div>
+                <p className="mt-2 text-xs text-slate-500">{completedRequiredSections}/3</p>
+              </div>
+
               <button
                 type="submit"
                 disabled={loading}
-                className="ml-auto flex items-center px-8 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg font-bold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="mt-5 flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 px-6 py-3.5 font-bold text-white transition-all hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? (
                   <>
@@ -1585,7 +1510,34 @@ const VeterinarianRegistrationForm = () => {
                   </>
                 )}
               </button>
-            )}
+            </div>
+          </aside>
+
+          <div className="mt-8 flex justify-end pt-2 xl:hidden">
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 px-8 py-3.5 font-bold text-white transition-all hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            >
+              {loading ? (
+                <>
+                  <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  {submitStage === 'preparing'
+                    ? t('vetRegistration.preparingUpload', 'Preparing files...')
+                    : t('vetRegistration.uploadingNow', 'Uploading...')}
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {t('vetRegistration.submit')}
+                </>
+              )}
+            </button>
           </div>
         </form>
 

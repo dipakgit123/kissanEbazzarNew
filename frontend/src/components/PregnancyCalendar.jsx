@@ -22,7 +22,6 @@ import {
   FaXmark
 } from 'react-icons/fa6';
 import { GiAlarmClock, GiBuffaloHead, GiGoat, GiSheep } from 'react-icons/gi';
-import { MdPregnantWoman } from 'react-icons/md';
 import { FullPageLoader } from './AppLoader';
 
 // Pregnancy duration in days for different animal types
@@ -529,7 +528,7 @@ const PregnancyCalendar = () => {
                   <p className="text-3xl font-bold text-white">{stats.active_pregnancies || 0}</p>
                 </div>
                 <div className="w-12 h-12 bg-green-900/50 rounded-lg flex items-center justify-center border border-green-700">
-                  <MdPregnantWoman className="text-2xl text-green-300" />
+                  <FaCow className="text-2xl text-green-300" />
                 </div>
               </div>
             </div>
@@ -775,7 +774,7 @@ const PregnancyCalendar = () => {
             {/* Modal Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <MdPregnantWoman className="text-green-600" />
+                <AnimalTypeIcon type={formData.animal_type} className="text-xl" />
                 {t("pregnancy.addPregnancyRecord")}
               </h3>
               <button

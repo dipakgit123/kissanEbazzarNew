@@ -58,7 +58,7 @@ const Footer = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
-            <div className="flex items-center space-x-3 mb-4">
+            <Link to="/" className="mb-4 flex items-center space-x-3 transition-opacity hover:opacity-90">
               <div className="w-10 h-10 bg-gradient-to-r from-[#15BB73] to-[#0FA568] rounded-xl flex items-center justify-center">
                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -68,7 +68,7 @@ const Footer = () => {
                 <h3 className="text-xl font-bold">{t('footer.appName')}</h3>
                 <p className="text-sm text-gray-400">{t('footer.farmersMarketplace')}</p>
               </div>
-            </div>
+            </Link>
             <p className="text-gray-400 text-sm">
               {t('footer.description')}
             </p>

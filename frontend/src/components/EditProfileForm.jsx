@@ -692,14 +692,14 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
 
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1">
-            {t('footer.country', { defaultValue: 'Country' })}
+            {t('profile.country', { defaultValue: 'Country' })}
           </label>
           <input
             name="country"
             value={form.country}
             onChange={handleChange}
             className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all"
-            placeholder={t('footer.country', { defaultValue: 'Country' })}
+            placeholder={t('profile.country', { defaultValue: 'Country' })}
           />
         </div>
 
@@ -707,7 +707,7 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
-                Latitude
+                {t('profile.latitude', { defaultValue: 'Latitude' })}
               </label>
               <input
                 value={form.latitude}
@@ -717,7 +717,7 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
             </div>
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
-                Longitude
+                {t('profile.longitude', { defaultValue: 'Longitude' })}
               </label>
               <input
                 value={form.longitude}

@@ -20,6 +20,7 @@ const BuyAnimalsPage = () => {
   const [animalData, setAnimalData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState(null);
+  const [locationResolved, setLocationResolved] = useState(false);
   const [distanceMode, setDistanceMode] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -27,7 +28,29 @@ const BuyAnimalsPage = () => {
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
   const [isSearchSticky, setIsSearchSticky] = useState(false);
+  const [shouldScrollToListings, setShouldScrollToListings] = useState(false);
   const searchBarRef = useRef(null);
+  const listingsSectionRef = useRef(null);
+
+  const scrollToListings = useCallback(() => {
+    setShouldScrollToListings(true);
+  }, []);
+
+  useEffect(() => {
+    if (!shouldScrollToListings) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      listingsSectionRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+      setShouldScrollToListings(false);
+    }, 120);
+
+    return () => window.clearTimeout(timer);
+  }, [shouldScrollToListings, selectedCategory, distanceMode, selectedBreed, minPrice, maxPrice, searchQuery]);
 
   // Scroll effect for sticky search bar
   useEffect(() => {
@@ -194,6 +217,8 @@ const BuyAnimalsPage = () => {
         }
       } catch (error) {
         console.error('Error fetching user location:', error);
+      } finally {
+        setLocationResolved(true);
       }
     };
 
@@ -202,6 +227,10 @@ const BuyAnimalsPage = () => {
 
   // Fetch listings based on distance mode
   useEffect(() => {
+    if (!locationResolved) {
+      return;
+    }
+
     const fetchListings = async () => {
       setLoading(true);
       try {
@@ -274,7 +303,7 @@ const BuyAnimalsPage = () => {
     };
 
     fetchListings();
-  }, [distanceMode, userLocation, formatTimeAgo]);
+  }, [distanceMode, userLocation, formatTimeAgo, locationResolved]);
 
   const animalsForSelectedCategory = useMemo(() => {
     if (!selectedCategory) return [];
@@ -341,6 +370,7 @@ const BuyAnimalsPage = () => {
     setMinPrice('');
     setMaxPrice('');
     setSelectedCategory(category);
+    scrollToListings();
   };
 
   const clearCategoryFilter = () => {
@@ -348,6 +378,12 @@ const BuyAnimalsPage = () => {
     setMinPrice('');
     setMaxPrice('');
     setSelectedCategory(null);
+    scrollToListings();
+  };
+
+  const handleDistanceModeChange = (mode) => {
+    setDistanceMode(mode);
+    scrollToListings();
   };
 
   return (
@@ -435,7 +471,7 @@ const BuyAnimalsPage = () => {
             <div className="flex items-center justify-center">
               <div className="inline-flex items-center bg-gradient-to-r from-gray-100 to-gray-50 rounded-lg p-1 shadow-inner">
                 <button
-                  onClick={() => setDistanceMode('all')}
+                  onClick={() => handleDistanceModeChange('all')}
                   className={`px-4 py-2 rounded-md text-sm font-semibold transition-all duration-300 ${
                     distanceMode === 'all'
                       ? 'bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white shadow-lg transform scale-105'
@@ -450,7 +486,7 @@ const BuyAnimalsPage = () => {
                   </div>
                 </button>
                 <button
-                  onClick={() => setDistanceMode('nearby')}
+                  onClick={() => handleDistanceModeChange('nearby')}
                   className={`px-4 py-2 rounded-md text-sm font-semibold transition-all duration-300 ${
                     distanceMode === 'nearby'
                       ? 'bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white shadow-lg transform scale-105'
@@ -869,7 +905,7 @@ const BuyAnimalsPage = () => {
         )}
 
         {/* Listings */}
-        <div className="mb-8">
+        <div id="animal-listings" ref={listingsSectionRef} className="mb-8 scroll-mt-28">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-3">
             <div>
               <h3 className="text-2xl font-bold text-[#000600]">

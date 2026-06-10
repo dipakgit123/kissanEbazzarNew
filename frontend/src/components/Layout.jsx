@@ -56,7 +56,7 @@ const Layout = ({ showHeaderFooter = true }) => {
                     <h1 className="text-base xl:text-lg font-bold text-[#000600] bg-gradient-to-r from-[#000600] to-[#15BB73] bg-clip-text text-transparent group-hover:from-[#15BB73] group-hover:to-[#0FA568] transition-all duration-300 whitespace-nowrap">
                       Animal E Bazar
                     </h1>
-                    <p className="hidden 2xl:block text-xs text-gray-600 font-medium whitespace-nowrap">Farmers Marketplace</p>
+                    <p className="hidden 2xl:block text-xs text-gray-600 font-medium whitespace-nowrap">{t('footer.farmersMarketplace')}</p>
                   </div>
                 </Link>
 
@@ -255,7 +255,7 @@ const Layout = ({ showHeaderFooter = true }) => {
             <div className="flex items-center justify-between border-b border-gray-200 px-5 py-5">
               <div>
                 <p className="text-lg font-bold text-gray-900">Animal E Bazar</p>
-                <p className="mt-1 text-xs text-gray-500">Farmers Marketplace</p>
+                <p className="mt-1 text-xs text-gray-500">{t('footer.farmersMarketplace')}</p>
               </div>
               <button
                 type="button"
