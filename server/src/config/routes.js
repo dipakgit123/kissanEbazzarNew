@@ -20,6 +20,7 @@ const vetReportRoutes = require('../routes/vetReportRoutes');
 const appointmentRoutes = require('../routes/appointmentRoutes');
 const wishlistRoutes = require('../routes/wishlistRoutes');
 const blogRoutes = require('../routes/blogRoutes');
+const contactRoutes = require('../routes/contactRoutes');
 
 const setupRoutes = (app) => {
   // Routes
@@ -45,6 +46,7 @@ const setupRoutes = (app) => {
   app.use('/api/appointments', appointmentRoutes);
   app.use('/api/wishlist', wishlistRoutes);
   app.use('/api/blogs', blogRoutes);
+  app.use('/api/contact', contactRoutes);
 
   // Health check endpoint
   app.get('/health', async (req, res) => {

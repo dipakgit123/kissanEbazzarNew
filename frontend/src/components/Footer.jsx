@@ -86,7 +86,7 @@ const Footer = () => {
             <h4 className="text-lg font-semibold mb-4">{t('footer.support')}</h4>
             <ul className="space-y-2 text-sm text-gray-400">
               <li><Link to="/help" className="hover:text-[#15BB73] transition-colors">{t('footer.helpCenter')}</Link></li>
-              <li><Link to="/profile" className="hover:text-[#15BB73] transition-colors">{t('footer.contactUs')}</Link></li>
+              <li><Link to="/contact" className="hover:text-[#15BB73] transition-colors">{t('footer.contactUs')}</Link></li>
               <li><Link to="/privacy" className="hover:text-[#15BB73] transition-colors">{t('footer.privacyPolicy')}</Link></li>
               <li><Link to="/terms" className="hover:text-[#15BB73] transition-colors">{t('footer.termsOfService')}</Link></li>
             </ul>

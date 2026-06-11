@@ -618,4 +618,15 @@ export const userService = {
   }
 };
 
+export const contactService = {
+  submitInquiry: async (data) => {
+    try {
+      const response = await api.post('/api/contact', data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  }
+};
+
 export default api;

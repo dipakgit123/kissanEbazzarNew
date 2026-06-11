@@ -218,11 +218,12 @@ class VeterinarianController {
       const normalizedEmail = email ? email.trim().toLowerCase() : null;
 
       // Validate required fields
-      if (!full_name || !phone_number || !license_number || !latitude || !longitude || !city || !state || !pincode) {
+      if (!full_name || !phone_number || !normalizedEmail || !license_number || !latitude || !longitude || !city || !state || !pincode) {
         console.log('=== VALIDATION FAILED ===');
         console.log('Missing:', {
           full_name: !!full_name,
           phone_number: !!phone_number,
+          email: !!normalizedEmail,
           license_number: !!license_number,
           latitude: !!latitude,
           longitude: !!longitude,
@@ -234,7 +235,15 @@ class VeterinarianController {
         
         return res.status(400).json({
           success: false,
-          message: 'Required fields: full_name, phone_number, license_number, latitude, longitude, city, state, pincode'
+          message: 'Required fields: full_name, phone_number, email, license_number, latitude, longitude, city, state, pincode'
+        });
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(normalizedEmail)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide a valid email address'
         });
       }
 
@@ -258,17 +267,15 @@ class VeterinarianController {
         });
       }
 
-      if (normalizedEmail) {
-        const existingEmail = await db.Veterinarian.findOne({
-          where: { email: normalizedEmail }
-        });
+      const existingEmail = await db.Veterinarian.findOne({
+        where: { email: normalizedEmail }
+      });
 
-        if (existingEmail) {
-          return res.status(400).json({
-            success: false,
-            message: 'Email address already registered'
-          });
-        }
+      if (existingEmail) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email address already registered'
+        });
       }
 
       // Process file uploads

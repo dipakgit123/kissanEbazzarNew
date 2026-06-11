@@ -34,7 +34,6 @@ const VeterinarianRegistrationForm = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const success = false;
   const [locationLoading, setLocationLoading] = useState(false);
   const [dragActive, setDragActive] = useState({});
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -291,13 +290,18 @@ const VeterinarianRegistrationForm = () => {
   };
 
   const validateForm = () => {
-    if (!formData.full_name || !formData.phone_number) {
+    if (!formData.full_name?.trim() || !formData.phone_number || !formData.email?.trim()) {
       setError(t('vetRegistration.fillAllRequired'));
       return false;
     }
 
     if (!/^\+91[0-9]{10}$/.test(formData.phone_number)) {
       setError(t('vetRegistration.phoneFormat'));
+      return false;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      setError(t('vetRegistration.emailInvalid'));
       return false;
     }
 
@@ -394,7 +398,7 @@ const VeterinarianRegistrationForm = () => {
     }
   };
 
-  if (success) {
+  if (false) {
     return (
       <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center p-4">
         <div className="bg-white rounded-3xl shadow-2xl p-12 max-w-lg w-full text-center border border-gray-100">
@@ -522,10 +526,10 @@ const VeterinarianRegistrationForm = () => {
           <LanguageSwitcher />
         </div>
         
-        <div className="mx-auto mb-6 max-w-4xl rounded-2xl border border-emerald-100 bg-[#0b4a28] text-white shadow-sm">
-          <div className="px-6 py-5 sm:px-8">
+        <div className="mx-auto mb-6 max-w-4xl">
+          <div className="px-1 py-1 sm:px-0">
             <div>
-              <h1 className="text-2xl font-semibold leading-tight text-white sm:text-3xl">
+              <h1 className="text-2xl font-semibold leading-tight text-slate-900 sm:text-3xl">
                 {t('vetRegistration.title')}
               </h1>
             </div>
@@ -540,27 +544,6 @@ const VeterinarianRegistrationForm = () => {
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
               <p className="text-sm font-medium text-red-700">{error}</p>
-            </div>
-          </div>
-        )}
-
-        {!loading && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 shadow-sm">
-            <div className="flex items-center justify-between gap-4 mb-2">
-              <p className="text-sm font-medium text-blue-700">
-                {submitStage === 'preparing'
-                  ? t('vetRegistration.optimizingFiles', 'Optimizing documents before upload...')
-                  : t('vetRegistration.uploadingDocuments', 'Uploading registration documents...')}
-              </p>
-              <span className="text-sm font-semibold text-blue-700">
-                {submitStage === 'preparing' ? '...' : `${uploadProgress}%`}
-              </span>
-            </div>
-            <div className="h-2 rounded-full bg-blue-100 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-300"
-                style={{ width: `${submitStage === 'preparing' ? 20 : Math.max(uploadProgress, 8)}%` }}
-              />
             </div>
           </div>
         )}
@@ -604,7 +587,7 @@ const VeterinarianRegistrationForm = () => {
                         name="full_name"
                         value={formData.full_name}
                         onChange={handleChange}
-                        placeholder="Dr. John Doe"
+                        placeholder={t('vetRegistration.fullNamePlaceholder')}
                         className="w-full pl-12 pr-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder-gray-400"
                         required
                       />
@@ -629,7 +612,7 @@ const VeterinarianRegistrationForm = () => {
                           name="phone_number"
                           value={formData.phone_number}
                           onChange={handleChange}
-                          placeholder="+919876543210"
+                          placeholder={t('vetRegistration.phonePlaceholder')}
                           className="w-full pl-12 pr-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder-gray-400"
                           required
                         />
@@ -639,7 +622,7 @@ const VeterinarianRegistrationForm = () => {
                     {/* Email */}
                     <div className="group">
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        {t('vetRegistration.emailOptional')}
+                        {t('vetRegistration.email')} <span className="text-red-500">*</span>
                       </label>
                       <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -652,8 +635,9 @@ const VeterinarianRegistrationForm = () => {
                           name="email"
                           value={formData.email}
                           onChange={handleChange}
-                          placeholder="doctor@example.com"
+                          placeholder={t('vetRegistration.emailPlaceholder')}
                           className="w-full pl-12 pr-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder-gray-400"
+                          required
                         />
                       </div>
                     </div>
@@ -671,7 +655,7 @@ const VeterinarianRegistrationForm = () => {
                   </div>
                   <div>
                     <h2 className="text-xl font-bold text-gray-900">{t('vetRegistration.professionalInfo')}</h2>
-                    <p className="text-sm text-gray-500">{t('vetRegistration.qualifications')}</p>
+                    <p className="text-sm text-gray-500">{t('vetRegistration.professionalInfoSubtitle')}</p>
                   </div>
                 </div>
                 
@@ -783,7 +767,7 @@ const VeterinarianRegistrationForm = () => {
                           name="consultation_fee"
                           value={formData.consultation_fee}
                           onChange={handleChange}
-                          placeholder="500"
+                          placeholder={t('vetRegistration.consultationFeePlaceholder')}
                           min="0"
                           className="w-full pl-10 pr-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all text-gray-900 placeholder-gray-400"
                         />
@@ -807,7 +791,7 @@ const VeterinarianRegistrationForm = () => {
                         name="clinic_name"
                         value={formData.clinic_name}
                         onChange={handleChange}
-                        placeholder="e.g., Krishna Veterinary Clinic"
+                        placeholder={t('vetRegistration.clinicNamePlaceholder')}
                         className="w-full pl-12 pr-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all text-gray-900 placeholder-gray-400"
                       />
                     </div>
@@ -1021,7 +1005,7 @@ const VeterinarianRegistrationForm = () => {
                             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
-                            Remove
+                            {t('vetRegistration.removeFile')}
                           </button>
                         </div>
                       ) : (
@@ -1040,7 +1024,7 @@ const VeterinarianRegistrationForm = () => {
                             </div>
                             <div>
                               <p className="text-gray-700 font-semibold">{t('vetRegistration.dropLicenseHere')} <span className="text-amber-600">{t('vetRegistration.browse')}</span></p>
-                              <p className="text-gray-500 text-sm mt-1">Supports: PDF, JPG, PNG (Max 10MB)</p>
+                              <p className="text-gray-500 text-sm mt-1">{t('vetRegistration.uploadSupportText')}</p>
                             </div>
                           </div>
                         </label>
@@ -1104,7 +1088,7 @@ const VeterinarianRegistrationForm = () => {
                             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
-                            Remove
+                            {t('vetRegistration.removeFile')}
                           </button>
                         </div>
                       ) : (
@@ -1123,7 +1107,7 @@ const VeterinarianRegistrationForm = () => {
                             </div>
                             <div>
                               <p className="text-gray-700 font-semibold">{t('vetRegistration.dropDegreeHere')} <span className="text-teal-600">{t('vetRegistration.browse')}</span></p>
-                              <p className="text-gray-500 text-sm mt-1">Supports: PDF, JPG, PNG (Max 10MB)</p>
+                              <p className="text-gray-500 text-sm mt-1">{t('vetRegistration.uploadSupportText')}</p>
                             </div>
                           </div>
                         </label>
@@ -1168,7 +1152,7 @@ const VeterinarianRegistrationForm = () => {
                             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
-                            Remove
+                            {t('vetRegistration.removeFile')}
                           </button>
                         </div>
                       ) : (
@@ -1187,7 +1171,7 @@ const VeterinarianRegistrationForm = () => {
                             </div>
                             <div>
                               <p className="text-gray-700 font-semibold">{t('vetRegistration.dropAadharHere')} <span className="text-teal-600">{t('vetRegistration.browse')}</span></p>
-                              <p className="text-gray-500 text-sm mt-1">Supports: PDF, JPG, PNG (Max 10MB)</p>
+                              <p className="text-gray-500 text-sm mt-1">{t('vetRegistration.uploadSupportText')}</p>
                             </div>
                           </div>
                         </label>
@@ -1266,7 +1250,7 @@ const VeterinarianRegistrationForm = () => {
                         <div className="ml-3">
                           <p className="text-sm font-bold text-green-800">{t('vetRegistration.locationCaptured')}</p>
                           <p className="text-xs text-green-700 mt-1">
-                            Coordinates: {parseFloat(formData.latitude).toFixed(4)}, {parseFloat(formData.longitude).toFixed(4)}
+                            {t('vetRegistration.coordinatesLabel')}: {parseFloat(formData.latitude).toFixed(4)}, {parseFloat(formData.longitude).toFixed(4)}
                           </p>
                         </div>
                       </div>
@@ -1303,7 +1287,7 @@ const VeterinarianRegistrationForm = () => {
                           name="city"
                           value={formData.city}
                           onChange={handleChange}
-                          placeholder="e.g., Pune"
+                          placeholder={t('vetRegistration.cityPlaceholder')}
                           className="w-full pl-12 pr-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-gray-900 placeholder-gray-400"
                           required
                         />
@@ -1326,7 +1310,7 @@ const VeterinarianRegistrationForm = () => {
                           name="state"
                           value={formData.state}
                           onChange={handleChange}
-                          placeholder="e.g., Maharashtra"
+                          placeholder={t('vetRegistration.statePlaceholder')}
                           className="w-full pl-12 pr-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-gray-900 placeholder-gray-400"
                           required
                         />
@@ -1349,7 +1333,7 @@ const VeterinarianRegistrationForm = () => {
                           name="pincode"
                           value={formData.pincode}
                           onChange={handleChange}
-                          placeholder="e.g., 411001"
+                          placeholder={t('vetRegistration.pincodePlaceholder')}
                           pattern="[0-9]{6}"
                           className="w-full pl-12 pr-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-gray-900 placeholder-gray-400"
                           required
@@ -1374,7 +1358,7 @@ const VeterinarianRegistrationForm = () => {
                         name="clinic_address"
                         value={formData.clinic_address}
                         onChange={handleChange}
-                        placeholder="Enter full address of your clinic or practice location"
+                        placeholder={t('vetRegistration.clinicAddressPlaceholder')}
                         rows="3"
                         className="w-full pl-12 pr-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all resize-none text-gray-900 placeholder-gray-400"
                       />
@@ -1410,28 +1394,28 @@ const VeterinarianRegistrationForm = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Latitude
+                      {t('vetRegistration.latitude')}
                     </label>
                     <input
                       type="number"
                       name="latitude"
                       value={formData.latitude}
                       onChange={handleChange}
-                      placeholder="e.g., 18.5204"
+                      placeholder={t('vetRegistration.latitudePlaceholder')}
                       step="any"
                       className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#15BB73] focus:border-transparent"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Longitude
+                      {t('vetRegistration.longitude')}
                     </label>
                     <input
                       type="number"
                       name="longitude"
                       value={formData.longitude}
                       onChange={handleChange}
-                      placeholder="e.g., 73.8567"
+                      placeholder={t('vetRegistration.longitudePlaceholder')}
                       step="any"
                       className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#15BB73] focus:border-transparent"
                     />
