@@ -57,6 +57,25 @@ const MIME_EXTENSION_MAP = {
   'application/pdf': '.pdf'
 };
 
+const RESOURCE_TYPE_MIME_TYPES = {
+  image: new Set([
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/webp',
+    'image/gif'
+  ]),
+  video: new Set([
+    'video/mp4',
+    'video/webm',
+    'video/quicktime',
+    'video/x-msvideo'
+  ]),
+  raw: new Set([
+    'application/pdf'
+  ])
+};
+
 const normalizeFolder = (folder) => (folder || '')
   .replace(/\\/g, '/')
   .replace(/^\/+/, '')
@@ -169,17 +188,49 @@ const ensureS3Configured = () => {
   }
 };
 
-const uploadFields = multer({
+const isAllowedMimeType = (mimeType, allowedTypes = []) => allowedTypes.some((type) => {
+  const allowedMimeTypes = RESOURCE_TYPE_MIME_TYPES[type];
+  return allowedMimeTypes ? allowedMimeTypes.has(mimeType) : false;
+});
+
+const createUploadFields = (
+  fields,
+  {
+    maxFileSizeBytes = 25 * 1024 * 1024,
+    fieldTypeMap = {},
+    defaultAllowedTypes = ['image']
+  } = {}
+) => multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 25 * 1024 * 1024
+    fileSize: maxFileSizeBytes
+  },
+  fileFilter: (req, file, cb) => {
+    const configuredTypes = fieldTypeMap[file.fieldname] || defaultAllowedTypes;
+    const allowedTypes = Array.isArray(configuredTypes) ? configuredTypes : [configuredTypes];
+
+    if (!isAllowedMimeType(file.mimetype, allowedTypes)) {
+      cb(new Error(`Invalid file type for ${file.fieldname}`), false);
+      return;
+    }
+
+    cb(null, true);
   }
-}).fields([
+}).fields(fields);
+
+const uploadFields = createUploadFields([
   { name: 'frontPhoto', maxCount: 1 },
   { name: 'sidePhoto', maxCount: 1 },
   { name: 'milkScenePhoto', maxCount: 1 },
   { name: 'video', maxCount: 1 }
-]);
+], {
+  fieldTypeMap: {
+    frontPhoto: ['image'],
+    sidePhoto: ['image'],
+    milkScenePhoto: ['image'],
+    video: ['video']
+  }
+});
 
 const uploadToCloudinary = async (file, folderOrType, resourceType) => {
   ensureS3Configured();
@@ -244,6 +295,7 @@ const deleteFromCloudinary = async (publicIdOrUrl, resourceType = 'image') => {
 module.exports = {
   cloudinary: null,
   s3,
+  createUploadFields,
   uploadFields,
   uploadToCloudinary,
   uploadToStorage: uploadToCloudinary,

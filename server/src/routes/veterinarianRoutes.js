@@ -1,23 +1,23 @@
 const express = require('express');
 const router = express.Router();
 const veterinarianController = require('../controllers/veterinarianController');
-const multer = require('multer');
 const vetAuthMiddleware = require('../middlewares/vetAuthMiddleware');
+const { createUploadFields } = require('../config/cloudinary');
 
-// Multer configuration for file uploads
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB max
-  }
-});
-
-const fileUploadConfig = upload.fields([
+const fileUploadConfig = createUploadFields([
   { name: 'profile_photo', maxCount: 1 },
   { name: 'license_document', maxCount: 1 },
   { name: 'degree_certificate', maxCount: 1 },
   { name: 'aadhar_document', maxCount: 1 }
-]);
+], {
+  maxFileSizeBytes: 10 * 1024 * 1024,
+  fieldTypeMap: {
+    profile_photo: ['image'],
+    license_document: ['image', 'raw'],
+    degree_certificate: ['image', 'raw'],
+    aadhar_document: ['image', 'raw']
+  }
+});
 
 // ============ PUBLIC ROUTES ============
 
@@ -81,6 +81,13 @@ router.put('/profile/me', vetAuthMiddleware, fileUploadConfig, veterinarianContr
  * @access  Protected (Veterinarian)
  */
 router.get('/dashboard', vetAuthMiddleware, veterinarianController.getDashboard.bind(veterinarianController));
+
+/**
+ * @route   POST /api/veterinarians/:id/track-interaction
+ * @desc    Track public veterinarian profile views and contact clicks
+ * @access  Public
+ */
+router.post('/:id/track-interaction', veterinarianController.trackInteraction.bind(veterinarianController));
 
 /**
  * @route   GET /api/veterinarians

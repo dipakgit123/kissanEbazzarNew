@@ -3,6 +3,7 @@ const router = express.Router();
 const aiHealthController = require('../controllers/aiHealthController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const multer = require('multer');
+const { uploadLimiter } = require('../config/rateLimiter');
 
 const aiHealthUploadMiddleware = (req, res, next) => {
   aiHealthController.upload.single('image')(req, res, (error) => {
@@ -38,6 +39,7 @@ router.post('/analyze', authMiddleware, aiHealthController.analyzeHealth);
 router.post(
   '/upload-and-analyze',
   authMiddleware,
+  uploadLimiter,
   aiHealthUploadMiddleware,
   aiHealthController.uploadAndAnalyze
 );

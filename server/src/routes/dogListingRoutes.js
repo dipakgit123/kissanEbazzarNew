@@ -3,6 +3,8 @@ const router = express.Router();
 const dogListingController = require('../controllers/dogListingController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { body } = require('express-validator');
+const { createUploadFields } = require('../config/cloudinary');
+const { uploadLimiter } = require('../config/rateLimiter');
 
 // Validation rules
 const dogValidationRules = [
@@ -65,17 +67,23 @@ const dogValidationRules = [
     .isBoolean().withMessage('Negotiable must be true or false')
 ];
 
-// Multer configuration for file uploads
-const upload = require('multer')({ storage: require('multer').memoryStorage() });
-
-const fileUploadConfig = upload.fields([
+const fileUploadConfig = createUploadFields([
   { name: 'photo1', maxCount: 1 },
   { name: 'photo2', maxCount: 1 },
   { name: 'photo3', maxCount: 1 },
   { name: 'photo4', maxCount: 1 },
   { name: 'photo5', maxCount: 1 },
   { name: 'video', maxCount: 1 }
-]);
+], {
+  fieldTypeMap: {
+    photo1: ['image'],
+    photo2: ['image'],
+    photo3: ['image'],
+    photo4: ['image'],
+    photo5: ['image'],
+    video: ['video']
+  }
+});
 
 // Protected routes - authentication required (POST routes first)
 /**
@@ -86,6 +94,7 @@ const fileUploadConfig = upload.fields([
 router.post(
   '/listings',
   authMiddleware,
+  uploadLimiter,
   fileUploadConfig,
   dogValidationRules,
   dogListingController.createDogListing
@@ -128,6 +137,7 @@ router.get('/my-listings', authMiddleware, dogListingController.getMyDogListings
 router.put(
   '/listings/:id',
   authMiddleware,
+  uploadLimiter,
   fileUploadConfig,
   dogListingController.updateDogListing
 );

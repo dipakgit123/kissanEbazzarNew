@@ -27,6 +27,9 @@ const parseTrustProxySetting = (value) => {
 };
 
 const setupMiddleware = (app) => {
+  const jsonBodyLimit = process.env.JSON_BODY_LIMIT || '1mb';
+  const formBodyLimit = process.env.FORM_BODY_LIMIT || '256kb';
+
   // CORS configuration from environment
   const corsOrigins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',')
@@ -54,8 +57,8 @@ const setupMiddleware = (app) => {
   app.use('/api/', generalLimiter);
 
   // Body parsing middleware
-  app.use(express.json({ limit: '50mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+  app.use(express.json({ limit: jsonBodyLimit }));
+  app.use(express.urlencoded({ extended: true, limit: formBodyLimit }));
 
   return corsOrigins;
 };

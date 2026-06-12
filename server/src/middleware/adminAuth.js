@@ -4,6 +4,12 @@ const jwt = require('jsonwebtoken');
 const models = require('../models');
 const { getJwtSecret } = require('../config/jwt');
 
+const buildServerErrorResponse = (message, error) => ({
+  success: false,
+  message,
+  ...(process.env.NODE_ENV === 'development' && error ? { error: error.message } : {})
+});
+
 const adminAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -65,11 +71,7 @@ const adminAuth = async (req, res, next) => {
     }
 
     console.error('Admin auth error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Authentication failed',
-      error: error.message
-    });
+    res.status(500).json(buildServerErrorResponse('Authentication failed', error));
   }
 };
 

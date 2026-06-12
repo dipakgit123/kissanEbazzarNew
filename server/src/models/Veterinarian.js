@@ -416,6 +416,12 @@ module.exports = (sequelize, DataTypes) => {
         as: 'reports'
       });
     }
+    if (models.VetLeadLog) {
+      Veterinarian.hasMany(models.VetLeadLog, {
+        foreignKey: 'veterinarian_id',
+        as: 'lead_logs'
+      });
+    }
   };
 
   return Veterinarian;

@@ -63,7 +63,11 @@ if (usesTwilioProvider() && process.env.TWILIO_ACCOUNT_SID) {
 // ✅ NEW: Start WhatsApp auto-reactivation
 // Sends test message every 24 hours to keep WhatsApp active
 // Prevents deactivation due to inactivity
-if (otpService.getProvider() === 'local' && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_WHATSAPP_NUMBER) {
+if (
+  ['local', 'twilio-whatsapp'].includes(otpService.getProvider())
+  && process.env.TWILIO_ACCOUNT_SID
+  && process.env.TWILIO_WHATSAPP_NUMBER
+) {
   if (process.env.ADMIN_PHONE_NUMBER) {
     startAutoReactivation(60); // Check every 60 minutes, reactivate every 24 hours
     logger.log('✅ WhatsApp auto-reactivation started');
@@ -83,7 +87,7 @@ const startServer = async () => {
       console.log(`
 ╔══════════════════════════════════════════════╗
 ║   🚀 Server is running on port ${PORT}         ║
-║   📱 WhatsApp OTP Service with Sequelize    ║
+║   📱 OTP Service with Sequelize             ║
 ║   📍 Location Services Enabled               ║
 ║   🐄 Animal Marketplace Active              ║
 ║   🐃 Buffalo Marketplace Active             ║

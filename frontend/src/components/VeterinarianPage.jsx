@@ -1,24 +1,21 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import {
   FaCalendarCheck,
   FaLocationDot,
   FaPhone,
   FaRegClock,
-  FaShieldHeart,
   FaStar,
-  FaStethoscope,
-  FaSyringe,
   FaUserDoctor,
   FaWhatsapp,
 } from 'react-icons/fa6';
-import { GiHealthCapsule, GiMedicines } from 'react-icons/gi';
-import { MdClose, MdOutlinePets } from 'react-icons/md';
+import { MdClose } from 'react-icons/md';
+import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config/api';
-import veterinarianHeroImage from '../assets/images/veternarian.png';
-import { InlineLoader } from './AppLoader';
+import { veterinarianService, vetReviewService } from '../services/api';
 import { resolveUserLocation } from '../utils/userLocation';
+import { InlineLoader } from './AppLoader';
 
 const API_URL = API_BASE_URL;
 const SPECIALIZATION_OPTIONS = ['general', 'large_animal', 'small_animal', 'livestock', 'surgery', 'emergency', 'reproduction'];
@@ -35,63 +32,15 @@ const VeterinarianPage = () => {
   const [specializationFilter, setSpecializationFilter] = useState('');
   const [selectedVet, setSelectedVet] = useState(null);
   const [viewMode, setViewMode] = useState('nearby');
-
-  const ServiceCatalog = useMemo(() => ([
-    {
-      id: 1,
-      name: t('veterinarian.emergencyCare'),
-      Icon: FaShieldHeart,
-      description: t('veterinarian.emergencyCareDesc'),
-      price: '₹500-2000',
-      duration: 'Immediate',
-      available: true,
-    },
-    {
-      id: 2,
-      name: t('veterinarian.generalCheckup'),
-      Icon: FaStethoscope,
-      description: t('veterinarian.generalCheckupDesc'),
-      price: '₹300-800',
-      duration: '30-45 mins',
-      available: true,
-    },
-    {
-      id: 3,
-      name: t('veterinarian.vaccination'),
-      Icon: FaSyringe,
-      description: t('veterinarian.vaccinationDesc'),
-      price: '₹200-500',
-      duration: '15-30 mins',
-      available: true,
-    },
-    {
-      id: 4,
-      name: t('veterinarian.surgery'),
-      Icon: GiMedicines,
-      description: t('veterinarian.surgeryDesc'),
-      price: '₹2000-15000',
-      duration: '1-4 hours',
-      available: true,
-    },
-    {
-      id: 5,
-      name: t('veterinarian.dentalCare'),
-      Icon: GiHealthCapsule,
-      description: t('veterinarian.dentalCareDesc'),
-      price: '₹400-1200',
-      duration: '45-60 mins',
-      available: true,
-    },
-    {
-      id: 6,
-      name: t('veterinarian.pregnancyCare'),
-      Icon: MdOutlinePets,
-      description: t('veterinarian.pregnancyCareDesc'),
-      price: '₹600-1500',
-      duration: '1-2 hours',
-      available: true,
-    },
-  ]), [t]);
+  const [selectedVetReviews, setSelectedVetReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [userReview, setUserReview] = useState(null);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewForm, setReviewForm] = useState({
+    rating: 5,
+    reviewText: '',
+  });
+  const hasUserToken = Boolean(localStorage.getItem('token'));
 
   const getSpecializationLabel = (key) => {
     const labels = {
@@ -235,147 +184,208 @@ const VeterinarianPage = () => {
     vet.city?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleCall = (phone) => {
-    window.location.href = `tel:${phone}`;
+  const trackVetInteraction = async (vetId, leadType, sourcePage) => {
+    try {
+      await veterinarianService.trackInteraction(vetId, { leadType, sourcePage });
+    } catch (error) {
+      console.error('Failed to track veterinarian interaction:', error);
+    }
   };
 
-  const handleWhatsApp = (phone, vetName) => {
-    const cleanPhone = phone.replace(/[^0-9]/g, '');
+  const openVetProfile = (vet, sourcePage = 'veterinarian-list') => {
+    setSelectedVet(vet);
+    void trackVetInteraction(vet.id, 'profile_view', sourcePage);
+  };
+
+  const handleCall = (vet, sourcePage = 'veterinarian-card') => {
+    void trackVetInteraction(vet.id, 'call_click', sourcePage);
+    window.location.href = `tel:${vet.phone_number}`;
+  };
+
+  const handleWhatsApp = (vet, sourcePage = 'veterinarian-card') => {
+    void trackVetInteraction(vet.id, 'whatsapp_click', sourcePage);
+    const cleanPhone = vet.phone_number.replace(/[^0-9]/g, '');
     const message = encodeURIComponent(
-      `Hello Dr. ${vetName}, I found your profile on Animal E Bazar and would like to inquire about veterinary services for my animal. Can we discuss further?`
+      `Hello Dr. ${vet.full_name}, I found your profile on Animal E Bazar and would like to inquire about veterinary services for my animal. Can we discuss further?`
     );
     window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank');
   };
 
-  const handleBookAppointment = (vet) => {
-    navigate(`/book-appointment/${vet.id}`, { state: { veterinarian: vet } });
+  const loadSelectedVetReviewData = async (vetId) => {
+    setReviewsLoading(true);
+
+    try {
+      const requests = [
+        veterinarianService.getById(vetId),
+        vetReviewService.getVetReviews(vetId, { limit: 5, sort: 'newest' }),
+      ];
+
+      if (hasUserToken) {
+        requests.push(vetReviewService.getUserReview(vetId));
+      }
+
+      const [vetResponse, reviewsResponse, myReviewResponse] = await Promise.all(requests);
+      const refreshedVet = vetResponse.data || null;
+      const reviewItems = reviewsResponse.data?.reviews || [];
+      const ownReview = myReviewResponse?.data || null;
+
+      if (refreshedVet) {
+        setSelectedVet((current) => (
+          current?.id === vetId
+            ? { ...current, ...refreshedVet }
+            : current
+        ));
+
+        setVeterinarians((current) => current.map((item) => (
+          item.id === vetId
+            ? { ...item, ...refreshedVet, distance: item.distance ?? refreshedVet.distance }
+            : item
+        )));
+      }
+
+      setSelectedVetReviews(reviewItems);
+      setUserReview(ownReview);
+      setReviewForm({
+        rating: ownReview?.rating || 5,
+        reviewText: ownReview?.review_text || '',
+      });
+    } catch (error) {
+      console.error('Failed to load veterinarian reviews:', error);
+      toast.error(t('veterinarian.reviewLoadFailed', 'Failed to load reviews'));
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedVet?.id) {
+      setSelectedVetReviews([]);
+      setUserReview(null);
+      setReviewForm({ rating: 5, reviewText: '' });
+      return;
+    }
+
+    loadSelectedVetReviewData(selectedVet.id);
+  }, [selectedVet?.id, hasUserToken]);
+
+  const handleReviewSubmit = async () => {
+    if (!selectedVet?.id) {
+      return;
+    }
+
+    if (!hasUserToken) {
+      toast.error(t('veterinarian.loginToReview', 'Please login to submit a review'));
+      navigate('/login');
+      return;
+    }
+
+    setReviewSubmitting(true);
+
+    try {
+      const payload = {
+        veterinarian_id: selectedVet.id,
+        rating: reviewForm.rating,
+        review_text: reviewForm.reviewText.trim(),
+      };
+
+      if (userReview?.id) {
+        await vetReviewService.updateReview(userReview.id, payload);
+        toast.success(t('veterinarian.reviewUpdated', 'Review updated successfully'));
+      } else {
+        await vetReviewService.createReview(payload);
+        toast.success(t('veterinarian.reviewSubmitted', 'Review submitted successfully'));
+      }
+
+      await loadSelectedVetReviewData(selectedVet.id);
+    } catch (error) {
+      console.error('Failed to submit veterinarian review:', error);
+      toast.error(error.message || t('veterinarian.reviewSubmitFailed', 'Failed to submit review'));
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
+  const handleReviewDelete = async () => {
+    if (!userReview?.id) {
+      return;
+    }
+
+    setReviewSubmitting(true);
+
+    try {
+      await vetReviewService.deleteReview(userReview.id);
+      toast.success(t('veterinarian.reviewDeleted', 'Review deleted successfully'));
+      await loadSelectedVetReviewData(selectedVet.id);
+    } catch (error) {
+      console.error('Failed to delete veterinarian review:', error);
+      toast.error(error.message || t('veterinarian.reviewDeleteFailed', 'Failed to delete review'));
+    } finally {
+      setReviewSubmitting(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#edf6ef_0%,#f7faf8_100%)]">
-      <div className="border-b border-emerald-100 bg-[radial-gradient(circle_at_top_left,_rgba(21,187,115,0.16),_transparent_38%),linear-gradient(135deg,#f6fffb_0%,#ecf7ff_55%,#f7faf8_100%)] py-10 sm:py-12">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-8 lg:grid-cols-[1.02fr_0.98fr] lg:items-center">
-            <div className="text-center lg:text-left">
-              <span className="inline-flex items-center rounded-full border border-emerald-200 bg-white/90 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 shadow-sm">
-                {t('veterinarian.heroEyebrow')}
-              </span>
-              <h1 className="mt-5 text-4xl font-black tracking-tight text-[#000600] sm:text-5xl lg:max-w-3xl">
-                {t('veterinarian.title')}
-              </h1>
-              <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600 sm:text-lg lg:max-w-2xl">
-                {t('veterinarian.pageDescription')}
-              </p>
-            </div>
-
-            <div className="mx-auto w-full max-w-[560px] lg:max-w-none">
-              <div className="relative overflow-hidden rounded-[32px] border border-white/70 bg-white/75 p-5 shadow-[0_28px_80px_rgba(15,23,42,0.10)] backdrop-blur">
-                <div className="absolute inset-x-10 top-6 h-24 rounded-full bg-emerald-100/80 blur-3xl" />
-                <div className="relative rounded-[26px] bg-[linear-gradient(145deg,#f4fff8_0%,#ffffff_48%,#edf9f2_100%)] px-4 py-3">
-                  <img
-                    src={veterinarianHeroImage}
-                    alt={t('veterinarian.title')}
-                    className="h-[280px] w-full object-contain object-center sm:h-[340px] lg:h-[360px] xl:h-[390px]"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-8 rounded-[30px] border border-white/60 bg-white/85 p-4 shadow-[0_28px_80px_rgba(15,23,42,0.08)] backdrop-blur sm:p-5">
-            <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+        <section className="mb-12">
+          <div className="mb-8 rounded-[28px] border border-emerald-100 bg-white/90 p-5 shadow-sm sm:p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-700">{t('veterinarian.searchPanelTitle')}</p>
-                <p className="mt-1 text-sm text-slate-500">{t('veterinarian.searchPanelDesc')}</p>
-
-                <div className="relative mt-4">
-                  <input
-                    type="text"
-                    placeholder={t('veterinarian.searchPlaceholder')}
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    className="w-full rounded-[22px] border border-slate-200 bg-white px-6 py-4 pl-12 pr-28 text-base shadow-sm outline-none transition focus:border-[#15BB73] focus:ring-4 focus:ring-[#15BB73]/15 sm:text-lg"
-                  />
-                  <svg className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  <button className="absolute right-2 top-1/2 -translate-y-1/2 rounded-[16px] bg-gradient-to-r from-[#15BB73] to-[#0FA568] px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20">
-                    {t('veterinarian.searchButton')}
-                  </button>
-                </div>
-              </div>
-
-              <Link
-                to="/veterinarian/register"
-                className="inline-flex items-center justify-center rounded-[22px] border-2 border-[#15BB73] bg-white px-6 py-3.5 font-semibold text-[#15BB73] transition hover:bg-[#15BB73] hover:text-white"
-              >
-                <FaUserDoctor className="mr-2" />
-                {t('vetRegistration.title')}
-              </Link>
-            </div>
-
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-              <select
-                value={specializationFilter}
-                onChange={(event) => setSpecializationFilter(event.target.value)}
-                className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-[#15BB73]"
-              >
-                <option value="">{t('veterinarian.allSpecializations')}</option>
-                {SPECIALIZATION_OPTIONS.map((value) => (
-                  <option key={value} value={value}>
-                    {getSpecializationLabel(value)}
-                  </option>
-                ))}
-              </select>
-
-              <div className="sm:w-auto">
-                <div className="inline-flex w-full rounded-2xl bg-slate-100 p-1 shadow-inner sm:min-w-[320px]">
-                  <button
-                    type="button"
-                    onClick={() => setViewMode('nearby')}
-                    className={`flex-1 rounded-[14px] px-4 py-3 text-sm font-semibold transition ${
-                      viewMode === 'nearby'
-                        ? 'bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white shadow-md'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    {t('veterinarian.showNearby')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode('all')}
-                    className={`flex-1 rounded-[14px] px-4 py-3 text-sm font-semibold transition ${
-                      viewMode === 'all'
-                        ? 'bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white shadow-md'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    {t('veterinarian.showAllVets')}
-                  </button>
-                </div>
-                <p className="mt-2 text-xs text-slate-500">
+                <h1 className="text-2xl font-bold text-[#000600] sm:text-3xl">
+                  {viewMode === 'nearby' ? t('veterinarian.nearbyVets') : t('veterinarian.allVerifiedVets')}
+                </h1>
+                <p className="mt-2 text-sm text-slate-500">
                   {viewMode === 'nearby'
                     ? t('veterinarian.farmerLocationHint', { radius: NEARBY_RADIUS_KM })
                     : t('veterinarian.allVerifiedHint')}
                 </p>
               </div>
+              <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                <p className="text-sm text-slate-500">
+                  {viewMode === 'nearby' ? t('veterinarian.showNearby') : t('veterinarian.showAllVets')}
+                </p>
+                <p className="text-base font-semibold text-slate-900">{filteredVets.length} {t('veterinarian.profilesFound')}</p>
+              </div>
             </div>
-          </div>
-        </div>
-      </div>
 
-      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-        <section className="mb-12">
-          <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">{t('veterinarian.nearbyVets')}</p>
-              <h2 className="mt-2 text-3xl font-black text-[#000600]">{viewMode === 'nearby' ? t('veterinarian.nearbyVets') : t('veterinarian.allVerifiedVets')}</h2>
-            </div>
-            <div className="rounded-2xl bg-white px-4 py-3 shadow-sm">
-              <p className="text-sm text-slate-500">
-                {viewMode === 'nearby' ? t('veterinarian.showNearby') : t('veterinarian.showAllVets')}
-              </p>
-              <p className="text-base font-semibold text-slate-900">{filteredVets.length} {t('veterinarian.profilesFound')}</p>
+            <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder={t('veterinarian.searchPlaceholder')}
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 pl-11 text-sm text-slate-700 outline-none transition focus:border-[#15BB73] focus:ring-4 focus:ring-[#15BB73]/10"
+                />
+                <svg className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+
+              <div className="inline-flex w-full rounded-2xl bg-slate-100 p-1 shadow-inner">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('nearby')}
+                  className={`flex-1 rounded-[14px] px-4 py-3 text-sm font-semibold transition ${
+                    viewMode === 'nearby'
+                      ? 'bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {t('veterinarian.showNearby')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('all')}
+                  className={`flex-1 rounded-[14px] px-4 py-3 text-sm font-semibold transition ${
+                    viewMode === 'all'
+                      ? 'bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {t('veterinarian.showAllVets')}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -402,7 +412,7 @@ const VeterinarianPage = () => {
                 return (
                   <div
                     key={vet.id}
-                    onClick={() => setSelectedVet(vet)}
+                    onClick={() => openVetProfile(vet)}
                     className="group cursor-pointer rounded-[30px] border border-white/20 bg-white/90 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.08)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_30px_90px_rgba(15,23,42,0.12)]"
                   >
                     <div className="flex items-start justify-between gap-4">
@@ -488,7 +498,7 @@ const VeterinarianPage = () => {
                       <button
                         onClick={(event) => {
                           event.stopPropagation();
-                          handleCall(vet.phone_number);
+                          handleCall(vet, 'veterinarian-card');
                         }}
                         className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#15BB73] to-[#0FA568] px-4 py-3 font-semibold text-white transition hover:shadow-lg"
                       >
@@ -498,7 +508,7 @@ const VeterinarianPage = () => {
                       <button
                         onClick={(event) => {
                           event.stopPropagation();
-                          handleWhatsApp(vet.phone_number, vet.full_name);
+                          handleWhatsApp(vet, 'veterinarian-card');
                         }}
                         className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-green-500 px-4 py-3 font-semibold text-white transition hover:bg-green-600"
                       >
@@ -513,65 +523,7 @@ const VeterinarianPage = () => {
           )}
         </section>
 
-        <section className="overflow-hidden rounded-[32px] border border-red-100 bg-[linear-gradient(135deg,#fff5f5_0%,#ffffff_45%,#f0fdf4_100%)] p-6 shadow-[0_28px_90px_rgba(15,23,42,0.09)] sm:p-8">
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.95fr)] lg:items-center">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-              <div className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-[22px] bg-red-500 text-white shadow-[0_16px_35px_rgba(239,68,68,0.28)]">
-                <FaShieldHeart className="text-[28px]" />
-              </div>
-
-              <div className="min-w-0">
-                <span className="inline-flex rounded-full border border-red-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-red-600">
-                  {t('veterinarian.emergencyBadge')}
-                </span>
-                <h2 className="mt-4 text-2xl font-black text-slate-950 sm:text-3xl">{t('veterinarian.emergencyTitle')}</h2>
-                <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
-                  {t('veterinarian.emergencySubtitle')}
-                </p>
-
-                <div className="mt-5 flex flex-wrap gap-3">
-                  <span className="inline-flex items-center gap-2 rounded-full bg-red-50 px-4 py-2 text-sm font-semibold text-red-700">
-                    <FaRegClock className="text-sm" />
-                    {t('veterinarian.emergencyAvailable')}
-                  </span>
-                  <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">
-                    <FaPhone className="text-sm" />
-                    +91 98765 00000
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-              <button
-                onClick={() => handleCall('+919876500000')}
-                className="rounded-[24px] bg-red-600 p-5 text-left text-white shadow-[0_18px_40px_rgba(239,68,68,0.22)] transition hover:bg-red-700"
-              >
-                <span className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-red-100">
-                  <FaPhone className="text-base" />
-                  {t('veterinarian.callEmergency')}
-                </span>
-                <span className="mt-3 block text-2xl font-black">+91 98765 00000</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  const cleanPhone = '+919876500000'.replace(/[^0-9]/g, '');
-                  const message = encodeURIComponent('EMERGENCY: I need urgent veterinary assistance for my animal. Please respond ASAP!');
-                  window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank');
-                }}
-                className="rounded-[24px] border border-emerald-200 bg-white p-5 text-left text-slate-900 shadow-[0_18px_40px_rgba(34,197,94,0.10)] transition hover:border-emerald-300 hover:bg-emerald-50"
-              >
-                <span className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-emerald-700">
-                  <FaWhatsapp className="text-base" />
-                  {t('veterinarian.consultEmergency')}
-                </span>
-                <span className="mt-3 block text-lg font-black text-slate-900">WhatsApp</span>
-                <span className="mt-1 block text-sm text-slate-500">{t('veterinarian.emergencyAvailable')}</span>
-              </button>
-            </div>
-          </div>
-        </section>
+       
       </div>
 
       {selectedVet && (
@@ -706,6 +658,130 @@ const VeterinarianPage = () => {
                     </div>
                   </div>
 
+                  <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <h5 className="text-lg font-black text-slate-900">{t('veterinarian.latestReviews', 'Latest Reviews')}</h5>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {t('veterinarian.rating')}: {selectedVet.rating || '0.0'} ({selectedVet.total_reviews || 0} {t('veterinarian.reviews')})
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1 text-yellow-500">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <FaStar key={star} className={star <= Math.round(Number(selectedVet.rating || 0)) ? 'opacity-100' : 'opacity-20'} />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <h6 className="text-sm font-semibold text-slate-900">
+                          {userReview ? t('veterinarian.updateReview', 'Update Your Review') : t('veterinarian.writeReview', 'Write a Review')}
+                        </h6>
+                        {!hasUserToken && (
+                          <button
+                            type="button"
+                            onClick={() => navigate('/login')}
+                            className="text-sm font-semibold text-[#15BB73] hover:text-[#0FA568]"
+                          >
+                            {t('common.login', 'Login')}
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="mt-4 flex items-center gap-2">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setReviewForm((current) => ({ ...current, rating: star }))}
+                            className="rounded-full p-1 transition hover:scale-110"
+                            disabled={reviewSubmitting || !hasUserToken}
+                          >
+                            <FaStar className={`text-xl ${star <= reviewForm.rating ? 'text-yellow-500' : 'text-slate-300'}`} />
+                          </button>
+                        ))}
+                      </div>
+
+                      <textarea
+                        value={reviewForm.reviewText}
+                        onChange={(event) => setReviewForm((current) => ({ ...current, reviewText: event.target.value }))}
+                        placeholder={t('veterinarian.reviewPlaceholder', 'Share your experience with this veterinarian')}
+                        rows={4}
+                        disabled={reviewSubmitting || !hasUserToken}
+                        className="mt-4 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-[#15BB73] focus:ring-4 focus:ring-[#15BB73]/15 disabled:cursor-not-allowed disabled:bg-slate-100"
+                      />
+
+                      <div className="mt-4 flex flex-wrap items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={handleReviewSubmit}
+                          disabled={reviewSubmitting || !hasUserToken}
+                          className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-[#15BB73] to-[#0FA568] px-5 py-3 text-sm font-semibold text-white transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {reviewSubmitting
+                            ? t('common.loading', 'Loading...')
+                            : userReview
+                              ? t('veterinarian.updateReview', 'Update Your Review')
+                              : t('veterinarian.submitReview', 'Submit Review')}
+                        </button>
+
+                        {userReview && (
+                          <button
+                            type="button"
+                            onClick={handleReviewDelete}
+                            disabled={reviewSubmitting}
+                            className="inline-flex items-center justify-center rounded-2xl border border-red-200 px-5 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {t('veterinarian.deleteReview', 'Delete Review')}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-5 space-y-3">
+                      {reviewsLoading ? (
+                        <p className="text-sm text-slate-500">{t('common.loading', 'Loading...')}</p>
+                      ) : selectedVetReviews.length > 0 ? (
+                        selectedVetReviews.map((review) => (
+                          <div key={review.id} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <p className="font-semibold text-slate-900">{review.user?.full_name || t('veterinarian.farmer', 'Farmer')}</p>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  {review.createdAt
+                                    ? new Intl.DateTimeFormat(
+                                      { en: 'en-IN', hi: 'hi-IN', mr: 'mr-IN' }[i18n.language] || 'en-IN',
+                                      { day: 'numeric', month: 'short', year: 'numeric' }
+                                    ).format(new Date(review.createdAt))
+                                    : ''}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1 text-yellow-500">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <FaStar key={star} className={star <= review.rating ? 'opacity-100' : 'opacity-20'} />
+                                ))}
+                              </div>
+                            </div>
+
+                            {review.review_text && (
+                              <p className="mt-3 text-sm leading-6 text-slate-600">{review.review_text}</p>
+                            )}
+
+                            {review.vet_response && (
+                              <div className="mt-3 rounded-2xl bg-white px-4 py-3">
+                                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t('veterinarian.vetResponse', 'Veterinarian Response')}</p>
+                                <p className="mt-2 text-sm text-slate-700">{review.vet_response}</p>
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-slate-500">{t('veterinarian.noReviewsYet', 'No reviews yet')}</p>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="rounded-[28px] bg-[#0f2b17] p-5 text-white shadow-[0_25px_80px_rgba(15,43,23,0.24)]">
                     <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-200">{t('veterinarian.contactVet')}</p>
                     <h5 className="mt-2 text-2xl font-black">{selectedVet.full_name}</h5>
@@ -713,22 +789,16 @@ const VeterinarianPage = () => {
 
                     <div className="mt-5 grid gap-3 sm:grid-cols-3">
                       <button
-                        onClick={() => handleCall(selectedVet.phone_number)}
+                        onClick={() => handleCall(selectedVet, 'veterinarian-modal')}
                         className="inline-flex items-center justify-center rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-[#0f2b17] transition hover:bg-slate-100"
                       >
                         {t('veterinarian.call')}
                       </button>
                       <button
-                        onClick={() => handleWhatsApp(selectedVet.phone_number, selectedVet.full_name)}
+                        onClick={() => handleWhatsApp(selectedVet, 'veterinarian-modal')}
                         className="inline-flex items-center justify-center rounded-2xl bg-green-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-green-600"
                       >
                         {t('veterinarian.consult')}
-                      </button>
-                      <button
-                        onClick={() => handleBookAppointment(selectedVet)}
-                        className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
-                      >
-                        {t('veterinarian.bookAppointment')}
                       </button>
                     </div>
                   </div>

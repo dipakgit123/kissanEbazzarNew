@@ -3,6 +3,8 @@ const router = express.Router();
 const horseListingController = require('../controllers/horseListingController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { body } = require('express-validator');
+const { createUploadFields } = require('../config/cloudinary');
+const { uploadLimiter } = require('../config/rateLimiter');
 
 // Validation rules
 const horseValidationRules = [
@@ -36,15 +38,19 @@ const horseValidationRules = [
     .isBoolean().withMessage('Negotiable must be true or false')
 ];
 
-// Multer configuration for file uploads
-const upload = require('multer')({ storage: require('multer').memoryStorage() });
-
-const fileUploadConfig = upload.fields([
+const fileUploadConfig = createUploadFields([
   { name: 'frontPhoto', maxCount: 1 },
   { name: 'sidePhoto', maxCount: 1 },
   { name: 'fullBodyPhoto', maxCount: 1 },
   { name: 'video', maxCount: 1 }
-]);
+], {
+  fieldTypeMap: {
+    frontPhoto: ['image'],
+    sidePhoto: ['image'],
+    fullBodyPhoto: ['image'],
+    video: ['video']
+  }
+});
 
 // Protected routes - authentication required (POST routes first)
 /**
@@ -55,6 +61,7 @@ const fileUploadConfig = upload.fields([
 router.post(
   '/listings',
   authMiddleware,
+  uploadLimiter,
   fileUploadConfig,
   horseValidationRules,
   horseListingController.createHorseListing
@@ -97,6 +104,7 @@ router.get('/my-listings', authMiddleware, horseListingController.getMyHorseList
 router.put(
   '/listings/:id',
   authMiddleware,
+  uploadLimiter,
   fileUploadConfig,
   horseListingController.updateHorseListing
 );

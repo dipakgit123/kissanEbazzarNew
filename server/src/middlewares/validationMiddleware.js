@@ -30,7 +30,7 @@ const validatePhone = (req, res, next) => {
  * Validate OTP format
  */
 const getExpectedOtpLength = () => {
-  const provider = (process.env.OTP_PROVIDER || 'twilio-verify').toLowerCase();
+  const provider = (process.env.OTP_PROVIDER || 'twilio-sms').toLowerCase();
 
   if (provider === 'messagecentral') {
     return parseInt(process.env.MESSAGE_CENTRAL_OTP_LENGTH, 10) || 4;

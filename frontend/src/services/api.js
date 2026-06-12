@@ -11,6 +11,13 @@ const api = axios.create({
   },
 });
 
+const vetApi = axios.create({
+  baseURL: API_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
 // Add token to requests if it exists
 api.interceptors.request.use(
   (config) => {
@@ -33,6 +40,29 @@ api.interceptors.response.use(
       // Handle unauthorized access
       localStorage.removeItem('token');
       window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+vetApi.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('vetToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+vetApi.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('vetToken');
+      localStorage.removeItem('veterinarian');
+      window.location.href = '/veterinarian/login';
     }
     return Promise.reject(error);
   }
@@ -616,6 +646,95 @@ export const userService = {
       throw error.response?.data || error;
     }
   }
+};
+
+export const veterinarianService = {
+  getDashboard: async () => {
+    try {
+      const response = await vetApi.get('/api/veterinarians/dashboard');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  getById: async (id) => {
+    try {
+      const response = await api.get(`/api/veterinarians/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  trackInteraction: async (id, payload = {}) => {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/api/veterinarians/${id}/track-interaction`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify(payload),
+      keepalive: true
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw error;
+    }
+
+    return response.json();
+  },
+};
+
+export const vetReviewService = {
+  getVetReviews: async (veterinarianId, options = {}) => {
+    try {
+      const response = await api.get(`/api/vet-reviews/veterinarian/${veterinarianId}`, {
+        params: options,
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  getUserReview: async (veterinarianId) => {
+    try {
+      const response = await api.get(`/api/vet-reviews/my-review/${veterinarianId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  createReview: async (payload) => {
+    try {
+      const response = await api.post('/api/vet-reviews', payload);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  updateReview: async (reviewId, payload) => {
+    try {
+      const response = await api.put(`/api/vet-reviews/${reviewId}`, payload);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  deleteReview: async (reviewId) => {
+    try {
+      const response = await api.delete(`/api/vet-reviews/${reviewId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
 };
 
 export const contactService = {

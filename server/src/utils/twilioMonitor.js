@@ -7,11 +7,11 @@ const twilioClient = require('../config/twilio');
 const logger = require('./logger');
 
 function getOtpProvider() {
-  return (process.env.OTP_PROVIDER || 'twilio-verify').toLowerCase();
+  return (process.env.OTP_PROVIDER || 'twilio-sms').toLowerCase();
 }
 
 function usesTwilioProvider() {
-  return ['twilio-verify', 'local'].includes(getOtpProvider());
+  return ['twilio-verify', 'local', 'twilio-sms', 'twilio-whatsapp'].includes(getOtpProvider());
 }
 
 /**

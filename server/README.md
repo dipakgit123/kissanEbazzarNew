@@ -14,12 +14,12 @@
 
 ## Overview
 
-KissanEbazzar is a WhatsApp OTP-based authentication system with integrated location services. Users can register/login using their phone number, receive OTP via WhatsApp, and set their location for location-based features.
+KissanEbazzar is a phone OTP-based authentication system with integrated location services. Users can register/login using their phone number, receive OTP via SMS or WhatsApp depending on the configured provider, and set their location for location-based features.
 
 ## Features
 
-✅ **WhatsApp OTP Authentication**
-- Phone number verification via WhatsApp
+✅ **OTP Authentication**
+- Phone number verification via SMS or WhatsApp
 - Secure OTP generation and validation
 - Rate limiting and attempt tracking
 - JWT token-based authentication
@@ -43,7 +43,7 @@ KissanEbazzar is a WhatsApp OTP-based authentication system with integrated loca
 - **Backend**: Node.js, Express.js
 - **Database**: PostgreSQL with Sequelize ORM
 - **Authentication**: JWT, Bcrypt
-- **Messaging**: Twilio WhatsApp API
+- **Messaging**: Twilio SMS / WhatsApp API, Message Central
 - **Geocoding**: OpenStreetMap Nominatim (free)
 - **Environment**: dotenv for configuration
 
@@ -52,7 +52,7 @@ KissanEbazzar is a WhatsApp OTP-based authentication system with integrated loca
 ### Prerequisites
 - Node.js (v14 or higher)
 - PostgreSQL database
-- Twilio account with WhatsApp sandbox
+- Twilio account with SMS enabled
 
 ### Installation
 
@@ -95,9 +95,14 @@ DB_PASSWORD=your_db_password
 JWT_SECRET=your_super_secret_key_change_this
 JWT_EXPIRE=7d
 
-# Twilio (WhatsApp)
+# OTP provider
+OTP_PROVIDER=twilio-sms
+OTP_LOCAL_CHANNEL=sms
+
+# Twilio
 TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 TWILIO_AUTH_TOKEN=your_auth_token_here
+TWILIO_PHONE_NUMBER=+1234567890
 TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886
 
 # OTP Settings
@@ -118,7 +123,7 @@ http://localhost:5000/api
 ### Authentication Endpoints
 
 #### 1. Send OTP
-Sends OTP to user's WhatsApp number.
+Sends OTP to the user's configured delivery channel.
 
 **Endpoint:** `POST /api/auth/send-otp`
 
@@ -133,7 +138,7 @@ Sends OTP to user's WhatsApp number.
 ```json
 {
   "success": true,
-  "message": "OTP sent successfully to WhatsApp",
+  "message": "OTP sent successfully via sms",
   "expiresIn": "5 minutes"
 }
 ```
@@ -188,7 +193,7 @@ Verifies the OTP and returns JWT token.
 ---
 
 #### 3. Resend OTP
-Resends OTP to the registered phone number.
+Resends OTP to the registered phone number using the active provider.
 
 **Endpoint:** `POST /api/auth/resend-otp`
 
@@ -203,7 +208,7 @@ Resends OTP to the registered phone number.
 ```json
 {
   "success": true,
-  "message": "OTP sent successfully to WhatsApp",
+  "message": "OTP sent successfully via sms",
   "expiresIn": "5 minutes"
 }
 ```

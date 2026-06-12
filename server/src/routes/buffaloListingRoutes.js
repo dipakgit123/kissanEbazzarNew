@@ -3,6 +3,8 @@ const router = express.Router();
 const buffaloListingController = require('../controllers/buffaloListingController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { body } = require('express-validator');
+const { createUploadFields } = require('../config/cloudinary');
+const { uploadLimiter } = require('../config/rateLimiter');
 
 // Validation rules
 const buffaloValidationRules = [
@@ -40,15 +42,19 @@ const buffaloValidationRules = [
     .isBoolean().withMessage('Negotiable must be true or false')
 ];
 
-// Multer configuration for file uploads
-const upload = require('multer')({ storage: require('multer').memoryStorage() });
-
-const fileUploadConfig = upload.fields([
+const fileUploadConfig = createUploadFields([
   { name: 'frontPhoto', maxCount: 1 },
   { name: 'sidePhoto', maxCount: 1 },
   { name: 'milkScenePhoto', maxCount: 1 },
   { name: 'video', maxCount: 1 }
-]);
+], {
+  fieldTypeMap: {
+    frontPhoto: ['image'],
+    sidePhoto: ['image'],
+    milkScenePhoto: ['image'],
+    video: ['video']
+  }
+});
 
 // Protected routes - authentication required (POST routes first)
 /**
@@ -59,6 +65,7 @@ const fileUploadConfig = upload.fields([
 router.post(
   '/listings',
   authMiddleware,
+  uploadLimiter,
   fileUploadConfig,
   buffaloValidationRules,
   buffaloListingController.createBuffaloListing
@@ -101,6 +108,7 @@ router.get('/my-listings', authMiddleware, buffaloListingController.getMyBuffalo
 router.put(
   '/listings/:id',
   authMiddleware,
+  uploadLimiter,
   fileUploadConfig,
   buffaloListingController.updateBuffaloListing
 );

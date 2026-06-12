@@ -13,7 +13,7 @@ require('dotenv').config();
 
 class OTPService {
   getProvider() {
-    return (process.env.OTP_PROVIDER || 'twilio-verify').toLowerCase();
+    return (process.env.OTP_PROVIDER || 'twilio-sms').toLowerCase();
   }
 
   getExpectedOtpLength() {
@@ -32,6 +32,18 @@ class OTPService {
     return this.getProvider() === 'local';
   }
 
+  isTwilioSmsProvider() {
+    return this.getProvider() === 'twilio-sms';
+  }
+
+  isTwilioWhatsAppProvider() {
+    return this.getProvider() === 'twilio-whatsapp';
+  }
+
+  isTwilioDirectProvider() {
+    return this.isLocalProvider() || this.isTwilioSmsProvider() || this.isTwilioWhatsAppProvider();
+  }
+
   isMessageCentralProvider() {
     return this.getProvider() === 'messagecentral';
   }
@@ -41,11 +53,11 @@ class OTPService {
   }
 
   usesLocalOtpVerification() {
-    return this.isLocalProvider() || this.isMessageCentralSmsProvider();
+    return this.isTwilioDirectProvider() || this.isMessageCentralSmsProvider();
   }
 
   updatesOtpStateDuringSend() {
-    return this.isLocalProvider() || this.isMessageCentralProvider() || this.isMessageCentralSmsProvider();
+    return this.isTwilioDirectProvider() || this.isMessageCentralProvider() || this.isMessageCentralSmsProvider();
   }
 
   getDeliveryChannel() {
@@ -53,7 +65,15 @@ class OTPService {
       return 'sms';
     }
 
-    return (process.env.OTP_LOCAL_CHANNEL || process.env.TWILIO_VERIFY_DEFAULT_CHANNEL || 'whatsapp').toLowerCase();
+    if (this.isTwilioSmsProvider()) {
+      return 'sms';
+    }
+
+    if (this.isTwilioWhatsAppProvider()) {
+      return 'whatsapp';
+    }
+
+    return (process.env.OTP_LOCAL_CHANNEL || process.env.TWILIO_VERIFY_DEFAULT_CHANNEL || 'sms').toLowerCase();
   }
 
   shouldExposeDebugOtp() {
@@ -61,7 +81,7 @@ class OTPService {
       return true;
     }
 
-    return process.env.NODE_ENV !== 'production' && this.isLocalProvider();
+    return process.env.NODE_ENV !== 'production' && this.isTwilioDirectProvider();
   }
 
   getProviderMetadata(user) {
@@ -182,7 +202,7 @@ class OTPService {
       return this.startMessageCentralSmsVerification(user, phoneNumber, transaction);
     }
 
-    if (this.isLocalProvider()) {
+    if (this.isTwilioDirectProvider()) {
       return this.startLocalVerification(user, phoneNumber, transaction);
     }
 
@@ -472,7 +492,7 @@ class OTPService {
                 status: verificationResult.status,
                 channel: this.isMessageCentralProvider()
                   ? 'sms'
-                  : this.isLocalProvider()
+                  : this.isTwilioDirectProvider()
                     ? this.getDeliveryChannel()
                     : process.env.TWILIO_VERIFY_DEFAULT_CHANNEL || 'whatsapp',
                 provider,
@@ -524,7 +544,7 @@ class OTPService {
               status: verificationResult.status,
               channel: this.isMessageCentralProvider()
                 ? 'sms'
-                : this.isLocalProvider()
+                : this.isTwilioDirectProvider()
                   ? this.getDeliveryChannel()
                   : process.env.TWILIO_VERIFY_DEFAULT_CHANNEL || 'whatsapp',
               provider,

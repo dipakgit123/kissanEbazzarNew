@@ -3,6 +3,8 @@ const router = express.Router();
 const otherAnimalListingController = require('../controllers/otherAnimalListingController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { body } = require('express-validator');
+const { createUploadFields } = require('../config/cloudinary');
+const { uploadLimiter } = require('../config/rateLimiter');
 
 // Validation rules
 const otherAnimalValidationRules = [
@@ -38,27 +40,31 @@ const otherAnimalValidationRules = [
     .isFloat({ min: 0 }).withMessage('Price must be a positive number'),
 
   body('isNegotiable')
-    .custom(value => {
+    .custom((value) => {
       return value === true || value === false || value === 'true' || value === 'false';
     })
     .withMessage('Negotiable must be true or false'),
 
   body('isTrainedForWork')
-    .custom(value => {
+    .custom((value) => {
       return value === true || value === false || value === 'true' || value === 'false';
     })
     .withMessage('Training status must be true or false')
 ];
 
-// Multer configuration for file uploads
-const upload = require('multer')({ storage: require('multer').memoryStorage() });
-
-const fileUploadConfig = upload.fields([
+const fileUploadConfig = createUploadFields([
   { name: 'frontPhoto', maxCount: 1 },
   { name: 'sidePhoto', maxCount: 1 },
   { name: 'additionalPhoto', maxCount: 1 },
   { name: 'video', maxCount: 1 }
-]);
+], {
+  fieldTypeMap: {
+    frontPhoto: ['image'],
+    sidePhoto: ['image'],
+    additionalPhoto: ['image'],
+    video: ['video']
+  }
+});
 
 // Protected routes - authentication required (POST routes should come before parameterized routes)
 /**
@@ -69,6 +75,7 @@ const fileUploadConfig = upload.fields([
 router.post(
   '/listings',
   authMiddleware,
+  uploadLimiter,
   fileUploadConfig,
   otherAnimalValidationRules,
   otherAnimalListingController.createOtherAnimalListing
@@ -111,6 +118,7 @@ router.get('/my-listings', authMiddleware, otherAnimalListingController.getMyOth
 router.put(
   '/listings/:id',
   authMiddleware,
+  uploadLimiter,
   fileUploadConfig,
   otherAnimalListingController.updateOtherAnimalListing
 );

@@ -32,6 +32,22 @@ const BuyAnimalsPage = () => {
   const searchBarRef = useRef(null);
   const listingsSectionRef = useRef(null);
 
+  const locationLabel = useMemo(() => {
+    if (userLocation?.city && userLocation?.state && userLocation?.postalCode) {
+      return `${userLocation.city}, ${userLocation.state}, ${userLocation.postalCode}`;
+    }
+
+    if (userLocation?.city && userLocation?.state) {
+      return `${userLocation.city}, ${userLocation.state}`;
+    }
+
+    if (userLocation?.postalCode) {
+      return userLocation.postalCode;
+    }
+
+    return t('buyPage.pageSubtitle');
+  }, [t, userLocation]);
+
   const scrollToListings = useCallback(() => {
     setShouldScrollToListings(true);
   }, []);
@@ -162,6 +178,60 @@ const BuyAnimalsPage = () => {
 
     return '';
   }, [formatPriceValue, maxPrice, minPrice, t]);
+
+  const categoryItems = useMemo(
+    () => [
+      {
+        key: 'cow',
+        label: t('buyPage.cows'),
+        helper: t('buyPage.browseCows'),
+        image: cowCategoryImage,
+      },
+      {
+        key: 'buffalo',
+        label: t('buyPage.buffalo'),
+        helper: t('buyPage.browseBuffalo'),
+        image: buffaloCategoryImage,
+      },
+      {
+        key: 'goat',
+        label: t('buyPage.goats'),
+        helper: t('buyPage.browseGoats'),
+        image: goatCategoryImage,
+      },
+      {
+        key: 'bull',
+        label: t('buyPage.bulls'),
+        helper: t('buyPage.browseBulls'),
+        image: bullCategoryImage,
+      },
+      {
+        key: 'horse',
+        label: t('buyPage.horses'),
+        helper: t('buyPage.browseHorses'),
+        image: horseCategoryImage,
+      },
+      {
+        key: 'dog',
+        label: t('buyPage.dogs'),
+        helper: t('buyPage.browseDogs'),
+        image: dogCategoryImage,
+      },
+      {
+        key: 'cat',
+        label: t('buyPage.cats'),
+        helper: t('buyPage.browseCats'),
+        image: catCategoryImage,
+      },
+      {
+        key: 'other',
+        label: t('buyPage.otherAnimals'),
+        helper: t('buyPage.browseAll'),
+        image: null,
+      },
+    ],
+    [t]
+  );
 
   const clearAllFilters = useCallback(() => {
     setSelectedCategory(null);
@@ -428,334 +498,124 @@ const BuyAnimalsPage = () => {
       )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Page Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-[#000600] mb-2">{t('home.buyAnimals')}</h1>
-          <p className="text-gray-600 text-sm sm:text-base">{t('buyPage.pageSubtitle')}</p>
-        </div>
-
-        {/* Search & Filter Section */}
-        <div ref={searchBarRef} className="mb-8">
-          <div className="bg-gradient-to-br from-white via-blue-50/30 to-green-50/30 rounded-xl shadow-lg border border-gray-100 p-4 sm:p-5 backdrop-blur-sm">
-            {/* Search Bar */}
-            <div className="relative mb-3">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#15BB73] to-[#0FA568] flex items-center justify-center shadow-md">
-                  <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        <section ref={searchBarRef} className="mb-8 overflow-hidden rounded-[2rem] border border-cyan-100 bg-white/75 shadow-[0_24px_70px_rgba(15,23,42,0.07)] backdrop-blur-sm">
+          <div className="border-b border-cyan-100/80 px-4 py-4 sm:px-6">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+              <div className="flex min-w-0 items-center gap-3 text-sm text-slate-600">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#e8fff5] text-[#15BB73] shadow-sm">
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
                 </div>
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-slate-700">{locationLabel}</p>
+                  <p className="text-xs text-slate-500">{t('buyPage.pageSubtitle')}</p>
+                </div>
               </div>
-              <input
-                type="text"
-                placeholder={t('buyPage.searchPlaceholderDetail')}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-14 pr-11 py-3 bg-white border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[#15BB73] focus:border-[#15BB73] transition-all duration-200 text-sm shadow-sm hover:shadow-md"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                >
-                  <div className="w-7 h-7 rounded-full bg-gray-100 hover:bg-red-100 flex items-center justify-center transition-colors group">
-                    <svg className="h-3.5 w-3.5 text-gray-500 group-hover:text-red-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </div>
-                </button>
-              )}
-            </div>
 
-            {/* Distance Toggle */}
-            <div className="flex items-center justify-center">
-              <div className="inline-flex items-center bg-gradient-to-r from-gray-100 to-gray-50 rounded-lg p-1 shadow-inner">
-                <button
-                  onClick={() => handleDistanceModeChange('all')}
-                  className={`px-4 py-2 rounded-md text-sm font-semibold transition-all duration-300 ${
-                    distanceMode === 'all'
-                      ? 'bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white shadow-lg transform scale-105'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
-                  }`}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <svg className={`w-4 h-4 ${distanceMode === 'all' ? 'animate-pulse' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center xl:justify-end">
+                <div className="flex items-center justify-between gap-3 rounded-full bg-slate-50 px-4 py-2 text-sm text-slate-600 shadow-inner">
+                  <span className="font-medium">{t('buyPage.nearby')}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleDistanceModeChange(distanceMode === 'nearby' ? 'all' : 'nearby')}
+                    className={`relative h-7 w-14 rounded-full transition-colors duration-300 ${
+                      distanceMode === 'nearby' ? 'bg-[#15BB73]' : 'bg-slate-300'
+                    }`}
+                    aria-pressed={distanceMode === 'nearby'}
+                  >
+                    <span
+                      className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-300 ${
+                        distanceMode === 'nearby' ? 'translate-x-8' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <div className="relative min-w-0 sm:w-72">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
-                    <span>{t('buyPage.allAnimals')}</span>
                   </div>
-                </button>
-                <button
-                  onClick={() => handleDistanceModeChange('nearby')}
-                  className={`px-4 py-2 rounded-md text-sm font-semibold transition-all duration-300 ${
-                    distanceMode === 'nearby'
-                      ? 'bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white shadow-lg transform scale-105'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
-                  }`}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <svg className={`w-4 h-4 ${distanceMode === 'nearby' ? 'animate-pulse' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <span>{t('buyPage.nearby')}</span>
-                  </div>
-                </button>
+                  <input
+                    type="text"
+                    placeholder={t('buyPage.searchPlaceholder')}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full rounded-full border border-slate-200 bg-white px-10 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-[#15BB73] focus:ring-2 focus:ring-[#15BB73]/20"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 transition hover:text-slate-600"
+                    >
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* {t('buyPage.browseByCategory')} Section */}
-        <div className="mb-8">
-          <div className="text-center mb-6">
-            <h3 className="text-2xl sm:text-3xl font-bold text-[#000600] mb-2">{t('buyPage.browseByCategory')}</h3>
-            <p className="text-gray-600 text-sm">{t('buyPage.browseCategorySubtitle')}</p>
+          <div className="px-4 py-4 sm:px-6">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <h1 className="text-2xl font-bold text-[#000600] sm:text-3xl">{t('buyPage.browseByCategory')}</h1>
+                <p className="mt-1 text-sm text-slate-500">{t('buyPage.browseCategorySubtitle')}</p>
+              </div>
+              <span className="hidden rounded-full bg-[#eefcf5] px-4 py-2 text-sm font-medium text-[#0f8b54] sm:inline-flex">
+                {filteredAnimals.length} {filteredAnimals.length === 1 ? t('buyPage.result') : t('buyPage.results')}
+              </span>
+            </div>
+
+            <div className="hide-scrollbar -mx-1 overflow-x-auto pb-1">
+              <div className="flex min-w-max gap-2 px-1 sm:gap-3">
+                {categoryItems.map((category) => {
+                  const isSelected = selectedCategory === category.key;
+
+                  return (
+                    <button
+                      key={category.key}
+                      type="button"
+                      onClick={() => handleCategoryClick(category.key)}
+                      className={`group flex h-[84px] w-[96px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-[1rem] border px-2 py-2.5 text-center transition-all duration-300 sm:h-[96px] sm:w-[112px] ${
+                        isSelected
+                          ? 'border-[#15BB73] bg-[#e9fff5] shadow-[0_14px_30px_rgba(21,187,115,0.18)]'
+                          : 'border-cyan-100 bg-[linear-gradient(135deg,#ecffff_0%,#f9fffd_100%)] shadow-sm hover:-translate-y-0.5 hover:shadow-md'
+                      }`}
+                    >
+                      <div className={`relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[0.8rem] sm:h-12 sm:w-12 ${
+                        category.image ? 'bg-white/80 shadow-sm' : 'bg-slate-100'
+                      }`}>
+                        {category.image ? (
+                          <img
+                            src={category.image}
+                            alt={category.label}
+                            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                          />
+                        ) : (
+                          <svg className="h-5 w-5 text-slate-400 sm:h-6 sm:w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 5v14m7-7H5" />
+                          </svg>
+                        )}
+                      </div>
+
+                      <div className="w-full min-w-0">
+                        <p className={`truncate text-xs font-bold leading-tight sm:text-sm ${isSelected ? 'text-[#0f8b54]' : 'text-[#125f66]'}`}>
+                          {category.label}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
-          
-          {/* Category Grid - Same structure as HomePage feature cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-              {/* Cow Card */}
-              <button
-                onClick={() => handleCategoryClick('cow')}
-                className={`group relative rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105 ${
-                  selectedCategory === 'cow' ? 'ring-4 ring-[#15BB73]' : ''
-                }`}
-              >
-                <div className="relative h-40 sm:h-48 overflow-hidden bg-gradient-to-br from-blue-50 to-green-50">
-                  <img
-                    src={cowCategoryImage}
-                    alt="Cows"
-                    className="w-full h-full object-contain opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 p-4"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-blue-900/40 via-blue-900/10 to-transparent"></div>
-                </div>
-                <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 bg-gradient-to-t from-black/80 to-transparent">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow-lg">{t('buyPage.cows')}</h3>
-                      <p className="text-xs text-white/80 mt-1">{t('buyPage.browseCows')}</p>
-                    </div>
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
-                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-              </button>
-
-              {/* Buffalo Card */}
-              <button
-                onClick={() => handleCategoryClick('buffalo')}
-                className={`group relative rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105 ${
-                  selectedCategory === 'buffalo' ? 'ring-4 ring-[#15BB73]' : ''
-                }`}
-              >
-                <div className="relative h-40 sm:h-48 overflow-hidden bg-gradient-to-br from-purple-50 to-pink-50">
-                  <img
-                    src={buffaloCategoryImage}
-                    alt="Buffalo"
-                    className="w-full h-full object-contain opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 p-4"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-purple-900/40 via-purple-900/10 to-transparent"></div>
-                </div>
-                <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 bg-gradient-to-t from-black/80 to-transparent">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow-lg">{t('buyPage.buffalo')}</h3>
-                      <p className="text-xs text-white/80 mt-1">{t('buyPage.browseBuffalo')}</p>
-                    </div>
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
-                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-              </button>
-
-              {/* Goat Card */}
-              <button
-                onClick={() => handleCategoryClick('goat')}
-                className={`group relative rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105 ${
-                  selectedCategory === 'goat' ? 'ring-4 ring-[#15BB73]' : ''
-                }`}
-              >
-                <div className="relative h-40 sm:h-48 overflow-hidden bg-gradient-to-br from-orange-50 to-yellow-50">
-                  <img
-                    src={goatCategoryImage}
-                    alt="Goats"
-                    className="w-full h-full object-contain opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 p-4"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-orange-900/40 via-orange-900/10 to-transparent"></div>
-                </div>
-                <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 bg-gradient-to-t from-black/80 to-transparent">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow-lg">{t('buyPage.goats')}</h3>
-                      <p className="text-xs text-white/80 mt-1">{t('buyPage.browseGoats')}</p>
-                    </div>
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
-                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-              </button>
-
-              {/* Bull Card */}
-              <button
-                onClick={() => handleCategoryClick('bull')}
-                className={`group relative rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105 ${
-                  selectedCategory === 'bull' ? 'ring-4 ring-[#15BB73]' : ''
-                }`}
-              >
-                <div className="relative h-40 sm:h-48 overflow-hidden bg-gradient-to-br from-red-50 to-orange-50">
-                  <img
-                    src={bullCategoryImage}
-                    alt="Bulls"
-                    className="w-full h-full object-contain opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 p-4"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-red-900/40 via-red-900/10 to-transparent"></div>
-                </div>
-                <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 bg-gradient-to-t from-black/80 to-transparent">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow-lg">{t('buyPage.bulls')}</h3>
-                      <p className="text-xs text-white/80 mt-1">{t('buyPage.browseBulls')}</p>
-                    </div>
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
-                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-              </button>
-
-              {/* Horse Card */}
-              <button
-                onClick={() => handleCategoryClick('horse')}
-                className={`group relative rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105 ${
-                  selectedCategory === 'horse' ? 'ring-4 ring-[#15BB73]' : ''
-                }`}
-              >
-                <div className="relative h-40 sm:h-48 overflow-hidden bg-gradient-to-br from-amber-50 to-orange-50">
-                  <img
-                    src={horseCategoryImage}
-                    alt="Horses"
-                    className="w-full h-full object-contain opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 p-4"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-amber-900/40 via-amber-900/10 to-transparent"></div>
-                </div>
-                <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 bg-gradient-to-t from-black/80 to-transparent">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow-lg">{t('buyPage.horses')}</h3>
-                      <p className="text-xs text-white/80 mt-1">{t('buyPage.browseHorses')}</p>
-                    </div>
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
-                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-              </button>
-
-              {/* Dog Card */}
-              <button
-                onClick={() => handleCategoryClick('dog')}
-                className={`group relative rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105 ${
-                  selectedCategory === 'dog' ? 'ring-4 ring-[#15BB73]' : ''
-                }`}
-              >
-                <div className="relative h-40 sm:h-48 overflow-hidden bg-gradient-to-br from-blue-50 to-cyan-50">
-                  <img
-                    src={dogCategoryImage}
-                    alt="Dogs"
-                    className="w-full h-full object-contain opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 p-4"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-blue-900/40 via-blue-900/10 to-transparent"></div>
-                </div>
-                <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 bg-gradient-to-t from-black/80 to-transparent">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow-lg">{t('buyPage.dogs')}</h3>
-                      <p className="text-xs text-white/80 mt-1">{t('buyPage.browseDogs')}</p>
-                    </div>
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
-                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-              </button>
-
-              {/* Cat Card */}
-              <button
-                onClick={() => handleCategoryClick('cat')}
-                className={`group relative rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105 ${
-                  selectedCategory === 'cat' ? 'ring-4 ring-[#15BB73]' : ''
-                }`}
-              >
-                <div className="relative h-40 sm:h-48 overflow-hidden bg-gradient-to-br from-pink-50 to-purple-50">
-                  <img
-                    src={catCategoryImage}
-                    alt="Cats"
-                    className="w-full h-full object-contain opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 p-4"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-pink-900/40 via-pink-900/10 to-transparent"></div>
-                </div>
-                <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 bg-gradient-to-t from-black/80 to-transparent">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow-lg">{t('buyPage.cats')}</h3>
-                      <p className="text-xs text-white/80 mt-1">{t('buyPage.browseCats')}</p>
-                    </div>
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
-                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-              </button>
-
-              {/* Other Animals Card */}
-              <button
-                onClick={() => handleCategoryClick('other')}
-                className={`group relative rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105 ${
-                  selectedCategory === 'other' ? 'ring-4 ring-[#15BB73]' : ''
-                }`}
-              >
-                <div className="relative h-40 sm:h-48 overflow-hidden bg-gradient-to-br from-gray-50 to-slate-50">
-                  <div className="w-full h-full flex items-center justify-center p-4">
-                    <svg className="w-20 h-20 sm:w-24 sm:h-24 text-gray-400 group-hover:text-gray-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                  </div>
-                  <div className="absolute inset-0 bg-gradient-to-t from-gray-900/40 via-gray-900/10 to-transparent"></div>
-                </div>
-                <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 bg-gradient-to-t from-black/80 to-transparent">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow-lg">{t('buyPage.otherAnimals')}</h3>
-                      <p className="text-xs text-white/80 mt-1">{t('buyPage.browseAll')}</p>
-                    </div>
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
-                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-              </button>
-          </div>
-        </div>
+        </section>
 
         {selectedCategory && (
           <section className="mb-8 overflow-hidden rounded-[1.75rem] border border-emerald-100 bg-white shadow-[0_18px_50px_rgba(21,187,115,0.08)]">

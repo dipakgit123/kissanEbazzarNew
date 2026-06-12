@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
 const adminAuth = require('../middleware/adminAuth');
+const { authLimiter } = require('../config/rateLimiter');
 
 const requireAdminInitSecret = (req, res, next) => {
   const configuredSecret = process.env.ADMIN_INIT_SECRET;
@@ -36,8 +37,8 @@ const requireAdminInitSecret = (req, res, next) => {
 };
 
 // Public routes
-router.post('/login', adminController.login);
-router.post('/init', requireAdminInitSecret, adminController.initSuperAdmin); // One-time setup with explicit secret
+router.post('/login', authLimiter, adminController.login);
+router.post('/init', authLimiter, requireAdminInitSecret, adminController.initSuperAdmin); // One-time setup with explicit secret
 
 // Protected routes - require admin authentication
 router.use(adminAuth);

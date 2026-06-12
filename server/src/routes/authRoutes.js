@@ -6,6 +6,7 @@ const multer = require('multer');
 const authController = require('../controllers/authController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { validatePhone, validateOTP } = require('../middlewares/validationMiddleware');
+const { authLimiter, uploadLimiter } = require('../config/rateLimiter');
 
 // Multer configuration for profile photo upload
 const upload = multer({
@@ -24,13 +25,13 @@ const upload = multer({
 
 // Public routes
 // Send OTP
-router.post('/send-otp', validatePhone, authController.sendOTP);
+router.post('/send-otp', authLimiter, validatePhone, authController.sendOTP);
 
 // Verify OTP
-router.post('/verify-otp', validateOTP, authController.verifyOTP);
+router.post('/verify-otp', authLimiter, validateOTP, authController.verifyOTP);
 
 // Resend OTP
-router.post('/resend-otp', validatePhone, authController.resendOTP);
+router.post('/resend-otp', authLimiter, validatePhone, authController.resendOTP);
 
 // Protected routes (require authentication)
 // Get user profile
@@ -43,7 +44,7 @@ router.post('/complete-profile', authMiddleware, authController.completeProfile)
 router.put('/update-profile', authMiddleware, authController.updateProfile);
 
 // Upload profile photo
-router.post('/upload-photo', authMiddleware, upload.single('photo'), authController.uploadProfilePhoto);
+router.post('/upload-photo', authMiddleware, uploadLimiter, upload.single('photo'), authController.uploadProfilePhoto);
 
 // Delete profile photo
 router.delete('/delete-photo', authMiddleware, authController.deleteProfilePhoto);

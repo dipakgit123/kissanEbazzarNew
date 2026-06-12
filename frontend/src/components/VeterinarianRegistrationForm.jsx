@@ -35,6 +35,8 @@ const VeterinarianRegistrationForm = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [locationLoading, setLocationLoading] = useState(false);
+  const [pincodeLookupLoading, setPincodeLookupLoading] = useState(false);
+  const [lastResolvedPincode, setLastResolvedPincode] = useState('');
   const [dragActive, setDragActive] = useState({});
   const [uploadProgress, setUploadProgress] = useState(0);
   const [submitStage, setSubmitStage] = useState('idle');
@@ -178,8 +180,79 @@ const VeterinarianRegistrationForm = () => {
     );
   };
 
+  const lookupPincodeLocation = async (pincode) => {
+    const normalizedPincode = String(pincode || '').replace(/\D/g, '').slice(0, 6);
+
+    if (!/^\d{6}$/.test(normalizedPincode) || normalizedPincode === lastResolvedPincode) {
+      return;
+    }
+
+    setPincodeLookupLoading(true);
+    setError(null);
+
+    try {
+      const response = await axios.get(
+        `${API_URL}/api/location/lookup/pincode/${encodeURIComponent(normalizedPincode)}`
+      );
+
+      const locationData = response.data?.data;
+
+      if (!locationData) {
+        throw new Error(
+          t('vetRegistration.pincodeLookupFailed', { defaultValue: 'Failed to fetch location from pincode' })
+        );
+      }
+
+      setFormData((prev) => {
+        if (prev.pincode !== normalizedPincode) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          pincode: normalizedPincode,
+          city: locationData.city || prev.city,
+          state: locationData.state || prev.state,
+          latitude: locationData.latitude !== null && locationData.latitude !== undefined
+            ? String(locationData.latitude)
+            : prev.latitude,
+          longitude: locationData.longitude !== null && locationData.longitude !== undefined
+            ? String(locationData.longitude)
+            : prev.longitude,
+          clinic_address: prev.clinic_address || locationData.address || ''
+        };
+      });
+
+      setLastResolvedPincode(normalizedPincode);
+    } catch (err) {
+      console.error('Pincode lookup error:', err);
+      setError(
+        err.response?.data?.message
+          || err.message
+          || t('vetRegistration.pincodeLookupFailed', { defaultValue: 'Failed to fetch location from pincode' })
+      );
+    } finally {
+      setPincodeLookupLoading(false);
+    }
+  };
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+
+    if (name === 'pincode') {
+      const sanitizedPincode = value.replace(/\D/g, '').slice(0, 6);
+      setLastResolvedPincode('');
+      setFormData((prev) => ({
+        ...prev,
+        pincode: sanitizedPincode
+      }));
+
+      if (/^\d{6}$/.test(sanitizedPincode)) {
+        lookupPincodeLocation(sanitizedPincode);
+      }
+      return;
+    }
+
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
@@ -1217,7 +1290,7 @@ const VeterinarianRegistrationForm = () => {
                   <button
                     type="button"
                     onClick={getCurrentLocation}
-                    disabled={locationLoading}
+                    disabled={locationLoading || pincodeLookupLoading}
                     className="w-full flex items-center justify-center space-x-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white py-4 rounded-xl font-semibold transition-all disabled:opacity-50 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                   >
                     {locationLoading ? (
@@ -1333,12 +1406,19 @@ const VeterinarianRegistrationForm = () => {
                           name="pincode"
                           value={formData.pincode}
                           onChange={handleChange}
+                          onBlur={() => lookupPincodeLocation(formData.pincode)}
                           placeholder={t('vetRegistration.pincodePlaceholder')}
                           pattern="[0-9]{6}"
+                          inputMode="numeric"
                           className="w-full pl-12 pr-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-gray-900 placeholder-gray-400"
                           required
                         />
                       </div>
+                      {pincodeLookupLoading && (
+                        <p className="mt-2 text-xs font-medium text-indigo-600">
+                          {t('vetRegistration.fetchingLocationFromPincode', { defaultValue: 'Fetching location from pincode...' })}
+                        </p>
+                      )}
                     </div>
                   </div>
 

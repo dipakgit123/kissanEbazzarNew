@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const locationController = require('../controllers/locationController');
 const authMiddleware = require('../middlewares/authMiddleware');
+const { lookupLimiter } = require('../config/rateLimiter');
 
 // Define validators directly in this file since they're missing
 const validateCoordinates = (req, res, next) => {
@@ -33,7 +34,10 @@ const validateAddress = (req, res, next) => {
   next();
 };
 
-// Rest of your routes...
+// Public lookup route used during onboarding/registration before login
+router.get('/lookup/pincode/:postalCode', lookupLimiter, locationController.lookupPostalCode);
+
+// Rest of your protected routes...
 router.use(authMiddleware);
 router.post('/set/current', validateCoordinates, locationController.setLocationFromCurrent);
 
@@ -60,9 +64,6 @@ router.get('/me', locationController.getUserLocation);
 
 // GET /api/location/status - Check if location is set
 router.get('/status', locationController.checkLocationStatus);
-
-// GET /api/location/lookup/pincode/:postalCode - Lookup pincode details
-router.get('/lookup/pincode/:postalCode', locationController.lookupPostalCode);
 
 // GET /api/location/nearby - Get nearby users within radius
 router.get('/nearby', locationController.getNearbyUsers);

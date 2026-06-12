@@ -7,6 +7,12 @@ const { getJwtSecret } = require('../config/jwt');
 
 const analyticsService = new AnalyticsService(models);
 
+const buildServerErrorResponse = (message, error) => ({
+  success: false,
+  message,
+  ...(process.env.NODE_ENV === 'development' && error ? { error: error.message } : {})
+});
+
 // Admin Login
 exports.login = async (req, res) => {
   try {
@@ -66,11 +72,7 @@ exports.login = async (req, res) => {
     });
   } catch (error) {
     console.error('Admin login error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Login failed',
-      error: error.message
-    });
+    res.status(500).json(buildServerErrorResponse('Login failed', error));
   }
 };
 
@@ -92,11 +94,7 @@ exports.getProfile = async (req, res) => {
     });
   } catch (error) {
     console.error('Get profile error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get profile',
-      error: error.message
-    });
+    res.status(500).json(buildServerErrorResponse('Failed to get profile', error));
   }
 };
 
@@ -111,11 +109,7 @@ exports.getDashboardStats = async (req, res) => {
     });
   } catch (error) {
     console.error('Dashboard stats error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get dashboard stats',
-      error: error.message
-    });
+    res.status(500).json(buildServerErrorResponse('Failed to get dashboard stats', error));
   }
 };
 
@@ -131,11 +125,7 @@ exports.getUserGrowth = async (req, res) => {
     });
   } catch (error) {
     console.error('User growth error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get user growth data',
-      error: error.message
-    });
+    res.status(500).json(buildServerErrorResponse('Failed to get user growth data', error));
   }
 };
 
@@ -151,11 +141,7 @@ exports.getListingsGrowth = async (req, res) => {
     });
   } catch (error) {
     console.error('Listings growth error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get listings growth data',
-      error: error.message
-    });
+    res.status(500).json(buildServerErrorResponse('Failed to get listings growth data', error));
   }
 };
 
@@ -171,11 +157,7 @@ exports.getSalesData = async (req, res) => {
     });
   } catch (error) {
     console.error('Sales data error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get sales data',
-      error: error.message
-    });
+    res.status(500).json(buildServerErrorResponse('Failed to get sales data', error));
   }
 };
 
@@ -191,11 +173,7 @@ exports.getTopSellers = async (req, res) => {
     });
   } catch (error) {
     console.error('Top sellers error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get top sellers',
-      error: error.message
-    });
+    res.status(500).json(buildServerErrorResponse('Failed to get top sellers', error));
   }
 };
 
@@ -210,11 +188,7 @@ exports.getLocationStats = async (req, res) => {
     });
   } catch (error) {
     console.error('Location stats error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get location stats',
-      error: error.message
-    });
+    res.status(500).json(buildServerErrorResponse('Failed to get location stats', error));
   }
 };
 
@@ -230,11 +204,7 @@ exports.getRecentActivity = async (req, res) => {
     });
   } catch (error) {
     console.error('Recent activity error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get recent activity',
-      error: error.message
-    });
+    res.status(500).json(buildServerErrorResponse('Failed to get recent activity', error));
   }
 };
 
@@ -264,11 +234,7 @@ exports.getUsers = async (req, res) => {
     });
   } catch (error) {
     console.error('Get users error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get users',
-      error: error.message
-    });
+    res.status(500).json(buildServerErrorResponse('Failed to get users', error));
   }
 };
 
@@ -291,11 +257,7 @@ exports.getListings = async (req, res) => {
     });
   } catch (error) {
     console.error('Get listings error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get listings',
-      error: error.message
-    });
+    res.status(500).json(buildServerErrorResponse('Failed to get listings', error));
   }
 };
 
@@ -329,11 +291,7 @@ exports.toggleUserBlock = async (req, res) => {
     });
   } catch (error) {
     console.error('Toggle user block error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update user status',
-      error: error.message
-    });
+    res.status(500).json(buildServerErrorResponse('Failed to update user status', error));
   }
 };
 
@@ -379,11 +337,7 @@ exports.deleteListing = async (req, res) => {
     });
   } catch (error) {
     console.error('Delete listing error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to delete listing',
-      error: error.message
-    });
+    res.status(500).json(buildServerErrorResponse('Failed to delete listing', error));
   }
 };
 
@@ -434,11 +388,7 @@ exports.createAdmin = async (req, res) => {
     });
   } catch (error) {
     console.error('Create admin error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create admin',
-      error: error.message
-    });
+    res.status(500).json(buildServerErrorResponse('Failed to create admin', error));
   }
 };
 
@@ -480,10 +430,6 @@ exports.initSuperAdmin = async (req, res) => {
     });
   } catch (error) {
     console.error('Init super admin error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to initialize super admin',
-      error: error.message
-    });
+    res.status(500).json(buildServerErrorResponse('Failed to initialize super admin', error));
   }
 };

@@ -4,17 +4,17 @@ const express = require('express');
 const router = express.Router();
 const blogController = require('../controllers/blogController');
 const adminAuth = require('../middleware/adminAuth');
-const multer = require('multer');
+const { createUploadFields } = require('../config/cloudinary');
+const { uploadLimiter } = require('../config/rateLimiter');
 
-// Configure multer for blog image upload
-const uploadFields = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB max for blog images
-  }
-}).fields([
+const uploadFields = createUploadFields([
   { name: 'featured_image', maxCount: 1 }
-]);
+], {
+  maxFileSizeBytes: 5 * 1024 * 1024,
+  fieldTypeMap: {
+    featured_image: ['image']
+  }
+});
 
 // Public routes
 router.get('/', blogController.getAllBlogs);
@@ -26,11 +26,11 @@ router.get('/featured', blogController.getFeaturedBlogs);
 router.use(adminAuth);
 
 // Blog CRUD operations
-router.post('/', uploadFields, blogController.createBlog);
+router.post('/', uploadLimiter, uploadFields, blogController.createBlog);
 router.get('/admin/all', blogController.getAllBlogs); // Get all blogs including drafts
 router.get('/admin/stats', blogController.getBlogStats);
 router.get('/admin/:id', blogController.getBlogById);
-router.patch('/:id', uploadFields, blogController.updateBlog);
+router.patch('/:id', uploadLimiter, uploadFields, blogController.updateBlog);
 router.delete('/:id', blogController.deleteBlog);
 router.patch('/:id/toggle-featured', blogController.toggleFeatured);
 

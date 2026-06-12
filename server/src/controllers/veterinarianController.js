@@ -2,12 +2,113 @@
 
 const db = require('../models');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudinary');
-const { Op, UniqueConstraintError, ValidationError } = require('sequelize');
+const { Op, QueryTypes, UniqueConstraintError, ValidationError } = require('sequelize');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const { getJwtSecret } = require('../config/jwt');
+
+const buildServerErrorResponse = (message, error) => ({
+  success: false,
+  message,
+  ...(process.env.NODE_ENV === 'development' && error ? { error: error.message } : {})
+});
+
+const PUBLIC_VET_LEAD_TYPES = new Set(['profile_view', 'whatsapp_click', 'call_click']);
+
+const getClientIpAddress = (req) => {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim()) {
+    return forwarded.split(',')[0].trim();
+  }
+
+  return req.ip || req.connection?.remoteAddress || null;
+};
+
+const sanitizeSourcePage = (value) => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.trim().slice(0, 100);
+  return normalized || null;
+};
+
+const getIndiaDayBounds = (date = new Date()) => {
+  const indiaOffsetMs = (5 * 60 + 30) * 60 * 1000;
+  const shifted = new Date(date.getTime() + indiaOffsetMs);
+  const startOfShiftedDayUtcMs = Date.UTC(
+    shifted.getUTCFullYear(),
+    shifted.getUTCMonth(),
+    shifted.getUTCDate()
+  );
+  const start = new Date(startOfShiftedDayUtcMs - indiaOffsetMs);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+
+  return { start, end };
+};
+
+const isMissingRelationError = (error, relationName) => {
+  const relationPattern = relationName ? new RegExp(`relation ["']?${relationName}["']? does not exist`, 'i') : null;
+  return Boolean(
+    error?.original?.code === '42P01' ||
+    error?.parent?.code === '42P01' ||
+    (relationPattern && (
+      relationPattern.test(error?.message || '') ||
+      relationPattern.test(error?.original?.message || '') ||
+      relationPattern.test(error?.parent?.message || '')
+    ))
+  );
+};
+
+const extractOptionalUserId = (req) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return null;
+  }
+
+  const [scheme, token] = authHeader.split(' ');
+  if (scheme !== 'Bearer' || !token) {
+    return null;
+  }
+
+  try {
+    const decoded = jwt.verify(token, getJwtSecret());
+    if (decoded?.type === 'veterinarian') {
+      return null;
+    }
+
+    return decoded?.userId || null;
+  } catch (_error) {
+    return null;
+  }
+};
+
+const calculateProfileCompletion = (veterinarian) => {
+  const checks = [
+    Boolean(veterinarian?.full_name),
+    Boolean(veterinarian?.phone_number),
+    Boolean(veterinarian?.email),
+    Boolean(veterinarian?.profile_photo),
+    Boolean(veterinarian?.specialization),
+    Number(veterinarian?.experience_years || 0) > 0,
+    Boolean(veterinarian?.qualification),
+    Array.isArray(veterinarian?.services) ? veterinarian.services.length > 0 : Boolean(veterinarian?.services),
+    Boolean(veterinarian?.clinic_name),
+    Boolean(veterinarian?.clinic_address),
+    Boolean(veterinarian?.city),
+    Boolean(veterinarian?.state),
+    Boolean(veterinarian?.pincode),
+    Boolean(veterinarian?.license_document),
+    veterinarian?.available_hours && typeof veterinarian.available_hours === 'object'
+      ? Object.keys(veterinarian.available_hours).length > 0
+      : false
+  ];
+
+  const completed = checks.filter(Boolean).length;
+  return Math.round((completed / checks.length) * 100);
+};
 
 class VeterinarianController {
 
@@ -433,11 +534,7 @@ class VeterinarianController {
         });
       }
 
-      res.status(500).json({
-        success: false,
-        message: 'Registration failed',
-        error: error.message
-      });
+      res.status(500).json(buildServerErrorResponse('Registration failed', error));
     }
   }
 
@@ -480,11 +577,7 @@ class VeterinarianController {
       });
     } catch (error) {
       console.error('Send OTP error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to send OTP',
-        error: error.message
-      });
+      res.status(500).json(buildServerErrorResponse('Failed to send OTP', error));
     }
   }
 
@@ -555,11 +648,7 @@ class VeterinarianController {
       });
     } catch (error) {
       console.error('Verify OTP error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Verification failed',
-        error: error.message
-      });
+      res.status(500).json(buildServerErrorResponse('Verification failed', error));
     }
   }
 
@@ -648,11 +737,7 @@ class VeterinarianController {
       });
     } catch (error) {
       console.error('Login error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Login failed',
-        error: error.message
-      });
+      res.status(500).json(buildServerErrorResponse('Login failed', error));
     }
   }
 
@@ -851,11 +936,7 @@ class VeterinarianController {
       });
     } catch (error) {
       console.error('Get nearby veterinarians error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch veterinarians',
-        error: error.message
-      });
+      res.status(500).json(buildServerErrorResponse('Failed to fetch veterinarians', error));
     }
   }
 
@@ -922,11 +1003,7 @@ class VeterinarianController {
       });
     } catch (error) {
       console.error('Get all veterinarians error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch veterinarians',
-        error: error.message
-      });
+      res.status(500).json(buildServerErrorResponse('Failed to fetch veterinarians', error));
     }
   }
 
@@ -949,7 +1026,7 @@ class VeterinarianController {
           'specialization', 'experience_years', 'qualification', 'services',
           'consultation_fee', 'available_hours', 'emergency_available',
           'clinic_name', 'clinic_address', 'city', 'state', 'pincode',
-          'latitude', 'longitude', 'rating', 'total_reviews', 'total_patients'
+          'latitude', 'longitude', 'rating', 'total_reviews'
         ]
       });
 
@@ -966,11 +1043,100 @@ class VeterinarianController {
       });
     } catch (error) {
       console.error('Get veterinarian by ID error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch veterinarian',
-        error: error.message
+      res.status(500).json(buildServerErrorResponse('Failed to fetch veterinarian', error));
+    }
+  }
+
+  /**
+   * Track public veterinarian interactions
+   * POST /api/veterinarians/:id/track-interaction
+   */
+  async trackInteraction(req, res) {
+    try {
+      const { id } = req.params;
+      const { leadType, sourcePage } = req.body || {};
+
+      if (!PUBLIC_VET_LEAD_TYPES.has(leadType)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid veterinarian interaction type'
+        });
+      }
+
+      const veterinarian = await db.Veterinarian.findOne({
+        where: {
+          id,
+          verification_status: 'verified',
+          is_active: true
+        },
+        attributes: ['id']
       });
+
+      if (!veterinarian) {
+        return res.status(404).json({
+          success: false,
+          message: 'Veterinarian not found'
+        });
+      }
+
+      const viewerUserId = extractOptionalUserId(req);
+      const ipAddress = getClientIpAddress(req);
+      const userAgent = req.headers['user-agent'] || null;
+      const { start, end } = getIndiaDayBounds();
+      const dedupeWhere = {
+        veterinarian_id: veterinarian.id,
+        lead_type: leadType,
+        created_at: {
+          [Op.gte]: start,
+          [Op.lt]: end
+        }
+      };
+
+      if (viewerUserId) {
+        dedupeWhere.viewer_user_id = viewerUserId;
+      } else if (ipAddress && userAgent) {
+        dedupeWhere.ip_address = ipAddress;
+        dedupeWhere.user_agent = userAgent;
+      }
+
+      const existingInteraction = await db.VetLeadLog.findOne({
+        where: dedupeWhere,
+        attributes: ['id']
+      });
+
+      if (existingInteraction) {
+        return res.json({
+          success: true,
+          deduped: true,
+          message: 'Interaction already tracked for today'
+        });
+      }
+
+      await db.VetLeadLog.create({
+        veterinarian_id: veterinarian.id,
+        viewer_user_id: viewerUserId,
+        lead_type: leadType,
+        source_page: sanitizeSourcePage(sourcePage),
+        ip_address: ipAddress,
+        user_agent: userAgent
+      });
+
+      res.json({
+        success: true,
+        deduped: false,
+        message: 'Interaction tracked successfully'
+      });
+    } catch (error) {
+      if (isMissingRelationError(error, 'vet_lead_logs')) {
+        console.warn('Vet lead tracking skipped because vet_lead_logs table is missing.');
+        return res.status(202).json({
+          success: true,
+          message: 'Interaction accepted'
+        });
+      }
+
+      console.error('Track veterinarian interaction error:', error);
+      res.status(500).json(buildServerErrorResponse('Failed to track veterinarian interaction', error));
     }
   }
 
@@ -998,11 +1164,7 @@ class VeterinarianController {
       });
     } catch (error) {
       console.error('Get profile error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch profile',
-        error: error.message
-      });
+      res.status(500).json(buildServerErrorResponse('Failed to fetch profile', error));
     }
   }
 
@@ -1014,7 +1176,6 @@ class VeterinarianController {
     try {
       const vetId = req.vet.id;
 
-      // Get veterinarian profile
       const veterinarian = await db.Veterinarian.findByPk(vetId);
       if (!veterinarian) {
         return res.status(404).json({
@@ -1023,76 +1184,210 @@ class VeterinarianController {
         });
       }
 
-      // Get appointment statistics
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
+      const now = new Date();
+      const pad = (value) => String(value).padStart(2, '0');
+      const formatDateKey = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+      const daysAgo = (days) => new Date(now.getFullYear(), now.getMonth(), now.getDate() - days);
+      const last30DaysStart = daysAgo(29);
+      const weekStart = daysAgo(6);
 
-      const [totalAppointments, todayAppointments, pendingAppointments, recentAppointments] = await Promise.all([
-        // Total appointments
-        db.Appointment.count({
-          where: { veterinarian_id: vetId }
-        }),
-        // Today's appointments
-        db.Appointment.count({
-          where: {
-            veterinarian_id: vetId,
-            appointment_date: {
-              [Op.gte]: today,
-              [Op.lt]: tomorrow
+      const latestReview = await db.VetReview.findOne({
+        where: {
+          veterinarian_id: vetId,
+          is_visible: true
+        },
+        include: [{
+          model: db.User,
+          as: 'user',
+          attributes: ['id', 'full_name', 'profile_photo']
+        }],
+        order: [['created_at', 'DESC']]
+      });
+
+      let totalProfileViews = 0;
+      let whatsappClicks = 0;
+      let callClicks = 0;
+      let last30DaysViews = 0;
+      let last30DaysLeads = 0;
+      let recentLeadRows = [];
+      let activityTrendRows = [];
+      let leadSourceRows = [];
+
+      try {
+        [
+          totalProfileViews,
+          whatsappClicks,
+          callClicks,
+          last30DaysViews,
+          last30DaysLeads,
+          recentLeadRows,
+          activityTrendRows,
+          leadSourceRows
+        ] = await Promise.all([
+          db.VetLeadLog.count({
+            where: {
+              veterinarian_id: vetId,
+              lead_type: 'profile_view'
             }
-          }
-        }),
-        // Pending appointments
-        db.Appointment.count({
-          where: {
-            veterinarian_id: vetId,
-            status: 'pending'
-          }
-        }),
-        // Recent appointments
-        db.Appointment.findAll({
-          where: { veterinarian_id: vetId },
-          include: [{
-            model: db.User,
-            as: 'user',
-            attributes: ['id', 'full_name', 'phone_number']
-          }],
-          order: [['appointment_date', 'DESC'], ['appointment_time', 'DESC']],
-          limit: 5
-        })
-      ]);
+          }),
+          db.VetLeadLog.count({
+            where: {
+              veterinarian_id: vetId,
+              lead_type: 'whatsapp_click'
+            }
+          }),
+          db.VetLeadLog.count({
+            where: {
+              veterinarian_id: vetId,
+              lead_type: 'call_click'
+            }
+          }),
+          db.VetLeadLog.count({
+            where: {
+              veterinarian_id: vetId,
+              lead_type: 'profile_view',
+              created_at: {
+                [Op.gte]: last30DaysStart
+              }
+            }
+          }),
+          db.VetLeadLog.count({
+            where: {
+              veterinarian_id: vetId,
+              lead_type: {
+                [Op.in]: ['whatsapp_click', 'call_click']
+              },
+              created_at: {
+                [Op.gte]: last30DaysStart
+              }
+            }
+          }),
+          db.VetLeadLog.findAll({
+            where: {
+              veterinarian_id: vetId,
+              lead_type: {
+                [Op.in]: ['whatsapp_click', 'call_click']
+              }
+            },
+            include: [{
+              model: db.User,
+              as: 'viewer',
+              attributes: ['id', 'full_name', 'phone_number']
+            }],
+            order: [['created_at', 'DESC']],
+            limit: 10
+          }),
+          db.sequelize.query(`
+            SELECT
+              TO_CHAR(created_at::date, 'YYYY-MM-DD') AS day_key,
+              COUNT(*) FILTER (WHERE lead_type = 'profile_view')::int AS profile_views,
+              COUNT(*) FILTER (WHERE lead_type = 'whatsapp_click')::int AS whatsapp_clicks,
+              COUNT(*) FILTER (WHERE lead_type = 'call_click')::int AS call_clicks
+            FROM vet_lead_logs
+            WHERE veterinarian_id = :vetId
+              AND created_at >= :startDate
+              AND created_at < :endDate
+            GROUP BY 1
+            ORDER BY 1 ASC
+          `, {
+            replacements: {
+              vetId,
+              startDate: weekStart,
+              endDate: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+            },
+            type: QueryTypes.SELECT
+          }),
+          db.sequelize.query(`
+            SELECT
+              lead_type,
+              COUNT(*)::int AS total
+            FROM vet_lead_logs
+            WHERE veterinarian_id = :vetId
+            GROUP BY lead_type
+            ORDER BY total DESC, lead_type ASC
+          `, {
+            replacements: { vetId },
+            type: QueryTypes.SELECT
+          })
+        ]);
+      } catch (leadError) {
+        if (isMissingRelationError(leadError, 'vet_lead_logs')) {
+          console.warn('Vet dashboard lead metrics unavailable because vet_lead_logs table is missing.');
+        } else {
+          throw leadError;
+        }
+      }
 
-      // Format recent appointments
-      const formattedAppointments = recentAppointments.map(apt => ({
-        id: apt.id,
-        userName: apt.user?.full_name || 'User',
-        userPhone: apt.user?.phone_number || '',
-        date: apt.appointment_date,
-        time: apt.appointment_time,
-        animalType: apt.animal_type,
-        reason: apt.reason,
-        status: apt.status
+      const weekKeys = Array.from({ length: 7 }, (_, index) =>
+        formatDateKey(new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + index))
+      );
+      const activityTrendMap = new Map(activityTrendRows.map((row) => [row.day_key, row]));
+      const activityTrend = weekKeys.map((dayKey) => {
+        const row = activityTrendMap.get(dayKey);
+        return {
+          dayKey,
+          profileViews: Number(row?.profile_views || 0),
+          whatsappClicks: Number(row?.whatsapp_clicks || 0),
+          callClicks: Number(row?.call_clicks || 0)
+        };
+      });
+
+      const leadSourceBreakdown = leadSourceRows.map((row) => ({
+        leadType: row.lead_type,
+        value: Number(row.total || 0)
       }));
+
+      const recentLeads = recentLeadRows.map((lead) => ({
+        id: lead.id,
+        leadType: lead.lead_type,
+        sourcePage: lead.source_page,
+        createdAt: lead.createdAt || lead.created_at,
+        viewerName: lead.viewer?.full_name || 'Visitor',
+        viewerPhone: lead.viewer?.phone_number || '',
+        viewerId: lead.viewer?.id || null
+      }));
+
+      const profileCompletion = calculateProfileCompletion(veterinarian);
+      const totalLeads = Number(whatsappClicks || 0) + Number(callClicks || 0);
 
       res.json({
         success: true,
-        stats: {
-          totalAppointments,
-          todayAppointments,
-          pendingAppointments,
-          totalEarnings: 0 // TODO: Calculate from completed appointments
-        },
-        recentAppointments: formattedAppointments
+        data: {
+          profile: {
+            ...veterinarian.toJSON(),
+            profile_completion: profileCompletion
+          },
+          summary: {
+            profileViews: Number(totalProfileViews || 0),
+            whatsappClicks: Number(whatsappClicks || 0),
+            callClicks: Number(callClicks || 0),
+            totalLeads,
+            averageRating: Number(veterinarian.rating || 0),
+            totalReviews: Number(veterinarian.total_reviews || 0),
+            profileCompletion,
+            last30DaysViews: Number(last30DaysViews || 0),
+            last30DaysLeads: Number(last30DaysLeads || 0)
+          },
+          charts: {
+            activityTrend,
+            leadSourceBreakdown
+          },
+          recentLeads,
+          latestReview: latestReview ? {
+            id: latestReview.id,
+            rating: latestReview.rating,
+            reviewText: latestReview.review_text,
+            serviceType: latestReview.service_type,
+            createdAt: latestReview.createdAt,
+            userName: latestReview.user?.full_name || 'Farmer',
+            userPhoto: latestReview.user?.profile_photo || null,
+            vetResponse: latestReview.vet_response || null
+          } : null
+        }
       });
     } catch (error) {
       console.error('Get dashboard error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch dashboard data',
-        error: error.message
-      });
+      res.status(500).json(buildServerErrorResponse('Failed to fetch dashboard data', error));
     }
   }
 
@@ -1142,11 +1437,7 @@ class VeterinarianController {
       });
     } catch (error) {
       console.error('Update profile error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to update profile',
-        error: error.message
-      });
+      res.status(500).json(buildServerErrorResponse('Failed to update profile', error));
     }
   }
 
@@ -1170,11 +1461,7 @@ class VeterinarianController {
       });
     } catch (error) {
       console.error('Get pending verifications error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch pending verifications',
-        error: error.message
-      });
+      res.status(500).json(buildServerErrorResponse('Failed to fetch pending verifications', error));
     }
   }
 
@@ -1218,11 +1505,7 @@ class VeterinarianController {
       });
     } catch (error) {
       console.error('Get all for admin error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch veterinarians',
-        error: error.message
-      });
+      res.status(500).json(buildServerErrorResponse('Failed to fetch veterinarians', error));
     }
   }
 
@@ -1295,11 +1578,7 @@ class VeterinarianController {
       });
     } catch (error) {
       console.error('Verify veterinarian error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Verification failed',
-        error: error.message
-      });
+      res.status(500).json(buildServerErrorResponse('Verification failed', error));
     }
   }
 
@@ -1344,11 +1623,7 @@ class VeterinarianController {
       });
     } catch (error) {
       console.error('Reject veterinarian error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Rejection failed',
-        error: error.message
-      });
+      res.status(500).json(buildServerErrorResponse('Rejection failed', error));
     }
   }
 
@@ -1382,11 +1657,7 @@ class VeterinarianController {
       });
     } catch (error) {
       console.error('Suspend veterinarian error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Suspension failed',
-        error: error.message
-      });
+      res.status(500).json(buildServerErrorResponse('Suspension failed', error));
     }
   }
 
@@ -1416,11 +1687,7 @@ class VeterinarianController {
       });
     } catch (error) {
       console.error('Get stats error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch stats',
-        error: error.message
-      });
+      res.status(500).json(buildServerErrorResponse('Failed to fetch stats', error));
     }
   }
 }

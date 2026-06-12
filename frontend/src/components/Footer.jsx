@@ -19,6 +19,7 @@ import {
 const Footer = () => {
   const { t } = useTranslation();
   const whatsappUrl = getWhatsAppSupportUrl();
+  const currentYear = new Date().getFullYear();
 
   const socialLinks = [
     {
@@ -124,7 +125,7 @@ const Footer = () => {
           </div>
         </div>
         <div className="border-t border-gray-700 mt-8 pt-8 text-center text-sm text-gray-400">
-          <p>{t('footer.copyright')}</p>
+          <p>{t('footer.copyright', { year: currentYear })}</p>
         </div>
       </div>
     </footer>

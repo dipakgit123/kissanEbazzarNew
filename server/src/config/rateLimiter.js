@@ -33,8 +33,34 @@ const uploadLimiter = rateLimit({
   },
 });
 
+// Rate limiter for public contact submissions that trigger email delivery
+const contactLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: parseInt(process.env.CONTACT_RATE_LIMIT_MAX_REQUESTS, 10) || 5,
+  message: {
+    success: false,
+    message: 'Too many contact form submissions, please try again later.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Rate limiter for public postal code lookups that can trigger geocoding providers
+const lookupLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: parseInt(process.env.LOOKUP_RATE_LIMIT_MAX_REQUESTS, 10) || 30,
+  message: {
+    success: false,
+    message: 'Too many lookup requests, please try again later.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 module.exports = {
   generalLimiter,
   authLimiter,
-  uploadLimiter
+  uploadLimiter,
+  contactLimiter,
+  lookupLimiter
 };
