@@ -17,11 +17,20 @@ import { useTranslation } from 'react-i18next';
 import { COLORS } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
+import OptionSelectField from '../OptionSelectField';
+import { getCowBreedOptions } from '../../constants/cowBreeds';
+import cowFrontGuide from '../../assets/cliparts/cow_front.png';
+import cowSideGuide from '../../assets/cliparts/cow_side.png';
+import cowTeatsGuide from '../../assets/cliparts/four_teats.png';
 
 const CowListingForm = ({ navigation, onSuccess }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
+  const cowBreedOptions = getCowBreedOptions(
+    i18n.resolvedLanguage || i18n.language,
+    t('common.selectOption') || 'Select breed'
+  );
 
   const [formData, setFormData] = useState({
     breedName: '',
@@ -32,11 +41,9 @@ const CowListingForm = ({ navigation, onSuccess }) => {
     healthCondition: 'good',
     expectedPrice: '',
     isNegotiable: 'true',
-    vaccinationDetails: '',
-    deliveryAvailable: false,
-    additionalNotes: '',
     frontPhoto: null,
     sidePhoto: null,
+    milkScenePhoto: null,
     video: null,
   });
 
@@ -93,7 +100,7 @@ const CowListingForm = ({ navigation, onSuccess }) => {
       Alert.alert(t('errors.error'), 'Expected price is required');
       return false;
     }
-    if (!formData.frontPhoto && !formData.sidePhoto) {
+    if (!formData.frontPhoto && !formData.sidePhoto && !formData.milkScenePhoto) {
       Alert.alert(t('errors.error'), 'Please upload at least one photo');
       return false;
     }
@@ -117,14 +124,6 @@ const CowListingForm = ({ navigation, onSuccess }) => {
       submitData.append('healthCondition', formData.healthCondition);
       submitData.append('expectedPrice', formData.expectedPrice);
       submitData.append('isNegotiable', formData.isNegotiable);
-      submitData.append('deliveryAvailable', formData.deliveryAvailable);
-      
-      if (formData.vaccinationDetails) {
-        submitData.append('vaccinationDetails', formData.vaccinationDetails);
-      }
-      if (formData.additionalNotes) {
-        submitData.append('additionalNotes', formData.additionalNotes);
-      }
 
       // Add photos
       if (formData.frontPhoto) {
@@ -139,6 +138,13 @@ const CowListingForm = ({ navigation, onSuccess }) => {
           uri: formData.sidePhoto.uri,
           type: 'image/jpeg',
           name: 'side.jpg',
+        });
+      }
+      if (formData.milkScenePhoto) {
+        submitData.append('milkScenePhoto', {
+          uri: formData.milkScenePhoto.uri,
+          type: 'image/jpeg',
+          name: 'milk_scene.jpg',
         });
       }
       if (formData.video) {
@@ -204,7 +210,11 @@ const CowListingForm = ({ navigation, onSuccess }) => {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      showsVerticalScrollIndicator={false}
+    >
       {/* Basic Information */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>
@@ -213,14 +223,13 @@ const CowListingForm = ({ navigation, onSuccess }) => {
         </Text>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>
-            {t('animal.breedName') || 'Breed Name'} <Text style={styles.required}>*</Text>
-          </Text>
-          <TextInput
-            style={styles.input}
-            placeholder={t('animal.breedNamePlaceholder') || 'e.g., Gir, Sahiwal, Holstein'}
+          <OptionSelectField
+            label={t('animal.breedName') || 'Breed Name'}
             value={formData.breedName}
-            onChangeText={(value) => handleChange('breedName', value)}
+            onChange={(value) => handleChange('breedName', value)}
+            options={cowBreedOptions}
+            placeholder={t('common.selectOption') || 'Select breed'}
+            required
           />
         </View>
 
@@ -242,7 +251,7 @@ const CowListingForm = ({ navigation, onSuccess }) => {
           </Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g., 15"
+            placeholder={t('common.example', { value: '15' }) || 'e.g., 15'}
             value={formData.milkCapacity}
             onChangeText={(value) => handleChange('milkCapacity', value)}
             keyboardType="numeric"
@@ -354,7 +363,7 @@ const CowListingForm = ({ navigation, onSuccess }) => {
               </>
             ) : (
               <View style={styles.photoPlaceholder}>
-                <Ionicons name="camera" size={32} color={COLORS.primary} />
+                <Image source={cowFrontGuide} style={styles.guideImage} resizeMode="contain" />
                 <Text style={styles.photoLabel}>{t('animal.frontPhoto') || 'Front Photo'}</Text>
               </View>
             )}
@@ -376,12 +385,34 @@ const CowListingForm = ({ navigation, onSuccess }) => {
               </>
             ) : (
               <View style={styles.photoPlaceholder}>
-                <Ionicons name="camera" size={32} color={COLORS.primary} />
+                <Image source={cowSideGuide} style={styles.guideImage} resizeMode="contain" />
                 <Text style={styles.photoLabel}>{t('animal.sidePhoto') || 'Side Photo'}</Text>
               </View>
             )}
           </TouchableOpacity>
         </View>
+
+        <TouchableOpacity
+          style={styles.photoUploadFull}
+          onPress={() => handlePickImage('milkScenePhoto')}
+        >
+          {formData.milkScenePhoto ? (
+            <>
+              <Image source={{ uri: formData.milkScenePhoto.uri }} style={styles.photoPreview} />
+              <TouchableOpacity
+                style={styles.removePhoto}
+                onPress={() => handleChange('milkScenePhoto', null)}
+              >
+                <Ionicons name="close-circle" size={24} color="#EF4444" />
+              </TouchableOpacity>
+            </>
+          ) : (
+            <View style={styles.photoPlaceholder}>
+              <Image source={cowTeatsGuide} style={styles.guideImage} resizeMode="contain" />
+              <Text style={styles.photoLabel}>{t('animal.milkScenePhoto') || 'Milking Scene Photo (Optional)'}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.videoUpload}
@@ -417,7 +448,7 @@ const CowListingForm = ({ navigation, onSuccess }) => {
           </Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g., 50000"
+            placeholder={t('animal.pricePlaceholder') || 'e.g., 50000'}
             value={formData.expectedPrice}
             onChangeText={(value) => handleChange('expectedPrice', value)}
             keyboardType="numeric"
@@ -445,44 +476,6 @@ const CowListingForm = ({ navigation, onSuccess }) => {
             </TouchableOpacity>
           </View>
         </View>
-
-        <View style={styles.checkboxGroup}>
-          <TouchableOpacity
-            style={styles.checkbox}
-            onPress={() => handleChange('deliveryAvailable', !formData.deliveryAvailable)}
-          >
-            <Ionicons
-              name={formData.deliveryAvailable ? 'checkbox' : 'square-outline'}
-              size={24}
-              color={formData.deliveryAvailable ? COLORS.primary : '#9CA3AF'}
-            />
-            <Text style={styles.checkboxLabel}>{t('animal.deliveryAvailable') || 'Delivery Available'}</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>{t('animal.vaccinationDetails') || 'Vaccination Details (Optional)'}</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder={t('animal.vaccinationPlaceholder') || 'List vaccinations...'}
-            value={formData.vaccinationDetails}
-            onChangeText={(value) => handleChange('vaccinationDetails', value)}
-            multiline
-            numberOfLines={3}
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>{t('animal.additionalNotes') || 'Additional Notes (Optional)'}</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder={t('animal.additionalNotesPlaceholder') || 'Any other details...'}
-            value={formData.additionalNotes}
-            onChangeText={(value) => handleChange('additionalNotes', value)}
-            multiline
-            numberOfLines={3}
-          />
-        </View>
       </View>
 
       {/* Submit Button */}
@@ -500,7 +493,6 @@ const CowListingForm = ({ navigation, onSuccess }) => {
         )}
       </TouchableOpacity>
 
-      <View style={{ height: 20 }} />
     </ScrollView>
   );
 };
@@ -509,6 +501,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
+  },
+  contentContainer: {
+    paddingBottom: 140,
   },
   section: {
     backgroundColor: '#FFF',
@@ -606,6 +601,15 @@ const styles = StyleSheet.create({
     borderColor: '#D1D5DB',
     overflow: 'hidden',
   },
+  photoUploadFull: {
+    height: 140,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: '#D1D5DB',
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
   photoPreview: {
     width: '100%',
     height: '100%',
@@ -622,6 +626,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 10,
+  },
+  guideImage: {
+    width: '100%',
+    height: 72,
+    marginBottom: 8,
   },
   photoLabel: {
     fontSize: 12,

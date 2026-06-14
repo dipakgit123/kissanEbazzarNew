@@ -17,11 +17,17 @@ import { useTranslation } from 'react-i18next';
 import { COLORS } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
+import OptionSelectField from '../OptionSelectField';
+import { getGoatBreedOptions } from '../../constants/goatBreeds';
 
 const GoatListingForm = ({ navigation, onSuccess }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
+  const goatBreedOptions = getGoatBreedOptions(
+    i18n.resolvedLanguage || i18n.language,
+    t('common.selectOption') || 'Select breed'
+  );
 
   const [formData, setFormData] = useState({
     goatType: 'male',
@@ -40,6 +46,9 @@ const GoatListingForm = ({ navigation, onSuccess }) => {
     isNegotiable: 'true',
     frontPhoto: null,
     sidePhoto: null,
+    photo3: null,
+    photo4: null,
+    photo5: null,
     video: null,
   });
 
@@ -108,7 +117,7 @@ const GoatListingForm = ({ navigation, onSuccess }) => {
       Alert.alert(t('errors.error'), 'Expected price is required');
       return false;
     }
-    if (!formData.frontPhoto && !formData.sidePhoto) {
+    if (!formData.frontPhoto && !formData.sidePhoto && !formData.photo3 && !formData.photo4 && !formData.photo5) {
       Alert.alert(t('errors.error'), 'Please upload at least one photo');
       return false;
     }
@@ -163,6 +172,27 @@ const GoatListingForm = ({ navigation, onSuccess }) => {
           name: 'photo2.jpg',
         });
       }
+      if (formData.photo3) {
+        submitData.append('photo3', {
+          uri: formData.photo3.uri,
+          type: 'image/jpeg',
+          name: 'photo3.jpg',
+        });
+      }
+      if (formData.photo4) {
+        submitData.append('photo4', {
+          uri: formData.photo4.uri,
+          type: 'image/jpeg',
+          name: 'photo4.jpg',
+        });
+      }
+      if (formData.photo5) {
+        submitData.append('photo5', {
+          uri: formData.photo5.uri,
+          type: 'image/jpeg',
+          name: 'photo5.jpg',
+        });
+      }
       if (formData.video) {
         submitData.append('video', {
           uri: formData.video.uri,
@@ -212,7 +242,11 @@ const GoatListingForm = ({ navigation, onSuccess }) => {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      showsVerticalScrollIndicator={false}
+    >
       {/* Basic Information */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>
@@ -246,14 +280,13 @@ const GoatListingForm = ({ navigation, onSuccess }) => {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>
-            {t('animal.breedName') || 'Breed Name'} <Text style={styles.required}>*</Text>
-          </Text>
-          <TextInput
-            style={styles.input}
-            placeholder={t('animal.breedNamePlaceholder') || 'e.g., Sirohi, Beetal, Jamunapari'}
+          <OptionSelectField
+            label={t('animal.breedName') || 'Breed Name'}
             value={formData.breedName}
-            onChangeText={(value) => handleChange('breedName', value)}
+            onChange={(value) => handleChange('breedName', value)}
+            options={goatBreedOptions}
+            placeholder={t('common.selectOption') || 'Select breed'}
+            required
           />
         </View>
 
@@ -275,7 +308,7 @@ const GoatListingForm = ({ navigation, onSuccess }) => {
           </Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g., 35"
+            placeholder={t('animal.weightPlaceholder') || 'e.g., 35'}
             value={formData.weight}
             onChangeText={(value) => handleChange('weight', value)}
             keyboardType="numeric"
@@ -286,7 +319,7 @@ const GoatListingForm = ({ navigation, onSuccess }) => {
           <Text style={styles.label}>{t('animal.color') || 'Color (Optional)'}</Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g., White, Black, Brown"
+            placeholder={t('animal.colorPlaceholder') || 'e.g., White, Black, Brown'}
             value={formData.color}
             onChangeText={(value) => handleChange('color', value)}
           />
@@ -381,7 +414,7 @@ const GoatListingForm = ({ navigation, onSuccess }) => {
               <Text style={styles.label}>{t('animal.milkCapacity') || 'Milk Capacity (liters/day)'}</Text>
               <TextInput
                 style={styles.input}
-                placeholder="e.g., 2"
+                placeholder={t('common.example', { value: '2' }) || 'e.g., 2'}
                 value={formData.milkCapacity}
                 onChangeText={(value) => handleChange('milkCapacity', value)}
                 keyboardType="numeric"
@@ -392,7 +425,7 @@ const GoatListingForm = ({ navigation, onSuccess }) => {
               <Text style={styles.label}>{t('animal.lastDeliveryDate') || 'Last Delivery Date (Optional)'}</Text>
               <TextInput
                 style={styles.input}
-                placeholder="e.g., Jan 2025"
+                placeholder={t('animal.lastDeliveryDatePlaceholder') || 'e.g., Jan 2025'}
                 value={formData.lastDeliveryDate}
                 onChangeText={(value) => handleChange('lastDeliveryDate', value)}
               />
@@ -402,7 +435,7 @@ const GoatListingForm = ({ navigation, onSuccess }) => {
               <Text style={styles.label}>{t('animal.numberOfKidsDelivered') || 'Number of Kids Delivered'}</Text>
               <TextInput
                 style={styles.input}
-                placeholder="e.g., 2"
+                placeholder={t('animal.countPlaceholder') || 'e.g., 2'}
                 value={formData.numberOfKidsDelivered}
                 onChangeText={(value) => handleChange('numberOfKidsDelivered', value)}
                 keyboardType="numeric"
@@ -475,6 +508,72 @@ const GoatListingForm = ({ navigation, onSuccess }) => {
               </View>
             )}
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.photoUpload}
+            onPress={() => handlePickImage('photo3')}
+          >
+            {formData.photo3 ? (
+              <>
+                <Image source={{ uri: formData.photo3.uri }} style={styles.photoPreview} />
+                <TouchableOpacity
+                  style={styles.removePhoto}
+                  onPress={() => handleChange('photo3', null)}
+                >
+                  <Ionicons name="close-circle" size={24} color="#EF4444" />
+                </TouchableOpacity>
+              </>
+            ) : (
+              <View style={styles.photoPlaceholder}>
+                <Ionicons name="camera" size={32} color={COLORS.primary} />
+                <Text style={styles.photoLabel}>{t('animal.additionalPhoto') || 'Additional Photo'}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.photoUpload}
+            onPress={() => handlePickImage('photo4')}
+          >
+            {formData.photo4 ? (
+              <>
+                <Image source={{ uri: formData.photo4.uri }} style={styles.photoPreview} />
+                <TouchableOpacity
+                  style={styles.removePhoto}
+                  onPress={() => handleChange('photo4', null)}
+                >
+                  <Ionicons name="close-circle" size={24} color="#EF4444" />
+                </TouchableOpacity>
+              </>
+            ) : (
+              <View style={styles.photoPlaceholder}>
+                <Ionicons name="camera" size={32} color={COLORS.primary} />
+                <Text style={styles.photoLabel}>{t('animal.additionalPhoto') || 'Additional Photo'}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.photoUpload}
+            onPress={() => handlePickImage('photo5')}
+          >
+            {formData.photo5 ? (
+              <>
+                <Image source={{ uri: formData.photo5.uri }} style={styles.photoPreview} />
+                <TouchableOpacity
+                  style={styles.removePhoto}
+                  onPress={() => handleChange('photo5', null)}
+                >
+                  <Ionicons name="close-circle" size={24} color="#EF4444" />
+                </TouchableOpacity>
+              </>
+            ) : (
+              <View style={styles.photoPlaceholder}>
+                <Ionicons name="camera" size={32} color={COLORS.primary} />
+                <Text style={styles.photoLabel}>{t('animal.additionalPhoto') || 'Additional Photo'}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity
@@ -511,7 +610,7 @@ const GoatListingForm = ({ navigation, onSuccess }) => {
           </Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g., 15000"
+            placeholder={t('animal.pricePlaceholder') || 'e.g., 15000'}
             value={formData.expectedPrice}
             onChangeText={(value) => handleChange('expectedPrice', value)}
             keyboardType="numeric"
@@ -556,7 +655,6 @@ const GoatListingForm = ({ navigation, onSuccess }) => {
         )}
       </TouchableOpacity>
 
-      <View style={{ height: 20 }} />
     </ScrollView>
   );
 };
@@ -565,6 +663,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
+  },
+  contentContainer: {
+    paddingBottom: 140,
   },
   section: {
     backgroundColor: '#FFF',

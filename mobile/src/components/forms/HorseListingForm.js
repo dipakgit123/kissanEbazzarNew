@@ -17,11 +17,17 @@ import { useTranslation } from 'react-i18next';
 import { COLORS } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
+import OptionSelectField from '../OptionSelectField';
+import { getHorseBreedOptions } from '../../constants/horseBreeds';
 
 const HorseListingForm = ({ navigation, onSuccess }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
+  const horseBreedOptions = getHorseBreedOptions(
+    i18n.resolvedLanguage || i18n.language,
+    t('common.selectOption') || 'Select breed'
+  );
 
   const [formData, setFormData] = useState({
     gender: 'male',
@@ -37,9 +43,9 @@ const HorseListingForm = ({ navigation, onSuccess }) => {
     description: '',
     expectedPrice: '',
     isNegotiable: 'true',
-    deliveryAvailable: false,
     frontPhoto: null,
     sidePhoto: null,
+    fullBodyPhoto: null,
     video: null,
   });
 
@@ -116,7 +122,7 @@ const HorseListingForm = ({ navigation, onSuccess }) => {
       Alert.alert(t('errors.error'), 'Expected price is required');
       return false;
     }
-    if (!formData.frontPhoto && !formData.sidePhoto) {
+    if (!formData.frontPhoto && !formData.sidePhoto && !formData.fullBodyPhoto) {
       Alert.alert(t('errors.error'), 'Please upload at least one photo');
       return false;
     }
@@ -142,7 +148,6 @@ const HorseListingForm = ({ navigation, onSuccess }) => {
       submitData.append('purpose', formData.purpose);
       submitData.append('expectedPrice', formData.expectedPrice);
       submitData.append('isNegotiable', formData.isNegotiable);
-      submitData.append('deliveryAvailable', formData.deliveryAvailable);
       
       if (formData.vaccinationDetails) {
         submitData.append('vaccinationDetails', formData.vaccinationDetails);
@@ -163,6 +168,13 @@ const HorseListingForm = ({ navigation, onSuccess }) => {
           uri: formData.sidePhoto.uri,
           type: 'image/jpeg',
           name: 'side.jpg',
+        });
+      }
+      if (formData.fullBodyPhoto) {
+        submitData.append('fullBodyPhoto', {
+          uri: formData.fullBodyPhoto.uri,
+          type: 'image/jpeg',
+          name: 'full-body.jpg',
         });
       }
       if (formData.video) {
@@ -214,7 +226,11 @@ const HorseListingForm = ({ navigation, onSuccess }) => {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      showsVerticalScrollIndicator={false}
+    >
       {/* Basic Information */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>
@@ -248,14 +264,13 @@ const HorseListingForm = ({ navigation, onSuccess }) => {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>
-            {t('animal.breedName') || 'Breed Name'} <Text style={styles.required}>*</Text>
-          </Text>
-          <TextInput
-            style={styles.input}
-            placeholder={t('animal.breedNamePlaceholder') || 'e.g., Arabian, Thoroughbred, Marwari'}
+          <OptionSelectField
+            label={t('animal.breedName') || 'Breed Name'}
             value={formData.breedName}
-            onChangeText={(value) => handleChange('breedName', value)}
+            onChange={(value) => handleChange('breedName', value)}
+            options={horseBreedOptions}
+            placeholder={t('common.selectOption') || 'Select breed'}
+            required
           />
         </View>
 
@@ -277,7 +292,7 @@ const HorseListingForm = ({ navigation, onSuccess }) => {
           </Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g., Bay, Black, Chestnut, White"
+            placeholder={t('animal.colorPlaceholder') || 'e.g., White, Black, Brown'}
             value={formData.color}
             onChangeText={(value) => handleChange('color', value)}
           />
@@ -289,7 +304,7 @@ const HorseListingForm = ({ navigation, onSuccess }) => {
           </Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g., 15 hands or 150 cm"
+            placeholder={t('animal.heightPlaceholder') || 'e.g., 15 hands or 150 cm'}
             value={formData.height}
             onChangeText={(value) => handleChange('height', value)}
           />
@@ -301,7 +316,7 @@ const HorseListingForm = ({ navigation, onSuccess }) => {
           </Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g., 450"
+            placeholder={t('animal.weightPlaceholder') || 'e.g., 450'}
             value={formData.weight}
             onChangeText={(value) => handleChange('weight', value)}
             keyboardType="numeric"
@@ -467,6 +482,28 @@ const HorseListingForm = ({ navigation, onSuccess }) => {
               </View>
             )}
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.photoUpload}
+            onPress={() => handlePickImage('fullBodyPhoto')}
+          >
+            {formData.fullBodyPhoto ? (
+              <>
+                <Image source={{ uri: formData.fullBodyPhoto.uri }} style={styles.photoPreview} />
+                <TouchableOpacity
+                  style={styles.removePhoto}
+                  onPress={() => handleChange('fullBodyPhoto', null)}
+                >
+                  <Ionicons name="close-circle" size={24} color="#EF4444" />
+                </TouchableOpacity>
+              </>
+            ) : (
+              <View style={styles.photoPlaceholder}>
+                <Ionicons name="camera" size={32} color={COLORS.primary} />
+                <Text style={styles.photoLabel}>{t('animal.fullBodyPhoto') || 'Full Body Photo'}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity
@@ -503,7 +540,7 @@ const HorseListingForm = ({ navigation, onSuccess }) => {
           </Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g., 100000"
+            placeholder={t('animal.pricePlaceholder') || 'e.g., 100000'}
             value={formData.expectedPrice}
             onChangeText={(value) => handleChange('expectedPrice', value)}
             keyboardType="numeric"
@@ -532,19 +569,6 @@ const HorseListingForm = ({ navigation, onSuccess }) => {
           </View>
         </View>
 
-        <View style={styles.checkboxGroup}>
-          <TouchableOpacity
-            style={styles.checkbox}
-            onPress={() => handleChange('deliveryAvailable', !formData.deliveryAvailable)}
-          >
-            <Ionicons
-              name={formData.deliveryAvailable ? 'checkbox' : 'square-outline'}
-              size={24}
-              color={formData.deliveryAvailable ? COLORS.primary : '#9CA3AF'}
-            />
-            <Text style={styles.checkboxLabel}>{t('animal.deliveryAvailable') || 'Delivery Available'}</Text>
-          </TouchableOpacity>
-        </View>
       </View>
 
       {/* Submit Button */}
@@ -562,7 +586,6 @@ const HorseListingForm = ({ navigation, onSuccess }) => {
         )}
       </TouchableOpacity>
 
-      <View style={{ height: 20 }} />
     </ScrollView>
   );
 };
@@ -571,6 +594,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
+  },
+  contentContainer: {
+    paddingBottom: 140,
   },
   section: {
     backgroundColor: '#FFF',

@@ -120,13 +120,13 @@ const VetLoginScreen = ({ navigation }) => {
             style={styles.languageButton}
             onPress={() => setLanguageModalVisible(true)}
           >
-            <Ionicons name="language" size={20} color="#fff" />
+            <Ionicons name="language" size={20} color={COLORS.white} />
             <Text style={styles.languageButtonText}>{t('profile.language')}</Text>
           </TouchableOpacity>
           
           <View style={styles.headerTextContainer}>
             <View style={styles.iconBadge}>
-              <Ionicons name="medical" size={32} color="#fff" />
+              <Ionicons name="medical" size={32} color={COLORS.white} />
             </View>
             <Text style={styles.appTitle}>{t('vetAuth.loginTitle')}</Text>
             <Text style={styles.appSubtitle}>{t('vetAuth.loginSubtitle')}</Text>
@@ -142,7 +142,7 @@ const VetLoginScreen = ({ navigation }) => {
             {/* Error Message */}
             {error ? (
               <View style={styles.errorContainer}>
-                <Ionicons name="alert-circle" size={20} color="#DC2626" />
+                <Ionicons name="alert-circle" size={20} color={COLORS.error} />
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             ) : null}
@@ -150,11 +150,11 @@ const VetLoginScreen = ({ navigation }) => {
             {/* Email Input */}
             <View style={styles.inputContainer}>
               <View style={styles.inputWrapper}>
-                <Ionicons name="mail-outline" size={20} color="#6B7280" style={styles.inputIcon} />
+                <Ionicons name="mail-outline" size={20} color={COLORS.textMuted} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder={t('vetAuth.emailPlaceholder') || 'Email Address'}
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={COLORS.borderStrong}
                   value={email}
                   onChangeText={(text) => {
                     setEmail(text);
@@ -171,11 +171,11 @@ const VetLoginScreen = ({ navigation }) => {
             {/* Password Input */}
             <View style={styles.inputContainer}>
               <View style={styles.inputWrapper}>
-                <Ionicons name="lock-closed-outline" size={20} color="#6B7280" style={styles.inputIcon} />
+                <Ionicons name="lock-closed-outline" size={20} color={COLORS.textMuted} style={styles.inputIcon} />
                 <TextInput
                   style={[styles.input, styles.passwordInput]}
                   placeholder={t('vetAuth.passwordPlaceholder') || 'Password'}
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={COLORS.borderStrong}
                   value={password}
                   onChangeText={(text) => {
                     setPassword(text);
@@ -192,7 +192,7 @@ const VetLoginScreen = ({ navigation }) => {
                   <Ionicons
                     name={showPassword ? 'eye-outline' : 'eye-off-outline'}
                     size={20}
-                    color="#6B7280"
+                    color={COLORS.textMuted}
                   />
                 </TouchableOpacity>
               </View>
@@ -205,11 +205,11 @@ const VetLoginScreen = ({ navigation }) => {
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={COLORS.white} />
               ) : (
                 <>
                   <Text style={styles.loginButtonText}>{t('vetAuth.loginButton')}</Text>
-                  <Ionicons name="arrow-forward" size={20} color="#fff" />
+                  <Ionicons name="arrow-forward" size={20} color={COLORS.white} />
                 </>
               )}
             </TouchableOpacity>
@@ -249,7 +249,7 @@ const VetLoginScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(59, 130, 246, 0.5)',
+    backgroundColor: 'rgba(29, 158, 117, 0.45)',
   },
   languageButton: {
     position: 'absolute',
@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
     right: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: 'rgba(15, 110, 86, 0.75)',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   languageButtonText: {
-    color: '#fff',
+    color: COLORS.white,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -308,19 +308,19 @@ const styles = StyleSheet.create({
   appTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#fff',
+    color: COLORS.white,
     textAlign: 'center',
     marginBottom: 8,
   },
   appSubtitle: {
     fontSize: 16,
-    color: '#fff',
+    color: COLORS.white,
     textAlign: 'center',
     opacity: 0.9,
   },
   formContainer: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: COLORS.background,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     marginTop: -30,
@@ -332,18 +332,18 @@ const styles = StyleSheet.create({
   welcomeText: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1F2937',
+    color: COLORS.text,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: '#6B7280',
+    color: COLORS.textMuted,
     marginBottom: 24,
   },
   errorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEE2E2',
+    backgroundColor: COLORS.errorSoft,
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     flex: 1,
-    color: '#DC2626',
+    color: COLORS.error,
     fontSize: 14,
   },
   inputContainer: {
@@ -360,10 +360,10 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: COLORS.border,
     paddingHorizontal: 16,
     height: 56,
   },
@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    color: '#1F2937',
+    color: COLORS.text,
   },
   passwordInput: {
     paddingRight: 40,
@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
   loginButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
+    color: COLORS.white,
   },
   registerContainer: {
     flexDirection: 'row',
@@ -410,7 +410,7 @@ const styles = StyleSheet.create({
   },
   registerText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: COLORS.textMuted,
   },
   registerLink: {
     fontSize: 14,

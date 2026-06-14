@@ -730,7 +730,7 @@ const ProfileScreen = ({ navigation }) => {
                         style={styles.addListingButton}
                         onPress={() => navigation.navigate('SellAnimal')}
                       >
-                        <Ionicons name="add-circle" size={20} color="#fff" />
+                        <Ionicons name="pricetag" size={20} color="#fff" />
                         <Text style={styles.addListingText}>{t('profile.addListing')}</Text>
                       </TouchableOpacity>
                     </View>
@@ -756,8 +756,8 @@ const ProfileScreen = ({ navigation }) => {
                 {renderMenuItem('location', t('profile.locationSetup'), t('profile.locationSetupDesc'), () => navigation.navigate('LocationSetup'))}
                 {renderMenuItem('notifications', t('profile.notifications'), t('profile.notificationsDesc'), () => navigation.navigate('NotificationSettings'))}
                 {renderMenuItem('language', t('profile.language'), 'English', () => {})}
-                {renderMenuItem('shield-checkmark', t('profile.privacyPolicy'), '', () => {})}
-                {renderMenuItem('document-text', t('profile.termsConditions'), '', () => {})}
+                {renderMenuItem('shield-checkmark', t('profile.privacyPolicy'), '', () => navigation.navigate('LegalDocument', { type: 'privacy' }))}
+                {renderMenuItem('document-text', t('profile.termsConditions'), '', () => navigation.navigate('LegalDocument', { type: 'terms' }))}
               </View>
             </View>
 

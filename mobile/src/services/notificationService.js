@@ -5,6 +5,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from './api';
 import logger from '../utils/logger';
+import { COLORS } from '../utils/constants';
 
 // Sleep utility for retry logic
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -38,6 +39,11 @@ try {
  */
 export const registerForPushNotifications = async () => {
   let token = null;
+
+  if (Platform.OS === 'android' && Constants.appOwnership === 'expo') {
+    logger.log('Skipping remote push registration in Expo Go on Android; use a development build for push notifications.');
+    return null;
+  }
 
   // Must be a physical device
   if (!Device.isDevice) {
@@ -84,7 +90,7 @@ export const registerForPushNotifications = async () => {
         name: 'default',
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#15BB73',
+        lightColor: COLORS.primary,
       });
 
       // Also create high-priority channel
@@ -92,7 +98,7 @@ export const registerForPushNotifications = async () => {
         name: 'High Priority',
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#15BB73',
+        lightColor: COLORS.primary,
       });
     } catch (error) {
       logger.error('Error setting up Android notification channels:', error);
@@ -112,7 +118,7 @@ export const registerTokenWithBackend = async (token, retries = 3) => {
         token,
         platform: Platform.OS,
       });
-      logger.log('✅ Token registered with backend');
+      logger.log('Token registered with backend');
 
       // Save token to AsyncStorage
       await AsyncStorage.setItem('pushToken', token);
@@ -293,7 +299,7 @@ export const scheduleLocalNotification = async (title, body, data = {}, trigger 
       },
       trigger: trigger || null, // null = immediate
     });
-    logger.log(`✅ Local notification scheduled: ${id}`);
+    logger.log(`Local notification scheduled: ${id}`);
     return id;
   } catch (error) {
     logger.error('Error scheduling local notification:', error);
@@ -325,6 +331,7 @@ export const setBadgeCount = async (count) => {
 export default {
   registerForPushNotifications,
   registerTokenWithBackend,
+  shouldReregisterToken,
   unregisterToken,
   getNotifications,
   getUnreadCount,

@@ -17,11 +17,17 @@ import { useTranslation } from 'react-i18next';
 import { COLORS } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
+import OptionSelectField from '../OptionSelectField';
+import { getCatBreedOptions } from '../../constants/catBreeds';
 
 const CatListingForm = ({ navigation, onSuccess }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
+  const catBreedOptions = getCatBreedOptions(
+    i18n.resolvedLanguage || i18n.language,
+    t('common.selectOption') || 'Select breed'
+  );
 
   const [formData, setFormData] = useState({
     catType: 'male',
@@ -39,6 +45,9 @@ const CatListingForm = ({ navigation, onSuccess }) => {
     isNegotiable: 'true',
     frontPhoto: null,
     sidePhoto: null,
+    photo3: null,
+    photo4: null,
+    photo5: null,
     video: null,
   });
 
@@ -112,7 +121,7 @@ const CatListingForm = ({ navigation, onSuccess }) => {
       Alert.alert(t('errors.error'), 'Expected price is required');
       return false;
     }
-    if (!formData.frontPhoto && !formData.sidePhoto) {
+    if (!formData.frontPhoto && !formData.sidePhoto && !formData.photo3 && !formData.photo4 && !formData.photo5) {
       Alert.alert(t('errors.error'), 'Please upload at least one photo');
       return false;
     }
@@ -160,6 +169,27 @@ const CatListingForm = ({ navigation, onSuccess }) => {
           uri: formData.sidePhoto.uri,
           type: 'image/jpeg',
           name: 'photo2.jpg',
+        });
+      }
+      if (formData.photo3) {
+        submitData.append('photo3', {
+          uri: formData.photo3.uri,
+          type: 'image/jpeg',
+          name: 'photo3.jpg',
+        });
+      }
+      if (formData.photo4) {
+        submitData.append('photo4', {
+          uri: formData.photo4.uri,
+          type: 'image/jpeg',
+          name: 'photo4.jpg',
+        });
+      }
+      if (formData.photo5) {
+        submitData.append('photo5', {
+          uri: formData.photo5.uri,
+          type: 'image/jpeg',
+          name: 'photo5.jpg',
         });
       }
       if (formData.video) {
@@ -211,7 +241,11 @@ const CatListingForm = ({ navigation, onSuccess }) => {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      showsVerticalScrollIndicator={false}
+    >
       {/* Basic Information */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>
@@ -245,14 +279,13 @@ const CatListingForm = ({ navigation, onSuccess }) => {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>
-            {t('animal.breedName') || 'Breed Name'} <Text style={styles.required}>*</Text>
-          </Text>
-          <TextInput
-            style={styles.input}
-            placeholder={t('animal.breedNamePlaceholder') || 'e.g., Persian, Siamese, Maine Coon'}
+          <OptionSelectField
+            label={t('animal.breedName') || 'Breed Name'}
             value={formData.breedName}
-            onChangeText={(value) => handleChange('breedName', value)}
+            onChange={(value) => handleChange('breedName', value)}
+            options={catBreedOptions}
+            placeholder={t('common.selectOption') || 'Select breed'}
+            required
           />
         </View>
 
@@ -274,7 +307,7 @@ const CatListingForm = ({ navigation, onSuccess }) => {
           </Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g., Orange, Gray, White, Black"
+            placeholder={t('animal.colorPlaceholder') || 'e.g., White, Black, Brown'}
             value={formData.color}
             onChangeText={(value) => handleChange('color', value)}
           />
@@ -284,7 +317,7 @@ const CatListingForm = ({ navigation, onSuccess }) => {
           <Text style={styles.label}>{t('animal.weight') || 'Weight (kg) (Optional)'}</Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g., 4"
+            placeholder={t('common.example', { value: '4' }) || 'e.g., 4'}
             value={formData.weight}
             onChangeText={(value) => handleChange('weight', value)}
             keyboardType="numeric"
@@ -295,7 +328,7 @@ const CatListingForm = ({ navigation, onSuccess }) => {
           <Text style={styles.label}>{t('animal.eyeColor') || 'Eye Color (Optional)'}</Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g., Blue, Green, Amber"
+            placeholder={t('animal.eyeColorPlaceholder') || 'e.g., Blue, Green, Amber'}
             value={formData.eyeColor}
             onChangeText={(value) => handleChange('eyeColor', value)}
           />
@@ -473,6 +506,72 @@ const CatListingForm = ({ navigation, onSuccess }) => {
               </View>
             )}
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.photoUpload}
+            onPress={() => handlePickImage('photo3')}
+          >
+            {formData.photo3 ? (
+              <>
+                <Image source={{ uri: formData.photo3.uri }} style={styles.photoPreview} />
+                <TouchableOpacity
+                  style={styles.removePhoto}
+                  onPress={() => handleChange('photo3', null)}
+                >
+                  <Ionicons name="close-circle" size={24} color="#EF4444" />
+                </TouchableOpacity>
+              </>
+            ) : (
+              <View style={styles.photoPlaceholder}>
+                <Ionicons name="camera" size={32} color={COLORS.primary} />
+                <Text style={styles.photoLabel}>{t('animal.additionalPhoto') || 'Additional Photo'}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.photoUpload}
+            onPress={() => handlePickImage('photo4')}
+          >
+            {formData.photo4 ? (
+              <>
+                <Image source={{ uri: formData.photo4.uri }} style={styles.photoPreview} />
+                <TouchableOpacity
+                  style={styles.removePhoto}
+                  onPress={() => handleChange('photo4', null)}
+                >
+                  <Ionicons name="close-circle" size={24} color="#EF4444" />
+                </TouchableOpacity>
+              </>
+            ) : (
+              <View style={styles.photoPlaceholder}>
+                <Ionicons name="camera" size={32} color={COLORS.primary} />
+                <Text style={styles.photoLabel}>{t('animal.additionalPhoto') || 'Additional Photo'}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.photoUpload}
+            onPress={() => handlePickImage('photo5')}
+          >
+            {formData.photo5 ? (
+              <>
+                <Image source={{ uri: formData.photo5.uri }} style={styles.photoPreview} />
+                <TouchableOpacity
+                  style={styles.removePhoto}
+                  onPress={() => handleChange('photo5', null)}
+                >
+                  <Ionicons name="close-circle" size={24} color="#EF4444" />
+                </TouchableOpacity>
+              </>
+            ) : (
+              <View style={styles.photoPlaceholder}>
+                <Ionicons name="camera" size={32} color={COLORS.primary} />
+                <Text style={styles.photoLabel}>{t('animal.additionalPhoto') || 'Additional Photo'}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity
@@ -509,7 +608,7 @@ const CatListingForm = ({ navigation, onSuccess }) => {
           </Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g., 5000"
+            placeholder={t('animal.pricePlaceholder') || 'e.g., 5000'}
             value={formData.expectedPrice}
             onChangeText={(value) => handleChange('expectedPrice', value)}
             keyboardType="numeric"
@@ -554,7 +653,6 @@ const CatListingForm = ({ navigation, onSuccess }) => {
         )}
       </TouchableOpacity>
 
-      <View style={{ height: 20 }} />
     </ScrollView>
   );
 };
@@ -563,6 +661,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
+  },
+  contentContainer: {
+    paddingBottom: 140,
   },
   section: {
     backgroundColor: '#FFF',

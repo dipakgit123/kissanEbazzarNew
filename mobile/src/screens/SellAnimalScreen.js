@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,14 +6,14 @@ import {
   StyleSheet,
   ScrollView,
   Image,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useFocusEffect } from '@react-navigation/native';
 import { COLORS } from '../utils/constants';
-import { useAuth } from '../context/AuthContext';
 
-// Import form components
 import CowListingForm from '../components/forms/CowListingForm';
 import BuffaloListingForm from '../components/forms/BuffaloListingForm';
 import GoatListingForm from '../components/forms/GoatListingForm';
@@ -24,78 +24,78 @@ import OtherAnimalListingForm from '../components/forms/OtherAnimalListingForm';
 
 const SellAnimalScreen = ({ navigation }) => {
   const { t } = useTranslation();
-  const { user } = useAuth();
   const [selectedAnimal, setSelectedAnimal] = useState(null);
 
-  const animalTypes = [
-    { 
-      id: 'cow', 
-      name: t('animalTypes.cow') || 'Cow', 
-      emoji: '🐄', 
-      image: require('../assets/cow1.png'), 
-      color: '#F59E0B', 
-      bgColor: '#FEF3C7'
-    },
-    { 
-      id: 'buffalo', 
-      name: t('animalTypes.buffalo') || 'Buffalo', 
-      emoji: '🐃', 
-      image: require('../assets/buffalo1.png'), 
-      color: '#6B7280', 
-      bgColor: '#F3F4F6'
-    },
-    { 
-      id: 'goat', 
-      name: t('animalTypes.goat') || 'Goat', 
-      emoji: '🐐', 
-      image: require('../assets/goat1.png'), 
-      color: '#10B981', 
-      bgColor: '#D1FAE5'
-    },
-    { 
-      id: 'horse', 
-      name: t('animalTypes.horse') || 'Horse', 
-      emoji: '🐴', 
-      image: require('../assets/horse1.png'), 
-      color: '#8B5CF6', 
-      bgColor: '#EDE9FE'
-    },
-    { 
-      id: 'dog', 
-      name: t('animalTypes.dog') || 'Dog', 
-      emoji: '🐕', 
-      image: require('../assets/dog1.png'), 
-      color: '#F97316', 
-      bgColor: '#FED7AA'
-    },
-    { 
-      id: 'cat', 
-      name: t('animalTypes.cat') || 'Cat', 
-      emoji: '🐱', 
-      image: require('../assets/cat1.png'), 
-      color: '#EC4899', 
-      bgColor: '#FCE7F3'
-    },
-    { 
-      id: 'other', 
-      name: t('animalTypes.other') || 'Other', 
-      emoji: '🐾', 
-      image: null, 
-      color: '#3B82F6', 
-      bgColor: '#DBEAFE'
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (event) => {
+      if (!selectedAnimal) {
+        return;
+      }
+
+      event.preventDefault();
+      setSelectedAnimal(null);
+    });
+
+    return unsubscribe;
+  }, [navigation, selectedAnimal]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        if (!selectedAnimal) {
+          return false;
+        }
+
+        setSelectedAnimal(null);
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        'hardwareBackPress',
+        onBackPress
+      );
+
+      return () => subscription.remove();
+    }, [selectedAnimal])
+  );
+
+  useEffect(() => {
+    const parentNavigation = navigation.getParent();
+    if (!parentNavigation) {
+      return undefined;
     }
+
+    const unsubscribeTabPress = parentNavigation.addListener('tabPress', (event) => {
+      if (!selectedAnimal) {
+        return;
+      }
+
+      event.preventDefault();
+      setSelectedAnimal(null);
+    });
+
+    return unsubscribeTabPress;
+  }, [navigation, selectedAnimal]);
+
+  const animalTypes = [
+    { id: 'cow', name: t('animalTypes.cow') || 'Cow', image: require('../assets/cow1.png'), color: COLORS.primary, bgColor: '#EEFDF6' },
+    { id: 'buffalo', name: t('animalTypes.buffalo') || 'Buffalo', image: require('../assets/buffalo1.png'), color: '#5F5E5A', bgColor: '#FBF1EE' },
+    { id: 'goat', name: t('animalTypes.goat') || 'Goat', image: require('../assets/goat1.png'), color: '#D85A30', bgColor: '#FFF3EA' },
+    { id: 'horse', name: t('animalTypes.horse') || 'Horse', image: require('../assets/horse1.png'), color: '#8B5F1A', bgColor: '#FFF6D9' },
+    { id: 'dog', name: t('animalTypes.dog') || 'Dog', image: require('../assets/dog1.png'), color: '#D85A30', bgColor: '#EEF7EE' },
+    { id: 'cat', name: t('animalTypes.cat') || 'Cat', image: require('../assets/cat1.png'), color: '#993C1D', bgColor: '#FFF0EF' },
+    { id: 'other', name: t('animalTypes.other') || 'Other', icon: 'add', color: '#5F5E5A', bgColor: '#F5F4EF' },
   ];
 
-  // Render form based on selected animal
-  const renderAnimalForm = () => {
-    const formProps = {
-      navigation,
-      onSuccess: () => {
-        setSelectedAnimal(null);
-        navigation.navigate('Home');
-      }
-    };
+  const formProps = {
+    navigation,
+    onSuccess: () => {
+      setSelectedAnimal(null);
+      navigation.navigate('BuyAnimals');
+    }
+  };
 
+  const renderAnimalForm = () => {
     switch (selectedAnimal?.id) {
       case 'cow':
         return <CowListingForm {...formProps} />;
@@ -116,46 +116,48 @@ const SellAnimalScreen = ({ navigation }) => {
     }
   };
 
-  // Animal Selection Screen
   const renderAnimalSelection = () => (
     <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-      {/* Section Title */}
-      <Text style={styles.sectionTitle}>
-        {t('listing.selectAnimalType') || 'Select Animal Type'}
-      </Text>
-      
-      {/* Animal Cards Grid */}
-      <View style={styles.animalGrid}>
-        {animalTypes.map((animal) => (
-          <TouchableOpacity
-            key={animal.id}
-            style={[styles.animalCard, { backgroundColor: animal.bgColor }]}
-            onPress={() => setSelectedAnimal(animal)}
-            activeOpacity={0.7}
-          >
-            {/* Animal Image/Icon */}
-            {animal.image ? (
-              <Image source={animal.image} style={styles.animalImage} />
-            ) : (
-              <View style={[styles.animalIconContainer, { backgroundColor: animal.color }]}>
-                <Text style={styles.animalEmoji}>{animal.emoji}</Text>
-              </View>
-            )}
-            
-            {/* Animal Name */}
-            <Text style={[styles.animalName, { color: animal.color }]}>
-              {animal.name}
+      <View style={styles.selectorCard}>
+        <View style={styles.selectorHeader}>
+          <View style={styles.selectorIcon}>
+            <Ionicons name="grid-outline" size={18} color={COLORS.primary} />
+          </View>
+          <View style={styles.selectorTextWrap}>
+            <Text style={styles.selectorTitle}>
+              {t('listing.selectAnimalType') || 'Select Animal Type'}
             </Text>
-            
-            {/* Select Button */}
-            <View style={[styles.selectButton, { backgroundColor: animal.color }]}>
-              <Ionicons name="arrow-forward" size={16} color="#fff" />
-            </View>
-          </TouchableOpacity>
-        ))}
+            <Text style={styles.selectorSubtitle}>
+              {t('sellAnimal.chooseAnimalPrompt') || 'Which animal do you want to sell?'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.selectorDivider} />
+
+        <View style={styles.animalGrid}>
+          {animalTypes.map((animal) => (
+            <TouchableOpacity
+              key={animal.id}
+              style={styles.animalCategoryItem}
+              onPress={() => setSelectedAnimal(animal)}
+              activeOpacity={0.85}
+            >
+              <View style={[styles.animalThumbWrap, { backgroundColor: animal.bgColor, borderColor: animal.color }]}>
+                <View style={styles.animalThumbInner}>
+                  {animal.image ? (
+                    <Image source={animal.image} style={styles.animalImage} resizeMode="cover" />
+                  ) : (
+                    <Ionicons name={animal.icon} size={28} color={animal.color} />
+                  )}
+                </View>
+              </View>
+              <Text style={styles.animalName}>{animal.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
-      {/* Info Banner */}
       <View style={styles.infoBanner}>
         <Ionicons name="shield-checkmark" size={20} color={COLORS.primary} />
         <Text style={styles.infoBannerText}>
@@ -167,26 +169,24 @@ const SellAnimalScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
       <View style={[styles.header, { backgroundColor: COLORS.primary }]}>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => {
             if (selectedAnimal) {
               setSelectedAnimal(null);
             } else {
               navigation.goBack();
             }
-          }} 
+          }}
           style={styles.backButton}
         >
           <Ionicons name="arrow-back" size={24} color="#FFF" />
         </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>
-            {selectedAnimal 
+            {selectedAnimal
               ? `${t('listing.createListing') || 'Create Listing'} - ${selectedAnimal.name}`
-              : t('sellAnimal.title') || 'Sell Animal'
-            }
+              : t('sellAnimal.title') || 'Sell Animal'}
           </Text>
           {!selectedAnimal && (
             <Text style={styles.headerSubtitle}>
@@ -196,19 +196,17 @@ const SellAnimalScreen = ({ navigation }) => {
         </View>
       </View>
 
-      {/* Content - Show Selection or Form */}
       {selectedAnimal ? (
         <>
-          {/* Selected Animal Badge */}
           <View style={[styles.animalBadge, { backgroundColor: selectedAnimal.bgColor }]}>
             <View style={styles.animalBadgeContent}>
-              {selectedAnimal.image ? (
-                <Image source={selectedAnimal.image} style={styles.badgeImage} />
-              ) : (
-                <View style={[styles.badgeIconContainer, { backgroundColor: selectedAnimal.color }]}>
-                  <Text style={styles.badgeEmoji}>{selectedAnimal.emoji}</Text>
-                </View>
-              )}
+              <View style={[styles.badgeThumb, { borderColor: selectedAnimal.color }]}>
+                {selectedAnimal.image ? (
+                  <Image source={selectedAnimal.image} style={styles.badgeImage} resizeMode="cover" />
+                ) : (
+                  <Ionicons name={selectedAnimal.icon} size={24} color={selectedAnimal.color} />
+                )}
+              </View>
               <View style={styles.badgeTextContainer}>
                 <Text style={styles.badgeLabel}>
                   {t('listing.selectedAnimal') || 'Selected Animal'}
@@ -217,7 +215,7 @@ const SellAnimalScreen = ({ navigation }) => {
                   {selectedAnimal.name}
                 </Text>
               </View>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.changeBadge, { borderColor: selectedAnimal.color }]}
                 onPress={() => setSelectedAnimal(null)}
               >
@@ -227,8 +225,7 @@ const SellAnimalScreen = ({ navigation }) => {
               </TouchableOpacity>
             </View>
           </View>
-          
-          {/* Render Animal-Specific Form */}
+
           {renderAnimalForm()}
         </>
       ) : (
@@ -274,93 +271,91 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  instructionsCard: {
-    flexDirection: 'row',
-    backgroundColor: '#EFF6FF',
-    padding: 16,
-    margin: 16,
-    borderRadius: 12,
-    alignItems: 'flex-start',
-  },
-  instructionsText: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  instructionsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.primary,
-    marginBottom: 4,
-  },
-  instructionsSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    lineHeight: 20,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111827',
+  selectorCard: {
+    backgroundColor: COLORS.surface,
     marginHorizontal: 16,
     marginTop: 16,
-    marginBottom: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  selectorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  selectorIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primarySoft,
+    marginRight: 12,
+  },
+  selectorTextWrap: {
+    flex: 1,
+  },
+  selectorTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  selectorSubtitle: {
+    marginTop: 2,
+    fontSize: 13,
+    color: COLORS.textMuted,
+  },
+  selectorDivider: {
+    height: 1,
+    backgroundColor: COLORS.border,
   },
   animalGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 16,
-    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    justifyContent: 'space-between',
   },
-  animalCard: {
-    width: '48%',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 12,
+  animalCategoryItem: {
+    width: '25%',
     alignItems: 'center',
-    position: 'relative',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    minHeight: 120,
+    marginBottom: 14,
+  },
+  animalThumbWrap: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  animalThumbInner: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
   animalImage: {
-    width: 55,
-    height: 55,
-    marginBottom: 10,
-    resizeMode: 'contain',
-  },
-  animalIconContainer: {
-    width: 55,
-    height: 55,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 28,
-    marginBottom: 10,
-  },
-  animalEmoji: {
-    fontSize: 30,
+    width: '100%',
+    height: '100%',
   },
   animalName: {
-    fontSize: 15,
+    fontSize: 12,
     fontWeight: '700',
-    marginBottom: 24,
-  },
-  selectButton: {
-    position: 'absolute',
-    bottom: 12,
-    right: 12,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 4,
+    color: COLORS.text,
+    textAlign: 'center',
   },
   infoBanner: {
     flexDirection: 'row',
@@ -381,11 +376,11 @@ const styles = StyleSheet.create({
   },
   animalBadge: {
     margin: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 2,
     elevation: 2,
   },
@@ -393,20 +388,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  badgeImage: {
-    width: 50,
-    height: 50,
-    resizeMode: 'contain',
-  },
-  badgeIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
+  badgeThumb: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#FFFFFFCC',
+    borderWidth: 2,
     alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
-  badgeEmoji: {
-    fontSize: 28,
+  badgeImage: {
+    width: '100%',
+    height: '100%',
   },
   badgeTextContainer: {
     flex: 1,
@@ -424,12 +418,13 @@ const styles = StyleSheet.create({
   changeBadge: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 2,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    backgroundColor: '#FFFFFFAA',
   },
   changeText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });
 

@@ -5,8 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
   Alert,
   Image,
@@ -17,20 +15,33 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
 import { otpService } from '../services/api';
-import LanguageSwitcher from '../components/LanguageSwitcher';
 
 const { width, height } = Dimensions.get('window');
+const LANGUAGE_OPTIONS = [
+  { code: 'en', label: 'English' },
+  { code: 'mr', label: 'मराठी' },
+  { code: 'hi', label: 'हिंदी' },
+];
 
 const LoginScreen = ({ navigation }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [languageModalVisible, setLanguageModalVisible] = useState(false);
 
   const validatePhone = (phone) => {
     const phoneRegex = /^[6-9]\d{9}$/;
     return phoneRegex.test(phone);
+  };
+
+  const selectedLanguage = i18n.resolvedLanguage || i18n.language || 'en';
+
+  const handleLanguageChange = async (languageCode) => {
+    if (selectedLanguage === languageCode) {
+      return;
+    }
+
+    await i18n.changeLanguage(languageCode);
   };
 
   const handleSendOTP = async () => {
@@ -82,16 +93,7 @@ const LoginScreen = ({ navigation }) => {
             resizeMode="cover"
           />
           <View style={styles.imageOverlay} />
-          
-          {/* Language Switcher Button */}
-          <TouchableOpacity 
-            style={styles.languageButton}
-            onPress={() => setLanguageModalVisible(true)}
-          >
-            <Ionicons name="language" size={20} color="#fff" />
-            <Text style={styles.languageButtonText}>{t('profile.language')}</Text>
-          </TouchableOpacity>
-          
+
           <View style={styles.headerTextContainer}>
             <Text style={styles.appTitle}>{t('common.appName')}</Text>
             <Text style={styles.appSubtitle}>{t('home.heroSubtitle')}</Text>
@@ -117,7 +119,7 @@ const LoginScreen = ({ navigation }) => {
                 <TextInput
                   style={styles.input}
                   placeholder={t('auth.phoneNumberPlaceholder')}
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={COLORS.borderStrong}
                   value={phoneNumber}
                   onChangeText={(text) => {
                     setPhoneNumber(text.replace(/[^0-9]/g, ''));
@@ -127,14 +129,14 @@ const LoginScreen = ({ navigation }) => {
                   maxLength={10}
                 />
                 {phoneNumber.length === 10 && validatePhone(phoneNumber) && (
-                  <Ionicons name="checkmark-circle" size={22} color="#10B981" style={styles.validIcon} />
+                  <Ionicons name="checkmark-circle" size={22} color={COLORS.success} style={styles.validIcon} />
                 )}
               </View>
             </View>
 
             {error ? (
               <View style={styles.errorContainer}>
-                <Ionicons name="alert-circle" size={18} color="#EF4444" />
+                <Ionicons name="alert-circle" size={18} color={COLORS.error} />
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             ) : null}
@@ -146,11 +148,11 @@ const LoginScreen = ({ navigation }) => {
               activeOpacity={0.8}
             >
               {loading ? (
-                <ActivityIndicator color="#fff" size="small" />
+                <ActivityIndicator color={COLORS.white} size="small" />
               ) : (
                 <View style={styles.buttonContent}>
                   <Text style={styles.buttonText}>{t('auth.sendOTP')}</Text>
-                  <Ionicons name="arrow-forward-circle" size={24} color="#fff" />
+                  <Ionicons name="arrow-forward-circle" size={24} color={COLORS.white} />
                 </View>
               )}
             </TouchableOpacity>
@@ -168,37 +170,69 @@ const LoginScreen = ({ navigation }) => {
               activeOpacity={0.9}
             >
               <View style={styles.vetLoginIconContainer}>
-                <Ionicons name="medical" size={24} color="#fff" />
+                <Ionicons name="medkit" size={24} color={COLORS.white} />
               </View>
               <View style={styles.vetLoginTextContainer}>
                 <Text style={styles.vetLoginText}>{t('auth.loginAsVet')}</Text>
                 <Text style={styles.vetLoginSubtext}>{t('vetAuth.loginSubtitle')}</Text>
               </View>
               <Ionicons name="chevron-forward" size={24} color={COLORS.primary} />
-            </TouchableOpacity><TouchableOpacity
-              style={styles.vetRegisterButton}
-              onPress={() => navigation.navigate('VetRegistration')}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="person-add" size={18} color={COLORS.primary} />
-              <Text style={styles.vetRegisterText}>
-                {t('auth.vetRegister')}
-              </Text>
             </TouchableOpacity>
 
+            <View style={styles.languageSection}>
+              <View style={styles.languageDivider}>
+                <View style={styles.languageDividerLine} />
+                <Text style={styles.languageSectionLabel}>{t('profile.language')} / भाषा</Text>
+                <View style={styles.languageDividerLine} />
+              </View>
+
+              <View style={styles.languagePillRow}>
+                {LANGUAGE_OPTIONS.map((language) => {
+                  const isActive = selectedLanguage === language.code;
+
+                  return (
+                    <TouchableOpacity
+                      key={language.code}
+                      style={[
+                        styles.languagePill,
+                        isActive && styles.languagePillActive,
+                      ]}
+                      onPress={() => handleLanguageChange(language.code)}
+                      activeOpacity={0.85}
+                    >
+                      <Text
+                        style={[
+                          styles.languagePillText,
+                          isActive && styles.languagePillTextActive,
+                        ]}
+                      >
+                        {language.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
             <Text style={styles.termsText}>
-              {t('auth.termsAgree')}{'\n'}
-              <Text style={styles.linkText}>{t('auth.termsOfService')}</Text> {t('auth.and')}{' '}
-              <Text style={styles.linkText}>{t('auth.privacyPolicy')}</Text>
+              {t('auth.termsAgree')}{' '}
+              <Text
+                style={styles.linkText}
+                onPress={() => navigation.navigate('LegalDocument', { type: 'terms' })}
+              >
+                {t('auth.termsOfService')}
+              </Text>
+              {' '}{t('auth.and')}{' '}
+              <Text
+                style={styles.linkText}
+                onPress={() => navigation.navigate('LegalDocument', { type: 'privacy' })}
+              >
+                {t('auth.privacyPolicy')}
+              </Text>
             </Text>
           </View>
         </View>
       </ScrollView>
-      
-      <LanguageSwitcher 
-        visible={languageModalVisible} 
-        onClose={() => setLanguageModalVisible(false)} 
-      />
     </View>
   );
 };
@@ -206,7 +240,7 @@ const LoginScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.background,
   },
   scrollContainer: {
     flexGrow: 1,
@@ -226,25 +260,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-  },
-  languageButton: {
-    position: 'absolute',
-    top: 40,
-    right: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 6,
-    zIndex: 10,
-  },
-  languageButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
+    backgroundColor: 'rgba(15, 110, 86, 0.35)',
   },
   headerTextContainer: {
     position: 'absolute',
@@ -255,7 +271,7 @@ const styles = StyleSheet.create({
   appTitle: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#fff',
+    color: COLORS.white,
     marginBottom: 8,
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 2 },
@@ -263,14 +279,14 @@ const styles = StyleSheet.create({
   },
   appSubtitle: {
     fontSize: 16,
-    color: '#fff',
+    color: COLORS.white,
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
   contentContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.surface,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     marginTop: -30,
@@ -284,12 +300,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#1F2937',
+    color: COLORS.text,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#6B7280',
+    color: COLORS.textMuted,
   },
   form: {
     width: '100%',
@@ -300,33 +316,33 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
+    color: COLORS.text,
     marginBottom: 8,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: COLORS.border,
     paddingRight: 12,
   },
   countryCodeContainer: {
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderRightWidth: 1,
-    borderRightColor: '#E5E7EB',
+    borderRightColor: COLORS.border,
   },
   countryCode: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
+    color: COLORS.text,
   },
   input: {
     flex: 1,
     fontSize: 16,
-    color: '#1F2937',
+    color: COLORS.text,
     paddingHorizontal: 12,
     paddingVertical: 16,
   },
@@ -336,13 +352,13 @@ const styles = StyleSheet.create({
   errorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEE2E2',
+    backgroundColor: COLORS.errorSoft,
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
   },
   errorText: {
-    color: '#EF4444',
+    color: COLORS.error,
     fontSize: 14,
     marginLeft: 8,
     flex: 1,
@@ -361,7 +377,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   buttonDisabled: {
-    backgroundColor: '#D1D5DB',
+    backgroundColor: COLORS.borderStrong,
     shadowOpacity: 0,
     elevation: 0,
   },
@@ -371,7 +387,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonText: {
-    color: '#fff',
+    color: COLORS.white,
     fontSize: 18,
     fontWeight: '600',
     marginRight: 8,
@@ -384,10 +400,10 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: COLORS.border,
   },
   dividerText: {
-    color: '#9CA3AF',
+    color: COLORS.borderStrong,
     fontSize: 14,
     marginHorizontal: 16,
     fontWeight: '500',
@@ -395,7 +411,7 @@ const styles = StyleSheet.create({
   vetLoginCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 24,
@@ -422,49 +438,71 @@ const styles = StyleSheet.create({
   vetLoginText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
+    color: COLORS.text,
     marginBottom: 2,
   },
   vetLoginSubtext: {
     fontSize: 13,
-    color: '#6B7280',
+    color: COLORS.textMuted,
   },
-  footerLinks: {
+  languageSection: {
+    marginBottom: 18,
+  },
+  languageDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  languageDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: COLORS.border,
+  },
+  languageSectionLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: COLORS.borderStrong,
+    marginHorizontal: 12,
+  },
+  languagePillRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
+    gap: 10,
+    flexWrap: 'wrap',
   },
-  footerText: {
-    fontSize: 14,
-    color: '#6B7280',
+  languagePill: {
+    minWidth: 82,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+    alignItems: 'center',
+  },
+  languagePillActive: {
+    backgroundColor: COLORS.primarySoft,
+    borderColor: COLORS.secondary,
+  },
+  languagePillText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.textMuted,
+  },
+  languagePillTextActive: {
+    color: COLORS.primaryDark,
   },
   linkText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: COLORS.primary,
-  },
-  vetRegisterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.primary + '10',
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginBottom: 20,
-  },
-  vetRegisterText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.primary,
-    marginLeft: 8,
   },
   termsText: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: COLORS.borderStrong,
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 20,
+    paddingHorizontal: 8,
   },
 });
 

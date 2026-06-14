@@ -37,6 +37,7 @@ const ProfilePage = ({ onBack }) => {
   const [dogListings, setDogListings] = useState([]);
   const [goatListings, setGoatListings] = useState([]);
   const [horseListings, setHorseListings] = useState([]);
+  const [otherListings, setOtherListings] = useState([]);
   const [profileLoading, setProfileLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [showMyAnimals, setShowMyAnimals] = useState(false);
@@ -90,7 +91,8 @@ const ProfilePage = ({ onBack }) => {
 
   const getTotalListings = () => {
     return animalListings.length + buffaloListings.length + catListings.length +
-           dogListings.length + goatListings.length + horseListings.length;
+           dogListings.length + goatListings.length + horseListings.length +
+           otherListings.length;
   };
 
   const handleMessageUs = () => {
@@ -148,6 +150,7 @@ const ProfilePage = ({ onBack }) => {
         const dogs = listings.filter(l => l.animal_type === 'dog' || l.type === 'dog');
         const goats = listings.filter(l => l.animal_type === 'goat' || l.type === 'goat');
         const horses = listings.filter(l => l.animal_type === 'horse' || l.type === 'horse');
+        const others = listings.filter(l => l.animal_type === 'other' || l.type === 'other');
         
         setAnimalListings(cows);
         setBuffaloListings(buffalos);
@@ -155,6 +158,7 @@ const ProfilePage = ({ onBack }) => {
         setDogListings(dogs);
         setGoatListings(goats);
         setHorseListings(horses);
+        setOtherListings(others);
       }
     } catch (error) {
       console.error('Error fetching listings:', error);
@@ -165,6 +169,7 @@ const ProfilePage = ({ onBack }) => {
       setDogListings([]);
       setGoatListings([]);
       setHorseListings([]);
+      setOtherListings([]);
     } finally {
       setLoading(false);
     }
@@ -740,7 +745,7 @@ const ProfilePage = ({ onBack }) => {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {[...animalListings, ...buffaloListings, ...catListings, ...dogListings, ...goatListings, ...horseListings].map((animal) => (
+                  {[...animalListings, ...buffaloListings, ...catListings, ...dogListings, ...goatListings, ...horseListings, ...otherListings].map((animal) => (
                     <div key={`${animal.animal_type || animal.type || 'cow'}-${animal.id}`} className="bg-gray-50 rounded-lg border border-gray-200 p-4 hover:shadow-md transition-all">
                       <div className="flex gap-4">
                         {(animal.photo1 || animal.front_photo) && <img src={(animal.photo1 || animal.front_photo)} alt={animal.breed || animal.breed_name} className="w-20 h-20 rounded-lg object-cover" />}

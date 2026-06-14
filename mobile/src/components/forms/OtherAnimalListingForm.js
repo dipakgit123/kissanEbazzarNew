@@ -18,9 +18,11 @@ import { useTranslation } from 'react-i18next';
 import { COLORS } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
+import OptionSelectField from '../OptionSelectField';
+import { getOtherAnimalBreedOptions } from '../../constants/otherAnimalBreeds';
 
 const OtherAnimalListingForm = ({ navigation, onSuccess }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showAnimalTypePicker, setShowAnimalTypePicker] = useState(false);
@@ -36,11 +38,8 @@ const OtherAnimalListingForm = ({ navigation, onSuccess }) => {
     temperament: 'friendly',
     isTrainedForWork: false,
     specialSkills: '',
-    vaccinationDetails: '',
     expectedPrice: '',
     isNegotiable: true,
-    deliveryAvailable: false,
-    additionalNotes: '',
     frontPhoto: null,
     sidePhoto: null,
     additionalPhoto: null,
@@ -48,17 +47,17 @@ const OtherAnimalListingForm = ({ navigation, onSuccess }) => {
   });
 
   const animalTypeOptions = [
-    { value: 'sheep', label: t('animal.sheep') || 'Sheep' },
-    { value: 'pig', label: t('animal.pig') || 'Pig' },
-    { value: 'rabbit', label: t('animal.rabbit') || 'Rabbit' },
-    { value: 'chicken', label: t('animal.chicken') || 'Chicken' },
-    { value: 'duck', label: t('animal.duck') || 'Duck' },
-    { value: 'turkey', label: t('animal.turkey') || 'Turkey' },
-    { value: 'camel', label: t('animal.camel') || 'Camel' },
-    { value: 'donkey', label: t('animal.donkey') || 'Donkey' },
-    { value: 'mule', label: t('animal.mule') || 'Mule' },
-    { value: 'exotic', label: t('animal.exotic') || 'Exotic' },
-    { value: 'other', label: t('animal.other') || 'Other' },
+    { value: 'sheep', label: t('animalTypes.sheep') || 'Sheep' },
+    { value: 'pig', label: t('animalTypes.pig') || 'Pig' },
+    { value: 'rabbit', label: t('animalTypes.rabbit') || 'Rabbit' },
+    { value: 'chicken', label: t('animalTypes.chicken') || 'Chicken' },
+    { value: 'duck', label: t('animalTypes.duck') || 'Duck' },
+    { value: 'turkey', label: t('animalTypes.turkey') || 'Turkey' },
+    { value: 'camel', label: t('animalTypes.camel') || 'Camel' },
+    { value: 'donkey', label: t('animalTypes.donkey') || 'Donkey' },
+    { value: 'mule', label: t('animalTypes.mule') || 'Mule' },
+    { value: 'exotic', label: t('animalTypes.exotic') || 'Exotic' },
+    { value: 'other', label: t('animalTypes.other') || 'Other' },
   ];
 
   const genderOptions = [
@@ -79,6 +78,11 @@ const OtherAnimalListingForm = ({ navigation, onSuccess }) => {
     { value: 'protective', label: t('animal.protective') || 'Protective' },
     { value: 'independent', label: t('animal.independent') || 'Independent' },
   ];
+  const otherBreedOptions = getOtherAnimalBreedOptions(
+    formData.animalType,
+    i18n.resolvedLanguage || i18n.language,
+    t('common.selectOption') || 'Select breed'
+  );
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -121,7 +125,7 @@ const OtherAnimalListingForm = ({ navigation, onSuccess }) => {
       Alert.alert(t('errors.error'), 'Expected price is required');
       return false;
     }
-    if (!formData.frontPhoto && !formData.sidePhoto) {
+    if (!formData.frontPhoto && !formData.sidePhoto && !formData.additionalPhoto) {
       Alert.alert(t('errors.error'), 'Please upload at least one photo');
       return false;
     }
@@ -145,7 +149,6 @@ const OtherAnimalListingForm = ({ navigation, onSuccess }) => {
       submitData.append('isTrainedForWork', formData.isTrainedForWork);
       submitData.append('expectedPrice', formData.expectedPrice);
       submitData.append('isNegotiable', formData.isNegotiable);
-      submitData.append('deliveryAvailable', formData.deliveryAvailable);
       
       if (formData.weight) {
         submitData.append('weight', formData.weight);
@@ -155,12 +158,6 @@ const OtherAnimalListingForm = ({ navigation, onSuccess }) => {
       }
       if (formData.specialSkills) {
         submitData.append('specialSkills', formData.specialSkills);
-      }
-      if (formData.vaccinationDetails) {
-        submitData.append('vaccinationDetails', formData.vaccinationDetails);
-      }
-      if (formData.additionalNotes) {
-        submitData.append('additionalNotes', formData.additionalNotes);
       }
 
       if (formData.frontPhoto) {
@@ -273,7 +270,11 @@ const OtherAnimalListingForm = ({ navigation, onSuccess }) => {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      showsVerticalScrollIndicator={false}
+    >
       {/* Basic Information */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>
@@ -321,6 +322,7 @@ const OtherAnimalListingForm = ({ navigation, onSuccess }) => {
                     ]}
                     onPress={() => {
                       handleChange('animalType', option.value);
+                      handleChange('breedName', '');
                       setShowAnimalTypePicker(false);
                     }}
                   >
@@ -366,14 +368,13 @@ const OtherAnimalListingForm = ({ navigation, onSuccess }) => {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>
-            {t('animal.breedName') || 'Breed/Type Name'} <Text style={styles.required}>*</Text>
-          </Text>
-          <TextInput
-            style={styles.input}
-            placeholder={t('animal.breedNamePlaceholder') || 'e.g., Merino, Hampshire, Mixed'}
+          <OptionSelectField
+            label={t('animal.breedName') || 'Breed/Type Name'}
             value={formData.breedName}
-            onChangeText={(value) => handleChange('breedName', value)}
+            onChange={(value) => handleChange('breedName', value)}
+            options={otherBreedOptions}
+            placeholder={t('common.selectOption') || 'Select breed'}
+            required
           />
         </View>
 
@@ -393,7 +394,7 @@ const OtherAnimalListingForm = ({ navigation, onSuccess }) => {
           <Text style={styles.label}>{t('animal.weight') || 'Weight (kg) (Optional)'}</Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g., 40"
+            placeholder={t('animal.weightPlaceholder') || 'e.g., 40'}
             value={formData.weight}
             onChangeText={(value) => handleChange('weight', value)}
             keyboardType="numeric"
@@ -404,7 +405,7 @@ const OtherAnimalListingForm = ({ navigation, onSuccess }) => {
           <Text style={styles.label}>{t('animal.color') || 'Color (Optional)'}</Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g., White, Black, Brown"
+            placeholder={t('animal.colorPlaceholder') || 'e.g., White, Black, Brown'}
             value={formData.color}
             onChangeText={(value) => handleChange('color', value)}
           />
@@ -494,17 +495,6 @@ const OtherAnimalListingForm = ({ navigation, onSuccess }) => {
           />
         </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>{t('animal.vaccinationDetails') || 'Vaccination Details (Optional)'}</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder={t('animal.vaccinationPlaceholder') || 'List vaccinations...'}
-            value={formData.vaccinationDetails}
-            onChangeText={(value) => handleChange('vaccinationDetails', value)}
-            multiline
-            numberOfLines={3}
-          />
-        </View>
       </View>
 
       {/* Photos */}
@@ -603,11 +593,11 @@ const OtherAnimalListingForm = ({ navigation, onSuccess }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Price & Delivery */}
+      {/* Price Details */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>
           <Ionicons name="cash" size={20} color={COLORS.primary} />
-          {' '}{t('listing.priceDetails') || 'Price & Delivery'}
+          {' '}{t('listing.priceDetails') || 'Price Details'}
         </Text>
 
         <View style={styles.inputGroup}>
@@ -616,7 +606,7 @@ const OtherAnimalListingForm = ({ navigation, onSuccess }) => {
           </Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g., 10000"
+            placeholder={t('animal.pricePlaceholder') || 'e.g., 10000'}
             value={formData.expectedPrice}
             onChangeText={(value) => handleChange('expectedPrice', value)}
             keyboardType="numeric"
@@ -637,31 +627,6 @@ const OtherAnimalListingForm = ({ navigation, onSuccess }) => {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.checkboxGroup}>
-          <TouchableOpacity
-            style={styles.checkbox}
-            onPress={() => handleChange('deliveryAvailable', !formData.deliveryAvailable)}
-          >
-            <Ionicons
-              name={formData.deliveryAvailable ? 'checkbox' : 'square-outline'}
-              size={24}
-              color={formData.deliveryAvailable ? COLORS.primary : '#9CA3AF'}
-            />
-            <Text style={styles.checkboxLabel}>{t('animal.deliveryAvailable') || 'Delivery Available'}</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>{t('animal.additionalNotes') || 'Additional Notes (Optional)'}</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder={t('animal.additionalNotesPlaceholder') || 'Any other details...'}
-            value={formData.additionalNotes}
-            onChangeText={(value) => handleChange('additionalNotes', value)}
-            multiline
-            numberOfLines={3}
-          />
-        </View>
       </View>
 
       {/* Submit Button */}
@@ -679,7 +644,6 @@ const OtherAnimalListingForm = ({ navigation, onSuccess }) => {
         )}
       </TouchableOpacity>
 
-      <View style={{ height: 20 }} />
     </ScrollView>
   );
 };
@@ -688,6 +652,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
+  },
+  contentContainer: {
+    paddingBottom: 140,
   },
   section: {
     backgroundColor: '#FFF',

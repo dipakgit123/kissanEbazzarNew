@@ -15,24 +15,91 @@ import { COLORS, formatPrice, formatTimeAgo, getAnimalTypeIcon } from '../utils/
 import { useWishlist } from '../context/WishlistContext';
 import { callLogService } from '../services/api';
 
-const AnimalCard = ({
-  listing,
-  onPress,
-}) => {
-  if (!listing) return null;
+const OTP_DOT = '\u00B7';
+
+const AnimalCard = ({ listing, onPress }) => {
+  if (!listing) {
+    return null;
+  }
 
   const { t } = useTranslation();
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
-  const inWishlist = isInWishlist(listing.id);
   const [isWishlistLoading, setIsWishlistLoading] = useState(false);
+  const inWishlist = isInWishlist(listing.id);
+
+  const {
+    animal_type,
+    breed_name,
+    expected_price,
+    front_photo,
+    side_photo,
+    city,
+    state,
+    distance,
+    created_at,
+    seller,
+    vaccination_status,
+    vaccination_details,
+  } = listing;
+
+  const imageUrl = front_photo || side_photo || null;
+  const animalIcon = getAnimalTypeIcon(animal_type);
+  const formattedPrice = formatPrice(expected_price);
+  const animalTypeLabel = animal_type
+    ? t(`animalTypes.${animal_type}`, {
+        defaultValue: animal_type.charAt(0).toUpperCase() + animal_type.slice(1),
+      })
+    : 'Animal';
+
+  const formatPostedTime = () => {
+    if (!created_at) {
+      return null;
+    }
+
+    const date = new Date(created_at);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.max(0, Math.floor(diffMs / 60000));
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) {
+      return t('buyAnimals.justNow');
+    }
+    if (diffMins < 60) {
+      return t('buyAnimals.minutesAgo', { count: diffMins });
+    }
+    if (diffHours < 24) {
+      return t('buyAnimals.hoursAgo', { count: diffHours });
+    }
+    if (diffDays < 7) {
+      return t('buyAnimals.daysAgo', { count: diffDays });
+    }
+
+    return formatTimeAgo(created_at);
+  };
+
+  const getLocationText = () => city || state || t('buyAnimals.unknownLocation');
+
+  const isVaccinated =
+    vaccination_status === true ||
+    vaccination_status === 'true' ||
+    vaccination_status === 'yes' ||
+    vaccination_status === 'vaccinated' ||
+    Boolean(vaccination_details);
+
+  const statusLabel = isVaccinated
+    ? t('animalCard.vaccinated')
+    : t('animalCard.verifiedSeller');
 
   const handleWishlistToggle = async () => {
-    if (isWishlistLoading) return;
-    
+    if (isWishlistLoading) {
+      return;
+    }
+
     setIsWishlistLoading(true);
     try {
       if (inWishlist) {
-        console.log('🗑️ Removing from wishlist:', { id: listing.id, animal_type: listing.animal_type });
         await removeFromWishlist(listing.id, listing.animal_type);
         Toast.show({
           type: 'success',
@@ -62,242 +129,149 @@ const AnimalCard = ({
     }
   };
 
-  const {
-    animal_type,
-    breed_name,
-    expected_price,
-    front_photo,
-    side_photo,
-    city,
-    state,
-    distance,
-    created_at,
-    seller,
-    milk_capacity,
-    age,
-    status,
-  } = listing;
-
-  const imageUrl = front_photo || side_photo || null;
-  const animalIcon = getAnimalTypeIcon(animal_type);
-
   const handleCall = async () => {
-    if (seller?.phone) {
-      try {
-        // Log the call before making it
-        await callLogService.logCall({
-          receiverId: seller.id || listing.user_id,
-          receiverPhoneNumber: seller.phone,
-          callType: 'direct',
-          listingId: listing.id,
-          listingType: animal_type,
-        });
-        
-        // Open phone dialer
-        Linking.openURL(`tel:${seller.phone}`);
-      } catch (error) {
-        console.error('Error logging call:', error);
-        // Still make the call even if logging fails
-        Linking.openURL(`tel:${seller.phone}`);
-      }
+    if (!seller?.phone) {
+      return;
+    }
+
+    try {
+      await callLogService.logCall({
+        receiverId: seller.id || listing.user_id,
+        receiverPhoneNumber: seller.phone,
+        callType: 'direct',
+        listingId: listing.id,
+        listingType: animal_type,
+      });
+    } catch (error) {
+      console.error('Error logging call:', error);
+    } finally {
+      Linking.openURL(`tel:${seller.phone}`);
     }
   };
 
   const handleWhatsApp = async () => {
-    if (seller?.phone) {
-      try {
-        // Log the WhatsApp call before initiating
-        await callLogService.logCall({
-          receiverId: seller.id || listing.user_id,
-          receiverPhoneNumber: seller.phone,
-          callType: 'direct',
-          listingId: listing.id,
-          listingType: animal_type,
-        });
-        
-        const message = `Hi! I'm interested in your ${animal_type} listing: "${breed_name}" - ₹${formatPrice(expected_price)}`;
-        // Remove duplicate 91 - phone already has country code
-        const url = `whatsapp://send?phone=${seller.phone}&text=${encodeURIComponent(message)}`;
-        Linking.openURL(url).catch(() => {
-          Linking.openURL(`https://wa.me/${seller.phone}?text=${encodeURIComponent(message)}`);
-        });
-      } catch (error) {
-        console.error('Error logging WhatsApp call:', error);
-        // Still make the call even if logging fails
-        const message = `Hi! I'm interested in your ${animal_type} listing: "${breed_name}" - ₹${formatPrice(expected_price)}`;
-        // Remove duplicate 91 - phone already has country code
-        const url = `whatsapp://send?phone=${seller.phone}&text=${encodeURIComponent(message)}`;
-        Linking.openURL(url).catch(() => {
-          Linking.openURL(`https://wa.me/${seller.phone}?text=${encodeURIComponent(message)}`);
-        });
-      }
+    if (!seller?.phone) {
+      return;
+    }
+
+    const message = `Hi! I'm interested in your ${animal_type} listing: "${breed_name}" - \u20B9${formattedPrice}`;
+
+    try {
+      await callLogService.logCall({
+        receiverId: seller.id || listing.user_id,
+        receiverPhoneNumber: seller.phone,
+        callType: 'direct',
+        listingId: listing.id,
+        listingType: animal_type,
+      });
+    } catch (error) {
+      console.error('Error logging WhatsApp lead:', error);
+    } finally {
+      const url = `whatsapp://send?phone=${seller.phone}&text=${encodeURIComponent(message)}`;
+      Linking.openURL(url).catch(() => {
+        Linking.openURL(`https://wa.me/${seller.phone}?text=${encodeURIComponent(message)}`);
+      });
     }
   };
 
-  const getLocationText = () => {
-    let loc = city || t('buyAnimals.unknownLocation');
-    if (state) loc += `, ${state}`;
-    if (distance) {
-      loc += ` (${Math.round(distance)} ${t('common.km') || 'km'})`;
-    }
-    return loc;
-  };
-
-  const getStatusColor = () => {
-    switch (status?.toLowerCase()) {
-      case 'sold':
-        return '#EF4444';
-      case 'reserved':
-        return '#F59E0B';
-      default:
-        return COLORS.primary;
-    }
-  };
+  const numericDistance = Number(distance);
+  const distanceText =
+    Number.isFinite(numericDistance) && numericDistance > 0
+      ? t('buyAnimals.kmAway', { distance: Math.round(numericDistance) })
+      : null;
+  const postedTimeText = formatPostedTime();
 
   return (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={onPress}
-      activeOpacity={0.9}
-    >
-      {/* Image Section */}
-      <View style={styles.imageContainer}>
-        {imageUrl ? (
-          <Image source={{ uri: imageUrl }} style={styles.image} />
-        ) : (
-          <View style={styles.placeholderImage}>
-            <Text style={styles.placeholderEmoji}>{animalIcon}</Text>
-          </View>
-        )}
-
-        {/* Top Badge Row */}
-        <View style={styles.topBadgeRow}>
-          {/* Animal Type Badge */}
-          <View style={styles.typeBadge}>
-            <Text style={styles.typeIcon}>{animalIcon}</Text>
-            <Text style={styles.typeText}>
-              {animal_type?.charAt(0).toUpperCase() + animal_type?.slice(1) || 'Animal'}
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.92}>
+      <View style={styles.mediaSection}>
+        <View style={styles.topMetaRow}>
+          <View style={styles.statusChip}>
+            <Text style={styles.statusChipText} numberOfLines={1}>
+              {statusLabel}
             </Text>
           </View>
 
-          {/* Price Badge */}
-          <View style={styles.priceBadge}>
-            <Text style={styles.priceBadgeText}>₹{formatPrice(expected_price)}</Text>
+          <View style={styles.priceChip}>
+            <Text style={styles.priceChipText}>{`\u20B9${formattedPrice}`}</Text>
           </View>
         </View>
 
-        {/* Wishlist Heart Icon - Top Right Corner */}
         <TouchableOpacity
           style={[
             styles.wishlistButton,
             inWishlist && styles.wishlistButtonActive,
-            isWishlistLoading && styles.wishlistButtonLoading
+            isWishlistLoading && styles.wishlistButtonLoading,
           ]}
           onPress={handleWishlistToggle}
           activeOpacity={0.7}
           disabled={isWishlistLoading}
         >
           {isWishlistLoading ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
+            <ActivityIndicator size="small" color={COLORS.white} />
           ) : (
             <Ionicons
-              name={inWishlist ? "heart" : "heart-outline"}
-              size={24}
-              color={inWishlist ? "#EF4444" : "#FFFFFF"}
+              name={inWishlist ? 'heart' : 'heart-outline'}
+              size={18}
+              color={inWishlist ? COLORS.error : COLORS.borderStrong}
             />
           )}
         </TouchableOpacity>
 
-        {/* Status Badge */}
-        {status && status.toLowerCase() !== 'active' && (
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor() }]}>
-            <Text style={styles.statusText}>{status.toUpperCase()}</Text>
-          </View>
-        )}
+        <View style={styles.thumbnailWrap}>
+          {imageUrl ? (
+            <Image source={{ uri: imageUrl }} style={styles.thumbnailImage} />
+          ) : (
+            <View style={styles.placeholderImage}>
+              <Text style={styles.placeholderEmoji}>{animalIcon}</Text>
+            </View>
+          )}
+        </View>
       </View>
 
-      {/* Content Section */}
-      <View style={styles.content}>
-        {/* Breed Name */}
-        <Text style={styles.breedName} numberOfLines={2}>
-          {breed_name || t('buyAnimals.unknownBreed')}
+      <View style={styles.contentSection}>
+        <Text style={styles.breedName} numberOfLines={1}>
+          {`${breed_name || t('buyAnimals.unknownBreed')} | ${animalTypeLabel}`}
         </Text>
 
-        {/* Info Tags */}
-        <View style={styles.infoTags}>
-          {milk_capacity && (
-            <View style={styles.infoTag}>
-              <Ionicons name="water" size={14} color="#3B82F6" />
-              <Text style={styles.infoTagText}>{milk_capacity}L {t('animalCard.milk')}</Text>
-            </View>
-          )}
-          {age && (
-            <View style={styles.infoTag}>
-              <Ionicons name="time-outline" size={14} color="#10B981" />
-              <Text style={styles.infoTagText}>{age}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Location & Time Row */}
-        <View style={styles.metaRow}>
-          <View style={styles.metaItem}>
-            <Ionicons name="location-outline" size={14} color={COLORS.primary} />
-            <Text style={styles.metaText} numberOfLines={1}>
-              {getLocationText()}
-            </Text>
-          </View>
-          {created_at && (
-            <View style={styles.metaItem}>
-              <Ionicons name="time-outline" size={14} color="#9CA3AF" />
-              <Text style={styles.metaText}>{formatTimeAgo(created_at)}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Divider */}
-        <View style={styles.divider} />
-
-        {/* Seller Info */}
-        <View style={styles.sellerRow}>
-          <View style={styles.sellerAvatar}>
-            {seller?.profile_photo ? (
-              <Image source={{ uri: seller.profile_photo }} style={styles.avatarImage} />
-            ) : (
-              <Text style={styles.avatarText}>
-                {seller?.name?.charAt(0)?.toUpperCase() || 'S'}
+        <View style={styles.locationRow}>
+          <Ionicons name="location-outline" size={13} color={COLORS.textMuted} />
+          <Text style={styles.locationText} numberOfLines={1}>
+            {getLocationText()}
+          </Text>
+          {distanceText ? (
+            <View style={styles.distanceWrap}>
+              <Text style={styles.dotSeparator}>{OTP_DOT}</Text>
+              <Text style={styles.distanceText} numberOfLines={1}>
+                {distanceText}
               </Text>
-            )}
-          </View>
-          <View style={styles.sellerInfo}>
-            <Text style={styles.sellerName} numberOfLines={1}>
-              {seller?.name || t('buyAnimals.unknownSeller')}
-            </Text>
-            <View style={styles.verifiedRow}>
-              <Ionicons name="checkmark-circle" size={12} color={COLORS.primary} />
-              <Text style={styles.verifiedText}>{t('animalCard.verifiedSeller')}</Text>
             </View>
-          </View>
+          ) : null}
         </View>
 
-        {/* Action Buttons */}
-        <View style={styles.actionRow}>
-          <TouchableOpacity
-            style={styles.callButton}
-            onPress={handleCall}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="call" size={18} color="#FFFFFF" />
-            <Text style={styles.buttonText}>{t('animalCard.call')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.whatsappButton}
-            onPress={handleWhatsApp}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="logo-whatsapp" size={18} color="#FFFFFF" />
-            <Text style={styles.buttonText}>{t('animalCard.whatsapp')}</Text>
-          </TouchableOpacity>
+        <View style={styles.bottomRow}>
+          <View style={styles.bottomMeta}>
+            <Text style={styles.priceText}>{`\u20B9${formattedPrice}`}</Text>
+            {postedTimeText ? (
+              <Text style={styles.postedTimeText} numberOfLines={1}>
+                {postedTimeText}
+              </Text>
+            ) : null}
+          </View>
+
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={styles.callButton} onPress={handleCall} activeOpacity={0.8}>
+              <Ionicons name="call" size={13} color={COLORS.white} />
+              <Text style={styles.actionButtonText}>{t('animalCard.call')}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.whatsappButton}
+              onPress={handleWhatsApp}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="logo-whatsapp" size={15} color={COLORS.white} />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </TouchableOpacity>
@@ -306,22 +280,95 @@ const AnimalCard = ({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    overflow: 'hidden',
+    backgroundColor: COLORS.surface,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
     shadowRadius: 8,
-    elevation: 4,
-    marginBottom: 16,
+    elevation: 2,
+    marginBottom: 14,
+    overflow: 'hidden',
   },
-  imageContainer: {
+  mediaSection: {
+    backgroundColor: COLORS.primarySoft,
+    height: 190,
+    paddingHorizontal: 0,
+    paddingTop: 12,
+    paddingBottom: 0,
     position: 'relative',
-    height: 220,
-    backgroundColor: '#F3F4F6',
+    overflow: 'hidden',
   },
-  image: {
+  topMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 0,
+    gap: 8,
+    paddingHorizontal: 12,
+    zIndex: 3,
+  },
+  statusChip: {
+    maxWidth: '58%',
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: '#F2FFFA',
+    borderWidth: 1,
+    borderColor: COLORS.secondary,
+  },
+  statusChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.primaryDark,
+  },
+  priceChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: COLORS.primaryDark,
+    minWidth: 78,
+    alignItems: 'center',
+  },
+  priceChipText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: COLORS.white,
+  },
+  wishlistButton: {
+    position: 'absolute',
+    right: 12,
+    bottom: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: COLORS.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    zIndex: 2,
+  },
+  wishlistButtonActive: {
+    borderColor: COLORS.errorSoft,
+    backgroundColor: COLORS.errorSoft,
+  },
+  wishlistButtonLoading: {
+    backgroundColor: COLORS.borderStrong,
+  },
+  thumbnailWrap: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  thumbnailImage: {
     width: '100%',
     height: '100%',
     resizeMode: 'cover',
@@ -331,228 +378,101 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#E5E7EB',
+    backgroundColor: 'transparent',
   },
   placeholderEmoji: {
-    fontSize: 64,
-    opacity: 0.5,
+    fontSize: 48,
+    opacity: 0.92,
   },
-  topBadgeRow: {
-    position: 'absolute',
-    top: 12,
-    left: 12,
-    right: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  typeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    gap: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  typeIcon: {
-    fontSize: 14,
-  },
-  typeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  priceBadge: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  priceBadgeText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 16,
-  },
-  wishlistButton: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 4,
-    zIndex: 10,
-  },
-  wishlistButtonActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-  },
-  wishlistButtonLoading: {
-    backgroundColor: 'rgba(156, 163, 175, 0.95)',
-  },
-  statusBadge: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  statusText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  content: {
-    padding: 16,
+  contentSection: {
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 14,
   },
   breedName: {
     fontSize: 20,
-    fontWeight: '800',
-    color: '#111827',
-    marginBottom: 10,
-    lineHeight: 26,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: 6,
   },
-  infoTags: {
+  locationRow: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
     marginBottom: 12,
-    flexWrap: 'wrap',
   },
-  infoTag: {
+  locationText: {
+    fontSize: 14,
+    color: COLORS.textMuted,
+    marginLeft: 4,
+    flexShrink: 1,
+    maxWidth: '50%',
+  },
+  distanceWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-    gap: 4,
+    marginLeft: 6,
+    flexShrink: 1,
   },
-  infoTagText: {
+  dotSeparator: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#374151',
+    color: COLORS.borderStrong,
+    marginRight: 6,
   },
-  metaRow: {
+  distanceText: {
+    fontSize: 14,
+    color: COLORS.textMuted,
+    fontWeight: '500',
+    flexShrink: 1,
+  },
+  bottomRow: {
     flexDirection: 'row',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
-    marginBottom: 14,
-    gap: 8,
+    gap: 10,
   },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+  bottomMeta: {
     flex: 1,
+    justifyContent: 'flex-end',
   },
-  metaText: {
-    fontSize: 13,
-    color: '#6B7280',
-    flex: 1,
+  priceText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.primaryDark,
   },
-  divider: {
-    height: 1,
-    backgroundColor: '#E5E7EB',
-    marginBottom: 14,
-  },
-  sellerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sellerAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-    overflow: 'hidden',
-  },
-  avatarImage: {
-    width: 48,
-    height: 48,
-  },
-  avatarText: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  sellerInfo: {
-    flex: 1,
-  },
-  sellerName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  verifiedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  verifiedText: {
-    fontSize: 13,
-    color: COLORS.primary,
+  postedTimeText: {
+    fontSize: 11.5,
+    color: COLORS.accent,
     fontWeight: '600',
+    marginTop: 2,
   },
   actionRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
+    alignItems: 'center',
   },
   callButton: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#3B82F6',
-    paddingVertical: 14,
+    backgroundColor: COLORS.accent,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     borderRadius: 12,
-    gap: 8,
-    shadowColor: '#3B82F6',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    gap: 6,
+    minWidth: 82,
   },
   whatsappButton: {
-    flex: 1,
-    flexDirection: 'row',
+    width: 42,
+    height: 42,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#25D366',
-    paddingVertical: 14,
-    borderRadius: 12,
-    gap: 8,
-    shadowColor: '#25D366',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: COLORS.primary,
   },
-  buttonText: {
-    color: '#FFFFFF',
+  actionButtonText: {
+    color: COLORS.white,
     fontWeight: '700',
-    fontSize: 15,
+    fontSize: 13,
   },
 });
 

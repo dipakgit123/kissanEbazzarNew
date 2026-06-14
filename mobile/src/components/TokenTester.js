@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Clipboard } from 'react-native';
-import { registerForPushNotificationsAsync } from '../services/notificationService';
+import { registerForPushNotifications } from '../services/notificationService';
 
 /**
  * TOKEN TESTER COMPONENT
@@ -14,7 +14,7 @@ const TokenTester = () => {
   const getToken = async () => {
     setLoading(true);
     try {
-      const pushToken = await registerForPushNotificationsAsync();
+      const pushToken = await registerForPushNotifications();
       setToken(pushToken);
       
       // Show in alert

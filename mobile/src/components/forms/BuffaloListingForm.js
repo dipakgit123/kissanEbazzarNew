@@ -17,11 +17,20 @@ import { useTranslation } from 'react-i18next';
 import { COLORS } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
+import OptionSelectField from '../OptionSelectField';
+import { getBuffaloBreedOptions } from '../../constants/buffaloBreeds';
+import buffaloFrontGuide from '../../assets/cliparts/buffalo_front.png';
+import buffaloSideGuide from '../../assets/cliparts/buffalo_side.png';
+import buffaloTeatsGuide from '../../assets/cliparts/buffalo_teats.png';
 
 const BuffaloListingForm = ({ navigation, onSuccess }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
+  const buffaloBreedOptions = getBuffaloBreedOptions(
+    i18n.resolvedLanguage || i18n.language,
+    t('common.selectOption') || 'Select breed'
+  );
 
   const [formData, setFormData] = useState({
     breedName: '',
@@ -32,9 +41,6 @@ const BuffaloListingForm = ({ navigation, onSuccess }) => {
     healthCondition: 'good',
     expectedPrice: '',
     isNegotiable: 'true',
-    vaccinationDetails: '',
-    deliveryAvailable: false,
-    additionalNotes: '',
     frontPhoto: null,
     sidePhoto: null,
     milkScenePhoto: null,
@@ -94,7 +100,7 @@ const BuffaloListingForm = ({ navigation, onSuccess }) => {
       Alert.alert(t('errors.error'), 'Expected price is required');
       return false;
     }
-    if (!formData.frontPhoto && !formData.sidePhoto) {
+    if (!formData.frontPhoto && !formData.sidePhoto && !formData.milkScenePhoto) {
       Alert.alert(t('errors.error'), 'Please upload at least one photo');
       return false;
     }
@@ -118,14 +124,6 @@ const BuffaloListingForm = ({ navigation, onSuccess }) => {
       submitData.append('healthCondition', formData.healthCondition);
       submitData.append('expectedPrice', formData.expectedPrice);
       submitData.append('isNegotiable', formData.isNegotiable);
-      submitData.append('deliveryAvailable', formData.deliveryAvailable);
-      
-      if (formData.vaccinationDetails) {
-        submitData.append('vaccinationDetails', formData.vaccinationDetails);
-      }
-      if (formData.additionalNotes) {
-        submitData.append('additionalNotes', formData.additionalNotes);
-      }
 
       // Add photos
       if (formData.frontPhoto) {
@@ -198,7 +196,11 @@ const BuffaloListingForm = ({ navigation, onSuccess }) => {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      showsVerticalScrollIndicator={false}
+    >
       {/* Basic Information */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>
@@ -207,14 +209,13 @@ const BuffaloListingForm = ({ navigation, onSuccess }) => {
         </Text>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>
-            {t('animal.breedName') || 'Breed Name'} <Text style={styles.required}>*</Text>
-          </Text>
-          <TextInput
-            style={styles.input}
-            placeholder={t('animal.breedNamePlaceholder') || 'e.g., Murrah, Jaffarabadi, Mehsana'}
+          <OptionSelectField
+            label={t('animal.breedName') || 'Breed Name'}
             value={formData.breedName}
-            onChangeText={(value) => handleChange('breedName', value)}
+            onChange={(value) => handleChange('breedName', value)}
+            options={buffaloBreedOptions}
+            placeholder={t('common.selectOption') || 'Select breed'}
+            required
           />
         </View>
 
@@ -236,7 +237,7 @@ const BuffaloListingForm = ({ navigation, onSuccess }) => {
           </Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g., 12"
+            placeholder={t('common.example', { value: '12' }) || 'e.g., 12'}
             value={formData.milkCapacity}
             onChangeText={(value) => handleChange('milkCapacity', value)}
             keyboardType="numeric"
@@ -348,7 +349,7 @@ const BuffaloListingForm = ({ navigation, onSuccess }) => {
               </>
             ) : (
               <View style={styles.photoPlaceholder}>
-                <Ionicons name="camera" size={32} color={COLORS.primary} />
+                <Image source={buffaloFrontGuide} style={styles.guideImage} resizeMode="contain" />
                 <Text style={styles.photoLabel}>{t('animal.frontPhoto') || 'Front Photo'}</Text>
               </View>
             )}
@@ -370,7 +371,7 @@ const BuffaloListingForm = ({ navigation, onSuccess }) => {
               </>
             ) : (
               <View style={styles.photoPlaceholder}>
-                <Ionicons name="camera" size={32} color={COLORS.primary} />
+                <Image source={buffaloSideGuide} style={styles.guideImage} resizeMode="contain" />
                 <Text style={styles.photoLabel}>{t('animal.sidePhoto') || 'Side Photo'}</Text>
               </View>
             )}
@@ -393,7 +394,7 @@ const BuffaloListingForm = ({ navigation, onSuccess }) => {
             </>
           ) : (
             <View style={styles.photoPlaceholder}>
-              <Ionicons name="camera" size={32} color={COLORS.primary} />
+              <Image source={buffaloTeatsGuide} style={styles.guideImage} resizeMode="contain" />
               <Text style={styles.photoLabel}>{t('animal.milkScenePhoto') || 'Milking Scene Photo (Optional)'}</Text>
             </View>
           )}
@@ -433,7 +434,7 @@ const BuffaloListingForm = ({ navigation, onSuccess }) => {
           </Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g., 80000"
+            placeholder={t('animal.pricePlaceholder') || 'e.g., 80000'}
             value={formData.expectedPrice}
             onChangeText={(value) => handleChange('expectedPrice', value)}
             keyboardType="numeric"
@@ -462,43 +463,6 @@ const BuffaloListingForm = ({ navigation, onSuccess }) => {
           </View>
         </View>
 
-        <View style={styles.checkboxGroup}>
-          <TouchableOpacity
-            style={styles.checkbox}
-            onPress={() => handleChange('deliveryAvailable', !formData.deliveryAvailable)}
-          >
-            <Ionicons
-              name={formData.deliveryAvailable ? 'checkbox' : 'square-outline'}
-              size={24}
-              color={formData.deliveryAvailable ? COLORS.primary : '#9CA3AF'}
-            />
-            <Text style={styles.checkboxLabel}>{t('animal.deliveryAvailable') || 'Delivery Available'}</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>{t('animal.vaccinationDetails') || 'Vaccination Details (Optional)'}</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder={t('animal.vaccinationPlaceholder') || 'List vaccinations...'}
-            value={formData.vaccinationDetails}
-            onChangeText={(value) => handleChange('vaccinationDetails', value)}
-            multiline
-            numberOfLines={3}
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>{t('animal.additionalNotes') || 'Additional Notes (Optional)'}</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder={t('animal.additionalNotesPlaceholder') || 'Any other details...'}
-            value={formData.additionalNotes}
-            onChangeText={(value) => handleChange('additionalNotes', value)}
-            multiline
-            numberOfLines={3}
-          />
-        </View>
       </View>
 
       {/* Submit Button */}
@@ -516,7 +480,6 @@ const BuffaloListingForm = ({ navigation, onSuccess }) => {
         )}
       </TouchableOpacity>
 
-      <View style={{ height: 20 }} />
     </ScrollView>
   );
 };
@@ -525,6 +488,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
+  },
+  contentContainer: {
+    paddingBottom: 140,
   },
   section: {
     backgroundColor: '#FFF',
@@ -647,6 +613,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 10,
+  },
+  guideImage: {
+    width: '100%',
+    height: 72,
+    marginBottom: 8,
   },
   photoLabel: {
     fontSize: 12,

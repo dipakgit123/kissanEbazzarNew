@@ -1,15 +1,61 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
+import { NativeModules, Platform } from 'react-native';
 
-// API Configuration
-// Use environment variables or default to localhost for development
-const DEV_API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000';
-const PROD_API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000';
+const API_PORT = '5000';
 
-// Set to true for production build (can be overridden by environment variable)
-const IS_PRODUCTION = process.env.EXPO_PUBLIC_ENV === 'production' || false;
+const getHostFromUrl = (value) => {
+  if (!value || typeof value !== 'string') {
+    return null;
+  }
 
-const API_URL = IS_PRODUCTION ? PROD_API_URL : DEV_API_URL;
+  try {
+    if (value.startsWith('exp://') || value.startsWith('exps://')) {
+      return value.replace(/^exps?:\/\//, '').split(/[/:?]/)[0] || null;
+    }
+
+    return new URL(value).hostname || null;
+  } catch (error) {
+    return value.replace(/^exps?:\/\//, '').replace(/^https?:\/\//, '').split(/[/:?]/)[0] || null;
+  }
+};
+
+const getBundledHost = () => {
+  const hostCandidates = [
+    NativeModules.SourceCode?.scriptURL,
+    Constants.expoConfig?.hostUri,
+    Constants.expoGoConfig?.debuggerHost,
+    Constants.manifest2?.extra?.expoClient?.hostUri,
+    Constants.linkingUri,
+  ];
+
+  for (const candidate of hostCandidates) {
+    const host = getHostFromUrl(candidate);
+    if (host && host !== 'localhost' && host !== '127.0.0.1') {
+      return host;
+    }
+  }
+
+  return null;
+};
+
+const resolveDefaultApiUrl = () => {
+  const bundledHost = getBundledHost();
+
+  if (bundledHost) {
+    return `http://${bundledHost}:${API_PORT}`;
+  }
+
+  if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:5000';
+  }
+
+  return 'http://localhost:5000';
+};
+
+const DEFAULT_API_URL = resolveDefaultApiUrl();
+const API_URL = (process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_URL).replace(/\/+$/, '');
 
 // Export API_URL for use in other services
 export { API_URL };
@@ -205,12 +251,6 @@ export const userService = {
         name: `profile_photo.${fileExtension}`,
       });
 
-      console.log('FormData prepared:', {
-        uri: photoUri,
-        type: mimeType,
-        name: `profile_photo.${fileExtension}`,
-      });
-
       const token = await AsyncStorage.getItem('token');
       
       const response = await api.post('/api/auth/upload-photo', formData, {
@@ -225,15 +265,9 @@ export const userService = {
         },
       });
       
-      console.log('Upload successful:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Upload API error:', error);
-      if (error.response) {
-        console.error('Error response:', error.response.data);
-        throw error.response.data;
-      }
-      throw error;
+      throw error.response?.data || error;
     }
   },
 
@@ -499,7 +533,6 @@ export const veterinarianService = {
   // Send OTP for login
   sendOTP: async (phoneNumber) => {
     try {
-      // ✅ Veterinarian backend expects phone_number (snake_case)
       const response = await api.post('/api/veterinarians/send-otp', { phone_number: phoneNumber });
       return response.data;
     } catch (error) {
@@ -510,7 +543,6 @@ export const veterinarianService = {
   // Verify OTP
   verifyOTP: async (phoneNumber, otp) => {
     try {
-      // ✅ Veterinarian backend expects phone_number (snake_case)
       const response = await api.post('/api/veterinarians/verify-otp', { phone_number: phoneNumber, otp });
       return response.data;
     } catch (error) {
@@ -518,7 +550,6 @@ export const veterinarianService = {
     }
   },
 
-  // ✅ FIXED: Added missing resendOTP function
   resendOTP: async (phoneNumber) => {
     try {
       const response = await api.post('/api/veterinarians/send-otp', { phone_number: phoneNumber });

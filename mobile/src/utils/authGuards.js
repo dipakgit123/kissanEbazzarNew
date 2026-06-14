@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { COLORS } from './constants';
 
 /**
  * Safe JSON parse with fallback
@@ -43,7 +44,7 @@ const withAuthGuard = (WrappedComponent, userType = 'user') => {
     if (loading) {
       return (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#15BB73" />
+          <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
       );
     }
@@ -100,7 +101,7 @@ const withRoleGuard = (WrappedComponent, allowedRoles = []) => {
     if (loading) {
       return (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#15BB73" />
+          <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
       );
     }
@@ -119,7 +120,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.surface,
   },
 });
 

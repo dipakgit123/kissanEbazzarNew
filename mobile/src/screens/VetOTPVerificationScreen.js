@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -11,39 +11,86 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
 import { veterinarianService } from '../services/api';
 import { useVetAuth } from '../context/VetAuthContext';
 
+const OTP_LENGTH = 6;
+
 const VetOTPVerificationScreen = ({ route, navigation }) => {
   const { phoneNumber } = route.params;
   const { login } = useVetAuth();
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const { t } = useTranslation();
+  const [otp, setOtp] = useState(Array(OTP_LENGTH).fill(''));
   const [loading, setLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(60);
   const inputRefs = useRef([]);
 
   useEffect(() => {
-    if (resendTimer > 0) {
-      const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
-      return () => clearTimeout(timer);
+    if (resendTimer <= 0) {
+      return undefined;
     }
+
+    const timer = setTimeout(() => setResendTimer((prev) => prev - 1), 1000);
+    return () => clearTimeout(timer);
   }, [resendTimer]);
 
-  const handleOtpChange = (value, index) => {
-    if (value.length <= 1 && /^\d*$/.test(value)) {
-      const newOtp = [...otp];
-      newOtp[index] = value;
-      setOtp(newOtp);
+  const handleVerifyOTP = async (otpCode = null) => {
+    const code = otpCode || otp.join('');
 
-      // Auto-focus next input
-      if (value && index < 5) {
+    if (code.length !== OTP_LENGTH) {
+      Alert.alert(t('common.error'), t('auth.invalidOtp'));
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await veterinarianService.verifyOTP(phoneNumber, code);
+
+      if (response.success) {
+        await login(response.token, response.veterinarian);
+        navigation.replace('VetDashboard');
+        return;
+      }
+
+      Alert.alert(t('common.error'), response.message || t('auth.invalidOtp'));
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.message || error.message || t('errors.somethingWentWrong');
+      Alert.alert(t('common.error'), errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOtpChange = (value, index) => {
+    const digits = value.replace(/\D/g, '');
+
+    if (digits.length > 1) {
+      const pastedOtp = digits.slice(0, OTP_LENGTH).split('');
+      const nextOtp = [...Array(OTP_LENGTH)].map((_, otpIndex) => pastedOtp[otpIndex] || '');
+      setOtp(nextOtp);
+
+      if (pastedOtp.length === OTP_LENGTH) {
+        handleVerifyOTP(pastedOtp.join(''));
+      } else {
+        inputRefs.current[Math.min(pastedOtp.length, OTP_LENGTH - 1)]?.focus();
+      }
+      return;
+    }
+
+    if (digits.length <= 1) {
+      const nextOtp = [...otp];
+      nextOtp[index] = digits;
+      setOtp(nextOtp);
+
+      if (digits && index < OTP_LENGTH - 1) {
         inputRefs.current[index + 1]?.focus();
       }
 
-      // Auto-submit when all digits are entered
-      if (index === 5 && value && newOtp.every((digit) => digit)) {
-        handleVerifyOTP(newOtp.join(''));
+      if (index === OTP_LENGTH - 1 && digits && nextOtp.every(Boolean)) {
+        handleVerifyOTP(nextOtp.join(''));
       }
     }
   };
@@ -54,61 +101,27 @@ const VetOTPVerificationScreen = ({ route, navigation }) => {
     }
   };
 
-  const handleVerifyOTP = async (otpCode = null) => {
-    const code = otpCode || otp.join('');
-
-    if (code.length !== 6) {
-      Alert.alert('Error', 'Please enter a valid 6-digit OTP');
+  const handleResendOTP = async () => {
+    if (resendTimer > 0 || loading) {
       return;
     }
 
     setLoading(true);
     try {
-      const response = await veterinarianService.verifyOTP(phoneNumber, code);
-
-      if (response.success) {
-        // ✅ FIXED: Correct response structure (response.token, not response.data.token)
-        await login(response.token, response.veterinarian);
-
-        Alert.alert(
-          'Success',
-          'OTP verified successfully!',
-          [{ text: 'OK', onPress: () => navigation.replace('VetDashboard') }]
-        );
-      } else {
-        Alert.alert('Verification Failed', response.message || 'Invalid OTP. Please try again.');
-      }
-    } catch (error) {
-      console.error('OTP Verification Error:', error);
-
-      // ✅ FIXED: Better error handling
-      const errorMessage = error.response?.data?.message || error.message || 'Verification failed. Please try again.';
-      Alert.alert('Error', errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResendOTP = async () => {
-    if (resendTimer > 0) return;
-
-    setLoading(true);
-    try {
-      // ✅ FIXED: Use resendOTP function for clarity
       const response = await veterinarianService.resendOTP(phoneNumber);
 
       if (response.success) {
-        Alert.alert('Success', 'OTP resent successfully!');
-        setOtp(['', '', '', '', '', '']);
+        setOtp(Array(OTP_LENGTH).fill(''));
         setResendTimer(60);
         inputRefs.current[0]?.focus();
+        Alert.alert(t('common.success'), t('auth.otpSent'));
       } else {
-        Alert.alert('Error', response.message || 'Failed to resend OTP');
+        Alert.alert(t('common.error'), response.message || t('errors.somethingWentWrong'));
       }
     } catch (error) {
-      console.error('Resend OTP Error:', error);
-      const errorMessage = error.response?.data?.message || error.message || 'Failed to resend OTP';
-      Alert.alert('Error', errorMessage);
+      const errorMessage =
+        error.response?.data?.message || error.message || t('errors.somethingWentWrong');
+      Alert.alert(t('common.error'), errorMessage);
     } finally {
       setLoading(false);
     }
@@ -120,50 +133,43 @@ const VetOTPVerificationScreen = ({ route, navigation }) => {
       style={styles.container}
     >
       <View style={styles.content}>
-        {/* Back Button */}
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={COLORS.black} />
         </TouchableOpacity>
 
-        {/* Logo Section */}
         <View style={styles.logoContainer}>
           <View style={styles.logoCircle}>
             <Ionicons name="shield-checkmark" size={48} color={COLORS.white} />
           </View>
         </View>
 
-        {/* OTP Form */}
         <View style={styles.formContainer}>
-          <Text style={styles.title}>Verify OTP</Text>
+          <Text style={styles.title}>{t('auth.verifyOTP')}</Text>
           <Text style={styles.subtitle}>
-            Enter the 6-digit code sent to{'\n'}
+            {t('auth.enterOtpCode')}
+            {'\n'}
             <Text style={styles.phoneText}>{phoneNumber}</Text>
           </Text>
 
-          {/* OTP Inputs */}
           <View style={styles.otpContainer}>
             {otp.map((digit, index) => (
               <TextInput
                 key={index}
-                ref={(ref) => (inputRefs.current[index] = ref)}
-                style={[
-                  styles.otpInput,
-                  digit && styles.otpInputFilled,
-                ]}
+                ref={(ref) => {
+                  inputRefs.current[index] = ref;
+                }}
+                style={[styles.otpInput, digit && styles.otpInputFilled]}
                 value={digit}
                 onChangeText={(value) => handleOtpChange(value, index)}
                 onKeyPress={(e) => handleKeyPress(e, index)}
                 keyboardType="number-pad"
-                maxLength={1}
+                maxLength={OTP_LENGTH}
                 autoFocus={index === 0}
+                selectTextOnFocus
               />
             ))}
           </View>
 
-          {/* Verify Button */}
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
             onPress={() => handleVerifyOTP()}
@@ -172,30 +178,23 @@ const VetOTPVerificationScreen = ({ route, navigation }) => {
             {loading ? (
               <ActivityIndicator color={COLORS.white} />
             ) : (
-              <Text style={styles.buttonText}>Verify & Login</Text>
+              <Text style={styles.buttonText}>{t('vetAuth.verifyAndLogin')}</Text>
             )}
           </TouchableOpacity>
 
-          {/* Resend OTP */}
           <View style={styles.resendContainer}>
             {resendTimer > 0 ? (
-              <Text style={styles.resendText}>
-                Resend OTP in <Text style={styles.timerText}>{resendTimer}s</Text>
-              </Text>
+              <Text style={styles.resendText}>{t('auth.resendIn', { seconds: resendTimer })}</Text>
             ) : (
               <TouchableOpacity onPress={handleResendOTP} disabled={loading}>
-                <Text style={styles.resendLink}>Resend OTP</Text>
+                <Text style={styles.resendLink}>{t('auth.resendOTP')}</Text>
               </TouchableOpacity>
             )}
           </View>
 
-          {/* Change Number */}
-          <TouchableOpacity
-            style={styles.changeNumberButton}
-            onPress={() => navigation.goBack()}
-          >
+          <TouchableOpacity style={styles.changeNumberButton} onPress={() => navigation.goBack()}>
             <Ionicons name="phone-portrait-outline" size={18} color={COLORS.gray} />
-            <Text style={styles.changeNumberText}>Change phone number</Text>
+            <Text style={styles.changeNumberText}>{t('vetAuth.changePhoneNumber')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -206,7 +205,7 @@ const VetOTPVerificationScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: COLORS.background,
   },
   content: {
     flex: 1,
@@ -228,19 +227,21 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#3B82F6',
+    backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#3B82F6',
+    shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
   },
   formContainer: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 24,
     padding: 24,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -250,19 +251,19 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: COLORS.black,
+    color: COLORS.text,
     textAlign: 'center',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: COLORS.gray,
+    color: COLORS.textMuted,
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 22,
   },
   phoneText: {
-    color: '#3B82F6',
+    color: COLORS.primary,
     fontWeight: '600',
   },
   otpContainer: {
@@ -276,19 +277,19 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#E2E8F0',
+    borderColor: COLORS.border,
     textAlign: 'center',
     fontSize: 20,
     fontWeight: 'bold',
-    color: COLORS.black,
-    backgroundColor: '#F8FAFC',
+    color: COLORS.text,
+    backgroundColor: COLORS.surfaceAlt,
   },
   otpInputFilled: {
-    borderColor: '#3B82F6',
-    backgroundColor: '#EFF6FF',
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primarySoft,
   },
   button: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: COLORS.primary,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
@@ -308,15 +309,11 @@ const styles = StyleSheet.create({
   },
   resendText: {
     fontSize: 14,
-    color: COLORS.gray,
-  },
-  timerText: {
-    color: '#3B82F6',
-    fontWeight: '600',
+    color: COLORS.textMuted,
   },
   resendLink: {
     fontSize: 14,
-    color: '#3B82F6',
+    color: COLORS.primary,
     fontWeight: '600',
   },
   changeNumberButton: {
@@ -327,7 +324,7 @@ const styles = StyleSheet.create({
   },
   changeNumberText: {
     fontSize: 14,
-    color: COLORS.gray,
+    color: COLORS.textMuted,
   },
 });
 

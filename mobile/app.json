@@ -9,7 +9,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#15BB73"
+      "backgroundColor": "#1D9E75"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -21,7 +21,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#15BB73"
+        "backgroundColor": "#1D9E75"
       },
       "package": "com.kissanebazzar.app",
       "permissions": [
@@ -54,8 +54,8 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/notification-icon.png",
-          "color": "#15BB73",
+          "icon": "./assets/icon.png",
+          "color": "#1D9E75",
           "defaultChannel": "default"
         }
       ]
@@ -66,8 +66,8 @@
       }
     },
     "notification": {
-      "icon": "./assets/notification-icon.png",
-      "color": "#15BB73",
+      "icon": "./assets/icon.png",
+      "color": "#1D9E75",
       "androidMode": "default",
       "androidCollapsedTitle": "{{unread_notifications}} new notifications"
     }

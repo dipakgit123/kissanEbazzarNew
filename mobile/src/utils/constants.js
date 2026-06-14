@@ -1,28 +1,55 @@
 // App Colors
 export const COLORS = {
-  primary: '#15BB73',
-  primaryDark: '#0FA568',
-  secondary: '#E9F0F8',
-  background: '#F0F8FF',
+  primary: '#1D9E75',
+  primaryLight: '#5DCAA5',
+  primarySoft: '#E1F5EE',
+  primaryDark: '#0F6E56',
+  primaryDeep: '#085041',
+  secondary: '#9FE1CB',
+
+  accent: '#D85A30',
+  accentLight: '#F0997B',
+  accentSoft: '#FAECE7',
+  accentDark: '#993C1D',
+  accentDeep: '#712B13',
+
+  background: '#F5F4EF',
+  surface: '#FFFFFF',
+  surfaceAlt: '#F5F4EF',
   white: '#FFFFFF',
-  black: '#000600',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  red: '#EF4444',
-  blue: '#3B82F6',
-  yellow: '#F59E0B',
-  green: '#10B981',
+  black: '#2C2C2A',
+  text: '#2C2C2A',
+  textMuted: '#5F5E5A',
+  gray: '#5F5E5A',
+  lightGray: '#E5E4DC',
+  border: '#E5E4DC',
+  borderStrong: '#B4B2A9',
+
+  success: '#22A05B',
+  successSoft: '#D3F9D8',
+  warning: '#E8A000',
+  warningSoft: '#FFF3BF',
+  error: '#E03131',
+  errorSoft: '#FFE3E3',
+  info: '#1971C2',
+  infoSoft: '#D0EBFF',
+
+  // Legacy aliases kept for compatibility with existing screens.
+  red: '#E03131',
+  blue: '#1971C2',
+  yellow: '#E8A000',
+  green: '#22A05B',
 };
 
 // Animal Types
 export const ANIMAL_TYPES = [
-  { id: 'cow', name: 'Cow', icon: '🐄', endpoint: 'animals' },
-  { id: 'buffalo', name: 'Buffalo', icon: '🐃', endpoint: 'buffalos' },
-  { id: 'horse', name: 'Horse', icon: '🐴', endpoint: 'horses' },
-  { id: 'goat', name: 'Goat', icon: '🐐', endpoint: 'goats' },
-  { id: 'dog', name: 'Dog', icon: '🐕', endpoint: 'dogs' },
-  { id: 'cat', name: 'Cat', icon: '🐈', endpoint: 'cats' },
-  { id: 'other', name: 'Other Animals', icon: '🐾', endpoint: 'other' },
+  { id: 'cow', name: 'Cow', icon: '\uD83D\uDC04', endpoint: 'animals' },
+  { id: 'buffalo', name: 'Buffalo', icon: '\uD83D\uDC03', endpoint: 'buffalos' },
+  { id: 'horse', name: 'Horse', icon: '\uD83D\uDC34', endpoint: 'horses' },
+  { id: 'goat', name: 'Goat', icon: '\uD83D\uDC10', endpoint: 'goats' },
+  { id: 'dog', name: 'Dog', icon: '\uD83D\uDC15', endpoint: 'dogs' },
+  { id: 'cat', name: 'Cat', icon: '\uD83D\uDC08', endpoint: 'cats' },
+  { id: 'other', name: 'Other Animals', icon: '\uD83D\uDC3E', endpoint: 'other' },
 ];
 
 // Format price to Indian format
@@ -57,18 +84,18 @@ export const formatDate = (dateString) => {
   return date.toLocaleDateString('en-IN', {
     day: 'numeric',
     month: 'long',
-    year: 'numeric'
+    year: 'numeric',
   });
 };
 
 // Get animal type label
 export const getAnimalTypeLabel = (type) => {
-  const animal = ANIMAL_TYPES.find(a => a.id === type?.toLowerCase());
+  const animal = ANIMAL_TYPES.find((a) => a.id === type?.toLowerCase());
   return animal?.name || type;
 };
 
 // Get animal type icon
 export const getAnimalTypeIcon = (type) => {
-  const animal = ANIMAL_TYPES.find(a => a.id === type?.toLowerCase());
-  return animal?.icon || '🐾';
+  const animal = ANIMAL_TYPES.find((a) => a.id === type?.toLowerCase());
+  return animal?.icon || '\uD83D\uDC3E';
 };
