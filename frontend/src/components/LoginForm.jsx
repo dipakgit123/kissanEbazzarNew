@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import toast, { Toaster } from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import loginImage from '../assets/images/login1.png';
 import { otpService } from '../services/api';
-import LanguageSwitcher from './LanguageSwitcher';
 import { localizeApiMessage } from '../utils/localizeApiMessage';
+import LanguageSwitcher from './LanguageSwitcher';
 
 const DEFAULT_OTP_LENGTH = 6;
 const createEmptyOtp = (length) => Array.from({ length }, () => '');
@@ -160,11 +160,6 @@ const LoginForm = ({ onLoginSuccess }) => {
         setOtp(createEmptyOtp(nextOtpLength));
         setOtpError('');
         setDeliveryInfo(response);
-        toast.success(
-          response.debugOtp
-            ? t('auth.otpSentWithCode', { otp: response.debugOtp, channel: response.channel || 'whatsapp' })
-            : response.warning || t('auth.otpSent')
-        );
         setStep(2);
         setResendTimer(OTP_RESEND_DELAY);
       }
@@ -230,11 +225,6 @@ const LoginForm = ({ onLoginSuccess }) => {
         const nextOtpLength = Number(response.otpLength) || otpLength;
         setOtpLength(nextOtpLength);
         setDeliveryInfo(response);
-        toast.success(
-          response.debugOtp
-            ? t('auth.otpResentWithCode', { otp: response.debugOtp, channel: response.channel || 'whatsapp' })
-            : response.warning || t('auth.otpResentSuccess')
-        );
         setOtp(createEmptyOtp(nextOtpLength));
         setOtpError('');
         setResendTimer(OTP_RESEND_DELAY);
@@ -355,16 +345,6 @@ const LoginForm = ({ onLoginSuccess }) => {
               </div>
               
               <div className="space-y-6">
-                {deliveryInfo && (deliveryInfo.warning || deliveryInfo.debugOtp) && (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                    {deliveryInfo.debugOtp && (
-                      <p>{t('auth.devOtpNotice', { otp: deliveryInfo.debugOtp, channel: deliveryInfo.channel || 'whatsapp' })}</p>
-                    )}
-                    {deliveryInfo.warning && (
-                      <p className={deliveryInfo.debugOtp ? 'mt-1' : ''}>{deliveryInfo.warning}</p>
-                    )}
-                  </div>
-                )}
 
                 {/* OTP Input */}
                 <div>
