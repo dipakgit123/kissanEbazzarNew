@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DeviceEventEmitter } from 'react-native';
 import { veterinarianService } from '../services/api';
 
 const VetAuthContext = createContext({});
@@ -12,6 +13,18 @@ export const VetAuthProvider = ({ children }) => {
 
   useEffect(() => {
     loadStoredData();
+  }, []);
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('auth:unauthorized', async () => {
+      await AsyncStorage.removeItem('vetToken');
+      await AsyncStorage.removeItem('veterinarianData');
+      setVetToken(null);
+      setVeterinarian(null);
+      setIsVetAuthenticated(false);
+    });
+
+    return () => subscription.remove();
   }, []);
 
   const loadStoredData = async () => {

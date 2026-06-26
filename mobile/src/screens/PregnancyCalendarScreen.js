@@ -1,274 +1,504 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Modal,
-  TextInput,
-  Alert,
   ActivityIndicator,
+  Alert,
+  Modal,
   RefreshControl,
+  ScrollView,
   StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { COLORS } from '../utils/constants';
+import CowLoader from '../components/CowLoader';
+import AppHeader from '../components/AppHeader';
+import FeatureHelpModal from '../components/FeatureHelpModal';
+import { getLocalizedFeatureHelp } from '../constants/featureHelp';
 import { pregnancyService } from '../services/api';
+import { COLORS } from '../utils/constants';
+
+const DURATION_META = {
+  cow: { days: 280, months: 9, icon: 'cow', iconSet: 'material-community', accent: '#22A05B' },
+  buffalo: { days: 310, months: 10, icon: 'cow', iconSet: 'material-community', accent: '#475569' },
+  goat: { days: 150, months: 5, icon: 'sheep', iconSet: 'material-community', accent: '#D97706' },
+  sheep: { days: 150, months: 5, icon: 'sheep', iconSet: 'material-community', accent: '#64748B' },
+  horse: { days: 340, months: 11, icon: 'horse', iconSet: 'material-community', accent: '#7C3AED' },
+  dog: { days: 63, months: 2, icon: 'dog', iconSet: 'material-community', accent: '#EA580C' },
+  cat: { days: 65, months: 2, icon: 'cat', iconSet: 'material-community', accent: '#E11D48' },
+  other: { days: 150, months: 5, icon: 'apps-outline', iconSet: 'ionicons', accent: '#0284C7' },
+};
+
+const DEFAULT_STATS = {
+  active_pregnancies: 0,
+  successful_deliveries: 0,
+  upcoming_deliveries: [],
+  total_records: 0,
+};
+
+const getDateOnlyValue = (date) => {
+  if (!date) return '';
+  const normalizedDate = new Date(date);
+  normalizedDate.setHours(0, 0, 0, 0);
+  return normalizedDate.toISOString().split('T')[0];
+};
+
+const formatDisplayDate = (dateString, localeCode = 'en-IN') => {
+  if (!dateString) return '';
+
+  const parsedDate = new Date(dateString);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return '';
+  }
+
+  return parsedDate.toLocaleDateString(localeCode, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+};
+
+const getMonthTitle = (date, localeCode = 'en-IN') =>
+  date.toLocaleDateString(localeCode, {
+    month: 'long',
+    year: 'numeric',
+  });
 
 const PregnancyCalendarScreen = ({ navigation }) => {
-  const { t, ready } = useTranslation();
+  const { t, ready, i18n } = useTranslation();
+  const insets = useSafeAreaInsets();
+  const localeCode = i18n.language?.startsWith('hi')
+    ? 'hi-IN'
+    : i18n.language?.startsWith('mr')
+    ? 'mr-IN'
+    : 'en-IN';
+
   const [pregnancyRecords, setPregnancyRecords] = useState([]);
-  const [myAnimals, setMyAnimals] = useState([]);
   const [pregnancyDurations, setPregnancyDurations] = useState({});
-  const [stats, setStats] = useState({ active: 0, delivered: 0, dueSoon: 0, total: 0 });
+  const [stats, setStats] = useState(DEFAULT_STATS);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [deliverySubmitting, setDeliverySubmitting] = useState(false);
+  const [error, setError] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
-
-  // Show loading while translations are loading
-  if (!ready) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
-  }
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  const [helpVisible, setHelpVisible] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [activeTab, setActiveTab] = useState('active'); // 'active', 'delivered', 'all'
+  const [activeTab, setActiveTab] = useState('active');
 
-  // Form states
-  const [selectedAnimal, setSelectedAnimal] = useState(null);
-  const [matingDate, setMatingDate] = useState(new Date().toISOString().split('T')[0]);
-  const [matingType, setMatingType] = useState('natural');
-  const [bullSireDetails, setBullSireDetails] = useState('');
-  const [notes, setNotes] = useState('');
-  const [manualEntry, setManualEntry] = useState(true); // Default to manual entry for mobile
-  const [manualAnimalName, setManualAnimalName] = useState('');
-  const [manualAnimalType, setManualAnimalType] = useState('cow');
-  const [manualBreedName, setManualBreedName] = useState('');
+  const [formData, setFormData] = useState({
+    animal_type: 'cow',
+    animal_name: '',
+    ear_badge_number: '',
+    pregnancy_duration_days: '',
+    mating_date: getDateOnlyValue(new Date()),
+    notes: '',
+  });
 
-  // Delivery form states
-  const [offspringCount, setOffspringCount] = useState('1');
-  const [offspringGender, setOffspringGender] = useState('');
-  const [offspringDetails, setOffspringDetails] = useState('');
+  const [deliveryData, setDeliveryData] = useState({
+    delivery_date: getDateOnlyValue(new Date()),
+    offspring_count: '1',
+    offspring_gender: 'male',
+    offspring_details: '',
+  });
+  const pregnancyHelp = getLocalizedFeatureHelp('pregnancyCalendar', i18n.resolvedLanguage || i18n.language);
 
-  const getAnimalTypes = () => [
-    { key: 'cow', label: t('pregnancy.cow'), emoji: '🐄' },
-    { key: 'buffalo', label: t('pregnancy.buffalo'), emoji: '🐃' },
-    { key: 'goat', label: t('pregnancy.goat'), emoji: '🐐' },
-    { key: 'sheep', label: t('pregnancy.sheep'), emoji: '🐑' },
-    { key: 'horse', label: t('pregnancy.horse'), emoji: '🐴' },
-    { key: 'dog', label: t('pregnancy.dog'), emoji: '🐕' },
-    { key: 'cat', label: t('pregnancy.cat'), emoji: '🐱' },
-    { key: 'pig', label: t('pregnancy.pig'), emoji: '🐷' },
-  ];
-  
-  const animalTypes = getAnimalTypes();
+  const animalTypes = Object.keys(DURATION_META).map((type) => ({
+    key: type,
+    label: t(`pregnancy.${type}`, { defaultValue: type }),
+    icon: DURATION_META[type].icon,
+    iconSet: DURATION_META[type].iconSet,
+    accent: DURATION_META[type].accent,
+  }));
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
+      setError('');
       setLoading(true);
-      const [durationsRes, animalsRes, recordsRes, statsRes] = await Promise.all([
+
+      const [durationsRes, recordsRes, statsRes] = await Promise.all([
         pregnancyService.getDurations(),
-        pregnancyService.getMyAnimals(),
         pregnancyService.getRecords(),
         pregnancyService.getStats(),
       ]);
 
-      // Process durations response - backend returns array, convert to object
-      if (durationsRes?.success && durationsRes?.data) {
-        const durationsObj = {};
-        if (Array.isArray(durationsRes.data)) {
-          durationsRes.data.forEach(item => {
-            durationsObj[item.animal_type] = item.duration_days;
-          });
-          setPregnancyDurations(durationsObj);
-        } else {
-          // Fallback to default
-          setPregnancyDurations({
-            cow: 280,
-            buffalo: 310,
-            goat: 150,
-            sheep: 150,
-            horse: 340,
-            dog: 63,
-            cat: 65,
-            pig: 114,
-          });
-        }
-      } else {
-        // Set default pregnancy durations if API fails
-        setPregnancyDurations({
-          cow: 280,
-          buffalo: 310,
-          goat: 150,
-          sheep: 150,
-          horse: 340,
-          dog: 63,
-          cat: 65,
-          pig: 114,
+      const durationMap = {};
+
+      if (durationsRes?.success && Array.isArray(durationsRes.data)) {
+        durationsRes.data.forEach((item) => {
+          if (item?.animal_type && item?.duration_days) {
+            durationMap[item.animal_type] = Number(item.duration_days);
+          }
         });
       }
-      
-      if (animalsRes?.success && animalsRes?.data) {
-        setMyAnimals(Array.isArray(animalsRes.data) ? animalsRes.data : []);
-      }
-      
-      if (recordsRes?.success && recordsRes?.data) {
-        setPregnancyRecords(Array.isArray(recordsRes.data) ? recordsRes.data : []);
-      }
-      
-      if (statsRes?.success && statsRes?.data) {
-        setStats({
-          active: statsRes.data.active_pregnancies || 0,
-          delivered: statsRes.data.successful_deliveries || 0,
-          dueSoon: statsRes.data.upcoming_deliveries?.length || 0,
-          total: statsRes.data.total_records || 0
-        });
-      }
-    } catch (error) {
-      console.error('Error loading data:', error);
-      // Set default durations even on error
-      setPregnancyDurations({
-        cow: 280,
-        buffalo: 310,
-        goat: 150,
-        sheep: 150,
-        horse: 340,
-        dog: 63,
-        cat: 65,
-        pig: 114,
-      });
+
+      setPregnancyDurations(durationMap);
+      setPregnancyRecords(
+        recordsRes?.success && Array.isArray(recordsRes.data) ? recordsRes.data : []
+      );
+      setStats(statsRes?.success && statsRes?.data ? statsRes.data : DEFAULT_STATS);
+    } catch (loadError) {
+      console.error('Error loading pregnancy data:', loadError);
+      setError(t('pregnancy.loadFailed', { defaultValue: 'Failed to load pregnancy data' }));
+      setPregnancyDurations({});
+      setStats(DEFAULT_STATS);
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadData();
     setRefreshing(false);
+  }, [loadData]);
+
+  const resetAddForm = useCallback(() => {
+    setFormData({
+      animal_type: 'cow',
+      animal_name: '',
+      ear_badge_number: '',
+      pregnancy_duration_days: '',
+      mating_date: getDateOnlyValue(new Date()),
+      notes: '',
+    });
   }, []);
 
-  const getAnimalEmoji = (type) => {
-    const found = animalTypes.find(a => a.key === type?.toLowerCase());
-    return found?.emoji || '🐄';
-  };
-
-  const getProgressColor = (progress) => {
-    if (progress < 30) return COLORS.blue || '#3B82F6';
-    if (progress < 60) return COLORS.yellow || '#EAB308';
-    if (progress < 90) return '#F97316';
-    return COLORS.red || '#EF4444';
-  };
-
-  const calculateProgress = (record) => {
-    if (record.status !== 'pregnant') return 100;
-    const matingDate = new Date(record.mating_date);
-    const today = new Date();
-    const daysPassed = Math.floor((today - matingDate) / (1000 * 60 * 60 * 24));
-    const percentage = Math.min(100, Math.max(0, (daysPassed / record.pregnancy_duration_days) * 100));
-    return Math.round(percentage);
-  };
-
-  const getDaysRemaining = (record) => {
-    if (record.status !== 'pregnant') return 0;
-    const expectedDate = new Date(record.expected_delivery_date);
-    const today = new Date();
-    const diffDays = Math.ceil((expectedDate - today) / (1000 * 60 * 60 * 24));
-    return Math.max(0, diffDays);
-  };
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
+  const resetDeliveryForm = useCallback(() => {
+    setDeliveryData({
+      delivery_date: getDateOnlyValue(new Date()),
+      offspring_count: '1',
+      offspring_gender: 'male',
+      offspring_details: '',
     });
-  };
+  }, []);
 
-  const getDaysInMonth = (date) => {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-  };
+  const getAnimalMeta = useCallback(
+    (animalType) => {
+      const normalizedType = animalType?.toLowerCase() || 'cow';
+      const resolvedType = DURATION_META[normalizedType]
+        ? normalizedType
+        : 'other';
+      const base = DURATION_META[resolvedType];
 
-  const getFirstDayOfMonth = (date) => {
-    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
-  };
+      return {
+        ...base,
+        key: resolvedType,
+        label: t(`pregnancy.${resolvedType}`, {
+          defaultValue: resolvedType,
+        }),
+      };
+    },
+    [t]
+  );
 
-  const navigateMonth = (direction) => {
-    const newMonth = new Date(currentMonth);
-    newMonth.setMonth(newMonth.getMonth() + direction);
-    setCurrentMonth(newMonth);
-  };
-
-  const getRecordsForDate = (date) => {
-    const dateStr = date.toISOString().split('T')[0];
-    return pregnancyRecords.filter((record) => {
-      if (record.status !== 'pregnant') return false;
-      const matingDate = record.mating_date;
-      const expectedDate = record.expected_delivery_date;
-      return dateStr >= matingDate && dateStr <= expectedDate;
-    });
-  };
-
-  const isExpectedDeliveryDate = (date) => {
-    const dateStr = date.toISOString().split('T')[0];
-    return pregnancyRecords.some(r => r.expected_delivery_date === dateStr && r.status === 'pregnant');
-  };
-
-  const handleCreateRecord = async () => {
-    try {
-      // Validate manual entry (always manual for mobile)
-      if (!manualAnimalName.trim()) {
-        Alert.alert(t('common.error'), t('pregnancy.nameRequired'));
-        return;
+  const getDurationDays = useCallback(
+    (animalType, customDuration = null) => {
+      if (animalType === 'other') {
+        return Number(customDuration) || DURATION_META.other.days;
       }
 
-      // Validate date format
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (!dateRegex.test(matingDate)) {
-        Alert.alert(t('common.error'), t('pregnancy.invalidDateFormat'));
-        return;
+      return (
+        pregnancyDurations[animalType] ||
+        DURATION_META[animalType]?.days ||
+        DURATION_META.other.days
+      );
+    },
+    [pregnancyDurations]
+  );
+
+  const formatPregnancyDuration = useCallback(
+    (days) => {
+      if (!days || Number.isNaN(Number(days))) {
+        return '';
       }
 
-      setSubmitting(true);
+      const totalDays = Math.round(Number(days));
+      const months = Math.floor(totalDays / 30);
+      const remainingDays = totalDays % 30;
 
-      let recordData = {
-        mating_date: matingDate,
-        mating_type: matingType,
-        bull_sire_details: bullSireDetails || null,
-        notes: notes || null,
-        animal_name: manualAnimalName.trim(),
-        animal_type: manualAnimalType,
-        breed_name: manualBreedName?.trim() || null,
+      if (months > 0 && remainingDays > 0) {
+        return `${months} ${t('pregnancy.monthsLabel', {
+          defaultValue: 'months',
+        })} ${remainingDays} ${t('pregnancy.days')}`;
+      }
+
+      if (months > 0) {
+        return `${months} ${t('pregnancy.monthsLabel', {
+          defaultValue: 'months',
+        })}`;
+      }
+
+      return `${remainingDays} ${t('pregnancy.days')}`;
+    },
+    [t]
+  );
+
+  const getStatusConfig = useCallback(
+    (status) => {
+      const config = {
+        pregnant: {
+          backgroundColor: '#DCFCE7',
+          textColor: '#166534',
+          label: t('pregnancy.statusActive', { defaultValue: t('pregnancy.active') }),
+        },
+        delivered: {
+          backgroundColor: '#DBEAFE',
+          textColor: '#1D4ED8',
+          label: t('pregnancy.statusDelivered', {
+            defaultValue: t('pregnancy.delivered'),
+          }),
+        },
+        miscarriage: {
+          backgroundColor: '#FEE2E2',
+          textColor: '#B91C1C',
+          label: t('pregnancy.statusMiscarriage', { defaultValue: 'Miscarriage' }),
+        },
+        false_pregnancy: {
+          backgroundColor: '#FEF3C7',
+          textColor: '#B45309',
+          label: t('pregnancy.statusFalsePregnancy', {
+            defaultValue: 'False Pregnancy',
+          }),
+        },
+        cancelled: {
+          backgroundColor: '#E5E7EB',
+          textColor: '#4B5563',
+          label: t('pregnancy.statusCancelled', { defaultValue: 'Cancelled' }),
+        },
       };
 
-      console.log('Creating pregnancy record:', recordData);
-      const response = await pregnancyService.createRecord(recordData);
-      console.log('Create record response:', response);
+      return config[status] || config.pregnant;
+    },
+    [t]
+  );
+
+  const getProgressColor = useCallback((daysRemaining, totalDays) => {
+    const progress = ((totalDays - daysRemaining) / totalDays) * 100;
+
+    if (progress < 30) return '#2563EB';
+    if (progress < 60) return COLORS.primary;
+    if (progress < 85) return '#EA580C';
+    return '#DC2626';
+  }, []);
+
+  const getRecordDurationDays = useCallback(
+    (record) =>
+      Number(record?.pregnancy_duration_days) ||
+      getDurationDays(record?.animal_type, record?.pregnancy_duration_days),
+    [getDurationDays]
+  );
+
+  const getRecordProgress = useCallback(
+    (record) => {
+      if (record?.status !== 'pregnant') {
+        return 100;
+      }
+
+      const progressPercentage = Number(record?.progress_percentage);
+
+      if (Number.isFinite(progressPercentage)) {
+        return Math.min(100, Math.max(0, Math.round(progressPercentage)));
+      }
+
+      const totalDays = getRecordDurationDays(record);
+      const matingDate = new Date(record.mating_date);
+      const today = new Date();
+      const daysPassed = Math.floor(
+        (today - matingDate) / (1000 * 60 * 60 * 24)
+      );
+
+      return Math.min(100, Math.max(0, Math.round((daysPassed / totalDays) * 100)));
+    },
+    [getRecordDurationDays]
+  );
+
+  const getDaysRemaining = useCallback((record) => {
+    if (record?.status !== 'pregnant') {
+      return 0;
+    }
+
+    const providedDaysRemaining = Number(record?.days_remaining);
+
+    if (Number.isFinite(providedDaysRemaining)) {
+      return Math.max(0, providedDaysRemaining);
+    }
+
+    const expectedDate = new Date(record.expected_delivery_date);
+    const today = new Date();
+    return Math.max(
+      0,
+      Math.ceil((expectedDate - today) / (1000 * 60 * 60 * 24))
+    );
+  }, []);
+
+  const getDaysInMonth = (date) =>
+    new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+
+  const getFirstDayOfMonth = (date) =>
+    new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+
+  const navigateMonth = (direction) => {
+    const nextMonth = new Date(currentMonth);
+    nextMonth.setMonth(nextMonth.getMonth() + direction);
+    setCurrentMonth(nextMonth);
+  };
+
+  const getRecordsForDate = useCallback(
+    (date) => {
+      if (!date) return [];
+
+      const dateValue = getDateOnlyValue(date);
+
+      return pregnancyRecords.filter((record) => {
+        if (record.status === 'pregnant') {
+          return (
+            dateValue >= record.mating_date &&
+            dateValue <= record.expected_delivery_date
+          );
+        }
+
+        if (record.status === 'delivered' && record.actual_delivery_date) {
+          return record.actual_delivery_date === dateValue;
+        }
+
+        return false;
+      });
+    },
+    [pregnancyRecords]
+  );
+
+  const isDueDate = useCallback(
+    (date) => {
+      const dateValue = getDateOnlyValue(date);
+      return pregnancyRecords.some(
+        (record) =>
+          record.status === 'pregnant' &&
+          record.expected_delivery_date === dateValue
+      );
+    },
+    [pregnancyRecords]
+  );
+
+  const getFilteredRecords = useCallback(() => {
+    if (activeTab === 'active') {
+      return pregnancyRecords.filter((record) => record.status === 'pregnant');
+    }
+
+    if (activeTab === 'delivered') {
+      return pregnancyRecords.filter((record) => record.status === 'delivered');
+    }
+
+    return pregnancyRecords;
+  }, [activeTab, pregnancyRecords]);
+
+  const getSelectedDateRecords = useCallback(() => {
+    const records = getRecordsForDate(selectedDate);
+
+    if (activeTab === 'active') {
+      return records.filter((record) => record.status === 'pregnant');
+    }
+
+    if (activeTab === 'delivered') {
+      return records.filter((record) => record.status === 'delivered');
+    }
+
+    return records;
+  }, [activeTab, getRecordsForDate, selectedDate]);
+
+  const getExpectedDeliveryPreview = useCallback(() => {
+    if (!formData.mating_date) return '';
+
+    const durationDays = getDurationDays(
+      formData.animal_type,
+      formData.pregnancy_duration_days
+    );
+
+    if (!durationDays) return '';
+
+    const expectedDate = new Date(formData.mating_date);
+
+    if (Number.isNaN(expectedDate.getTime())) {
+      return '';
+    }
+
+    expectedDate.setDate(expectedDate.getDate() + Number(durationDays));
+    return formatDisplayDate(expectedDate.toISOString(), localeCode);
+  }, [formData, getDurationDays, localeCode]);
+
+  const handleCreateRecord = async () => {
+    if (!formData.animal_name.trim()) {
+      Alert.alert(t('common.error'), t('pregnancy.nameRequired'));
+      return;
+    }
+
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+    if (!dateRegex.test(formData.mating_date)) {
+      Alert.alert(t('common.error'), t('pregnancy.invalidDateFormat'));
+      return;
+    }
+
+    if (
+      formData.animal_type === 'other' &&
+      (!Number(formData.pregnancy_duration_days) ||
+        Number(formData.pregnancy_duration_days) <= 0)
+    ) {
+      Alert.alert(
+        t('common.error'),
+        t('pregnancy.placeholderCustomPregnancyDurationDays', {
+          defaultValue: 'Enter custom pregnancy duration in days',
+        })
+      );
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const payload = {
+        animal_type: formData.animal_type,
+        animal_name: formData.animal_name.trim(),
+        ear_badge_number: formData.ear_badge_number.trim() || null,
+        pregnancy_duration_days:
+          formData.animal_type === 'other'
+            ? Number(formData.pregnancy_duration_days)
+            : null,
+        mating_date: formData.mating_date,
+        notes: formData.notes.trim() || null,
+      };
+
+      const response = await pregnancyService.createRecord(payload);
 
       if (response?.success) {
         Alert.alert(t('common.success'), t('pregnancy.recordCreated'));
         setShowAddModal(false);
-        resetForm();
+        resetAddForm();
         await loadData();
       } else {
-        Alert.alert(t('common.error'), response?.message || t('pregnancy.recordCreatedError'));
+        Alert.alert(
+          t('common.error'),
+          response?.message || t('pregnancy.recordCreatedError')
+        );
       }
-    } catch (error) {
-      console.error('Error creating record:', error);
-      Alert.alert(t('common.error'), error?.message || t('pregnancy.recordCreatedError'));
+    } catch (createError) {
+      console.error('Error creating pregnancy record:', createError);
+      Alert.alert(
+        t('common.error'),
+        createError?.message || t('pregnancy.recordCreatedError')
+      );
     } finally {
       setSubmitting(false);
     }
@@ -277,28 +507,36 @@ const PregnancyCalendarScreen = ({ navigation }) => {
   const handleMarkDelivered = async () => {
     if (!selectedRecord) return;
 
-    try {
-      const deliveryData = {
-        deliveryDate: new Date().toISOString().split('T')[0],
-        offspringCount: parseInt(offspringCount) || 1,
-        offspringGender: offspringGender || null,
-        offspringDetails: offspringDetails || null,
-      };
+    setDeliverySubmitting(true);
 
-      const response = await pregnancyService.markDelivered(selectedRecord.id, deliveryData);
+    try {
+      const response = await pregnancyService.markDelivered(selectedRecord.id, {
+        delivery_date: deliveryData.delivery_date,
+        offspring_count: Number(deliveryData.offspring_count) || 1,
+        offspring_gender: deliveryData.offspring_gender || null,
+        offspring_details: deliveryData.offspring_details.trim() || null,
+      });
 
       if (response?.success) {
         Alert.alert(t('pregnancy.congratulations'), t('pregnancy.deliveryRecorded'));
         setShowDeliveryModal(false);
         setSelectedRecord(null);
         resetDeliveryForm();
-        loadData();
+        await loadData();
       } else {
-        Alert.alert(t('common.error'), response?.message || t('pregnancy.deliveryRecordedError'));
+        Alert.alert(
+          t('common.error'),
+          response?.message || t('pregnancy.deliveryRecordedError')
+        );
       }
-    } catch (error) {
-      console.log('Error marking delivered:', error);
-      Alert.alert(t('common.error'), error.message || t('pregnancy.deliveryRecordedError'));
+    } catch (deliveryError) {
+      console.error('Error recording delivery:', deliveryError);
+      Alert.alert(
+        t('common.error'),
+        deliveryError?.message || t('pregnancy.deliveryRecordedError')
+      );
+    } finally {
+      setDeliverySubmitting(false);
     }
   };
 
@@ -307,18 +545,25 @@ const PregnancyCalendarScreen = ({ navigation }) => {
       t('pregnancy.deleteRecord'),
       t('pregnancy.deleteConfirm', { name: record.animal_name }),
       [
-        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.cancel'),
+          style: 'cancel',
+        },
         {
           text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
               const response = await pregnancyService.deleteRecord(record.id);
-              if (response.success) {
+
+              if (response?.success) {
                 Alert.alert(t('common.success'), t('pregnancy.deleteSuccess'));
-                loadData();
+                await loadData();
+              } else {
+                Alert.alert(t('common.error'), t('pregnancy.deleteError'));
               }
-            } catch (error) {
+            } catch (deleteError) {
+              console.error('Error deleting pregnancy record:', deleteError);
               Alert.alert(t('common.error'), t('pregnancy.deleteError'));
             }
           },
@@ -327,75 +572,293 @@ const PregnancyCalendarScreen = ({ navigation }) => {
     );
   };
 
-  const resetForm = () => {
-    setSelectedAnimal(null);
-    setMatingDate(new Date().toISOString().split('T')[0]);
-    setMatingType('natural');
-    setBullSireDetails('');
-    setNotes('');
-    setManualEntry(true); // Default to manual entry for mobile
-    setManualAnimalName('');
-    setManualAnimalType('cow');
-    setManualBreedName('');
-  };
-
-  const resetDeliveryForm = () => {
-    setOffspringCount('1');
-    setOffspringGender('');
-    setOffspringDetails('');
-  };
-
   const openDeliveryModal = (record) => {
     setSelectedRecord(record);
+    setDeliveryData((current) => ({
+      ...current,
+      delivery_date: getDateOnlyValue(new Date()),
+    }));
     setShowDeliveryModal(true);
   };
 
-  const renderCalendar = () => {
+  const renderSummaryCard = (icon, title, value, accentColor, softColor) => (
+    <View style={styles.summaryCard} key={title}>
+      <View style={styles.summaryCopy}>
+        <Text style={styles.summaryLabel}>{title}</Text>
+        <Text style={styles.summaryValue}>{value}</Text>
+      </View>
+      <View
+        style={[
+          styles.summaryIconWrap,
+          {
+            backgroundColor: softColor,
+            borderColor: accentColor + '33',
+          },
+        ]}
+      >
+        <Ionicons name={icon} size={22} color={accentColor} />
+      </View>
+    </View>
+  );
+
+  const renderAnimalIcon = (animalMeta, size = 20) => {
+    if (animalMeta.iconSet === 'material-community') {
+      return (
+        <MaterialCommunityIcons
+          name={animalMeta.icon || 'cow'}
+          size={size}
+          color={animalMeta.accent}
+        />
+      );
+    }
+
+    return (
+      <Ionicons
+        name={animalMeta.icon || 'apps-outline'}
+        size={size}
+        color={animalMeta.accent}
+      />
+    );
+  };
+
+  const renderRecordCard = (record, { showActions = true } = {}) => {
+    const animalMeta = getAnimalMeta(record.animal_type);
+    const totalDays = getRecordDurationDays(record);
+    const daysRemaining = getDaysRemaining(record);
+    const progress = getRecordProgress(record);
+    const progressColor = getProgressColor(daysRemaining, totalDays);
+    const statusConfig = getStatusConfig(record.status);
+
+    return (
+      <View key={record.id} style={styles.recordCard}>
+        <View style={styles.recordTopRow}>
+          <View style={styles.recordAnimalRow}>
+            <View
+              style={[
+                styles.recordAnimalBadge,
+                { backgroundColor: animalMeta.accent + '18' },
+              ]}
+            >
+              {renderAnimalIcon(animalMeta, 24)}
+            </View>
+
+            <View style={styles.recordAnimalCopy}>
+              <Text style={styles.recordAnimalName}>{record.animal_name}</Text>
+              <Text style={styles.recordAnimalMetaText}>
+                {record.ear_badge_number
+                  ? `${t('pregnancy.earBadgeNumberShort', {
+                      defaultValue: 'Tag',
+                    })}: ${record.ear_badge_number}`
+                  : record.breed_name || animalMeta.label}
+              </Text>
+            </View>
+          </View>
+
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: statusConfig.backgroundColor },
+            ]}
+          >
+            <Text
+              style={[
+                styles.statusBadgeText,
+                { color: statusConfig.textColor },
+              ]}
+            >
+              {statusConfig.label}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.detailGrid}>
+          <View style={styles.detailTile}>
+            <Text style={styles.detailTileLabel}>{t('pregnancy.matingDate')}</Text>
+              <Text style={styles.detailTileValue}>
+              {formatDisplayDate(record.mating_date, localeCode)}
+            </Text>
+          </View>
+
+          <View style={styles.detailTile}>
+            <Text style={styles.detailTileLabel}>
+              {t('pregnancy.expectedDelivery')}
+            </Text>
+            <Text style={[styles.detailTileValue, styles.detailTileAccent]}>
+              {formatDisplayDate(record.expected_delivery_date, localeCode)}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.detailGrid}>
+          <View style={styles.detailTile}>
+            <Text style={styles.detailTileLabel}>{t('pregnancy.animalType')}</Text>
+            <Text style={styles.detailTileValue}>{animalMeta.label}</Text>
+          </View>
+
+          <View style={styles.detailTile}>
+            <Text style={styles.detailTileLabel}>
+              {t('pregnancy.customPregnancyDurationDays', {
+                defaultValue: 'Pregnancy Duration',
+              })}
+            </Text>
+            <Text style={styles.detailTileValue}>
+              {formatPregnancyDuration(totalDays) || `${totalDays} ${t('pregnancy.days')}`}
+            </Text>
+          </View>
+        </View>
+
+        {record.status === 'pregnant' ? (
+          <>
+            <View style={styles.progressHeader}>
+              <Text style={styles.progressLabel}>{t('pregnancy.progress')}</Text>
+              <Text style={[styles.progressValue, { color: progressColor }]}>
+                {progress}%
+              </Text>
+            </View>
+
+            <View style={styles.progressTrack}>
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: `${progress}%`,
+                    backgroundColor: progressColor,
+                  },
+                ]}
+              />
+            </View>
+
+            <View style={styles.remainingBanner}>
+              <Text style={styles.remainingBannerLabel}>
+                {t('pregnancy.daysRemaining')}
+              </Text>
+              <Text style={styles.remainingBannerValue}>
+                {daysRemaining} {t('pregnancy.days')}
+              </Text>
+            </View>
+          </>
+        ) : null}
+
+        {record.notes ? (
+          <View style={styles.notesBox}>
+            <Text style={styles.notesLabel}>{t('pregnancy.notes')}</Text>
+            <Text style={styles.notesText}>{record.notes}</Text>
+          </View>
+        ) : null}
+
+        {record.status === 'delivered' && record.actual_delivery_date ? (
+          <View style={styles.deliveryBanner}>
+            <Text style={styles.deliveryBannerText}>
+              {t('pregnancy.statusDelivered', {
+                defaultValue: t('pregnancy.delivered'),
+              })}{' '}
+              {formatDisplayDate(record.actual_delivery_date, localeCode)}
+              {record.offspring_count
+                ? ` - ${record.offspring_count} ${t('pregnancy.count', {
+                    defaultValue: 'count',
+                  })}`
+                : ''}
+            </Text>
+          </View>
+        ) : null}
+
+        {showActions && record.status === 'pregnant' ? (
+          <View style={styles.recordActions}>
+            <TouchableOpacity
+              style={styles.primaryActionButton}
+              onPress={() => openDeliveryModal(record)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+              <Text style={styles.primaryActionText}>
+                {t('pregnancy.markDelivered')}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.dangerActionButton}
+              onPress={() => handleDeleteRecord(record)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="trash-outline" size={18} color="#B91C1C" />
+              <Text style={styles.dangerActionText}>
+                {t('pregnancy.delete', { defaultValue: 'Delete' })}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+      </View>
+    );
+  };
+
+  const renderCalendarDays = () => {
     const daysInMonth = getDaysInMonth(currentMonth);
     const firstDay = getFirstDayOfMonth(currentMonth);
     const days = [];
+    const todayValue = getDateOnlyValue(new Date());
+    const selectedDateValue = selectedDate ? getDateOnlyValue(selectedDate) : null;
 
-    for (let i = 0; i < firstDay; i++) {
-      days.push(<View key={`empty-${i}`} style={styles.calendarCell} />);
+    for (let index = 0; index < firstDay; index += 1) {
+      days.push(<View key={`empty-${index}`} style={styles.calendarPlaceholder} />);
     }
 
-    for (let day = 1; day <= daysInMonth; day++) {
+    for (let day = 1; day <= daysInMonth; day += 1) {
       const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+      const dateValue = getDateOnlyValue(date);
       const recordsForDate = getRecordsForDate(date);
-      const isToday = date.toDateString() === new Date().toDateString();
-      const isSelected = date.toDateString() === selectedDate.toDateString();
-      const isDeliveryDate = isExpectedDeliveryDate(date);
+      const dueDate = isDueDate(date);
+      const isToday = dateValue === todayValue;
+      const isSelected = selectedDateValue === dateValue;
+
+      let cellStyle = styles.calendarDayButton;
+      let dayTextStyle = styles.calendarDayText;
+
+      if (recordsForDate.length > 0) {
+        cellStyle = [cellStyle, styles.calendarDayHasRecord];
+      }
+
+      if (dueDate) {
+        cellStyle = [cellStyle, styles.calendarDayDue];
+        dayTextStyle = [dayTextStyle, styles.calendarDayDueText];
+      }
+
+      if (isToday) {
+        cellStyle = [cellStyle, styles.calendarDayToday];
+        dayTextStyle = [dayTextStyle, styles.calendarDayTodayText];
+      }
+
+      if (isSelected) {
+        cellStyle = [cellStyle, styles.calendarDaySelected];
+        dayTextStyle = [dayTextStyle, styles.calendarDaySelectedText];
+      }
 
       days.push(
         <TouchableOpacity
-          key={day}
-          style={[
-            styles.calendarCell,
-            isToday && styles.todayCell,
-            isSelected && styles.selectedCell,
-            isDeliveryDate && styles.deliveryDateCell,
-          ]}
+          key={dateValue}
+          style={cellStyle}
           onPress={() => setSelectedDate(date)}
+          activeOpacity={0.85}
         >
-          <Text
-            style={[
-              styles.dayText,
-              isToday && styles.todayText,
-              isSelected && styles.selectedText,
-              isDeliveryDate && styles.deliveryDateText,
-            ]}
-          >
-            {day}
-          </Text>
-          {recordsForDate.length > 0 && (
-            <View style={styles.animalIndicator}>
-              {recordsForDate.slice(0, 3).map((record, idx) => (
-                <Text key={record.id} style={styles.animalMiniEmoji}>
-                  {getAnimalEmoji(record.animal_type)}
+          <View style={styles.calendarDayHeader}>
+            <Text style={dayTextStyle}>{day}</Text>
+            {recordsForDate.length > 0 ? (
+              <View style={styles.calendarCountBadge}>
+                <Text style={styles.calendarCountText}>
+                  {recordsForDate.length}
                 </Text>
-              ))}
-            </View>
-          )}
+              </View>
+            ) : null}
+          </View>
+
+          {dueDate ? (
+            <Text style={styles.calendarHintText} numberOfLines={1}>
+              {t('pregnancy.due')}
+            </Text>
+          ) : recordsForDate.length > 0 ? (
+            <Text style={styles.calendarHintText} numberOfLines={1}>
+              {recordsForDate[0]?.animal_name}
+            </Text>
+          ) : null}
         </TouchableOpacity>
       );
     }
@@ -403,449 +866,908 @@ const PregnancyCalendarScreen = ({ navigation }) => {
     return days;
   };
 
-  const getFilteredRecords = () => {
-    switch (activeTab) {
-      case 'active':
-        return pregnancyRecords.filter(r => r.status === 'pregnant');
-      case 'delivered':
-        return pregnancyRecords.filter(r => r.status === 'delivered');
-      default:
-        return pregnancyRecords;
-    }
-  };
-
-  const selectedDateRecords = getRecordsForDate(selectedDate);
   const filteredRecords = getFilteredRecords();
+  const selectedDateRecords = getSelectedDateRecords();
+  const currentDurationDays = getDurationDays(
+    formData.animal_type,
+    formData.pregnancy_duration_days
+  );
 
-  if (loading) {
+  if (!ready || loading) {
     return (
-      <SafeAreaView style={styles.loadingContainer} edges={['top']}>
-        <StatusBar barStyle="light-content" />
-        <View style={styles.loadingContent}>
-          <View style={styles.loadingIconContainer}>
-            <Ionicons name="calendar" size={48} color={COLORS.primary} />
-          </View>
-          <ActivityIndicator size="large" color={COLORS.primary} style={styles.loadingSpinner} />
-          <Text style={styles.loadingText}>{t('pregnancy.loadingCalendar')}</Text>
+      <SafeAreaView style={styles.loaderSafeArea}>
+        <StatusBar barStyle="dark-content" />
+        <View style={styles.loaderContent}>
+          <CowLoader message={t('pregnancy.loadingCalendar')} size="large" />
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <StatusBar barStyle="light-content" />
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" />
+      <AppHeader
+        safeArea={false}
+        navigation={navigation}
+        title={t('pregnancy.pageTitle', { defaultValue: t('pregnancy.title') })}
+        subtitle={t('pregnancy.pageDescription', {
+          defaultValue: t('pregnancy.subtitle'),
+        })}
+        rightActions={[
+          {
+            icon: 'help-circle-outline',
+            onPress: () => setHelpVisible(true),
+            color: COLORS.primary,
+            backgroundColor: COLORS.primarySoft,
+            accessibilityLabel: 'Open pregnancy calendar help',
+          },
+          {
+            icon: 'add',
+            onPress: () => setShowAddModal(true),
+            color: COLORS.surface,
+            backgroundColor: COLORS.primary,
+            accessibilityLabel: 'Add pregnancy record',
+          },
+        ]}
+      />
+
       <ScrollView
         style={styles.container}
+        contentContainerStyle={{
+          paddingBottom: insets.bottom + 28,
+        }}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.white} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.primary}
+          />
         }
       >
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerIcon}>
-          <Ionicons name="calendar" size={28} color={COLORS.white} />
-        </View>
-        <Text style={styles.title}>{t('pregnancy.title')}</Text>
-        <Text style={styles.subtitle}>{t('pregnancy.subtitle')}</Text>
-      </View>
-
-      {/* Stats - Removed for mobile */}
-
-      {/* Calendar */}
-      <View style={styles.calendarCard}>
-        <View style={styles.monthNav}>
-          <TouchableOpacity onPress={() => navigateMonth(-1)} style={styles.navBtn}>
-            <Ionicons name="chevron-back" size={24} color={COLORS.black} />
-          </TouchableOpacity>
-          <Text style={styles.monthTitle}>
-            {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-          </Text>
-          <TouchableOpacity onPress={() => navigateMonth(1)} style={styles.navBtn}>
-            <Ionicons name="chevron-forward" size={24} color={COLORS.black} />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.weekdaysRow}>
-          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
-            <Text key={index} style={styles.weekdayText}>
-              {day}
-            </Text>
-          ))}
-        </View>
-
-        <View style={styles.calendarGrid}>{renderCalendar()}</View>
-
-        <View style={styles.legendRow}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: COLORS.primary }]} />
-            <Text style={styles.legendText}>{t('pregnancy.pregnant')}</Text>
+        {error ? (
+          <View style={styles.errorBanner}>
+            <Ionicons name="alert-circle-outline" size={18} color="#B91C1C" />
+            <Text style={styles.errorBannerText}>{error}</Text>
           </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#EF4444' }]} />
-            <Text style={styles.legendText}>{t('pregnancy.dueDate')}</Text>
+        ) : null}
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.summaryRow}
+        >
+          {renderSummaryCard(
+            'leaf-outline',
+            t('pregnancy.activePregnancies'),
+            stats.active_pregnancies || 0,
+            '#15803D',
+            '#DCFCE7'
+          )}
+          {renderSummaryCard(
+            'happy-outline',
+            t('pregnancy.delivered'),
+            stats.successful_deliveries || 0,
+            '#2563EB',
+            '#DBEAFE'
+          )}
+          {renderSummaryCard(
+            'alarm-outline',
+            t('pregnancy.dueSoon'),
+            stats.upcoming_deliveries?.length || 0,
+            '#EA580C',
+            '#FFEDD5'
+          )}
+          {renderSummaryCard(
+            'stats-chart-outline',
+            t('pregnancy.totalRecords'),
+            stats.total_records || 0,
+            '#7C3AED',
+            '#EDE9FE'
+          )}
+        </ScrollView>
+
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>
+                {t('pregnancy.pregnancyDurationReference')}
+              </Text>
+            </View>
           </View>
-        </View>
-      </View>
 
-      {/* Add Pregnancy Button - Prominent */}
-      <View style={styles.addButtonContainer}>
-        <TouchableOpacity style={styles.addPregnancyButton} onPress={() => setShowAddModal(true)}>
-          <Ionicons name="add-circle" size={24} color={COLORS.white} />
-          <Text style={styles.addPregnancyButtonText}>{t('pregnancy.addPregnancyRecord')}</Text>
-        </TouchableOpacity>
-      </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.referenceChipRow}
+          >
+            {animalTypes.map((animal) => {
+              const durationDays = getDurationDays(animal.key);
+              const monthMeta = DURATION_META[animal.key]?.months;
+              const durationText =
+                animal.key === 'other'
+                  ? t('pregnancy.customDurationRequired', {
+                      defaultValue: 'Custom duration required',
+                    })
+                  : formatPregnancyDuration(durationDays) ||
+                    `${monthMeta} ${t('pregnancy.monthsLabel', {
+                      defaultValue: 'months',
+                    })}`;
 
-      {/* Selected Date Info */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Ionicons name="calendar-outline" size={20} color={COLORS.primary} />
-          <Text style={styles.sectionTitle}>{formatDate(selectedDate.toISOString())}</Text>
-        </View>
-
-        {selectedDateRecords.length > 0 ? (
-          selectedDateRecords.map((record) => {
-            const progress = calculateProgress(record);
-            const daysLeft = getDaysRemaining(record);
-            return (
-              <View key={record.id} style={styles.animalCard}>
-                <View style={styles.animalHeader}>
-                  <Text style={styles.animalEmoji}>{getAnimalEmoji(record.animal_type)}</Text>
-                  <View style={styles.animalInfo}>
-                    <Text style={styles.animalName}>{record.animal_name}</Text>
-                    <Text style={styles.animalBreed}>
-                      {record.breed_name || record.animal_type} • {daysLeft} {t('pregnancy.daysLeft')}
-                    </Text>
-                  </View>
-                  <View style={styles.progressBadge}>
-                    <Text style={[styles.progressText, { color: getProgressColor(progress) }]}>
-                      {progress}%
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.animalDetails}>
-                  <Text style={styles.detailText}>{t('pregnancy.mating')}: {formatDate(record.mating_date)}</Text>
-                  <Text style={styles.detailText}>{t('pregnancy.expected')}: {formatDate(record.expected_delivery_date)}</Text>
-                </View>
-
-                <View style={styles.progressBarContainer}>
+              return (
+                <View key={animal.key} style={styles.referenceChip}>
                   <View
                     style={[
-                      styles.progressBar,
-                      { width: `${progress}%`, backgroundColor: getProgressColor(progress) },
+                      styles.referenceIconBadge,
+                      { backgroundColor: animal.accent + '16' },
                     ]}
-                  />
-                </View>
-
-                <View style={styles.cardActions}>
-                  {record.status === 'pregnant' && (
-                    <TouchableOpacity
-                      style={styles.deliverBtn}
-                      onPress={() => openDeliveryModal(record)}
-                    >
-                      <Ionicons name="checkmark-circle" size={18} color="#22C55E" />
-                      <Text style={styles.deliverBtnText}>{t('pregnancy.markDelivered')}</Text>
-                    </TouchableOpacity>
-                  )}
-                  <TouchableOpacity
-                    style={styles.deleteBtn}
-                    onPress={() => handleDeleteRecord(record)}
                   >
-                    <Ionicons name="trash-outline" size={18} color={COLORS.red} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            );
-          })
-        ) : (
-          <View style={styles.emptyState}>
-            <Ionicons name="calendar-outline" size={48} color={COLORS.gray} />
-            <Text style={styles.emptyText}>{t('pregnancy.noPregnantAnimals')}</Text>
-          </View>
-        )}
-      </View>
-
-      {/* Tabs */}
-      <View style={styles.tabContainer}>
-        {['active', 'delivered', 'all'].map((tab) => (
-          <TouchableOpacity
-            key={tab}
-            style={[styles.tab, activeTab === tab && styles.activeTab]}
-            onPress={() => setActiveTab(tab)}
-          >
-            <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
-              {t(`pregnancy.${tab}`)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* All Records List */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          {activeTab === 'active' ? t('pregnancy.activePregnancies') :
-           activeTab === 'delivered' ? t('pregnancy.delivered') : t('pregnancy.allRecords')}
-        </Text>
-
-        {filteredRecords.length > 0 ? (
-          filteredRecords.map((record) => {
-            const progress = calculateProgress(record);
-            const daysLeft = getDaysRemaining(record);
-            return (
-              <View key={record.id} style={styles.miniAnimalCard}>
-                <Text style={styles.animalEmoji}>{getAnimalEmoji(record.animal_type)}</Text>
-                <View style={styles.miniAnimalInfo}>
-                  <Text style={styles.miniAnimalName}>{record.animal_name}</Text>
-                  <Text style={styles.miniAnimalDate}>
-                    {record.status === 'pregnant'
-                      ? `${t('pregnancy.due')}: ${formatDate(record.expected_delivery_date)}`
-                      : `${t('pregnancy.delivered')}: ${formatDate(record.actual_delivery_date)}`}
+                    {renderAnimalIcon(animal, 18)}
+                  </View>
+                  <Text style={styles.referenceLabel} numberOfLines={1}>
+                    {animal.label}
+                  </Text>
+                  <Text style={styles.referenceValue} numberOfLines={1}>
+                    {durationText}
                   </Text>
                 </View>
-                {record.status === 'pregnant' ? (
-                  <View style={[styles.miniBadge, { backgroundColor: getProgressColor(progress) + '20' }]}>
-                    <Text style={[styles.miniBadgeText, { color: getProgressColor(progress) }]}>
-                      {daysLeft}d
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        <View style={styles.sectionCard}>
+          <View style={styles.calendarHeaderRow}>
+            <TouchableOpacity
+              style={styles.monthNavButton}
+              onPress={() => navigateMonth(-1)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="chevron-back" size={20} color={COLORS.text} />
+            </TouchableOpacity>
+
+            <Text style={styles.monthTitle}>
+              {getMonthTitle(currentMonth, localeCode)}
+            </Text>
+
+            <TouchableOpacity
+              style={styles.monthNavButton}
+              onPress={() => navigateMonth(1)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="chevron-forward" size={20} color={COLORS.text} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.weekdayRow}>
+            {[
+              t('pregnancy.sun', { defaultValue: 'Sun' }),
+              t('pregnancy.mon', { defaultValue: 'Mon' }),
+              t('pregnancy.tue', { defaultValue: 'Tue' }),
+              t('pregnancy.wed', { defaultValue: 'Wed' }),
+              t('pregnancy.thu', { defaultValue: 'Thu' }),
+              t('pregnancy.fri', { defaultValue: 'Fri' }),
+              t('pregnancy.sat', { defaultValue: 'Sat' }),
+            ].map((day) => (
+              <Text key={day} style={styles.weekdayText}>
+                {day}
+              </Text>
+            ))}
+          </View>
+
+          <View style={styles.calendarGrid}>{renderCalendarDays()}</View>
+
+          <View style={styles.legendRow}>
+            <View style={styles.legendItem}>
+              <View
+                style={[styles.legendSwatch, { backgroundColor: '#DCFCE7' }]}
+              />
+              <Text style={styles.legendText}>{t('pregnancy.today')}</Text>
+            </View>
+
+            <View style={styles.legendItem}>
+              <View
+                style={[
+                  styles.legendSwatch,
+                  {
+                    backgroundColor: '#FFF7ED',
+                    borderColor: '#EA580C',
+                    borderWidth: 1,
+                  },
+                ]}
+              />
+              <Text style={styles.legendText}>{t('pregnancy.pregnant')}</Text>
+            </View>
+
+            <View style={styles.legendItem}>
+              <View
+                style={[
+                  styles.legendSwatch,
+                  {
+                    backgroundColor: '#FEF2F2',
+                    borderColor: '#DC2626',
+                    borderWidth: 1,
+                  },
+                ]}
+              />
+              <Text style={styles.legendText}>{t('pregnancy.dueDate')}</Text>
+            </View>
+          </View>
+
+          <View style={styles.tabRow}>
+            {[
+              { key: 'active', label: t('pregnancy.active') },
+              { key: 'delivered', label: t('pregnancy.delivered') },
+              { key: 'all', label: t('pregnancy.all') },
+            ].map((tab) => (
+              <TouchableOpacity
+                key={tab.key}
+                style={[
+                  styles.tabButton,
+                  activeTab === tab.key && styles.tabButtonActive,
+                ]}
+                onPress={() => setActiveTab(tab.key)}
+                activeOpacity={0.85}
+              >
+                <Text
+                  style={[
+                    styles.tabButtonText,
+                    activeTab === tab.key && styles.tabButtonTextActive,
+                  ]}
+                >
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.sectionCard}>
+          <View style={styles.selectedDateHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>
+                {t('pregnancy.selectedDateDetails', {
+                  defaultValue: 'Selected Date Details',
+                })}
+              </Text>
+              <Text style={styles.sectionSubtitle}>
+                {selectedDate
+                  ? formatDisplayDate(selectedDate.toISOString(), localeCode)
+                  : t('pregnancy.selectDateForDetails', {
+                      defaultValue: 'Select a date to see details',
+                    })}
+              </Text>
+            </View>
+
+            {selectedDate ? (
+              <View style={styles.selectedDateCountBadge}>
+                <Text style={styles.selectedDateCountText}>
+                  {selectedDateRecords.length}{' '}
+                  {selectedDateRecords.length === 1
+                    ? t('pregnancy.recordSingular', { defaultValue: 'record' })
+                    : t('pregnancy.recordsLabel', { defaultValue: 'records' })}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
+          {selectedDate ? (
+            selectedDateRecords.length > 0 ? (
+              <View style={styles.recordList}>
+                {selectedDateRecords.map((record) => renderRecordCard(record))}
+              </View>
+            ) : (
+              <View style={styles.emptyPanel}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={32}
+                  color={COLORS.borderStrong}
+                />
+                <Text style={styles.emptyPanelTitle}>
+                  {t('pregnancy.noRecordsForSelectedDate', {
+                    defaultValue: 'No records for this date',
+                  })}
+                </Text>
+                <Text style={styles.emptyPanelText}>
+                  {t('pregnancy.selectAnotherDateHint', {
+                    defaultValue: 'Choose another date to see pregnancy details',
+                  })}
+                </Text>
+              </View>
+            )
+          ) : (
+            <View style={styles.emptyPanel}>
+              <Ionicons
+                name="hand-left-outline"
+                size={32}
+                color={COLORS.borderStrong}
+              />
+              <Text style={styles.emptyPanelTitle}>
+                {t('pregnancy.selectDateForDetails', {
+                  defaultValue: 'Select a date to see details',
+                })}
+              </Text>
+              <Text style={styles.emptyPanelText}>
+                {t('pregnancy.tapCalendarDateHint', {
+                  defaultValue: 'Tap any calendar day to view related records',
+                })}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>
+                {activeTab === 'active'
+                  ? t('pregnancy.activePregnancies')
+                  : activeTab === 'delivered'
+                  ? t('pregnancy.delivered')
+                  : t('pregnancy.allRecords')}
+              </Text>
+              <Text style={styles.sectionSubtitle}>
+                {t('pregnancy.pageDescription', {
+                  defaultValue: 'Track and manage your animals',
+                })}
+              </Text>
+            </View>
+          </View>
+
+          {filteredRecords.length > 0 ? (
+            <View style={styles.recordList}>
+              {filteredRecords.map((record) => renderRecordCard(record))}
+            </View>
+          ) : (
+            <View style={styles.emptyPanel}>
+              <Ionicons
+                name="calendar-clear-outline"
+                size={32}
+                color={COLORS.borderStrong}
+              />
+              <Text style={styles.emptyPanelTitle}>
+                {t('pregnancy.noRecordsFound')}
+              </Text>
+              <Text style={styles.emptyPanelText}>
+                {t('pregnancy.noRecordsDesc', {
+                  defaultValue: 'Add a record to begin tracking pregnancy',
+                })}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {stats.upcoming_deliveries?.length > 0 ? (
+          <View style={[styles.sectionCard, styles.alertSection]}>
+            <View style={styles.alertHeader}>
+              <Ionicons name="alarm-outline" size={18} color="#C2410C" />
+              <Text style={styles.alertTitle}>
+                {t('pregnancy.dueWithin30Days')}
+              </Text>
+            </View>
+
+            <View style={styles.alertList}>
+              {stats.upcoming_deliveries.slice(0, 3).map((item) => {
+                const animalMeta = getAnimalMeta(item.animal_type);
+
+                return (
+                  <View key={item.id} style={styles.alertItem}>
+                    <View style={styles.alertAnimal}>
+                      <View
+                        style={[
+                          styles.alertIconBadge,
+                          { backgroundColor: animalMeta.accent + '18' },
+                        ]}
+                      >
+                        {renderAnimalIcon(animalMeta, 18)}
+                      </View>
+                      <Text style={styles.alertName}>{item.animal_name}</Text>
+                    </View>
+
+                    <Text style={styles.alertDays}>
+                      {item.days_remaining} {t('pregnancy.days')}
                     </Text>
                   </View>
-                ) : (
-                  <View style={[styles.miniBadge, { backgroundColor: '#22C55E20' }]}>
-                    <Ionicons name="checkmark" size={16} color="#22C55E" />
-                  </View>
-                )}
-              </View>
-            );
-          })
-        ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>{t('pregnancy.noRecordsFound')}</Text>
+                );
+              })}
+            </View>
           </View>
-        )}
-      </View>
+        ) : null}
+      </ScrollView>
 
-      {/* Bottom Spacer for Tab Bar */}
-      <View style={{ height: 80 }} />
+      <FeatureHelpModal
+        visible={helpVisible}
+        onClose={() => setHelpVisible(false)}
+        title={pregnancyHelp?.localized?.title || t('pregnancy.pageTitle', { defaultValue: t('pregnancy.title') })}
+        imageSource={pregnancyHelp?.image}
+        helpContent={pregnancyHelp?.localized}
+        t={t}
+      />
 
-      {/* Add Pregnancy Modal */}
-      <Modal visible={showAddModal} animationType="slide" transparent>
+      <Modal
+        visible={showAddModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          if (!submitting) {
+            setShowAddModal(false);
+            resetAddForm();
+          }
+        }}
+      >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t('pregnancy.addPregnancyRecord')}</Text>
-              <TouchableOpacity onPress={() => { setShowAddModal(false); resetForm(); }}>
-                <Ionicons name="close" size={24} color={COLORS.black} />
+              <View>
+                <Text style={styles.modalTitle}>
+                  {t('pregnancy.addPregnancyRecord')}
+                </Text>
+                <Text style={styles.modalSubtitle}>
+                  {t('pregnancy.pageDescription', {
+                    defaultValue: 'Track and manage your animals',
+                  })}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => {
+                  if (!submitting) {
+                    setShowAddModal(false);
+                    resetAddForm();
+                  }
+                }}
+                disabled={submitting}
+              >
+                <Ionicons name="close" size={22} color={COLORS.textMuted} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Toggle between listing selection and manual entry */}
-              {/* Manual Entry Fields - Always shown for mobile */}
+            <ScrollView
+              style={styles.modalScroll}
+              contentContainerStyle={styles.modalContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={styles.inputLabel}>{t('pregnancy.animalType')}</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.typeChipRow}
+              >
+                {animalTypes.map((animal) => (
+                  <TouchableOpacity
+                    key={animal.key}
+                    style={[
+                      styles.typeChip,
+                      formData.animal_type === animal.key && styles.typeChipActive,
+                    ]}
+                    onPress={() =>
+                      setFormData((current) => ({
+                        ...current,
+                        animal_type: animal.key,
+                        pregnancy_duration_days:
+                          animal.key === 'other'
+                            ? current.pregnancy_duration_days
+                            : '',
+                      }))
+                    }
+                    activeOpacity={0.85}
+                  >
+                    {renderAnimalIcon(animal, 17)}
+                    <Text
+                      style={[
+                        styles.typeChipText,
+                        formData.animal_type === animal.key &&
+                          styles.typeChipTextActive,
+                      ]}
+                    >
+                      {animal.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {formData.animal_type === 'other' ? (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>
+                    {t('pregnancy.customPregnancyDurationDays', {
+                      defaultValue: 'Pregnancy Duration in Days',
+                    })}
+                  </Text>
+                  <TextInput
+                    style={styles.input}
+                    value={formData.pregnancy_duration_days}
+                    onChangeText={(text) =>
+                      setFormData((current) => ({
+                        ...current,
+                        pregnancy_duration_days: text.replace(/[^0-9]/g, ''),
+                      }))
+                    }
+                    keyboardType="numeric"
+                    placeholder={t('pregnancy.placeholderCustomPregnancyDurationDays', {
+                      defaultValue: 'Enter custom pregnancy duration in days',
+                    })}
+                    placeholderTextColor="#9CA3AF"
+                  />
+                </View>
+              ) : null}
+
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>{t('pregnancy.animalName')} *</Text>
+                <Text style={styles.inputLabel}>{t('pregnancy.animalName')}</Text>
                 <TextInput
                   style={styles.input}
-                  value={manualAnimalName}
-                  onChangeText={setManualAnimalName}
-                  placeholder={t('pregnancy.enterAnimalName')}
+                  value={formData.animal_name}
+                  onChangeText={(text) =>
+                    setFormData((current) => ({
+                      ...current,
+                      animal_name: text,
+                    }))
+                  }
+                  placeholder={t('pregnancy.placeholderAnimalName', {
+                    defaultValue: t('pregnancy.enterAnimalName'),
+                  })}
                   placeholderTextColor="#9CA3AF"
                 />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>{t('pregnancy.animalType')} *</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={styles.typeSelector}>
-                    {animalTypes.map((type) => (
-                      <TouchableOpacity
-                        key={type.key}
-                        style={[
-                          styles.typeBtn,
-                          manualAnimalType === type.key && styles.typeBtnActive,
-                        ]}
-                        onPress={() => setManualAnimalType(type.key)}
-                      >
-                        <Text style={styles.typeEmoji}>{type.emoji}</Text>
-                        <Text
-                          style={[
-                            styles.typeText,
-                            manualAnimalType === type.key && styles.typeTextActive,
-                          ]}
-                        >
-                          {type.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </ScrollView>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>{t('pregnancy.breedOptional')}</Text>
+                <Text style={styles.inputLabel}>
+                  {t('pregnancy.earBadgeNumber', { defaultValue: 'Ear Badge Number' })}
+                </Text>
                 <TextInput
                   style={styles.input}
-                  value={manualBreedName}
-                  onChangeText={setManualBreedName}
-                  placeholder={t('pregnancy.enterBreedName')}
+                  value={formData.ear_badge_number}
+                  onChangeText={(text) =>
+                    setFormData((current) => ({
+                      ...current,
+                      ear_badge_number: text,
+                    }))
+                  }
+                  placeholder={t('pregnancy.earBadgeNumber', {
+                    defaultValue: 'Ear Badge Number',
+                  })}
                   placeholderTextColor="#9CA3AF"
                 />
               </View>
 
-              {/* Common Fields */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>{t('pregnancy.matingDate')} *</Text>
+                <Text style={styles.inputLabel}>{t('pregnancy.matingDate')}</Text>
                 <TextInput
                   style={styles.input}
-                  value={matingDate}
-                  onChangeText={setMatingDate}
+                  value={formData.mating_date}
+                  onChangeText={(text) =>
+                    setFormData((current) => ({
+                      ...current,
+                      mating_date: text,
+                    }))
+                  }
                   placeholder={t('pregnancy.dateFormatPlaceholder')}
                   placeholderTextColor="#9CA3AF"
                 />
-                <Text style={styles.inputHint}>{t('pregnancy.dateFormat')}</Text>
               </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>{t('pregnancy.matingType')}</Text>
-                <View style={styles.matingTypeRow}>
-                  <TouchableOpacity
-                    style={[styles.matingTypeBtn, matingType === 'natural' && styles.matingTypeBtnActive]}
-                    onPress={() => setMatingType('natural')}
-                  >
-                    <Text style={[styles.matingTypeText, matingType === 'natural' && styles.matingTypeTextActive]}>
-                      {t('pregnancy.natural')}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.matingTypeBtn, matingType === 'artificial_insemination' && styles.matingTypeBtnActive]}
-                    onPress={() => setMatingType('artificial_insemination')}
-                  >
-                    <Text style={[styles.matingTypeText, matingType === 'artificial_insemination' && styles.matingTypeTextActive]}>
-                      {t('pregnancy.artificialInsemination')}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>{t('pregnancy.bullSireDetails')}</Text>
-                <TextInput
-                  style={styles.input}
-                  value={bullSireDetails}
-                  onChangeText={setBullSireDetails}
-                  placeholder={t('pregnancy.enterBullSire')}
-                  placeholderTextColor="#9CA3AF"
+              <View style={styles.infoBanner}>
+                <Ionicons
+                  name="information-circle-outline"
+                  size={18}
+                  color={COLORS.primary}
                 />
+                <Text style={styles.infoBannerText}>
+                  {t('pregnancy.expectedDelivery')}: {getExpectedDeliveryPreview() || '--'}
+                  {'  '}|{'  '}
+                  {formData.animal_type === 'other'
+                    ? formatPregnancyDuration(formData.pregnancy_duration_days) ||
+                      t('pregnancy.enterCustomDurationHint', {
+                        defaultValue: 'Enter custom duration',
+                      })
+                    : formatPregnancyDuration(currentDurationDays)}
+                  {'  '}
+                  {t('pregnancy.fromMatingDate', {
+                    defaultValue: 'from mating date',
+                  })}
+                </Text>
               </View>
 
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>{t('pregnancy.notes')}</Text>
                 <TextInput
                   style={[styles.input, styles.textArea]}
-                  value={notes}
-                  onChangeText={setNotes}
-                  placeholder={t('pregnancy.notesPlaceholder')}
+                  value={formData.notes}
+                  onChangeText={(text) =>
+                    setFormData((current) => ({
+                      ...current,
+                      notes: text,
+                    }))
+                  }
+                  placeholder={t('pregnancy.placeholderNotes', {
+                    defaultValue: t('pregnancy.notesPlaceholder'),
+                  })}
                   placeholderTextColor="#9CA3AF"
                   multiline
-                  numberOfLines={3}
+                  textAlignVertical="top"
                 />
               </View>
 
-              {/* Pregnancy Duration Info */}
-              <View style={styles.durationInfo}>
-                <Ionicons name="information-circle" size={20} color={COLORS.primary} />
-                <Text style={styles.durationInfoText}>
-                  {t('pregnancy.pregnancyDurationInfo', {
-                    animal: animalTypes.find(a => a.key === manualAnimalType)?.label || t('pregnancy.cow'),
-                    days: pregnancyDurations[manualAnimalType] || 150
-                  })}
-                </Text>
-              </View>
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity
+                  style={styles.secondaryModalButton}
+                  onPress={() => {
+                    if (!submitting) {
+                      setShowAddModal(false);
+                      resetAddForm();
+                    }
+                  }}
+                  disabled={submitting}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.secondaryModalButtonText}>
+                    {t('pregnancy.cancel')}
+                  </Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity 
-                style={[styles.submitBtn, submitting && styles.submitBtnDisabled]} 
-                onPress={handleCreateRecord}
-                disabled={submitting}
-              >
-                {submitting ? (
-                  <>
-                    <ActivityIndicator size="small" color={COLORS.white} />
-                    <Text style={[styles.submitBtnText, { marginLeft: 8 }]}>{t('pregnancy.creating')}</Text>
-                  </>
-                ) : (
-                  <Text style={styles.submitBtnText}>{t('pregnancy.createRecord')}</Text>
-                )}
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.primaryModalButton,
+                    submitting && styles.primaryModalButtonDisabled,
+                  ]}
+                  onPress={handleCreateRecord}
+                  disabled={submitting}
+                  activeOpacity={0.85}
+                >
+                  {submitting ? (
+                    <>
+                      <ActivityIndicator size="small" color="#fff" />
+                      <Text style={styles.primaryModalButtonText}>
+                        {t('pregnancy.addingRecord', {
+                          defaultValue: t('pregnancy.creating'),
+                        })}
+                      </Text>
+                    </>
+                  ) : (
+                    <Text style={styles.primaryModalButtonText}>
+                      {t('pregnancy.addRecord', {
+                        defaultValue: t('pregnancy.createRecord'),
+                      })}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </ScrollView>
           </View>
         </View>
       </Modal>
 
-      {/* Mark Delivered Modal */}
-      <Modal visible={showDeliveryModal} animationType="slide" transparent>
+      <Modal
+        visible={showDeliveryModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          if (!deliverySubmitting) {
+            setShowDeliveryModal(false);
+            setSelectedRecord(null);
+            resetDeliveryForm();
+          }
+        }}
+      >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t('pregnancy.recordDelivery')}</Text>
-              <TouchableOpacity onPress={() => { setShowDeliveryModal(false); resetDeliveryForm(); }}>
-                <Ionicons name="close" size={24} color={COLORS.black} />
+              <View>
+                <Text style={styles.modalTitle}>
+                  {t('pregnancy.recordDelivery')}
+                </Text>
+                <Text style={styles.modalSubtitle}>
+                  {selectedRecord?.animal_name || ''}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => {
+                  if (!deliverySubmitting) {
+                    setShowDeliveryModal(false);
+                    setSelectedRecord(null);
+                    resetDeliveryForm();
+                  }
+                }}
+                disabled={deliverySubmitting}
+              >
+                <Ionicons name="close" size={22} color={COLORS.textMuted} />
               </TouchableOpacity>
             </View>
 
-            {selectedRecord && (
-              <ScrollView showsVerticalScrollIndicator={false}>
-                <View style={styles.deliveryAnimalInfo}>
-                  <Text style={styles.animalEmoji}>{getAnimalEmoji(selectedRecord.animal_type)}</Text>
-                  <View>
-                    <Text style={styles.deliveryAnimalName}>{selectedRecord.animal_name}</Text>
-                    <Text style={styles.deliveryAnimalBreed}>{selectedRecord.breed_name || selectedRecord.animal_type}</Text>
+            {selectedRecord ? (
+              <ScrollView
+                style={styles.modalScroll}
+                contentContainerStyle={styles.modalContent}
+                showsVerticalScrollIndicator={false}
+              >
+              <View style={styles.deliveryAnimalCard}>
+                  <View style={styles.deliveryAnimalIconBadge}>
+                    {renderAnimalIcon(getAnimalMeta(selectedRecord.animal_type), 28)}
+                  </View>
+
+                  <View style={styles.deliveryAnimalCopy}>
+                    <Text style={styles.deliveryAnimalName}>
+                      {selectedRecord.animal_name}
+                    </Text>
+                    <Text style={styles.deliveryAnimalMeta}>
+                      {selectedRecord.ear_badge_number
+                        ? `${t('pregnancy.earBadgeNumberShort', {
+                            defaultValue: 'Tag',
+                          })}: ${selectedRecord.ear_badge_number}`
+                        : selectedRecord.breed_name ||
+                          getAnimalMeta(selectedRecord.animal_type).label}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.inputRow}>
+                  <View style={[styles.inputGroup, styles.inputHalf]}>
+                    <Text style={styles.inputLabel}>
+                      {t('pregnancy.deliveryDateLabel', {
+                        defaultValue: 'Delivery Date',
+                      })}
+                    </Text>
+                    <TextInput
+                      style={styles.input}
+                      value={deliveryData.delivery_date}
+                      onChangeText={(text) =>
+                        setDeliveryData((current) => ({
+                          ...current,
+                          delivery_date: text,
+                        }))
+                      }
+                      placeholder={t('pregnancy.dateFormatPlaceholder')}
+                      placeholderTextColor="#9CA3AF"
+                    />
+                  </View>
+
+                  <View style={[styles.inputGroup, styles.inputHalf]}>
+                    <Text style={styles.inputLabel}>
+                      {t('pregnancy.numberOfOffspring')}
+                    </Text>
+                    <TextInput
+                      style={styles.input}
+                      value={deliveryData.offspring_count}
+                      onChangeText={(text) =>
+                        setDeliveryData((current) => ({
+                          ...current,
+                          offspring_count: text.replace(/[^0-9]/g, ''),
+                        }))
+                      }
+                      keyboardType="numeric"
+                      placeholder="1"
+                      placeholderTextColor="#9CA3AF"
+                    />
                   </View>
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>{t('pregnancy.numberOfOffspring')}</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={offspringCount}
-                    onChangeText={setOffspringCount}
-                    keyboardType="numeric"
-                    placeholder="1"
-                  />
+                  <Text style={styles.inputLabel}>
+                    {t('pregnancy.genders', {
+                      defaultValue: t('pregnancy.gender', {
+                        defaultValue: 'Gender',
+                      }),
+                    })}
+                  </Text>
+                  <View style={styles.segmentRow}>
+                    {[
+                      {
+                        key: 'male',
+                        label: t('pregnancy.genderMale', { defaultValue: 'Male' }),
+                      },
+                      {
+                        key: 'female',
+                        label: t('pregnancy.genderFemale', {
+                          defaultValue: 'Female',
+                        }),
+                      },
+                      {
+                        key: 'mixed',
+                        label: t('pregnancy.genderMixed', { defaultValue: 'Mixed' }),
+                      },
+                    ].map((option) => (
+                      <TouchableOpacity
+                        key={option.key}
+                        style={[
+                          styles.segmentButton,
+                          deliveryData.offspring_gender === option.key &&
+                            styles.segmentButtonActive,
+                        ]}
+                        onPress={() =>
+                          setDeliveryData((current) => ({
+                            ...current,
+                            offspring_gender: option.key,
+                          }))
+                        }
+                        activeOpacity={0.85}
+                      >
+                        <Text
+                          style={[
+                            styles.segmentButtonText,
+                            deliveryData.offspring_gender === option.key &&
+                              styles.segmentButtonTextActive,
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>{t('pregnancy.genders')}</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={offspringGender}
-                    onChangeText={setOffspringGender}
-                    placeholder={t('pregnancy.genderPlaceholder')}
-                  />
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>{t('pregnancy.additionalDetails')}</Text>
+                  <Text style={styles.inputLabel}>
+                    {t('pregnancy.detailsOptional', {
+                      defaultValue: 'Additional Details',
+                    })}
+                  </Text>
                   <TextInput
                     style={[styles.input, styles.textArea]}
-                    value={offspringDetails}
-                    onChangeText={setOffspringDetails}
-                    placeholder={t('pregnancy.healthStatusPlaceholder')}
+                    value={deliveryData.offspring_details}
+                    onChangeText={(text) =>
+                      setDeliveryData((current) => ({
+                        ...current,
+                        offspring_details: text,
+                      }))
+                    }
+                    placeholder={t('pregnancy.placeholderOffspringDetails')}
+                    placeholderTextColor="#9CA3AF"
                     multiline
-                    numberOfLines={3}
+                    textAlignVertical="top"
                   />
                 </View>
 
-                <TouchableOpacity style={[styles.submitBtn, { backgroundColor: '#22C55E' }]} onPress={handleMarkDelivered}>
-                  <Ionicons name="checkmark-circle" size={20} color={COLORS.white} />
-                  <Text style={styles.submitBtnText}> {t('pregnancy.confirmDelivery')}</Text>
-                </TouchableOpacity>
+                <View style={styles.modalActionRow}>
+                  <TouchableOpacity
+                    style={styles.secondaryModalButton}
+                    onPress={() => {
+                      if (!deliverySubmitting) {
+                        setShowDeliveryModal(false);
+                        setSelectedRecord(null);
+                        resetDeliveryForm();
+                      }
+                    }}
+                    disabled={deliverySubmitting}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.secondaryModalButtonText}>
+                      {t('pregnancy.cancel')}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.primaryModalButton,
+                      deliverySubmitting && styles.primaryModalButtonDisabled,
+                    ]}
+                    onPress={handleMarkDelivered}
+                    disabled={deliverySubmitting}
+                    activeOpacity={0.85}
+                  >
+                    {deliverySubmitting ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <Ionicons
+                          name="checkmark-circle-outline"
+                          size={18}
+                          color="#fff"
+                        />
+                        <Text style={styles.primaryModalButtonText}>
+                          {t('pregnancy.confirmDelivery')}
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
               </ScrollView>
-            )}
+            ) : null}
           </View>
         </View>
       </Modal>
-      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -853,725 +1775,858 @@ const PregnancyCalendarScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#F7F4EC',
+  },
+  loaderSafeArea: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  loaderContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  scrollContent: {
-    paddingBottom: 20,
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.primary + '15',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  loadingSpinner: {
-    marginVertical: 16,
-  },
-  loadingText: {
-    color: '#1F2937',
-    marginTop: 12,
-    fontSize: 16,
-    fontWeight: '500',
+    backgroundColor: '#F7F4EC',
   },
   header: {
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    paddingTop: 20,
-    paddingBottom: 24,
     paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 18,
   },
-  headerIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#94A3B8',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    marginBottom: 16,
-    gap: 10,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: COLORS.primary + '20',
-    padding: 16,
-    borderRadius: 16,
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#94A3B8',
-    marginTop: 4,
-  },
-  calendarCard: {
-    backgroundColor: COLORS.white,
-    marginHorizontal: 16,
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  monthNav: {
+  headerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 18,
   },
-  navBtn: {
-    padding: 8,
+  headerBackButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E4DC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerAddButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 14,
+    backgroundColor: COLORS.primary,
+  },
+  headerAddButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  pageTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: COLORS.text,
+    marginBottom: 6,
+  },
+  pageDescription: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: COLORS.textMuted,
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  errorBannerText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#B91C1C',
+    fontWeight: '500',
+  },
+  summaryRow: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    gap: 12,
+  },
+  summaryCard: {
+    width: 182,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#ECE8DE',
+  },
+  summaryCopy: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  summaryLabel: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: COLORS.textMuted,
+    marginBottom: 6,
+    fontWeight: '600',
+  },
+  summaryValue: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: COLORS.text,
+  },
+  summaryIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionCard: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#ECE8DE',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: COLORS.text,
+  },
+  sectionSubtitle: {
+    marginTop: 5,
+    fontSize: 13,
+    lineHeight: 19,
+    color: COLORS.textMuted,
+  },
+  referenceChipRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingRight: 6,
+  },
+  referenceChip: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 104,
+    minHeight: 78,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  referenceIconBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  referenceLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.text,
+    maxWidth: '100%',
+  },
+  referenceValue: {
+    marginTop: 2,
+    fontSize: 11,
+    color: COLORS.primary,
+    fontWeight: '700',
+    maxWidth: '100%',
+  },
+  calendarHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 18,
+  },
+  monthNavButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   monthTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.black,
+    fontWeight: '800',
+    color: COLORS.text,
   },
-  weekdaysRow: {
+  weekdayRow: {
     flexDirection: 'row',
     marginBottom: 8,
   },
   weekdayText: {
-    flex: 1,
+    width: '13.2%',
+    marginHorizontal: '0.54%',
     textAlign: 'center',
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.gray,
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+    textTransform: 'uppercase',
   },
   calendarGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    marginHorizontal: -2,
   },
-  calendarCell: {
-    width: '14.28%',
-    aspectRatio: 1.2,
-    justifyContent: 'flex-start',
-    alignItems: 'center',
+  calendarPlaceholder: {
+    width: '13.2%',
+    height: 82,
+    marginHorizontal: '0.54%',
+    marginBottom: 8,
+  },
+  calendarDayButton: {
+    width: '13.2%',
+    height: 82,
+    marginHorizontal: '0.54%',
+    marginBottom: 8,
+    padding: 6,
     borderRadius: 12,
-    position: 'relative',
-    marginBottom: 4,
-    paddingTop: 6,
     backgroundColor: '#F8FAFC',
-  },
-  todayCell: {
-    backgroundColor: COLORS.primary,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  selectedCell: {
-    borderWidth: 2.5,
-    borderColor: COLORS.primary,
-    backgroundColor: COLORS.primary + '15',
-  },
-  deliveryDateCell: {
-    backgroundColor: '#FEE2E2',
     borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  calendarDayHasRecord: {
+    backgroundColor: '#FFF7ED',
+    borderColor: '#FDBA74',
+  },
+  calendarDayDue: {
+    backgroundColor: '#FEF2F2',
     borderColor: '#FCA5A5',
   },
-  dayText: {
-    fontSize: 15,
-    color: '#1F2937',
-    fontWeight: '600',
-    marginBottom: 2,
+  calendarDayToday: {
+    backgroundColor: '#DCFCE7',
+    borderColor: '#86EFAC',
   },
-  todayText: {
-    color: COLORS.white,
-    fontWeight: 'bold',
+  calendarDaySelected: {
+    backgroundColor: '#DCF0FF',
+    borderColor: '#60A5FA',
   },
-  selectedText: {
-    color: COLORS.primary,
-    fontWeight: 'bold',
-  },
-  deliveryDateText: {
-    color: '#DC2626',
-    fontWeight: 'bold',
-  },
-  animalIndicator: {
-    position: 'absolute',
-    bottom: 2,
+  calendarDayHeader: {
     flexDirection: 'row',
-    gap: -4,
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
   },
-  animalMiniEmoji: {
-    fontSize: 12,
-    textShadowColor: 'rgba(0, 0, 0, 0.1)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+  calendarDayText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: COLORS.text,
+  },
+  calendarDayTodayText: {
+    color: '#166534',
+  },
+  calendarDayDueText: {
+    color: '#B91C1C',
+  },
+  calendarDaySelectedText: {
+    color: '#1D4ED8',
+  },
+  calendarCountBadge: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  calendarCountText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  calendarHintText: {
+    marginTop: 12,
+    fontSize: 10,
+    lineHeight: 13,
+    color: COLORS.textMuted,
   },
   legendRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 20,
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    flexWrap: 'wrap',
+    gap: 14,
+    marginTop: 10,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
-  legendDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+  legendSwatch: {
+    width: 14,
+    height: 14,
+    borderRadius: 5,
   },
   legendText: {
     fontSize: 12,
-    color: COLORS.gray,
+    color: COLORS.textMuted,
+    fontWeight: '600',
   },
-  addButtonContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#F9FAFB',
+  tabRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 18,
+    padding: 4,
+    borderRadius: 16,
+    backgroundColor: '#F8FAFC',
   },
-  addPregnancyButton: {
+  tabButton: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabButtonActive: {
     backgroundColor: COLORS.primary,
+  },
+  tabButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+  },
+  tabButtonTextActive: {
+    color: '#FFFFFF',
+  },
+  selectedDateHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 14,
+  },
+  selectedDateCountBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: '#ECFDF5',
+  },
+  selectedDateCountText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.primaryDark,
+  },
+  recordList: {
+    gap: 14,
+  },
+  recordCard: {
+    padding: 15,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#ECE8DE',
+    backgroundColor: '#FCFBF7',
+  },
+  recordTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 14,
+  },
+  recordAnimalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  recordAnimalBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recordAnimalCopy: {
+    flex: 1,
+  },
+  recordAnimalName: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: COLORS.text,
+    marginBottom: 2,
+  },
+  recordAnimalMetaText: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    fontWeight: '600',
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 999,
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  detailGrid: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 10,
+  },
+  detailTile: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#ECE8DE',
+  },
+  detailTileLabel: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginBottom: 6,
+    fontWeight: '600',
+  },
+  detailTileValue: {
+    fontSize: 13,
+    color: COLORS.text,
+    fontWeight: '800',
+  },
+  detailTileAccent: {
+    color: COLORS.primaryDark,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 2,
+    marginBottom: 8,
+  },
+  progressLabel: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    fontWeight: '600',
+  },
+  progressValue: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  progressTrack: {
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: '#E5E7EB',
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 999,
+  },
+  remainingBanner: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+  },
+  remainingBannerLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#9A3412',
+  },
+  remainingBannerValue: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#C2410C',
+  },
+  notesBox: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#ECE8DE',
+  },
+  notesLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+    marginBottom: 5,
+  },
+  notesText: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: COLORS.text,
+  },
+  deliveryBanner: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  deliveryBannerText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1D4ED8',
+  },
+  recordActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+  },
+  primaryActionButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    gap: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 4,
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: COLORS.primary,
   },
-  addPregnancyButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '600',
+  primaryActionText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
-  section: {
-    paddingHorizontal: 20,
-    marginTop: 8,
-    marginBottom: 16,
-  },
-  sectionHeader: {
+  dangerActionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
-    gap: 8,
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
   },
-  sectionTitle: {
-    fontSize: 19,
+  dangerActionText: {
+    fontSize: 13,
     fontWeight: '800',
-    color: '#1F2937',
-    letterSpacing: 0.3,
+    color: '#B91C1C',
   },
-  animalCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+  emptyPanel: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 28,
+    paddingHorizontal: 18,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    borderLeftWidth: 5,
-    borderLeftColor: COLORS.primary,
-  },
-  animalCardOld: {
-    backgroundColor: '#334155',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-  },
-  animalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  animalHeaderOld: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  animalEmoji: {
-    fontSize: 56,
-    marginRight: 16,
-    backgroundColor: COLORS.primary + '10',
-    width: 72,
-    height: 72,
-    textAlign: 'center',
-    lineHeight: 72,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  animalEmojiOld: {
-    fontSize: 32,
-    marginRight: 12,
-  },
-  animalInfo: {
-    flex: 1,
-  },
-  animalName: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 6,
-  },
-  animalBreed: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  progressBadge: {
-    backgroundColor: COLORS.primary + '15',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 24,
-    minWidth: 70,
-    alignItems: 'center',
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  progressText: {
-    color: COLORS.primary,
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  animalDetails: {
-    backgroundColor: '#F9FAFB',
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 16,
-    gap: 8,
-  },
-  detailText: {
-    fontSize: 14,
-    color: '#475569',
-    fontWeight: '500',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  progressBarContainer: {
-    height: 10,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 10,
-    overflow: 'hidden',
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-  },
-  progressBar: {
-    height: '100%',
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  cardActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  deliverBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#22C55E',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    gap: 8,
-    flex: 1,
-    justifyContent: 'center',
-    shadowColor: '#22C55E',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  deliverBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  deleteBtn: {
-    backgroundColor: '#FEE2E2',
-    padding: 12,
-    borderRadius: 12,
-    marginLeft: 12,
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 48,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 20,
-    marginBottom: 16,
-    borderWidth: 2,
-    borderColor: '#E2E8F0',
     borderStyle: 'dashed',
+    backgroundColor: '#F8FAFC',
   },
-  emptyText: {
-    fontSize: 15,
-    color: '#94A3B8',
-    marginTop: 16,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 16,
-    padding: 5,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderRadius: 12,
-  },
-  activeTab: {
-    backgroundColor: COLORS.primary,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  tabText: {
-    color: '#64748B',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  activeTabText: {
-    color: COLORS.white,
-    fontWeight: '700',
-  },
-  miniAnimalCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.primary,
-  },
-  miniAnimalInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  miniAnimalName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  miniAnimalDate: {
-    fontSize: 13,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  miniBadge: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 12,
-    minWidth: 50,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  miniBadgeText: {
+  emptyPanelTitle: {
+    marginTop: 10,
     fontSize: 14,
     fontWeight: '800',
+    color: COLORS.text,
+    textAlign: 'center',
+  },
+  emptyPanelText: {
+    marginTop: 6,
+    fontSize: 12,
+    lineHeight: 18,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+  },
+  alertSection: {
+    backgroundColor: '#FFF7ED',
+    borderColor: '#FED7AA',
+  },
+  alertHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  alertTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#9A3412',
+  },
+  alertList: {
+    gap: 10,
+  },
+  alertItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+  },
+  alertAnimal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  alertIconBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  alertName: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: COLORS.text,
+  },
+  alertDays: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#C2410C',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(21, 18, 12, 0.42)',
     justifyContent: 'flex-end',
   },
-  modalContent: {
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    maxHeight: '85%',
+  modalSheet: {
+    maxHeight: '88%',
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    overflow: 'hidden',
   },
   modalHeader: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ECE8DE',
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.black,
+    fontWeight: '800',
+    color: COLORS.text,
   },
-  toggleContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#F1F5F9',
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 16,
-  },
-  toggleBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 8,
-  },
-  toggleBtnActive: {
-    backgroundColor: COLORS.white,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  toggleText: {
-    color: COLORS.gray,
-    fontWeight: '600',
-  },
-  toggleTextActive: {
-    color: COLORS.primary,
-  },
-  animalSelector: {
-    maxHeight: 120,
-  },
-  animalSelectCard: {
-    width: 100,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    marginRight: 10,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  animalSelectCardActive: {
-    borderColor: COLORS.primary,
-    backgroundColor: COLORS.primary + '10',
-  },
-  animalSelectEmoji: {
-    fontSize: 28,
-    marginBottom: 4,
-  },
-  animalSelectName: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.black,
-    textAlign: 'center',
-  },
-  animalSelectType: {
-    fontSize: 10,
-    color: COLORS.gray,
-    marginTop: 2,
-  },
-  noAnimalsMsg: {
-    backgroundColor: '#FEF3C7',
-    padding: 12,
-    borderRadius: 8,
-  },
-  noAnimalsMsgText: {
-    color: '#92400E',
+  modalSubtitle: {
+    marginTop: 5,
     fontSize: 13,
-    textAlign: 'center',
+    lineHeight: 19,
+    color: COLORS.textMuted,
+  },
+  modalCloseButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalScroll: {
+    flexGrow: 0,
+  },
+  modalContent: {
+    padding: 18,
+    paddingBottom: 26,
+  },
+  typeChipRow: {
+    paddingVertical: 4,
+    gap: 10,
+  },
+  typeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#FFFFFF',
+  },
+  typeChipActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: '#ECFDF5',
+  },
+  typeChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+  },
+  typeChipTextActive: {
+    color: COLORS.primaryDark,
   },
   inputGroup: {
-    marginBottom: 16,
+    marginTop: 16,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  inputHalf: {
+    flex: 1,
   },
   inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.black,
+    fontSize: 13,
+    fontWeight: '800',
+    color: COLORS.text,
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#F1F5F9',
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 16,
-    color: COLORS.black,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  inputHint: {
-    fontSize: 11,
-    color: COLORS.gray,
-    marginTop: 4,
+    borderColor: '#D1D5DB',
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    fontSize: 14,
+    color: COLORS.text,
   },
   textArea: {
-    height: 80,
-    textAlignVertical: 'top',
+    minHeight: 104,
+    paddingTop: 14,
   },
-  typeSelector: {
+  infoBanner: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
     gap: 8,
-  },
-  typeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  typeBtnActive: {
-    borderColor: COLORS.primary,
-    backgroundColor: COLORS.primary + '10',
-  },
-  typeEmoji: {
-    fontSize: 18,
-    marginRight: 6,
-  },
-  typeText: {
-    fontSize: 14,
-    color: COLORS.gray,
-  },
-  typeTextActive: {
-    color: COLORS.primary,
-    fontWeight: '600',
-  },
-  matingTypeRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  matingTypeBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    backgroundColor: '#F1F5F9',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  matingTypeBtnActive: {
-    borderColor: COLORS.primary,
-    backgroundColor: COLORS.primary + '10',
-  },
-  matingTypeText: {
-    fontSize: 14,
-    color: COLORS.gray,
-    fontWeight: '600',
-  },
-  matingTypeTextActive: {
-    color: COLORS.primary,
-  },
-  durationInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.primary + '10',
+    marginTop: 16,
     padding: 12,
-    borderRadius: 12,
-    marginBottom: 16,
-    gap: 8,
+    borderRadius: 14,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
   },
-  durationInfoText: {
-    fontSize: 13,
-    color: COLORS.primary,
+  infoBannerText: {
     flex: 1,
-  },
-  submitBtn: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 8,
-  },
-  submitBtnDisabled: {
-    backgroundColor: COLORS.gray,
-    opacity: 0.7,
-  },
-  submitBtnText: {
-    color: COLORS.white,
-    fontSize: 16,
+    fontSize: 12,
+    lineHeight: 18,
+    color: COLORS.primaryDark,
     fontWeight: '600',
   },
-  deliveryAnimalInfo: {
+  segmentRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  segmentButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+  },
+  segmentButtonActive: {
+    backgroundColor: '#ECFDF5',
+    borderColor: COLORS.primary,
+  },
+  segmentButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+  },
+  segmentButtonTextActive: {
+    color: COLORS.primaryDark,
+  },
+  modalActionRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 22,
+  },
+  secondaryModalButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    paddingVertical: 14,
+    backgroundColor: '#FFFFFF',
+  },
+  secondaryModalButtonText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.textMuted,
+  },
+  primaryModalButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F1F5F9',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 20,
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 14,
+    paddingVertical: 14,
+    backgroundColor: COLORS.primary,
+  },
+  primaryModalButtonDisabled: {
+    backgroundColor: '#7ED8BA',
+  },
+  primaryModalButtonText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  deliveryAnimalCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  deliveryAnimalIconBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ECFDF5',
+  },
+  deliveryAnimalCopy: {
+    flex: 1,
   },
   deliveryAnimalName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.black,
+    fontSize: 15,
+    fontWeight: '800',
+    color: COLORS.text,
   },
-  deliveryAnimalBreed: {
-    fontSize: 14,
-    color: COLORS.gray,
+  deliveryAnimalMeta: {
+    marginTop: 3,
+    fontSize: 12,
+    color: COLORS.textMuted,
+    fontWeight: '600',
   },
 });
 

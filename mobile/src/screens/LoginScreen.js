@@ -14,7 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
-import { otpService } from '../services/api';
+import { API_URL, otpService } from '../services/api';
 
 const { width, height } = Dimensions.get('window');
 const LANGUAGE_OPTIONS = [
@@ -71,7 +71,19 @@ const LoginScreen = ({ navigation }) => {
         setError(response.message || t('errors.somethingWentWrong'));
       }
     } catch (error) {
-      setError(error.message || t('errors.somethingWentWrong'));
+      if (error.message === 'Network Error') {
+        let apiProbe = 'not checked';
+        try {
+          const probeResponse = await fetch(`${API_URL}/api`);
+          apiProbe = `${probeResponse.status} ${probeResponse.ok ? 'OK' : 'FAILED'}`;
+        } catch (probeError) {
+          apiProbe = probeError.message || 'failed';
+        }
+
+        setError(`Network Error\nServer URL: ${API_URL}\nAPI check: ${apiProbe}`);
+      } else {
+        setError(error.message || t('errors.somethingWentWrong'));
+      }
     } finally {
       setLoading(false);
     }

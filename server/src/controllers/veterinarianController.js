@@ -351,9 +351,11 @@ class VeterinarianController {
       // Check if phone number already exists
       const existingPhone = await db.Veterinarian.findByPhoneNumber(phone_number);
       if (existingPhone) {
-        return res.status(400).json({
+        return res.status(409).json({
           success: false,
-          message: 'Phone number already registered'
+          code: 'VET_PHONE_ALREADY_REGISTERED',
+          field: 'phone_number',
+          message: 'Phone number already registered. Please login instead or use a different phone number.'
         });
       }
 
@@ -362,9 +364,11 @@ class VeterinarianController {
         where: { license_number }
       });
       if (existingLicense) {
-        return res.status(400).json({
+        return res.status(409).json({
           success: false,
-          message: 'License number already registered'
+          code: 'VET_LICENSE_ALREADY_REGISTERED',
+          field: 'license_number',
+          message: 'License number already registered. Please use a different license number or contact support.'
         });
       }
 
@@ -373,9 +377,11 @@ class VeterinarianController {
       });
 
       if (existingEmail) {
-        return res.status(400).json({
+        return res.status(409).json({
           success: false,
-          message: 'Email address already registered'
+          code: 'VET_EMAIL_ALREADY_REGISTERED',
+          field: 'email',
+          message: 'Email address already registered. Please login instead or use a different email address.'
         });
       }
 
@@ -516,13 +522,20 @@ class VeterinarianController {
       if (error instanceof UniqueConstraintError) {
         const field = error.errors?.[0]?.path;
         const fieldMessages = {
-          phone_number: 'Phone number already registered',
-          license_number: 'License number already registered',
-          email: 'Email address already registered'
+          phone_number: 'Phone number already registered. Please login instead or use a different phone number.',
+          license_number: 'License number already registered. Please use a different license number or contact support.',
+          email: 'Email address already registered. Please login instead or use a different email address.'
+        };
+        const fieldCodes = {
+          phone_number: 'VET_PHONE_ALREADY_REGISTERED',
+          license_number: 'VET_LICENSE_ALREADY_REGISTERED',
+          email: 'VET_EMAIL_ALREADY_REGISTERED'
         };
 
-        return res.status(400).json({
+        return res.status(409).json({
           success: false,
+          code: fieldCodes[field] || 'VET_DUPLICATE_REGISTRATION',
+          field,
           message: fieldMessages[field] || 'A veterinarian with the same details already exists'
         });
       }

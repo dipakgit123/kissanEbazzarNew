@@ -7,7 +7,6 @@ import {
   StyleSheet,
   TextInput,
   Image,
-  ActivityIndicator,
   StatusBar,
   RefreshControl,
   Switch,
@@ -19,22 +18,27 @@ import Slider from '@react-native-community/slider';
 import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
 import AnimalCard from '../components/AnimalCard';
+import CowLoader from '../components/CowLoader';
+import FeatureHelpModal from '../components/FeatureHelpModal';
+import { getLocalizedFeatureHelp } from '../constants/featureHelp';
 import { animalListingService, userService } from '../services/api';
 
 const BuyAnimalsScreen = ({ navigation }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedBreed, setSelectedBreed] = useState('');
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
   const [breedModalVisible, setBreedModalVisible] = useState(false);
+  const [helpVisible, setHelpVisible] = useState(false);
   const [distanceFilter, setDistanceFilter] = useState('all');
   const [animals, setAnimals] = useState([]);
   const [filteredAnimals, setFilteredAnimals] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
+  const buyHelp = getLocalizedFeatureHelp('buyAnimals', i18n.resolvedLanguage || i18n.language);
 
   const categories = [
     { id: 'cow', name: t('categories.cow'), image: require('../assets/cow1.png'), cardColor: '#EEFDF6' },
@@ -249,6 +253,16 @@ const BuyAnimalsScreen = ({ navigation }) => {
           </TouchableOpacity>
 
           <Text style={styles.headerTitle}>{t('buyAnimals.title')}</Text>
+
+          <TouchableOpacity
+            style={styles.helpButton}
+            onPress={() => setHelpVisible(true)}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Open buy animals help"
+          >
+            <Ionicons name="help-circle-outline" size={22} color={COLORS.primaryDark} />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.locationCard}>
@@ -450,7 +464,7 @@ const BuyAnimalsScreen = ({ navigation }) => {
         {/* Animals Grid */}
         <View style={styles.animalsSection}>
           {loading && !refreshing ? (
-            <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 40 }} />
+            <CowLoader message={t('buyAnimals.loadingAnimals', { defaultValue: '' })} size="medium" />
           ) : filteredAnimals.length > 0 ? (
             <View style={styles.animalsList}>
               {filteredAnimals.map((animal) => (
@@ -565,6 +579,15 @@ const BuyAnimalsScreen = ({ navigation }) => {
           </View>
         </View>
       </Modal>
+
+      <FeatureHelpModal
+        visible={helpVisible}
+        onClose={() => setHelpVisible(false)}
+        title={buyHelp?.localized?.title || t('buyAnimals.title', { defaultValue: 'Buy Animals Guide' })}
+        imageSource={buyHelp?.image}
+        helpContent={buyHelp?.localized}
+        t={t}
+      />
     </SafeAreaView>
   );
 };
@@ -601,6 +624,14 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: COLORS.text,
+  },
+  helpButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   locationCard: {
     flexDirection: 'row',

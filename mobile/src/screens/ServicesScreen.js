@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
+import AppHeader from '../components/AppHeader';
 
 const { width } = Dimensions.get('window');
 
@@ -22,37 +23,46 @@ const ServicesScreen = ({ navigation }) => {
   const services = [
     {
       id: 1,
+      icon: 'water',
+      title: t('services.milkReports'),
+      subtitle: t('services.milkReportsDesc'),
+      color: COLORS.primary,
+      screen: 'MilkReports',
+      image: require('../assets/milk_report.jpeg'),
+    },
+    {
+      id: 2,
       icon: 'chatbubbles',
       title: t('services.aiAssistant'),
       subtitle: t('services.aiAssistantDesc'),
-      color: '#3B82F6',
+      color: COLORS.info,
       screen: 'AIAssistant',
       image: require('../assets/ai_assistant.png'),
     },
     {
-      id: 2,
+      id: 3,
       icon: 'medical',
       title: t('services.veterinarian'),
       subtitle: t('services.veterinarianDesc'),
-      color: '#10B981',
+      color: COLORS.primary,
       screen: 'Veterinarian',
       image: require('../assets/veterinarian.png'),
     },
     {
-      id: 3,
+      id: 4,
       icon: 'fitness',
       title: t('services.aiHealthCheck'),
       subtitle: t('services.aiHealthCheckDesc'),
-      color: '#8B5CF6',
+      color: COLORS.accent,
       screen: 'AIHealthCheck',
       image: require('../assets/ai_health.png'),
     },
     {
-      id: 4,
+      id: 5,
       icon: 'calendar',
       title: t('services.pregnancy'),
       subtitle: t('services.pregnancyDesc'),
-      color: '#EC4899',
+      color: COLORS.warning,
       screen: 'PregnancyCalendar',
       image: require('../assets/pregnancy_calendar.png'),
     },
@@ -62,10 +72,12 @@ const ServicesScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="dark-content" />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t('home.ourServices')}</Text>
-      </View>
+      <AppHeader
+        safeArea={false}
+        showBack={false}
+        title={t('home.ourServices')}
+        subtitle={t('services.subtitle', { defaultValue: 'Choose what you want to do today' })}
+      />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <View style={styles.servicesGrid}>
@@ -99,19 +111,19 @@ const ServicesScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: COLORS.background,
   },
   header: {
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: COLORS.border,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#000',
+    color: COLORS.text,
   },
   content: {
     padding: 16,
@@ -126,8 +138,10 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 16,
     marginBottom: 16,
-    backgroundColor: '#fff',
-    shadowColor: '#000',
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    shadowColor: COLORS.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -140,18 +154,18 @@ const styles = StyleSheet.create({
   },
   serviceContent: {
     padding: 12,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.surface,
     position: 'relative',
   },
   serviceTitle: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#1F2937',
+    color: COLORS.text,
     marginBottom: 2,
   },
   serviceSubtitle: {
     fontSize: 11,
-    color: '#6B7280',
+    color: COLORS.textMuted,
   },
   arrowContainer: {
     position: 'absolute',
@@ -160,7 +174,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: COLORS.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },

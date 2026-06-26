@@ -8,7 +8,6 @@ import {
   Image,
   Alert,
   RefreshControl,
-  ActivityIndicator,
   Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +16,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, formatPrice, getAnimalTypeIcon } from '../utils/constants';
 import { useWishlist } from '../context/WishlistContext';
 import { callLogService } from '../services/api';
+import CowLoader from '../components/CowLoader';
+import AppHeader from '../components/AppHeader';
 
 const CATEGORY_ORDER = ['all', 'cow', 'buffalo', 'goat', 'horse', 'dog', 'cat', 'other'];
 const ITEM_DOT = '\u00B7';
@@ -363,11 +364,6 @@ const WishlistScreen = ({ navigation }) => {
               </View>
               <Text style={styles.sellerName} numberOfLines={1}>{sellerName}</Text>
             </View>
-
-            <View style={styles.verifiedMiniChip}>
-              <Ionicons name="checkmark" size={12} color={COLORS.primaryDark} />
-              <Text style={styles.verifiedMiniText}>{t('animalCard.verifiedSeller')}</Text>
-            </View>
           </View>
 
           <View style={styles.featuredActions}>
@@ -427,10 +423,6 @@ const WishlistScreen = ({ navigation }) => {
             <Text style={styles.compactTitle} numberOfLines={1}>
               {`${breedName} ${getAnimalTypeLabel(animalType)}`}
             </Text>
-            <View style={styles.verifiedMiniChip}>
-              <Ionicons name="checkmark" size={12} color={COLORS.primaryDark} />
-              <Text style={styles.verifiedMiniText}>{t('animalCard.verifiedSeller')}</Text>
-            </View>
           </View>
 
           <View style={styles.compactInfoRow}>
@@ -459,28 +451,22 @@ const WishlistScreen = ({ navigation }) => {
   };
 
   const renderListHeader = () => (
-    <View style={styles.headerSection}>
-      <View style={[styles.topBar, { paddingTop: insets.top + 6 }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerIconButton} activeOpacity={0.85}>
-          <Ionicons name="arrow-back" size={20} color={COLORS.text} />
-        </TouchableOpacity>
-
-        <Text style={styles.screenTitle}>{t('wishlist.title')}</Text>
-
-        <TouchableOpacity
-          style={styles.headerIconButton}
-          onPress={handleClearWishlist}
-          activeOpacity={0.85}
-          disabled={!wishlist.length}
-        >
-          <Ionicons
-            name="trash-outline"
-            size={18}
-            color={wishlist.length ? COLORS.textMuted : COLORS.borderStrong}
-          />
-        </TouchableOpacity>
-      </View>
-
+    <>
+      <AppHeader
+        navigation={navigation}
+        title={t('wishlist.title')}
+        subtitle={t('wishlist.savedAnimalsCount', { count: wishlist.length })}
+        rightActions={[
+          {
+            icon: 'trash-outline',
+            onPress: handleClearWishlist,
+            disabled: !wishlist.length,
+            color: wishlist.length ? COLORS.error : COLORS.borderStrong,
+            accessibilityLabel: 'Clear wishlist',
+          },
+        ]}
+      />
+      <View style={styles.headerSection}>
       <View style={styles.summaryCard}>
         <View style={styles.summaryLeft}>
           <View style={styles.summaryIconWrap}>
@@ -512,7 +498,8 @@ const WishlistScreen = ({ navigation }) => {
         contentContainerStyle={styles.categoryRow}
         showsHorizontalScrollIndicator={false}
       />
-    </View>
+      </View>
+    </>
   );
 
   const renderQuickContactCard = () => {
@@ -559,8 +546,7 @@ const WishlistScreen = ({ navigation }) => {
     if (loading) {
       return (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>{t('wishlist.loadingWishlist')}</Text>
+          <CowLoader message={t('wishlist.loadingWishlist')} size="large" />
         </View>
       );
     }
@@ -854,7 +840,6 @@ const styles = StyleSheet.create({
     marginTop: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: 8,
   },
   sellerIdentity: {
@@ -881,20 +866,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: COLORS.text,
-  },
-  verifiedMiniChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    backgroundColor: COLORS.primarySoft,
-  },
-  verifiedMiniText: {
-    color: COLORS.primaryDark,
-    fontSize: 11,
-    fontWeight: '700',
   },
   featuredActions: {
     marginTop: 16,
@@ -993,7 +964,6 @@ const styles = StyleSheet.create({
   compactHeaderRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    justifyContent: 'space-between',
     gap: 8,
   },
   compactTitle: {

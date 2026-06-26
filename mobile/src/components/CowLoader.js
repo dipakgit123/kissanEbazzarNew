@@ -1,277 +1,285 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
-  View,
-  Text,
   Animated,
-  StyleSheet,
   Easing,
+  Image,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
+import LottieView from 'lottie-react-native/lib/commonjs';
 import { COLORS } from '../utils/constants';
 
-// Animated Cow Loader Component
-const CowLoader = ({ message = 'Loading...', size = 'medium' }) => {
-  const bounceAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-  const dotAnim = useRef(new Animated.Value(0)).current;
+const LOADER_URL = 'https://lottie.host/06f480b9-2289-4e35-ad5d-20eb8bc39b8f/afS103suEj.lottie';
+
+const SIZE_MAP = {
+  small: {
+    shell: 86,
+    inner: 66,
+    animation: 58,
+    fallback: 46,
+    text: 12,
+    padding: 14,
+  },
+  medium: {
+    shell: 126,
+    inner: 96,
+    animation: 86,
+    fallback: 66,
+    text: 14,
+    padding: 20,
+  },
+  large: {
+    shell: 168,
+    inner: 132,
+    animation: 116,
+    fallback: 90,
+    text: 16,
+    padding: 28,
+  },
+};
+
+const CowLoader = ({ message = 'Loading...', size = 'medium', fullScreen = false }) => {
+  const [lottieFailed, setLottieFailed] = useState(false);
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+  const bobAnim = useRef(new Animated.Value(0)).current;
+  const sizeConfig = SIZE_MAP[size] || SIZE_MAP.medium;
 
   useEffect(() => {
-    // Bounce animation
-    const bounce = Animated.loop(
+    const pulse = Animated.loop(
       Animated.sequence([
-        Animated.timing(bounceAnim, {
-          toValue: -15,
-          duration: 400,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(bounceAnim, {
-          toValue: 0,
-          duration: 400,
-          easing: Easing.in(Easing.quad),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-
-    // Scale animation (squash and stretch)
-    const scale = Animated.loop(
-      Animated.sequence([
-        Animated.timing(scaleAnim, {
-          toValue: 0.9,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scaleAnim, {
-          toValue: 1.1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scaleAnim, {
+        Animated.timing(pulseAnim, {
           toValue: 1,
-          duration: 200,
+          duration: 850,
+          easing: Easing.inOut(Easing.quad),
           useNativeDriver: true,
         }),
-      ])
-    );
-
-    // Subtle rotation animation
-    const rotate = Animated.loop(
-      Animated.sequence([
-        Animated.timing(rotateAnim, {
-          toValue: 1,
-          duration: 300,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        }),
-        Animated.timing(rotateAnim, {
-          toValue: -1,
-          duration: 600,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        }),
-        Animated.timing(rotateAnim, {
+        Animated.timing(pulseAnim, {
           toValue: 0,
-          duration: 300,
-          easing: Easing.linear,
+          duration: 850,
+          easing: Easing.inOut(Easing.quad),
           useNativeDriver: true,
         }),
       ])
     );
 
-    // Dot animation for loading text
-    const dots = Animated.loop(
-      Animated.timing(dotAnim, {
+    const bob = Animated.loop(
+      Animated.sequence([
+        Animated.timing(bobAnim, {
+          toValue: -5,
+          duration: 700,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(bobAnim, {
+          toValue: 0,
+          duration: 700,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    pulse.start();
+    bob.start();
+
+    return () => {
+      pulse.stop();
+      bob.stop();
+    };
+  }, [bobAnim, pulseAnim]);
+
+  const scale = pulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.025],
+  });
+
+  const glowOpacity = pulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.42, 0.75],
+  });
+
+  return (
+    <View style={[styles.wrapper, fullScreen && styles.fullScreen]}>
+      <Animated.View
+        style={[
+          styles.glow,
+          {
+            width: sizeConfig.shell + 42,
+            height: sizeConfig.shell + 42,
+            borderRadius: (sizeConfig.shell + 42) / 2,
+            opacity: glowOpacity,
+            transform: [{ scale }],
+          },
+        ]}
+      />
+
+      <Animated.View
+        style={[
+          styles.shell,
+          {
+            width: sizeConfig.shell,
+            height: sizeConfig.shell,
+            borderRadius: sizeConfig.shell * 0.22,
+            padding: sizeConfig.padding,
+            transform: [{ translateY: bobAnim }],
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.innerTile,
+            {
+              width: sizeConfig.inner,
+              height: sizeConfig.inner,
+              borderRadius: sizeConfig.inner * 0.22,
+            },
+          ]}
+        >
+          {lottieFailed ? (
+            <Image
+              source={require('../assets/cow1.png')}
+              style={{
+                width: sizeConfig.fallback,
+                height: sizeConfig.fallback,
+              }}
+              resizeMode="contain"
+            />
+          ) : (
+            <LottieView
+              source={{ uri: LOADER_URL }}
+              autoPlay
+              loop
+              speed={3}
+              resizeMode="contain"
+              style={{
+                width: sizeConfig.animation,
+                height: sizeConfig.animation,
+              }}
+              onAnimationFailure={() => setLottieFailed(true)}
+            />
+          )}
+        </View>
+      </Animated.View>
+
+      {message ? (
+        <View style={styles.messageWrap}>
+          <Text style={[styles.messageText, { fontSize: sizeConfig.text }]}>{message}</Text>
+          <AnimatedDots />
+        </View>
+      ) : null}
+    </View>
+  );
+};
+
+const AnimatedDots = () => {
+  const progress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.timing(progress, {
         toValue: 3,
-        duration: 1200,
+        duration: 1100,
         easing: Easing.linear,
         useNativeDriver: false,
       })
     );
 
-    bounce.start();
-    scale.start();
-    rotate.start();
-    dots.start();
-
-    return () => {
-      bounce.stop();
-      scale.stop();
-      rotate.stop();
-      dots.stop();
-    };
-  }, [bounceAnim, scaleAnim, rotateAnim, dotAnim]);
-
-  const rotateInterpolate = rotateAnim.interpolate({
-    inputRange: [-1, 1],
-    outputRange: ['-5deg', '5deg'],
-  });
-
-  const getSize = () => {
-    switch (size) {
-      case 'small':
-        return { emoji: 48, container: 80 };
-      case 'large':
-        return { emoji: 80, container: 140 };
-      default:
-        return { emoji: 64, container: 110 };
-    }
-  };
-
-  const sizeConfig = getSize();
+    animation.start();
+    return () => animation.stop();
+  }, [progress]);
 
   return (
-    <View style={styles.container}>
-      {/* Animated Cow */}
-      <View style={[styles.loaderContainer, { width: sizeConfig.container, height: sizeConfig.container }]}>
-        {/* Shadow */}
-        <Animated.View
-          style={[
-            styles.shadow,
-            {
-              transform: [
-                { scaleX: scaleAnim },
-              ],
-            },
-          ]}
-        />
+    <View style={styles.dotsRow}>
+      {[0, 1, 2].map((index) => {
+        const opacity = progress.interpolate({
+          inputRange: [0, index + 0.01, index + 1, 3],
+          outputRange: [0.3, 0.3, 1, 1],
+          extrapolate: 'clamp',
+        });
 
-        {/* Cow Emoji */}
-        <Animated.View
-          style={{
-            transform: [
-              { translateY: bounceAnim },
-              { scale: scaleAnim },
-              { rotate: rotateInterpolate },
-            ],
-          }}
-        >
-          <Text style={[styles.cowEmoji, { fontSize: sizeConfig.emoji }]}>🐄</Text>
-        </Animated.View>
-      </View>
-
-      {/* Grass decoration */}
-      <View style={styles.grassContainer}>
-        <Text style={styles.grassEmoji}>🌿</Text>
-        <Text style={[styles.grassEmoji, { marginHorizontal: 8 }]}>🌾</Text>
-        <Text style={styles.grassEmoji}>🌿</Text>
-      </View>
-
-      {/* Loading Message */}
-      {message && (
-        <View style={styles.messageContainer}>
-          <Text style={styles.messageText}>{message}</Text>
-          <AnimatedDots animation={dotAnim} />
-        </View>
-      )}
+        return (
+          <Animated.Text key={index} style={[styles.dot, { opacity }]}>
+            .
+          </Animated.Text>
+        );
+      })}
     </View>
   );
 };
 
-// Animated dots component
-const AnimatedDots = ({ animation }) => {
-  const dot1Opacity = animation.interpolate({
-    inputRange: [0, 1, 2, 3],
-    outputRange: [0.3, 1, 1, 1],
-  });
-
-  const dot2Opacity = animation.interpolate({
-    inputRange: [0, 1, 2, 3],
-    outputRange: [0.3, 0.3, 1, 1],
-  });
-
-  const dot3Opacity = animation.interpolate({
-    inputRange: [0, 1, 2, 3],
-    outputRange: [0.3, 0.3, 0.3, 1],
-  });
-
-  return (
-    <View style={styles.dotsContainer}>
-      <Animated.Text style={[styles.dot, { opacity: dot1Opacity }]}>.</Animated.Text>
-      <Animated.Text style={[styles.dot, { opacity: dot2Opacity }]}>.</Animated.Text>
-      <Animated.Text style={[styles.dot, { opacity: dot3Opacity }]}>.</Animated.Text>
-    </View>
-  );
-};
-
-// Full Page Cow Loader
 export const FullPageCowLoader = ({ message = 'Loading...', visible = true }) => {
   if (!visible) return null;
 
   return (
     <View style={styles.fullPageContainer}>
-      <View style={styles.fullPageContent}>
-        <CowLoader message={message} size="large" />
-      </View>
+      <CowLoader message={message} size="large" fullScreen />
     </View>
   );
 };
 
-// Inline Cow Loader (smaller, for inline use)
-export const InlineCowLoader = ({ message }) => {
-  return <CowLoader message={message} size="small" />;
-};
+export const InlineCowLoader = ({ message = '', size = 'small' }) => (
+  <CowLoader message={message} size={size} />
+);
 
 const styles = StyleSheet.create({
-  container: {
+  wrapper: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 24,
+    paddingVertical: 18,
   },
-  loaderContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  fullScreen: {
+    flex: 1,
   },
-  shadow: {
+  glow: {
     position: 'absolute',
-    bottom: 5,
-    width: 50,
-    height: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.15)',
-    borderRadius: 50,
+    backgroundColor: COLORS.primarySoft,
   },
-  cowEmoji: {
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 0, height: 4 },
-    textShadowRadius: 8,
+  shell: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F7FBFA',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+    shadowColor: COLORS.primaryDeep,
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.12,
+    shadowRadius: 28,
+    elevation: 8,
   },
-  grassContainer: {
-    flexDirection: 'row',
-    marginTop: -10,
-    opacity: 0.8,
+  innerTile: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F1FBF6',
+    overflow: 'hidden',
   },
-  grassEmoji: {
-    fontSize: 20,
-  },
-  messageContainer: {
+  messageWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 16,
+    justifyContent: 'center',
+    marginTop: 14,
   },
   messageText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.gray,
+    color: COLORS.textMuted,
+    fontWeight: '700',
   },
-  dotsContainer: {
+  dotsRow: {
     flexDirection: 'row',
-    width: 24,
+    width: 22,
+    marginLeft: 2,
   },
   dot: {
-    fontSize: 20,
-    fontWeight: 'bold',
     color: COLORS.primary,
-    marginLeft: 2,
+    fontSize: 18,
+    fontWeight: '900',
+    lineHeight: 18,
   },
   fullPageContainer: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: '#E9F2FA',
     zIndex: 1000,
-  },
-  fullPageContent: {
-    alignItems: 'center',
   },
 });
 

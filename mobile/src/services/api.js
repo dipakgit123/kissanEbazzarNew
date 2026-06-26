@@ -1,7 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
-import { NativeModules, Platform } from 'react-native';
+import { DeviceEventEmitter, NativeModules, Platform } from 'react-native';
 
 const API_PORT = '5000';
 
@@ -55,7 +55,8 @@ const resolveDefaultApiUrl = () => {
 };
 
 const DEFAULT_API_URL = resolveDefaultApiUrl();
-const API_URL = (process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_URL).replace(/\/+$/, '');
+const CONFIGURED_API_URL = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl;
+const API_URL = (CONFIGURED_API_URL || DEFAULT_API_URL).trim().replace(/\/+$/, '');
 
 // Export API_URL for use in other services
 export { API_URL };
@@ -100,6 +101,7 @@ api.interceptors.response.use(
       await AsyncStorage.removeItem('userData');
       await AsyncStorage.removeItem('vetToken');
       await AsyncStorage.removeItem('veterinarianData');
+      DeviceEventEmitter.emit('auth:unauthorized');
     }
     return Promise.reject(error);
   }
@@ -455,6 +457,90 @@ export const pregnancyService = {
   }
 };
 
+// Milk Report Service
+export const milkReportService = {
+  getCows: async (params = {}) => {
+    try {
+      const response = await api.get('/api/milk-reports/cows', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  createCow: async (data) => {
+    try {
+      const response = await api.post('/api/milk-reports/cows', data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  updateCow: async (id, data) => {
+    try {
+      const response = await api.put(`/api/milk-reports/cows/${id}`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  deleteCow: async (id) => {
+    try {
+      const response = await api.delete(`/api/milk-reports/cows/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  getReports: async (params = {}) => {
+    try {
+      const response = await api.get('/api/milk-reports/reports', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  createReport: async (data) => {
+    try {
+      const response = await api.post('/api/milk-reports/reports', data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  updateReport: async (id, data) => {
+    try {
+      const response = await api.put(`/api/milk-reports/reports/${id}`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  deleteReport: async (id) => {
+    try {
+      const response = await api.delete(`/api/milk-reports/reports/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  getStats: async (params = {}) => {
+    try {
+      const response = await api.get('/api/milk-reports/stats', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+};
+
 // Animal Listing Service (for creating listings)
 export const animalListingService = {
   // Get all animal listings
@@ -746,6 +832,7 @@ export const callLogService = {
   logCall: async (callData) => {
     try {
       const response = await api.post('/api/call-logs', callData);
+      DeviceEventEmitter.emit('callHistory:updated');
       return response.data;
     } catch (error) {
       throw error.response?.data || error;
@@ -756,6 +843,7 @@ export const callLogService = {
   deleteCallLog: async (logId) => {
     try {
       const response = await api.delete(`/api/call-logs/${logId}`);
+      DeviceEventEmitter.emit('callHistory:updated');
       return response.data;
     } catch (error) {
       throw error.response?.data || error;

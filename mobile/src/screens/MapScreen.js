@@ -8,16 +8,16 @@ import {
   Dimensions,
   Linking,
   Alert,
-  Image,
   RefreshControl,
   ScrollView,
 } from 'react-native';
 import MapView, { Marker, Circle, PROVIDER_GOOGLE, Callout } from 'react-native-maps';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { COLORS, formatPrice, getAnimalTypeIcon } from '../utils/constants';
+import { COLORS, formatPrice } from '../utils/constants';
 import { listingsService } from '../services/api';
 import CowLoader from '../components/CowLoader';
+import AppHeader from '../components/AppHeader';
 
 const { width, height } = Dimensions.get('window');
 const ASPECT_RATIO = width / height;
@@ -39,6 +39,22 @@ const getMarkerColor = (type) => {
   return colors[type?.toLowerCase()] || '#15BB73';
 };
 
+const getAnimalMarkerIcon = (type) => {
+  const icons = {
+    cow: 'cow',
+    buffalo: 'cow',
+    goat: 'sheep',
+    horse: 'horse',
+    dog: 'dog-side',
+    cat: 'cat',
+    bull: 'cow',
+    animal: 'paw',
+    other: 'paw',
+  };
+
+  return icons[type?.toLowerCase()] || 'paw';
+};
+
 // Get distance color
 const getDistanceColor = (distance) => {
   if (!distance) return COLORS.gray;
@@ -50,7 +66,7 @@ const getDistanceColor = (distance) => {
 
 // Custom Marker Component
 const AnimalMarker = ({ listing, isSelected, onPress }) => {
-  const emoji = getAnimalTypeIcon(listing.animal_type);
+  const emoji = '';
   const color = getMarkerColor(listing.animal_type);
 
   return (
@@ -72,8 +88,16 @@ const AnimalMarker = ({ listing, isSelected, onPress }) => {
   );
 };
 
-const MapScreen = ({ navigation }) => {
+const MapScreen = ({ navigation, route }) => {
   const mapRef = useRef(null);
+  const targetParams = route?.params || {};
+  const targetListingId = targetParams.listingId || targetParams.id || targetParams.listing?.id;
+  const targetAnimalType = targetParams.animalType || targetParams.listing?.animal_type;
+  const targetLatitude = Number(targetParams.latitude ?? targetParams.lat);
+  const targetLongitude = Number(targetParams.longitude ?? targetParams.lng);
+  const hasTargetCoordinates =
+    Number.isFinite(targetLatitude) && Number.isFinite(targetLongitude);
+
   const [userLocation, setUserLocation] = useState(null);
   const [listings, setListings] = useState([]);
   const [selectedListing, setSelectedListing] = useState(null);
@@ -87,12 +111,41 @@ const MapScreen = ({ navigation }) => {
     initializeMap();
   }, []);
 
+  const focusMapOnListing = useCallback((listing, delta = 0.05) => {
+    if (mapRef.current && listing?.latitude && listing?.longitude) {
+      mapRef.current.animateToRegion({
+        latitude: parseFloat(listing.latitude),
+        longitude: parseFloat(listing.longitude),
+        latitudeDelta: delta,
+        longitudeDelta: delta,
+      }, 500);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (mapReady && hasTargetCoordinates && selectedListing) {
+      focusMapOnListing(selectedListing, 0.02);
+    }
+  }, [focusMapOnListing, hasTargetCoordinates, mapReady, selectedListing]);
+
   const initializeMap = async () => {
     try {
       setLoading(true);
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission Denied', 'Location permission is required to use the map.');
+        if (hasTargetCoordinates) {
+          const selectedTarget = {
+            ...(targetParams.listing || {}),
+            id: targetListingId || targetParams.listing?.id || 'selected-location',
+            animal_type: targetAnimalType || 'animal',
+            breed_name: targetParams.listing?.breed_name || 'Selected animal',
+            latitude: targetLatitude,
+            longitude: targetLongitude,
+          };
+          setListings([selectedTarget]);
+          setSelectedListing(selectedTarget);
+        }
         setLoading(false);
         return;
       }
@@ -111,12 +164,25 @@ const MapScreen = ({ navigation }) => {
       await fetchListings(coords.latitude, coords.longitude);
     } catch (error) {
       console.error('Error initializing map:', error);
-      Alert.alert('Error', 'Failed to get your location');
-      // Default to India center
-      setUserLocation({
-        latitude: 20.5937,
-        longitude: 78.9629,
-      });
+      if (hasTargetCoordinates) {
+        const selectedTarget = {
+          ...(targetParams.listing || {}),
+          id: targetListingId || targetParams.listing?.id || 'selected-location',
+          animal_type: targetAnimalType || 'animal',
+          breed_name: targetParams.listing?.breed_name || 'Selected animal',
+          latitude: targetLatitude,
+          longitude: targetLongitude,
+        };
+        setListings([selectedTarget]);
+        setSelectedListing(selectedTarget);
+      } else {
+        Alert.alert('Error', 'Failed to get your location');
+        // Default to India center
+        setUserLocation({
+          latitude: 20.5937,
+          longitude: 78.9629,
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -206,9 +272,49 @@ const MapScreen = ({ navigation }) => {
       });
 
       // Sort by distance
-      const sortedListings = processedListings.sort((a, b) =>
+      let sortedListings = processedListings.sort((a, b) =>
         (a.distance || 0) - (b.distance || 0)
       );
+
+      if (hasTargetCoordinates) {
+        const matchedTarget = targetListingId
+          ? sortedListings.find((item) => {
+              const idMatches = String(item.id) === String(targetListingId);
+              const typeMatches = targetAnimalType
+                ? String(item.animal_type).toLowerCase() === String(targetAnimalType).toLowerCase()
+                : true;
+              return idMatches && typeMatches;
+            })
+          : null;
+
+        const routeTargetListing = matchedTarget || {
+          ...(targetParams.listing || {}),
+          id: targetListingId || targetParams.listing?.id || 'selected-location',
+          animal_type: targetAnimalType || 'animal',
+          breed_name: targetParams.listing?.breed_name || 'Selected animal',
+          city: targetParams.listing?.city,
+          state: targetParams.listing?.state,
+          expected_price: targetParams.listing?.expected_price,
+          seller: targetParams.listing?.seller,
+        };
+
+        const selectedTarget = {
+          ...routeTargetListing,
+          latitude: targetLatitude,
+          longitude: targetLongitude,
+        };
+
+        if (matchedTarget) {
+          sortedListings = sortedListings.map((item) =>
+            String(item.id) === String(matchedTarget.id) ? selectedTarget : item
+          );
+        } else {
+          sortedListings = [selectedTarget, ...sortedListings];
+        }
+
+        setSelectedListing(selectedTarget);
+        setTimeout(() => focusMapOnListing(selectedTarget, 0.02), 300);
+      }
 
       setListings(sortedListings);
       console.log(`Loaded ${sortedListings.length} animals on map`);
@@ -227,16 +333,7 @@ const MapScreen = ({ navigation }) => {
 
   const handleMarkerPress = (listing) => {
     setSelectedListing(listing);
-
-    // Animate to marker location
-    if (mapRef.current && listing.latitude && listing.longitude) {
-      mapRef.current.animateToRegion({
-        latitude: parseFloat(listing.latitude),
-        longitude: parseFloat(listing.longitude),
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-      }, 500);
-    }
+    focusMapOnListing(listing);
   };
 
   const handleCall = (phone) => {
@@ -295,7 +392,7 @@ const MapScreen = ({ navigation }) => {
 
   const renderListingCard = ({ item }) => {
     const isSelected = selectedListing?.id === item.id;
-    const emoji = getAnimalTypeIcon(item.animal_type);
+    const markerColor = getMarkerColor(item.animal_type);
     const distanceColor = getDistanceColor(item.distance);
 
     return (
@@ -307,7 +404,13 @@ const MapScreen = ({ navigation }) => {
         {/* Header */}
         <View style={styles.cardHeader}>
           <View style={styles.cardHeaderLeft}>
-            <Text style={styles.animalEmoji}>{emoji}</Text>
+            <View style={[styles.animalIconCircle, { backgroundColor: `${markerColor}18` }]}>
+              <MaterialCommunityIcons
+                name={getAnimalMarkerIcon(item.animal_type)}
+                size={24}
+                color={markerColor}
+              />
+            </View>
             <View style={styles.cardInfo}>
               <Text style={styles.cardTitle} numberOfLines={1}>
                 {item.breed_name || 'Unknown Breed'}
@@ -335,7 +438,8 @@ const MapScreen = ({ navigation }) => {
           {/* Extra info row */}
           {item.milk_capacity && (
             <View style={styles.milkRow}>
-              <Text style={styles.milkText}>🥛 {item.milk_capacity}L/day</Text>
+              <Ionicons name="water-outline" size={14} color={COLORS.blue} />
+              <Text style={styles.milkValueText}>{item.milk_capacity}L/day</Text>
             </View>
           )}
         </View>
@@ -377,30 +481,20 @@ const MapScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.black} />
-        </TouchableOpacity>
-        <View style={styles.headerTitle}>
-          <Text style={styles.title}>Animal Map</Text>
-          <Text style={styles.subtitle}>
-            {filteredListings.length} animals nearby
-          </Text>
-        </View>
-        <TouchableOpacity
-          style={styles.refreshBtn}
-          onPress={handleRefresh}
-          disabled={refreshing}
-        >
-          <Ionicons
-            name="refresh"
-            size={24}
-            color={COLORS.primary}
-            style={refreshing ? styles.spinning : null}
-          />
-        </TouchableOpacity>
-      </View>
+      <AppHeader
+        navigation={navigation}
+        title="Animal Map"
+        subtitle={`${filteredListings.length} animals nearby`}
+        rightActions={[
+          {
+            icon: 'refresh',
+            onPress: handleRefresh,
+            disabled: refreshing,
+            color: COLORS.primary,
+            accessibilityLabel: 'Refresh map',
+          },
+        ]}
+      />
 
       {/* Map */}
       <View style={styles.mapContainer}>
@@ -418,18 +512,39 @@ const MapScreen = ({ navigation }) => {
           showsMyLocationButton={false}
           onMapReady={() => {
             setMapReady(true);
-            setTimeout(fitToMarkers, 500);
+            if (!hasTargetCoordinates && !targetListingId) {
+              setTimeout(fitToMarkers, 500);
+            }
           }}
         >
           {/* User location circle */}
           {userLocation && (
-            <Circle
-              center={userLocation}
-              radius={1000}
-              fillColor="rgba(59, 130, 246, 0.1)"
-              strokeColor="rgba(59, 130, 246, 0.3)"
-              strokeWidth={2}
-            />
+            <>
+              <Circle
+                center={userLocation}
+                radius={1000}
+                fillColor="rgba(25, 113, 194, 0.10)"
+                strokeColor="rgba(25, 113, 194, 0.28)"
+                strokeWidth={2}
+              />
+              <Marker
+                coordinate={userLocation}
+                identifier="user-location"
+                zIndex={1000}
+                anchor={{ x: 0.5, y: 0.5 }}
+              >
+                <View style={styles.userMarkerOuter}>
+                  <View style={styles.userMarkerInner}>
+                    <View style={styles.userMarkerDot} />
+                  </View>
+                </View>
+                <Callout tooltip>
+                  <View style={styles.userCallout}>
+                    <Text style={styles.userCalloutText}>Your location</Text>
+                  </View>
+                </Callout>
+              </Marker>
+            </>
           )}
 
           {/* Animal markers */}
@@ -442,16 +557,21 @@ const MapScreen = ({ navigation }) => {
                   longitude: parseFloat(listing.longitude),
                 }}
                 onPress={() => handleMarkerPress(listing)}
-                tracksViewChanges={false}
+                anchor={{ x: 0.5, y: 1 }}
               >
-                <View style={[
-                  styles.customMarker,
-                  selectedListing?.id === listing.id && styles.selectedCustomMarker,
-                  { borderColor: getMarkerColor(listing.animal_type) }
-                ]}>
-                  <Text style={styles.markerEmoji}>
-                    {getAnimalTypeIcon(listing.animal_type)}
-                  </Text>
+                <View style={styles.markerWrap}>
+                  <View style={[
+                    styles.customMarker,
+                    selectedListing?.id === listing.id && styles.selectedCustomMarker,
+                    { borderColor: getMarkerColor(listing.animal_type) }
+                  ]}>
+                    <MaterialCommunityIcons
+                      name={getAnimalMarkerIcon(listing.animal_type)}
+                      size={24}
+                      color={getMarkerColor(listing.animal_type)}
+                    />
+                  </View>
+                  <View style={[styles.markerPointer, { borderTopColor: getMarkerColor(listing.animal_type) }]} />
                 </View>
                 <Callout tooltip onPress={() => handleViewDetails(listing)}>
                   <View style={styles.calloutContainer}>
@@ -462,10 +582,13 @@ const MapScreen = ({ navigation }) => {
                       <Text style={styles.calloutPrice}>
                         ₹{formatPrice(listing.expected_price)}
                       </Text>
-                      <Text style={styles.calloutLocation}>
-                        📍 {listing.city || 'Unknown'}
-                        {listing.distance ? ` (${Math.round(listing.distance)} km)` : ''}
-                      </Text>
+                      <View style={styles.calloutLocationRow}>
+                        <Ionicons name="location-outline" size={12} color={COLORS.gray} />
+                        <Text style={styles.calloutLocationText}>
+                          {listing.city || 'Unknown'}
+                          {listing.distance ? ` (${Math.round(listing.distance)} km)` : ''}
+                        </Text>
+                      </View>
                       <Text style={styles.calloutHint}>Tap for details</Text>
                     </View>
                     <View style={styles.calloutArrow} />
@@ -503,7 +626,9 @@ const MapScreen = ({ navigation }) => {
 
         {/* Animal Count Badge */}
         <View style={styles.countBadge}>
-          <Text style={styles.countEmoji}>🐄</Text>
+          <View style={styles.countIcon}>
+            <MaterialCommunityIcons name="map-marker-multiple" size={22} color={COLORS.primary} />
+          </View>
           <View>
             <Text style={styles.countNumber}>{filteredListings.length}</Text>
             <Text style={styles.countLabel}>on map</Text>
@@ -544,7 +669,11 @@ const MapScreen = ({ navigation }) => {
               ]}
               onPress={() => setFilterType(type)}
             >
-              <Text style={styles.filterEmoji}>{getAnimalTypeIcon(type)}</Text>
+              <MaterialCommunityIcons
+                name={getAnimalMarkerIcon(type)}
+                size={16}
+                color={filterType === type ? COLORS.white : getMarkerColor(type)}
+              />
               <Text style={[
                 styles.filterText,
                 filterType === type && styles.filterTextActive
@@ -584,7 +713,9 @@ const MapScreen = ({ navigation }) => {
           }
           ListEmptyComponent={() => (
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyEmoji}>🗺️</Text>
+              <View style={styles.emptyIconCircle}>
+                <MaterialCommunityIcons name="map-marker-off-outline" size={42} color={COLORS.borderStrong} />
+              </View>
               <Text style={styles.emptyText}>No animals found nearby</Text>
               <TouchableOpacity style={styles.retryBtn} onPress={handleRefresh}>
                 <Text style={styles.retryText}>Try Again</Text>
@@ -647,11 +778,17 @@ const styles = StyleSheet.create({
   map: {
     flex: 1,
   },
+  markerWrap: {
+    alignItems: 'center',
+  },
   customMarker: {
     backgroundColor: COLORS.white,
-    padding: 8,
-    borderRadius: 24,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     borderWidth: 3,
+    justifyContent: 'center',
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -663,8 +800,62 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     elevation: 8,
   },
+  markerPointer: {
+    width: 0,
+    height: 0,
+    marginTop: -2,
+    borderLeftWidth: 7,
+    borderRightWidth: 7,
+    borderTopWidth: 10,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+  },
   markerEmoji: {
-    fontSize: 22,
+    width: 0,
+    height: 0,
+    opacity: 0,
+  },
+  userMarkerOuter: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(25, 113, 194, 0.18)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(25, 113, 194, 0.30)',
+  },
+  userMarkerInner: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: COLORS.blue,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.white,
+  },
+  userMarkerDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+    backgroundColor: COLORS.white,
+  },
+  userCallout: {
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  userCalloutText: {
+    color: COLORS.black,
+    fontSize: 12,
+    fontWeight: '700',
   },
   mapControls: {
     position: 'absolute',
@@ -703,7 +894,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   countEmoji: {
-    fontSize: 24,
+    width: 0,
+    height: 0,
+    opacity: 0,
+  },
+  countIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: COLORS.primarySoft,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   countNumber: {
     fontSize: 16,
@@ -741,9 +942,20 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   calloutLocation: {
+    width: 0,
+    height: 0,
+    opacity: 0,
+  },
+  calloutLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 4,
+  },
+  calloutLocationText: {
     fontSize: 12,
     color: COLORS.gray,
-    marginBottom: 4,
+    flexShrink: 1,
   },
   calloutHint: {
     fontSize: 10,
@@ -862,7 +1074,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   animalEmoji: {
-    fontSize: 32,
+    width: 0,
+    height: 0,
+    opacity: 0,
+  },
+  animalIconCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 10,
   },
   cardInfo: {
@@ -903,8 +1124,16 @@ const styles = StyleSheet.create({
   },
   milkRow: {
     marginTop: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   milkText: {
+    width: 0,
+    height: 0,
+    opacity: 0,
+  },
+  milkValueText: {
     fontSize: 12,
     color: COLORS.blue,
     fontWeight: '500',
@@ -952,7 +1181,17 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
   },
   emptyEmoji: {
-    fontSize: 48,
+    width: 0,
+    height: 0,
+    opacity: 0,
+  },
+  emptyIconCircle: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: COLORS.surfaceAlt,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 12,
   },
   emptyText: {

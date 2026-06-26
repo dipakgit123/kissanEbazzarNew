@@ -42,7 +42,6 @@ const ProfileCompletionScreen = ({ navigation }) => {
 
       if (response.success) {
         await updateUser(response.user);
-        navigation.replace('MainTabs');
       } else {
         Alert.alert('Error', response.message || 'Failed to complete profile');
       }

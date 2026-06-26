@@ -15,6 +15,7 @@ import * as Location from 'expo-location';
 import { COLORS } from '../utils/constants';
 import { useAuth } from '../context/AuthContext';
 import { userService } from '../services/api';
+import AppHeader from '../components/AppHeader';
 
 const LocationSetupScreen = ({ navigation }) => {
   const { t } = useTranslation();
@@ -105,14 +106,10 @@ const LocationSetupScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('locationSetup.title')}</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <AppHeader
+        navigation={navigation}
+        title={t('locationSetup.title')}
+      />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Info Banner */}

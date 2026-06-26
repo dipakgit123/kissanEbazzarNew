@@ -18,6 +18,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../utils/constants';
 import { animalListingService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import AppHeader from '../components/AppHeader';
 
 const CreateListingScreen = ({ route, navigation }) => {
   const { category } = route.params;
@@ -282,17 +283,12 @@ const CreateListingScreen = ({ route, navigation }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="close" size={24} color={COLORS.black} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>List Your {category.name}</Text>
-        <View style={styles.headerRight} />
-      </View>
+      <AppHeader
+        navigation={navigation}
+        title={`List Your ${category.name}`}
+        subtitle="Add photos and animal details"
+        leftIcon="close"
+      />
 
       <ScrollView
         style={styles.scrollView}

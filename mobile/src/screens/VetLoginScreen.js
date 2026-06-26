@@ -19,6 +19,7 @@ import { COLORS } from '../utils/constants';
 import { useVetAuth } from '../context/VetAuthContext';
 import { veterinarianService } from '../services/api';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import CowLoader from '../components/CowLoader';
 
 const { width, height } = Dimensions.get('window');
 
@@ -36,7 +37,7 @@ const VetLoginScreen = ({ navigation }) => {
   if (!ready) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <CowLoader message="" size="large" />
       </View>
     );
   }

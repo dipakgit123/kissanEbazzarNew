@@ -196,7 +196,7 @@ const CowListingForm = ({ navigation, onSuccess }) => {
       if (error.code === 'ECONNABORTED') {
         errorMessage = 'Request timeout. Please check your internet connection and try again.';
       } else if (error.message === 'Network Error') {
-        errorMessage = 'Cannot connect to server. Please check:\n1. Server is running\n2. You are on the same WiFi network\n3. IP address is correct (192.168.15.146)';
+        errorMessage = `Cannot connect to server.\n\nServer URL: ${api.defaults.baseURL}\n\nPlease check internet connection and backend access.`;
       } else if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
       } else if (error.message) {

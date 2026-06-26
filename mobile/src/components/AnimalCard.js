@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import Toast from 'react-native-toast-message';
 import { COLORS, formatPrice, formatTimeAgo, getAnimalTypeIcon } from '../utils/constants';
@@ -23,6 +24,7 @@ const AnimalCard = ({ listing, onPress }) => {
   }
 
   const { t } = useTranslation();
+  const navigation = useNavigation();
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
   const [isWishlistLoading, setIsWishlistLoading] = useState(false);
   const inWishlist = isInWishlist(listing.id);
@@ -40,6 +42,8 @@ const AnimalCard = ({ listing, onPress }) => {
     seller,
     vaccination_status,
     vaccination_details,
+    latitude,
+    longitude,
   } = listing;
 
   const imageUrl = front_photo || side_photo || null;
@@ -80,6 +84,10 @@ const AnimalCard = ({ listing, onPress }) => {
   };
 
   const getLocationText = () => city || state || t('buyAnimals.unknownLocation');
+  const numericLatitude = Number(latitude);
+  const numericLongitude = Number(longitude);
+  const hasExactLocation =
+    Number.isFinite(numericLatitude) && Number.isFinite(numericLongitude);
 
   const isVaccinated =
     vaccination_status === true ||
@@ -88,9 +96,7 @@ const AnimalCard = ({ listing, onPress }) => {
     vaccination_status === 'vaccinated' ||
     Boolean(vaccination_details);
 
-  const statusLabel = isVaccinated
-    ? t('animalCard.vaccinated')
-    : t('animalCard.verifiedSeller');
+  const statusLabel = isVaccinated ? t('animalCard.vaccinated') : null;
 
   const handleWishlistToggle = async () => {
     if (isWishlistLoading) {
@@ -174,6 +180,20 @@ const AnimalCard = ({ listing, onPress }) => {
     }
   };
 
+  const handleLocationPress = () => {
+    const mapParams = hasExactLocation
+      ? {
+          listingId: listing.id,
+          animalType: animal_type,
+          latitude: numericLatitude,
+          longitude: numericLongitude,
+          listing,
+        }
+      : undefined;
+
+    navigation.navigate('Map', mapParams);
+  };
+
   const numericDistance = Number(distance);
   const distanceText =
     Number.isFinite(numericDistance) && numericDistance > 0
@@ -184,12 +204,14 @@ const AnimalCard = ({ listing, onPress }) => {
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.92}>
       <View style={styles.mediaSection}>
-        <View style={styles.topMetaRow}>
-          <View style={styles.statusChip}>
-            <Text style={styles.statusChipText} numberOfLines={1}>
-              {statusLabel}
-            </Text>
-          </View>
+        <View style={[styles.topMetaRow, !statusLabel && styles.topMetaRowPriceOnly]}>
+          {statusLabel ? (
+            <View style={styles.statusChip}>
+              <Text style={styles.statusChipText} numberOfLines={1}>
+                {statusLabel}
+              </Text>
+            </View>
+          ) : null}
 
           <View style={styles.priceChip}>
             <Text style={styles.priceChipText}>{`\u20B9${formattedPrice}`}</Text>
@@ -233,8 +255,12 @@ const AnimalCard = ({ listing, onPress }) => {
           {`${breed_name || t('buyAnimals.unknownBreed')} | ${animalTypeLabel}`}
         </Text>
 
-        <View style={styles.locationRow}>
-          <Ionicons name="location-outline" size={13} color={COLORS.textMuted} />
+        <TouchableOpacity
+          style={styles.locationRow}
+          onPress={handleLocationPress}
+          activeOpacity={0.75}
+        >
+          <Ionicons name="location-outline" size={13} color={COLORS.primaryDark} />
           <Text style={styles.locationText} numberOfLines={1}>
             {getLocationText()}
           </Text>
@@ -246,7 +272,11 @@ const AnimalCard = ({ listing, onPress }) => {
               </Text>
             </View>
           ) : null}
-        </View>
+          <View style={styles.locationTapIndicator}>
+            <Ionicons name="map-outline" size={13} color={COLORS.primaryDark} />
+            <Ionicons name="chevron-forward" size={13} color={COLORS.primaryDark} />
+          </View>
+        </TouchableOpacity>
 
         <View style={styles.bottomRow}>
           <View style={styles.bottomMeta}>
@@ -310,6 +340,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     zIndex: 3,
   },
+  topMetaRowPriceOnly: {
+    justifyContent: 'flex-end',
+  },
   statusChip: {
     maxWidth: '58%',
     paddingHorizontal: 11,
@@ -366,12 +399,12 @@ const styles = StyleSheet.create({
     left: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
+    backgroundColor: '#F0F8F4',
   },
   thumbnailImage: {
     width: '100%',
     height: '100%',
-    resizeMode: 'cover',
+    resizeMode: 'contain',
   },
   placeholderImage: {
     width: '100%',
@@ -398,14 +431,24 @@ const styles = StyleSheet.create({
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    backgroundColor: COLORS.primarySoft,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: COLORS.primaryLight,
+    paddingVertical: 5,
+    paddingLeft: 8,
+    paddingRight: 5,
     marginBottom: 12,
   },
   locationText: {
     fontSize: 14,
-    color: COLORS.textMuted,
+    color: COLORS.primaryDark,
     marginLeft: 4,
     flexShrink: 1,
-    maxWidth: '50%',
+    maxWidth: '48%',
+    fontWeight: '600',
   },
   distanceWrap: {
     flexDirection: 'row',
@@ -420,9 +463,19 @@ const styles = StyleSheet.create({
   },
   distanceText: {
     fontSize: 14,
-    color: COLORS.textMuted,
+    color: COLORS.primaryDark,
     fontWeight: '500',
     flexShrink: 1,
+  },
+  locationTapIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: 999,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    marginLeft: 8,
+    gap: 1,
   },
   bottomRow: {
     flexDirection: 'row',
@@ -454,7 +507,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.accent,
+    backgroundColor: COLORS.blue,
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 12,

@@ -8,6 +8,8 @@ import * as Location from 'expo-location';
 import { COLORS } from '../utils/constants';
 import { veterinarianService } from '../services/api';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import CowLoader from '../components/CowLoader';
+import AppHeader from '../components/AppHeader';
 
 const { width } = Dimensions.get('window');
 
@@ -30,7 +32,7 @@ const VetRegistrationScreen = ({ navigation }) => {
   if (!ready) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <CowLoader message="" size="large" />
       </View>
     );
   }
@@ -231,15 +233,25 @@ const VetRegistrationScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => step === 1 ? navigation.goBack() : handleBack()}>
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('vetAuth.registrationTitle')}</Text>
-        <TouchableOpacity onPress={() => setLanguageModalVisible(true)}>
-          <Ionicons name="language" size={24} color={COLORS.primary} />
-        </TouchableOpacity>
-      </View>
+      <AppHeader
+        safeArea={false}
+        navigation={navigation}
+        title={t('vetAuth.registrationTitle')}
+        subtitle={t('vetRegistration.stepLabel', {
+          step,
+          total: 3,
+          defaultValue: `Step ${step} of 3`,
+        })}
+        onBack={() => (step === 1 ? navigation.goBack() : handleBack())}
+        rightActions={[
+          {
+            icon: 'language',
+            onPress: () => setLanguageModalVisible(true),
+            color: COLORS.primary,
+            accessibilityLabel: 'Change language',
+          },
+        ]}
+      />
       <View style={styles.progressContainer}>
         {[1, 2, 3].map((stepNum) => (
           <View key={stepNum} style={styles.progressStep}>

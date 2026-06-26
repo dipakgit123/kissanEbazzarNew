@@ -13,6 +13,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from '@react-navigation/native';
 import { COLORS } from '../utils/constants';
+import FeatureHelpModal from '../components/FeatureHelpModal';
+import { getLocalizedFeatureHelp } from '../constants/featureHelp';
+import AppHeader from '../components/AppHeader';
 
 import CowListingForm from '../components/forms/CowListingForm';
 import BuffaloListingForm from '../components/forms/BuffaloListingForm';
@@ -23,8 +26,10 @@ import CatListingForm from '../components/forms/CatListingForm';
 import OtherAnimalListingForm from '../components/forms/OtherAnimalListingForm';
 
 const SellAnimalScreen = ({ navigation }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [selectedAnimal, setSelectedAnimal] = useState(null);
+  const [helpVisible, setHelpVisible] = useState(false);
+  const sellHelp = getLocalizedFeatureHelp('sellAnimal', i18n.resolvedLanguage || i18n.language);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (event) => {
@@ -169,32 +174,31 @@ const SellAnimalScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={[styles.header, { backgroundColor: COLORS.primary }]}>
-        <TouchableOpacity
-          onPress={() => {
-            if (selectedAnimal) {
-              setSelectedAnimal(null);
-            } else {
-              navigation.goBack();
-            }
-          }}
-          style={styles.backButton}
-        >
-          <Ionicons name="arrow-back" size={24} color="#FFF" />
-        </TouchableOpacity>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>
-            {selectedAnimal
-              ? `${t('listing.createListing') || 'Create Listing'} - ${selectedAnimal.name}`
-              : t('sellAnimal.title') || 'Sell Animal'}
-          </Text>
-          {!selectedAnimal && (
-            <Text style={styles.headerSubtitle}>
-              {t('sellAnimal.subtitle') || 'List your animal for sale'}
-            </Text>
-          )}
-        </View>
-      </View>
+      <AppHeader
+        safeArea={false}
+        navigation={navigation}
+        variant="primary"
+        title={
+          selectedAnimal
+            ? `${t('listing.createListing') || 'Create Listing'} - ${selectedAnimal.name}`
+            : t('sellAnimal.title') || 'Sell Animal'
+        }
+        subtitle={!selectedAnimal ? t('sellAnimal.subtitle') || 'List your animal for sale' : undefined}
+        onBack={() => {
+          if (selectedAnimal) {
+            setSelectedAnimal(null);
+          } else {
+            navigation.goBack();
+          }
+        }}
+        rightActions={[
+          {
+            icon: 'help-circle-outline',
+            onPress: () => setHelpVisible(true),
+            accessibilityLabel: 'Open sell animal help',
+          },
+        ]}
+      />
 
       {selectedAnimal ? (
         <>
@@ -231,6 +235,15 @@ const SellAnimalScreen = ({ navigation }) => {
       ) : (
         renderAnimalSelection()
       )}
+
+      <FeatureHelpModal
+        visible={helpVisible}
+        onClose={() => setHelpVisible(false)}
+        title={sellHelp?.localized?.title || t('sellAnimal.title', { defaultValue: 'Sell Animal Guide' })}
+        imageSource={sellHelp?.image}
+        helpContent={sellHelp?.localized}
+        t={t}
+      />
     </SafeAreaView>
   );
 };
@@ -239,34 +252,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  backButton: {
-    padding: 8,
-    marginRight: 12,
-  },
-  headerContent: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFF',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
-    marginTop: 2,
   },
   content: {
     flex: 1,

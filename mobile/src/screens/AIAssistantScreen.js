@@ -14,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
+import AppHeader from '../components/AppHeader';
 
 const { width } = Dimensions.get('window');
 
@@ -54,6 +55,33 @@ const AIAssistantScreen = ({ navigation }) => {
     ]
   };
 
+  const projectQuickReplies = {
+    en: [
+      'How to create a listing?',
+      'How to use milk reports?',
+      'Find a veterinarian',
+      'Use breed and price filters',
+      'Save animals to wishlist',
+      'How to set my location?'
+    ],
+    hi: [
+      'लिस्टिंग कैसे बनाएं?',
+      'दूध रिपोर्ट कैसे उपयोग करें?',
+      'पशु चिकित्सक कैसे खोजें?',
+      'नस्ल और कीमत फ़िल्टर कैसे उपयोग करें?',
+      'जानवरों को विशलिस्ट में कैसे सेव करें?',
+      'लोकेशन कैसे सेट करें?'
+    ],
+    mr: [
+      'लिस्टिंग कशी तयार करावी?',
+      'दूध अहवाल कसे वापरायचे?',
+      'पशुवैद्य कसा शोधावा?',
+      'जात आणि किंमत फिल्टर कसे वापरायचे?',
+      'प्राणी विशलिस्टमध्ये कसे सेव करायचे?',
+      'लोकेशन कसे सेट करायचे?'
+    ]
+  };
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
@@ -66,7 +94,6 @@ const AIAssistantScreen = ({ navigation }) => {
 
   const handleLanguageSelection = (langCode) => {
     setSelectedLanguage(langCode);
-    i18n.changeLanguage(langCode);
     setLanguageSelected(true);
     
     // Add welcome message in selected language
@@ -169,11 +196,94 @@ const AIAssistantScreen = ({ navigation }) => {
     }
   };
 
+  const projectResponses = {
+    en: {
+      listing: "📝 **Create a strong listing in Animal E Bazar:**\n\n1. Open **Sell Animal**.\n2. Choose the correct animal type.\n3. Add breed name, age, weight, milk capacity, and health details.\n4. Upload clear front and side photos.\n5. Set expected price and negotiable option.\n6. Add city, state, and useful notes.\n7. Submit the listing for review.\n\n💡 Complete listings with clear photos usually get faster calls.\n\nYou can check its status in **Profile → My Animals**.",
+      milkReports: "🥛 **How to use the Milk Reports feature:**\n\n• First add your animal to the milk record list.\n• Enter the daily milk quantity for that animal.\n• You can also record data for the whole herd if needed.\n• The system shows total milk, income, expenses, and profit/loss summary.\n• Review past reports to compare which animals are performing better.\n• Regular entries help with feeding, health, and selling decisions.\n\n💡 Tip: Update the report at the same time each day so the trends stay reliable.",
+      veterinarian: "🏥 **How to use the Veterinarian feature:**\n\n• Open **Find Veterinarian** or **Nearby Veterinarians**.\n• Check the doctor's profile, distance, and contact details.\n• Call or WhatsApp the doctor directly.\n• Get help for fever, injury, mastitis, pregnancy care, or low appetite.\n• Keep symptoms, vaccination records, and recent photos ready.\n\n💡 Early treatment can reduce cost and risk.",
+      filters: "🔎 **How to use filters in Buy Animals:**\n\n• First select the animal type.\n• Then use **Breed Name**, **Min Price**, and **Max Price**.\n• Breed options are based on available listings for that animal type.\n• You can also search by breed, location, or animal type.\n• Use nearby mode for animals close to you.\n\n💡 Clear filters any time to return to all listings.",
+      wishlist: "❤️ **Save animals to compare later:**\n\n• Tap the heart or wishlist icon on any listing.\n• Open **Wishlist** to view saved animals.\n• Compare breed, price, distance, and seller details before calling.\n• Remove saved items later if you no longer need them.\n\n💡 Wishlist is useful when comparing many animals before purchase.",
+      profile: "👤 **Complete your profile for better results:**\n\n• Add full name, phone number, and profile photo.\n• Set location so nearby listings, buyers, and vets appear correctly.\n• Keep city and state updated.\n• Use **Profile** to manage My Animals, Wishlist, and support.\n\n💡 Correct location helps nearby buyers, sellers, and vets find you faster."
+    },
+    hi: {
+      listing: "📝 **Animal E Bazar में अच्छी लिस्टिंग कैसे बनाएं:**\n\n1. **Sell Animal** खोलें।\n2. सही पशु प्रकार चुनें।\n3. नस्ल, उम्र, वजन, दूध क्षमता और स्वास्थ्य जानकारी भरें।\n4. सामने और साइड की साफ फोटो अपलोड करें।\n5. अपेक्षित कीमत और negotiable विकल्प सेट करें।\n6. शहर, राज्य और उपयोगी नोट जोड़ें।\n7. लिस्टिंग समीक्षा के लिए सबमिट करें।\n\n💡 साफ फोटो और पूरी जानकारी वाली लिस्टिंग पर जल्दी कॉल आते हैं।\n\nइसकी स्थिति **Profile → My Animals** में देख सकते हैं।",
+      milkReports: "🥛 **Milk Reports फीचर कैसे उपयोग करें:**\n\n• पहले अपने पशु को रिकॉर्ड सूची में जोड़ें।\n• हर दिन उसके लिए दूध की मात्रा दर्ज करें।\n• चाहें तो पूरे समूह का रिकॉर्ड भी भर सकते हैं।\n• सिस्टम कुल दूध, आमदनी, खर्च और लाभ/हानि का सार दिखाता है।\n• पुराने रिकॉर्ड देखकर किस पशु का प्रदर्शन बेहतर है यह समझ सकते हैं।\n• नियमित डेटा भरने से आहार, स्वास्थ्य और बिक्री निर्णय बेहतर होते हैं।\n\n💡 सुझाव: एक ही समय पर रोज़ रिकॉर्ड भरें, तब रिपोर्ट सबसे उपयोगी बनती है।",
+      veterinarian: "🏥 **पशु चिकित्सक फीचर कैसे उपयोग करें:**\n\n• **Find Veterinarian** या **Nearby Veterinarians** खोलें।\n• डॉक्टर की प्रोफाइल, दूरी और संपर्क जानकारी देखें।\n• डॉक्टर को सीधे कॉल या WhatsApp करें।\n• बुखार, चोट, थन संक्रमण, गर्भावस्था देखभाल या भूख कम होने पर मदद लें।\n• लक्षण, टीकाकरण रिकॉर्ड और नई फोटो तैयार रखें।\n\n💡 जल्दी उपचार लेने से खर्च और खतरा कम हो सकता है।",
+      filters: "🔎 **Buy Animals में फ़िल्टर कैसे उपयोग करें:**\n\n• पहले पशु प्रकार चुनें।\n• फिर **Breed Name**, **Min Price** और **Max Price** का उपयोग करें।\n• नस्ल विकल्प उसी पशु प्रकार की उपलब्ध लिस्टिंग से आते हैं।\n• आप नस्ल, स्थान या प्रकार से खोज भी कर सकते हैं।\n• नजदीकी पशुओं के लिए nearby mode उपयोग करें।\n\n💡 सभी लिस्टिंग देखने के लिए फ़िल्टर कभी भी हटाएं।",
+      wishlist: "❤️ **बाद में तुलना के लिए पशु सेव करें:**\n\n• किसी भी लिस्टिंग पर heart/wishlist आइकन दबाएं।\n• **Wishlist** खोलकर सेव किए गए पशु देखें।\n• कॉल करने से पहले नस्ल, कीमत, दूरी और विक्रेता की जानकारी तुलना करें।\n• जरूरत न हो तो सेव आइटम हटा सकते हैं।\n\n💡 कई पशुओं की तुलना करनी हो तो यह फीचर बहुत उपयोगी है।",
+      profile: "👤 **बेहतर परिणाम के लिए प्रोफाइल पूरी करें:**\n\n• पूरा नाम, फोन नंबर और प्रोफाइल फोटो जोड़ें।\n• लोकेशन सेट करें ताकि nearby listings, buyers और vets सही दिखें।\n• शहर और राज्य अपडेट रखें।\n• **Profile** से My Animals, Wishlist और support संभालें।\n\n💡 सही लोकेशन से नजदीकी खरीदार, विक्रेता और पशु चिकित्सक जल्दी मिलते हैं।"
+    },
+    mr: {
+      listing: "📝 **Animal E Bazar मध्ये चांगली लिस्टिंग कशी तयार करावी:**\n\n1. **Sell Animal** उघडा.\n2. योग्य पशु प्रकार निवडा.\n3. जात, वय, वजन, दूध क्षमता आणि आरोग्य तपशील भरा.\n4. समोरचा आणि बाजूचा स्पष्ट फोटो अपलोड करा.\n5. अपेक्षित किंमत आणि negotiable पर्याय ठेवा.\n6. शहर, राज्य आणि उपयुक्त नोंदी जोडा.\n7. लिस्टिंग मूल्यांकनासाठी सबमिट करा.\n\n💡 स्पष्ट फोटो आणि संपूर्ण माहिती असलेल्या लिस्टिंगवर लवकर कॉल येतात.\n\nतिची स्थिती **Profile → My Animals** मध्ये पाहू शकता.",
+      milkReports: "🥛 **दूध अहवाल फीचर कसे वापरायचे:**\n\n• आधी तुमचा प्राणी नोंद यादीत जोडा.\n• दररोज त्या प्राण्यासाठी दूधाचे प्रमाण भरा.\n• हवे असल्यास संपूर्ण कळपाची नोंदही करू शकता.\n• सिस्टम एकूण दूध, उत्पन्न, खर्च आणि नफा/तोट्याचा सारांश दाखवते.\n• जुने अहवाल पाहून कोणता प्राणी जास्त चांगले उत्पादन देतो ते समजू शकते.\n• नियमित नोंदीमुळे खाद्य, आरोग्य आणि विक्रीचे निर्णय अधिक अचूक होतात.\n\n💡 सूचना: रोज शक्यतो एकाच वेळी नोंद भरा, त्यामुळे अहवाल जास्त उपयुक्त ठरतात.",
+      veterinarian: "🏥 **पशुवैद्य फीचर कसे वापरावे:**\n\n• **Find Veterinarian** किंवा **Nearby Veterinarians** उघडा.\n• प्रोफाइल, अंतर आणि संपर्क तपशील तपासा.\n• डॉक्टरांना थेट कॉल किंवा WhatsApp करा.\n• ताप, दुखापत, स्तनदाह, गर्भधारणा काळजी किंवा भूक कमी झाल्यास मदत घ्या.\n• लक्षणे, लसीकरण नोंदी आणि अलीकडील फोटो तयार ठेवा.\n\n💡 लवकर उपचार घेतल्यास पुढचा खर्च आणि धोका कमी होतो.",
+      filters: "🔎 **Buy Animals मध्ये फिल्टर कसे वापरायचे:**\n\n• आधी पशु प्रकार निवडा.\n• मग **Breed Name**, **Min Price** आणि **Max Price** वापरा.\n• जातींची यादी त्या पशु प्रकारासाठी उपलब्ध लिस्टिंगमधूनच येते.\n• जात, ठिकाण किंवा प्रकाराने शोधही करू शकता.\n• जवळच्या लिस्टिंगसाठी nearby mode वापरा.\n\n💡 सर्व लिस्टिंगवर परत जाण्यासाठी फिल्टर कधीही काढू शकता.",
+      wishlist: "❤️ **नंतर तुलना करण्यासाठी प्राणी सेव करा:**\n\n• कोणत्याही लिस्टिंगवर heart/wishlist आयकॉन दाबा.\n• **Wishlist** उघडून सेव केलेले प्राणी पाहा.\n• कॉल करण्यापूर्वी जात, किंमत, अंतर आणि विक्रेता तुलना करा.\n• हवे असल्यास नंतर सेव केलेले आयटम काढू शकता.\n\n💡 अनेक प्राण्यांमध्ये तुलना करायची असल्यास हे फीचर खूप उपयोगी आहे.",
+      profile: "👤 **चांगल्या परिणामांसाठी प्रोफाइल पूर्ण करा:**\n\n• पूर्ण नाव, फोन नंबर आणि प्रोफाइल फोटो जोडा.\n• लोकेशन सेट करा म्हणजे nearby लिस्टिंग, खरेदीदार आणि पशुवैद्य योग्य दिसतील.\n• शहर आणि राज्य अद्ययावत ठेवा.\n• **Profile** मधून My Animals, Wishlist आणि support सांभाळा.\n\n💡 योग्य लोकेशनमुळे जवळचे खरेदीदार, विक्रेते आणि पशुवैद्य पटकन सापडतात."
+    }
+  };
+
+  const isMilkReportQuery = (lowerMessage) => (
+    lowerMessage.includes('milk report') ||
+    lowerMessage.includes('milk reports') ||
+    lowerMessage.includes('milk record') ||
+    lowerMessage.includes('milk entry') ||
+    lowerMessage.includes('दूध अहवाल') ||
+    lowerMessage.includes('दूध रिपोर्ट') ||
+    lowerMessage.includes('दूध रिकॉर्ड')
+  );
+
   const getAIResponse = (message) => {
     const lowerMessage = message.toLowerCase();
     const lang = selectedLanguage || 'en';
-    const responses = aiResponses[lang] || aiResponses.en;
+    const responses = {
+      ...(aiResponses[lang] || aiResponses.en),
+      ...(projectResponses[lang] || projectResponses.en)
+    };
     
+    // Check for project feature keywords before broad animal-care keywords.
+    if (isMilkReportQuery(lowerMessage)) {
+      return responses.milkReports;
+    } else if (
+      lowerMessage.includes('listing') ||
+      lowerMessage.includes('list my animal') ||
+      lowerMessage.includes('post animal') ||
+      lowerMessage.includes('लिस्टिंग')
+    ) {
+      return responses.listing;
+    } else if (
+      lowerMessage.includes('veterinarian') ||
+      lowerMessage.includes('vet') ||
+      lowerMessage.includes('doctor') ||
+      lowerMessage.includes('पशु चिकित्सक') ||
+      lowerMessage.includes('पशुवैद्य')
+    ) {
+      return responses.veterinarian;
+    } else if (
+      lowerMessage.includes('wishlist') ||
+      lowerMessage.includes('saved animal') ||
+      lowerMessage.includes('saved animals') ||
+      lowerMessage.includes('विशलिस्ट')
+    ) {
+      return responses.wishlist;
+    } else if (
+      lowerMessage.includes('profile') ||
+      lowerMessage.includes('account') ||
+      lowerMessage.includes('लोकेशन') ||
+      lowerMessage.includes('प्रोफाइल')
+    ) {
+      return responses.profile;
+    } else if (
+      lowerMessage.includes('filter') ||
+      lowerMessage.includes('filters') ||
+      lowerMessage.includes('breed filter') ||
+      lowerMessage.includes('price filter') ||
+      lowerMessage.includes('फिल्टर') ||
+      lowerMessage.includes('फ़िल्टर')
+    ) {
+      return responses.filters;
+    }
+
     // Check for keywords in multiple languages
     if (lowerMessage.includes('sell') || lowerMessage.includes('बेच') || lowerMessage.includes('विक')) {
       return responses.sell;
@@ -241,24 +351,20 @@ const AIAssistantScreen = ({ navigation }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <View style={styles.headerIconContainer}>
-            <Ionicons name="sparkles" size={20} color={COLORS.primary} />
-          </View>
-          <View>
-            <Text style={styles.headerTitle}>{t('aiAssistant.title')}</Text>
-            <Text style={styles.headerSubtitle}>{t('aiAssistant.subtitle')}</Text>
-          </View>
-        </View>
-        <TouchableOpacity onPress={() => setMessages([messages[0]])}>
-          <Ionicons name="refresh" size={24} color="#6B7280" />
-        </TouchableOpacity>
-      </View>
+      <AppHeader
+        navigation={navigation}
+        title={t('aiAssistant.title')}
+        subtitle={t('aiAssistant.subtitle')}
+        leading={<Ionicons name="sparkles" size={20} color={COLORS.primary} />}
+        rightActions={[
+          {
+            icon: 'refresh',
+            onPress: () => setMessages([messages[0]]),
+            color: COLORS.primary,
+            accessibilityLabel: 'Reset AI assistant chat',
+          },
+        ]}
+      />
 
       {/* Messages */}
       <ScrollView
@@ -344,7 +450,10 @@ const AIAssistantScreen = ({ navigation }) => {
                   {selectedLanguage === 'hi' ? 'त्वरित प्रश्न:' : selectedLanguage === 'mr' ? 'जलद प्रश्न:' : 'Quick questions:'}
                 </Text>
                 <View style={styles.quickQuestionsGrid}>
-                  {(quickReplies[selectedLanguage] || quickReplies.en).map((question, index) => (
+                  {[
+                    ...(quickReplies[selectedLanguage] || quickReplies.en),
+                    ...(projectQuickReplies[selectedLanguage] || projectQuickReplies.en)
+                  ].map((question, index) => (
                     <TouchableOpacity
                       key={index}
                       style={styles.quickQuestionChip}

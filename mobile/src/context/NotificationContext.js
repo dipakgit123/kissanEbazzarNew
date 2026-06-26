@@ -16,7 +16,7 @@ export const useNotifications = () => {
 };
 
 export const NotificationProvider = ({ children, navigation }) => {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, token, user } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -28,7 +28,7 @@ export const NotificationProvider = ({ children, navigation }) => {
 
   // Register for push notifications when authenticated
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && token) {
       setupNotifications();
       connectSocket();
     } else {
@@ -45,7 +45,7 @@ export const NotificationProvider = ({ children, navigation }) => {
       }
       disconnectSocket();
     };
-  }, [isAuthenticated, user?.id, setupNotifications, connectSocket, disconnectSocket]); // ✅ Include all dependencies
+  }, [isAuthenticated, token, user?.id, setupNotifications, connectSocket, disconnectSocket]); // ✅ Include all dependencies
 
   // Connect to Socket.IO for real-time notifications
   const connectSocket = useCallback(() => {
@@ -53,7 +53,7 @@ export const NotificationProvider = ({ children, navigation }) => {
 
     try {
       const socket = io(API_URL, {
-        transports: ['websocket'],
+        transports: ['websocket', 'polling'],
         reconnection: true,
         reconnectionDelay: 1000,
         reconnectionAttempts: 5
@@ -221,7 +221,7 @@ export const NotificationProvider = ({ children, navigation }) => {
   }, [navigation]);
 
   const fetchNotifications = useCallback(async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !token) return;
 
     setLoading(true);
     try {
@@ -240,17 +240,15 @@ export const NotificationProvider = ({ children, navigation }) => {
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, token]);
 
   const refreshUnreadCount = async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !token) return;
 
     try {
-      const response = await notificationService.getUnreadCount();
-      if (response.success) {
-        setUnreadCount(response.unread_count);
-        await notificationService.setBadgeCount(response.unread_count);
-      }
+      const nextUnreadCount = await notificationService.getUnreadCount();
+      setUnreadCount(nextUnreadCount);
+      await notificationService.setBadgeCount(nextUnreadCount);
     } catch (error) {
       logger.error('Error refreshing unread count:', error);
     }

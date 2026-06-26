@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DeviceEventEmitter } from 'react-native';
 import { userService } from '../services/api';
 
 const AuthContext = createContext({});
@@ -12,6 +13,18 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     loadStoredData();
+  }, []);
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('auth:unauthorized', async () => {
+      await AsyncStorage.removeItem('token');
+      await AsyncStorage.removeItem('userData');
+      setToken(null);
+      setUser(null);
+      setIsAuthenticated(false);
+    });
+
+    return () => subscription.remove();
   }, []);
 
   const loadStoredData = async () => {

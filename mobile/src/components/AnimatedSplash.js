@@ -167,7 +167,7 @@ const AnimatedSplash = ({ onFinish }) => {
         
         <View style={styles.logoBox}>
           <Image
-            source={require('../../src/assets/animal_bazar_logo.jpeg')}
+            source={require('../assets/animal_bazar_logo.jpeg')}
             style={styles.logo}
             resizeMode="contain"
           />

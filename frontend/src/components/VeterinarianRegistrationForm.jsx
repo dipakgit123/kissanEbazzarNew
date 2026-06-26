@@ -28,12 +28,18 @@ import LanguageSwitcher from './LanguageSwitcher';
 import { API_BASE_URL } from '../config/api';
 
 const API_URL = API_BASE_URL;
+const MB = 1024 * 1024;
+const MAX_VET_REGISTRATION_FILE_BYTES = 6 * MB;
+const MAX_VET_REGISTRATION_TOTAL_BYTES = 24 * MB;
+
+const formatFileSize = (bytes) => `${Number((bytes / MB).toFixed(1)).toString()}MB`;
 
 const VeterinarianRegistrationForm = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [registrationConflict, setRegistrationConflict] = useState(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [pincodeLookupLoading, setPincodeLookupLoading] = useState(false);
   const [lastResolvedPincode, setLastResolvedPincode] = useState('');
@@ -269,6 +275,17 @@ const VeterinarianRegistrationForm = () => {
   };
 
   const handleFileChange = (name, file) => {
+    if (file && !shouldCompressImage(file) && file.size > MAX_VET_REGISTRATION_FILE_BYTES) {
+      setRegistrationConflict(null);
+      setError(t('vetRegistration.fileTooLarge', {
+        maxSize: formatFileSize(MAX_VET_REGISTRATION_FILE_BYTES),
+        defaultValue: 'Each file must be {{maxSize}} or smaller.'
+      }));
+      return;
+    }
+
+    setError(null);
+    setRegistrationConflict(null);
     setFiles(prev => ({
       ...prev,
       [name]: file
@@ -338,7 +355,31 @@ const VeterinarianRegistrationForm = () => {
       Object.entries(files).map(async ([key, file]) => [key, await compressImageFile(file)])
     );
 
-    return Object.fromEntries(preparedEntries);
+    const preparedFiles = Object.fromEntries(preparedEntries);
+    const oversizedFile = Object.values(preparedFiles).find(
+      (file) => file && file.size > MAX_VET_REGISTRATION_FILE_BYTES
+    );
+
+    if (oversizedFile) {
+      throw new Error(t('vetRegistration.fileTooLarge', {
+        maxSize: formatFileSize(MAX_VET_REGISTRATION_FILE_BYTES),
+        defaultValue: 'Each file must be {{maxSize}} or smaller.'
+      }));
+    }
+
+    const totalUploadBytes = Object.values(preparedFiles).reduce(
+      (total, file) => total + (file?.size || 0),
+      0
+    );
+
+    if (totalUploadBytes > MAX_VET_REGISTRATION_TOTAL_BYTES) {
+      throw new Error(t('vetRegistration.totalUploadTooLarge', {
+        maxSize: formatFileSize(MAX_VET_REGISTRATION_TOTAL_BYTES),
+        defaultValue: 'Total document upload must be {{maxSize}} or smaller.'
+      }));
+    }
+
+    return preparedFiles;
   };
 
   // Handle drag and drop
@@ -364,40 +405,48 @@ const VeterinarianRegistrationForm = () => {
 
   const validateForm = () => {
     if (!formData.full_name?.trim() || !formData.phone_number || !formData.email?.trim()) {
+      setRegistrationConflict(null);
       setError(t('vetRegistration.fillAllRequired'));
       return false;
     }
 
     if (!/^\+91[0-9]{10}$/.test(formData.phone_number)) {
+      setRegistrationConflict(null);
       setError(t('vetRegistration.phoneFormat'));
       return false;
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      setRegistrationConflict(null);
       setError(t('vetRegistration.emailInvalid'));
       return false;
     }
 
     if (!formData.license_number) {
+      setRegistrationConflict(null);
       setError(t('vetRegistration.licenseRequired'));
       return false;
     }
 
     if (!files.license_document) {
+      setRegistrationConflict(null);
       setError(t('vetRegistration.licenseDocRequired'));
       return false;
     }
 
     if (!formData.latitude || !formData.longitude) {
+      setRegistrationConflict(null);
       setError(t('vetRegistration.locationRequired'));
       return false;
     }
 
     if (!formData.city || !formData.state || !formData.pincode) {
+      setRegistrationConflict(null);
       setError(t('vetRegistration.locationDetailsRequired'));
       return false;
     }
 
+    setRegistrationConflict(null);
     setError(null);
     return true;
   };
@@ -409,6 +458,7 @@ const VeterinarianRegistrationForm = () => {
     let shouldRedirectToLogin = false;
     setLoading(true);
     setError(null);
+    setRegistrationConflict(null);
     setUploadProgress(0);
     setSubmitStage('preparing');
 
@@ -456,7 +506,30 @@ const VeterinarianRegistrationForm = () => {
       }
     } catch (err) {
       console.error('Registration error:', err);
-      setError(err.response?.data?.message || t('vetRegistration.errorOccurred'));
+      const responseData = err.response?.data;
+      const conflictCode = responseData?.code;
+      const isRequestTooLarge = err.response?.status === 413;
+
+      if (
+        err.response?.status === 409 &&
+        ['VET_PHONE_ALREADY_REGISTERED', 'VET_EMAIL_ALREADY_REGISTERED'].includes(conflictCode)
+      ) {
+        setRegistrationConflict({
+          code: conflictCode,
+          field: responseData?.field,
+        });
+      } else {
+        setRegistrationConflict(null);
+      }
+
+      setError(
+        isRequestTooLarge
+          ? t('vetRegistration.requestTooLarge', {
+              maxSize: formatFileSize(MAX_VET_REGISTRATION_TOTAL_BYTES),
+              defaultValue: 'Uploaded documents are too large. Keep the total upload under {{maxSize}} and try again.'
+            })
+          : responseData?.message || err.message || t('vetRegistration.errorOccurred')
+      );
     } finally {
       if (!shouldRedirectToLogin) {
         setLoading(false);
@@ -612,14 +685,25 @@ const VeterinarianRegistrationForm = () => {
         {/* Error Message */}
         {error && (
           <div className="bg-red-50 border-l-4 border-red-500 rounded-xl p-4 mb-6 shadow-sm">
-            <div className="flex items-start">
-              <svg className="w-5 h-5 text-red-500 mr-3 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-              <p className="text-sm font-medium text-red-700">{error}</p>
+              <div className="flex items-start">
+                <svg className="w-5 h-5 text-red-500 mr-3 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                <div>
+                  <p className="text-sm font-medium text-red-700">{error}</p>
+                  {registrationConflict && (
+                    <button
+                      type="button"
+                      onClick={() => navigate('/veterinarian/login')}
+                      className="mt-3 inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+                    >
+                      {t('vetRegistration.goToLogin', 'Go to veterinarian login')}
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6 xl:grid xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start xl:gap-6 xl:space-y-0">

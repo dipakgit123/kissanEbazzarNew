@@ -5,13 +5,13 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../utils/constants';
 import { listingsService } from '../services/api';
 import AnimalCard from '../components/AnimalCard';
+import CowLoader from '../components/CowLoader';
+import AppHeader from '../components/AppHeader';
 
 const CategoryListingsScreen = ({ route, navigation }) => {
   const { category } = route.params;
@@ -92,38 +92,28 @@ const CategoryListingsScreen = ({ route, navigation }) => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Loading {category.name}...</Text>
+        <CowLoader message={`Loading ${category.name}...`} size="large" />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color={COLORS.black} />
-        </TouchableOpacity>
-        <View style={styles.headerContent}>
-          <Text style={styles.categoryIcon}>{category.icon}</Text>
-          <View>
-            <Text style={styles.headerTitle}>{category.name}</Text>
-            <Text style={styles.headerSubtitle}>
-              {listings.length} {listings.length === 1 ? 'listing' : 'listings'} available
-            </Text>
-          </View>
-        </View>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => navigation.navigate('CreateListing', { category })}
-        >
-          <Ionicons name="add" size={24} color={COLORS.white} />
-        </TouchableOpacity>
-      </View>
+      <AppHeader
+        navigation={navigation}
+        title={category.name}
+        subtitle={`${listings.length} ${listings.length === 1 ? 'listing' : 'listings'} available`}
+        leading={<Text style={styles.categoryIcon}>{category.icon}</Text>}
+        rightActions={[
+          {
+            icon: 'add',
+            onPress: () => navigation.navigate('CreateListing', { category }),
+            color: COLORS.surface,
+            backgroundColor: COLORS.primary,
+            accessibilityLabel: `List ${category.name}`,
+          },
+        ]}
+      />
 
       {/* Listings */}
       <FlatList

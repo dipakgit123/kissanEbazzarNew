@@ -6,13 +6,14 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  ActivityIndicator,
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
 import { appointmentService } from '../services/api';
+import CowLoader from '../components/CowLoader';
+import AppHeader from '../components/AppHeader';
 
 const VetAppointmentsScreen = ({ navigation }) => {
   const { t, ready } = useTranslation();
@@ -25,7 +26,7 @@ const VetAppointmentsScreen = ({ navigation }) => {
   if (!ready) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <CowLoader message="" size="large" />
       </View>
     );
   }
@@ -261,14 +262,11 @@ const VetAppointmentsScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Appointments</Text>
-        <View style={{ width: 24 }} />{/* Placeholder for alignment - VetCalendar screen not yet implemented */}
-      </View>
+      <AppHeader
+        navigation={navigation}
+        title={t('appointments.title', { defaultValue: 'Appointments' })}
+        variant="primary"
+      />
 
       {/* Stats Summary */}
       <View style={styles.statsContainer}>
@@ -316,8 +314,7 @@ const VetAppointmentsScreen = ({ navigation }) => {
       {/* Content */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>Loading appointments...</Text>
+          <CowLoader message="Loading appointments..." size="medium" />
         </View>
       ) : appointments.length === 0 ? (
         <View style={styles.emptyContainer}>

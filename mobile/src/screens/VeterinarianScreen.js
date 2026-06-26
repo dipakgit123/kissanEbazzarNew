@@ -8,7 +8,6 @@ import {
   TextInput,
   Image,
   Linking,
-  ActivityIndicator,
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,18 +16,30 @@ import { useTranslation } from 'react-i18next';
 import * as Location from 'expo-location';
 import { COLORS } from '../utils/constants';
 import { veterinarianService } from '../services/api';
+import CowLoader from '../components/CowLoader';
+import FeatureHelpModal from '../components/FeatureHelpModal';
+import { getLocalizedFeatureHelp } from '../constants/featureHelp';
+
+const NEARBY_RADIUS_OPTIONS = [25, 50, 100];
+
+const normalizeDistance = (distance) => {
+  const numericDistance = Number(distance);
+  return Number.isFinite(numericDistance) ? numericDistance : null;
+};
 
 const formatDistanceLabel = (distance, t) => {
-  if (typeof distance !== 'number' || Number.isNaN(distance) || distance <= 0) {
+  const numericDistance = normalizeDistance(distance);
+
+  if (!numericDistance || numericDistance <= 0) {
     return '';
   }
 
-  return `${distance.toFixed(distance < 10 ? 1 : 0)} ${t('veterinarian.kmAway')}`;
+  return `${numericDistance.toFixed(numericDistance < 10 ? 1 : 0)} ${t('veterinarian.kmAway')}`;
 };
 
 const normalizeServices = (services) => {
   if (Array.isArray(services)) {
-    return services.filter(Boolean);
+    return services.map((service) => toDisplayText(service)).filter(Boolean);
   }
 
   if (typeof services === 'string') {
@@ -41,8 +52,35 @@ const normalizeServices = (services) => {
   return [];
 };
 
+const toDisplayText = (value, fallback = '') => {
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+
+  if (typeof value === 'string') {
+    return value.trim() || fallback;
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    const joined = value.map((item) => toDisplayText(item)).filter(Boolean).join(', ');
+    return joined || fallback;
+  }
+
+  if (typeof value === 'object') {
+    const textKeys = ['label', 'name', 'title', 'value', 'text', 'service_type'];
+    const match = textKeys.map((key) => toDisplayText(value[key])).find(Boolean);
+    return match || fallback;
+  }
+
+  return fallback;
+};
+
 const getInitials = (name = '') =>
-  name
+  toDisplayText(name)
     .split(' ')
     .filter(Boolean)
     .slice(0, 2)
@@ -50,7 +88,7 @@ const getInitials = (name = '') =>
     .join('') || 'V';
 
 const VeterinarianScreen = ({ navigation }) => {
-  const { t, ready } = useTranslation();
+  const { t, i18n, ready } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [allVeterinarians, setAllVeterinarians] = useState([]);
   const [nearbyVeterinarians, setNearbyVeterinarians] = useState([]);
@@ -58,6 +96,9 @@ const VeterinarianScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
   const [nearbyOnly, setNearbyOnly] = useState(true);
+  const [nearbyRadius, setNearbyRadius] = useState(25);
+  const [helpVisible, setHelpVisible] = useState(false);
+  const veterinarianHelp = getLocalizedFeatureHelp('veterinarian', i18n.resolvedLanguage || i18n.language);
 
   useEffect(() => {
     if (!ready) {
@@ -90,14 +131,14 @@ const VeterinarianScreen = ({ navigation }) => {
       setNearbyOnly(false);
     }
 
-    await loadVeterinarians(resolvedLocation);
+    await loadVeterinarians(resolvedLocation, nearbyRadius);
   };
 
-  const loadVeterinarians = async (location = userLocation) => {
+  const loadVeterinarians = async (location = userLocation, radius = nearbyRadius) => {
     try {
       const allPromise = veterinarianService.getAll(1, 50);
       const nearbyPromise = location
-        ? veterinarianService.getNearby(location.latitude, location.longitude, 100)
+        ? veterinarianService.getNearby(location.latitude, location.longitude, radius)
         : null;
 
       const [allResult, nearbyResult] = await Promise.allSettled([
@@ -112,7 +153,16 @@ const VeterinarianScreen = ({ navigation }) => {
       }
 
       if (nearbyResult?.status === 'fulfilled' && nearbyResult.value?.success) {
-        setNearbyVeterinarians(nearbyResult.value.data || []);
+        const nearbyData = Array.isArray(nearbyResult.value.data) ? nearbyResult.value.data : [];
+        const normalizedNearby = nearbyData
+          .map((vet) => ({
+            ...vet,
+            distance: normalizeDistance(vet.distance),
+          }))
+          .filter((vet) => vet.distance !== null && vet.distance <= radius)
+          .sort((a, b) => a.distance - b.distance);
+
+        setNearbyVeterinarians(normalizedNearby);
       } else {
         setNearbyVeterinarians([]);
       }
@@ -128,10 +178,23 @@ const VeterinarianScreen = ({ navigation }) => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadVeterinarians();
+    await loadVeterinarians(userLocation, nearbyRadius);
+  };
+
+  const handleRadiusChange = async (radius) => {
+    setNearbyRadius(radius);
+    setNearbyOnly(true);
+
+    if (!userLocation) {
+      return;
+    }
+
+    setRefreshing(true);
+    await loadVeterinarians(userLocation, radius);
   };
 
   const getSpecializationLabel = (spec) => {
+    const specialization = toDisplayText(spec);
     const labels = {
       large_animal: t('veterinarian.specializations.largeAnimal'),
       small_animal: t('veterinarian.specializations.smallAnimal'),
@@ -142,15 +205,17 @@ const VeterinarianScreen = ({ navigation }) => {
       reproduction: t('veterinarian.specializations.reproduction'),
     };
 
-    return labels[spec] || spec || t('veterinarian.title');
+    return labels[specialization] || specialization || t('veterinarian.title');
   };
 
   const translateService = (service) => {
-    if (!service) {
+    const serviceText = toDisplayText(service);
+
+    if (!serviceText) {
       return '';
     }
 
-    const normalized = service.toString().trim().toLowerCase().replace(/\s+/g, '_');
+    const normalized = serviceText.toLowerCase().replace(/\s+/g, '_');
     const labels = {
       emergency_care: t('veterinarian.serviceNames.emergencyCare'),
       general_checkup: t('veterinarian.serviceNames.generalCheckup'),
@@ -163,7 +228,7 @@ const VeterinarianScreen = ({ navigation }) => {
       checkup: t('veterinarian.serviceNames.generalCheckup'),
     };
 
-    return labels[normalized] || service;
+    return labels[normalized] || serviceText;
   };
 
   const displayedVeterinarians = useMemo(() => {
@@ -180,30 +245,34 @@ const VeterinarianScreen = ({ navigation }) => {
     return displayedVeterinarians.filter((vet) => {
       return (
         !query ||
-        vet.full_name?.toLowerCase().includes(query) ||
-        vet.specialization?.toLowerCase().includes(query) ||
-        vet.city?.toLowerCase().includes(query) ||
-        vet.state?.toLowerCase().includes(query) ||
-        vet.clinic_name?.toLowerCase().includes(query)
+        toDisplayText(vet.full_name).toLowerCase().includes(query) ||
+        toDisplayText(vet.specialization).toLowerCase().includes(query) ||
+        toDisplayText(vet.city).toLowerCase().includes(query) ||
+        toDisplayText(vet.state).toLowerCase().includes(query) ||
+        toDisplayText(vet.clinic_name).toLowerCase().includes(query)
       );
     });
   }, [displayedVeterinarians, searchQuery]);
 
   const handleCall = (phone) => {
-    if (!phone) {
+    const phoneNumber = toDisplayText(phone);
+
+    if (!phoneNumber) {
       return;
     }
 
-    Linking.openURL(`tel:${phone.replace('+', '')}`);
+    Linking.openURL(`tel:${phoneNumber.replace('+', '')}`);
   };
 
   const handleWhatsApp = (phone, name) => {
-    if (!phone) {
+    const phoneNumberRaw = toDisplayText(phone);
+
+    if (!phoneNumberRaw) {
       return;
     }
 
-    const phoneNumber = phone.replace('+', '');
-    const message = `Hi Dr. ${name}! I would like consultation for my animal.`;
+    const phoneNumber = phoneNumberRaw.replace('+', '');
+    const message = `Hi Dr. ${toDisplayText(name, t('veterinarian.title'))}! I would like consultation for my animal.`;
     const url = `whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`;
 
     Linking.openURL(url).catch(() => {
@@ -235,7 +304,7 @@ const VeterinarianScreen = ({ navigation }) => {
   if (!ready) {
     return (
       <View style={[styles.loadingScreen, styles.centered]}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <CowLoader message="" size="large" />
       </View>
     );
   }
@@ -267,11 +336,13 @@ const VeterinarianScreen = ({ navigation }) => {
               <Text style={styles.title}>{t('veterinarian.title')}</Text>
             </View>
 
-            <View style={styles.countPill}>
-              <Text style={styles.countPillText}>
-                {filteredVets.length} {t('veterinarian.profilesLabel')}
-              </Text>
-            </View>
+            <TouchableOpacity
+              style={styles.headerHelpButton}
+              onPress={() => setHelpVisible(true)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="help-circle-outline" size={22} color={COLORS.primary} />
+            </TouchableOpacity>
           </View>
 
           <View style={styles.searchRow}>
@@ -341,13 +412,50 @@ const VeterinarianScreen = ({ navigation }) => {
               </Text>
             </TouchableOpacity>
           </View>
+
+          {nearbyOnly && userLocation ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.radiusRow}
+            >
+              {NEARBY_RADIUS_OPTIONS.map((radius) => {
+                const isActive = nearbyRadius === radius;
+
+                return (
+                  <TouchableOpacity
+                    key={radius}
+                    style={[
+                      styles.radiusChip,
+                      isActive && styles.radiusChipActive,
+                    ]}
+                    onPress={() => handleRadiusChange(radius)}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons
+                      name="navigate-outline"
+                      size={13}
+                      color={isActive ? COLORS.surface : COLORS.primary}
+                    />
+                    <Text
+                      style={[
+                        styles.radiusChipText,
+                        isActive && styles.radiusChipTextActive,
+                      ]}
+                    >
+                      {radius} km
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          ) : null}
         </View>
 
         <View style={styles.listSection}>
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={COLORS.primary} />
-              <Text style={styles.loadingText}>{t('veterinarian.findingVets')}</Text>
+              <CowLoader message={t('veterinarian.findingVets')} size="medium" />
             </View>
           ) : filteredVets.length === 0 ? (
             <View style={styles.emptyContainer}>
@@ -360,7 +468,14 @@ const VeterinarianScreen = ({ navigation }) => {
           ) : (
             filteredVets.map((vet) => {
               const services = normalizeServices(vet.services).slice(0, 4);
-              const locationLabel = [vet.city, vet.state].filter(Boolean).join(', ');
+              const vetName = toDisplayText(vet.full_name, t('veterinarian.title'));
+              const clinicName = toDisplayText(vet.clinic_name);
+              const experienceYears = toDisplayText(vet.experience_years, '0');
+              const consultationFee = toDisplayText(vet.consultation_fee);
+              const totalReviews = toDisplayText(vet.total_reviews, '0');
+              const locationLabel = [toDisplayText(vet.city), toDisplayText(vet.state)]
+                .filter(Boolean)
+                .join(', ');
               const distanceLabel = formatDistanceLabel(vet.distance, t);
 
               return (
@@ -375,13 +490,13 @@ const VeterinarianScreen = ({ navigation }) => {
                       <Image source={{ uri: vet.profile_photo }} style={styles.vetImage} />
                     ) : (
                       <View style={[styles.vetImage, styles.vetImagePlaceholder]}>
-                        <Text style={styles.vetInitials}>{getInitials(vet.full_name)}</Text>
+                        <Text style={styles.vetInitials}>{getInitials(vetName)}</Text>
                       </View>
                     )}
 
                     <View style={styles.vetInfo}>
                       <Text style={styles.vetName} numberOfLines={2}>
-                        Dr. {vet.full_name}
+                        Dr. {vetName}
                       </Text>
                       <Text style={styles.vetSpec}>{getSpecializationLabel(vet.specialization)}</Text>
                     </View>
@@ -427,22 +542,22 @@ const VeterinarianScreen = ({ navigation }) => {
                     <View style={styles.metaCell}>
                       <Ionicons name="location-outline" size={14} color={COLORS.primary} />
                       <Text style={styles.metaText} numberOfLines={1}>
-                        {distanceLabel ? `${locationLabel} • ${distanceLabel}` : locationLabel}
+                        {distanceLabel ? `${locationLabel} - ${distanceLabel}` : locationLabel}
                       </Text>
                     </View>
 
                     <View style={styles.metaCell}>
                       <Ionicons name="time-outline" size={14} color={COLORS.textMuted} />
                       <Text style={styles.metaText}>
-                        {vet.experience_years || 0}+ {t('veterinarian.experience')}
+                        {experienceYears}+ {t('veterinarian.experience')}
                       </Text>
                     </View>
 
                     <View style={styles.metaCell}>
                       <Ionicons name="cash-outline" size={14} color={COLORS.accent} />
                       <Text style={styles.metaText}>
-                        {vet.consultation_fee
-                          ? `\u20B9${vet.consultation_fee} ${t('veterinarian.consultationFee')}`
+                        {consultationFee
+                          ? `\u20B9${consultationFee} ${t('veterinarian.consultationFee')}`
                           : t('veterinarian.consultationFee')}
                       </Text>
                     </View>
@@ -450,7 +565,7 @@ const VeterinarianScreen = ({ navigation }) => {
                     <View style={styles.metaCell}>
                       <Ionicons name="business-outline" size={14} color={COLORS.textMuted} />
                       <Text style={styles.metaText} numberOfLines={1}>
-                        {vet.clinic_name || getSpecializationLabel(vet.specialization)}
+                        {clinicName || getSpecializationLabel(vet.specialization)}
                       </Text>
                     </View>
                   </View>
@@ -458,7 +573,7 @@ const VeterinarianScreen = ({ navigation }) => {
                   <View style={styles.ratingRow}>
                     {renderStars(vet.rating)}
                     <Text style={styles.ratingText}>
-                      {vet.rating ? Number(vet.rating).toFixed(1) : '0.0'} ({vet.total_reviews || 0}{' '}
+                      {vet.rating ? Number(vet.rating).toFixed(1) : '0.0'} ({totalReviews}{' '}
                       {t('veterinarian.reviews')})
                     </Text>
                   </View>
@@ -489,7 +604,7 @@ const VeterinarianScreen = ({ navigation }) => {
                       style={styles.primaryBtn}
                       onPress={(event) => {
                         event.stopPropagation();
-                        handleWhatsApp(vet.phone_number, vet.full_name);
+                        handleWhatsApp(vet.phone_number, vetName);
                       }}
                     >
                       <Ionicons name="logo-whatsapp" size={17} color={COLORS.surface} />
@@ -512,6 +627,14 @@ const VeterinarianScreen = ({ navigation }) => {
           )}
         </View>
       </ScrollView>
+      <FeatureHelpModal
+        visible={helpVisible}
+        onClose={() => setHelpVisible(false)}
+        title={veterinarianHelp?.localized?.title || t('veterinarian.title')}
+        imageSource={veterinarianHelp?.image}
+        helpContent={veterinarianHelp?.localized}
+        t={t}
+      />
     </SafeAreaView>
   );
 };
@@ -564,6 +687,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 10,
   },
+  headerHelpButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primarySoft,
+    borderWidth: 1,
+    borderColor: COLORS.secondary,
+  },
   headerIconBubble: {
     width: 36,
     height: 36,
@@ -579,21 +712,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '800',
     color: COLORS.text,
-  },
-  countPill: {
-    minWidth: 44,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 999,
-    backgroundColor: COLORS.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  countPillText: {
-    color: COLORS.primaryDark,
-    fontSize: 13,
-    fontWeight: '700',
-    textTransform: 'lowercase',
   },
   searchRow: {
     flexDirection: 'row',
@@ -660,6 +778,34 @@ const styles = StyleSheet.create({
   },
   topFilterTextDisabled: {
     color: COLORS.borderStrong,
+  },
+  radiusRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingTop: 12,
+  },
+  radiusChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  radiusChipActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  radiusChipText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: COLORS.primary,
+  },
+  radiusChipTextActive: {
+    color: COLORS.surface,
   },
   listSection: {
     paddingHorizontal: 16,

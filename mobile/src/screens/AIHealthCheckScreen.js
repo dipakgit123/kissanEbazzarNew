@@ -1,1193 +1,1158 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Image,
   ActivityIndicator,
   Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
   TextInput,
-  Modal,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../utils/constants';
 import { healthCheckService } from '../services/api';
+import FeatureHelpModal from '../components/FeatureHelpModal';
+import { getLocalizedFeatureHelp } from '../constants/featureHelp';
+import AppHeader from '../components/AppHeader';
 
-// Animal types in Marathi with images from assets
 const ANIMAL_TYPES = [
-  { id: 'cow', name: 'गाय', image: require('../assets/cow1.png'), color: '#D2691E', emoji: '🐄' },
-  { id: 'buffalo', name: 'म्हैस', image: require('../assets/buffalo1.png'), color: '#2F4F4F', emoji: '🐃' },
-  { id: 'goat', name: 'शेळी', image: require('../assets/goat1.png'), color: '#8B7355', emoji: '🐐' },
-  { id: 'horse', name: 'घोडा', image: require('../assets/horse1.png'), color: '#8B4513', emoji: '🐴' },
-  { id: 'dog', name: 'कुत्रा', image: require('../assets/dog1.png'), color: '#CD853F', emoji: '🐕' },
-  { id: 'cat', name: 'मांजर', image: require('../assets/cat1.png'), color: '#FFA07A', emoji: '🐈' },
-  { id: 'other', name: 'इतर', icon: 'dots-horizontal-circle', color: '#6B7280', emoji: '🐾' },
+  { id: 'cow', image: require('../assets/cow1.png') },
+  { id: 'buffalo', image: require('../assets/buffalo1.png') },
+  { id: 'goat', image: require('../assets/goat1.png') },
+  { id: 'horse', image: require('../assets/horse1.png') },
+  { id: 'dog', image: require('../assets/dog1.png') },
+  { id: 'cat', image: require('../assets/cat1.png') },
+  { id: 'other', icon: 'paw-outline' },
 ];
 
-// Helper functions
 const getScoreColor = (score) => {
-  if (score >= 8) return '#10B981'; // Green
-  if (score >= 6) return '#F59E0B'; // Amber
-  if (score >= 4) return '#F97316'; // Orange
-  return '#EF4444'; // Red
+  const numericScore = Number(score);
+  if (numericScore >= 8) return COLORS.success;
+  if (numericScore >= 6) return COLORS.warning;
+  if (numericScore >= 4) return COLORS.accent;
+  return COLORS.error;
 };
 
-const getUrgencyColor = (urgency) => {
-  if (urgency === 'तातडीची' || urgency === 'High') return '#EF4444';
-  if (urgency === 'मध्यम' || urgency === 'Medium') return '#F59E0B';
-  return '#10B981';
+const getUrgencyColor = (urgency = '') => {
+  const value = String(urgency).toLowerCase();
+  if (value.includes('high') || value.includes('critical') || value.includes('urgent')) return COLORS.error;
+  if (value.includes('medium') || value.includes('moderate')) return COLORS.warning;
+  return COLORS.success;
 };
 
-const getBodyConditionText = (score) => {
-  const num = Number(score);
-  if (num <= 2) return 'कमी वजन';
-  if (num >= 4) return 'जास्त वजन';
-  return 'सामान्य';
+const toDisplayText = (value, fallback = '-') => {
+  if (value === null || value === undefined || value === '') return fallback;
+  if (Array.isArray(value)) return value.map((item) => toDisplayText(item, '')).filter(Boolean).join(', ');
+  if (typeof value === 'object') {
+    return Object.entries(value)
+      .map(([key, item]) => `${key}: ${toDisplayText(item, '')}`)
+      .filter(Boolean)
+      .join(', ');
+  }
+  return String(value);
 };
 
-const getAnimalEmoji = (animalId) => {
-  const animal = ANIMAL_TYPES.find(a => a.id === animalId);
-  return animal?.emoji || '🐾';
+const normalizeList = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  return [value];
 };
 
-// Result Card Component
-const ResultCard = ({ title, icon, children, color = COLORS.primary }) => (
-  <View style={styles.resultCard}>
-    <View style={[styles.cardHeader, { backgroundColor: color + '15' }]}>
-      <Ionicons name={icon} size={20} color={color} />
-      <Text style={[styles.cardTitle, { color }]}>{title}</Text>
-    </View>
-    <View style={styles.cardContent}>{children}</View>
-  </View>
-);
-
-// Info Row Component
-const InfoRow = ({ label, value }) => {
-  if (!value) return null;
-  return (
-    <View style={styles.infoRow}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue}>{value}</Text>
-    </View>
-  );
-};
-
-// Severity Badge Component
-const SeverityBadge = ({ severity }) => {
-  const getSeverityColor = () => {
-    switch (severity?.toLowerCase()) {
-      case 'critical':
-      case 'गंभीर':
-        return '#DC2626';
-      case 'high':
-      case 'उच्च':
-        return '#EA580C';
-      case 'medium':
-      case 'मध्यम':
-        return '#F59E0B';
-      case 'low':
-      case 'कमी':
-        return '#22C55E';
-      default:
-        return '#6B7280';
-    }
-  };
-
-  return (
-    <View style={[styles.severityBadge, { backgroundColor: getSeverityColor() + '20' }]}>
-      <Text style={[styles.severityText, { color: getSeverityColor() }]}>
-        {severity || 'N/A'}
-      </Text>
-    </View>
-  );
+const getBodyConditionText = (score, t) => {
+  const numericScore = Number(score);
+  if (numericScore <= 2) return t('aiHealthCheck.underweight');
+  if (numericScore >= 4) return t('aiHealthCheck.overweight');
+  return t('aiHealthCheck.normal');
 };
 
 const AIHealthCheckScreen = ({ navigation }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const insets = useSafeAreaInsets();
   const [selectedAnimal, setSelectedAnimal] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [symptoms, setSymptoms] = useState('');
   const [age, setAge] = useState('');
   const [additionalInfo, setAdditionalInfo] = useState('');
+  const [customQuestion, setCustomQuestion] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
-  const [modalVisible, setModalVisible] = useState(false);
+  const [error, setError] = useState(null);
+  const [helpVisible, setHelpVisible] = useState(false);
+  const aiHealthHelp = getLocalizedFeatureHelp('aiHealth', i18n.resolvedLanguage || i18n.language);
 
-  // Pick image from gallery
+  const selectedAnimalMeta = useMemo(
+    () => ANIMAL_TYPES.find((animal) => animal.id === selectedAnimal),
+    [selectedAnimal]
+  );
+
+  const primaryRecommendation = result?.recommendations?.[0];
+  const healthScore = result?.healthScore || result?.score;
+  const bodyScore = result?.bodyConditionScore || result?.body_condition_score || 3;
+  const urgencyLevel = result?.urgencyLevel || result?.urgency || t('aiHealthCheck.normal');
+
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('परवानगी आवश्यक', 'कृपया गॅलरी वापरण्यासाठी परवानगी द्या');
+      Alert.alert(t('aiHealthCheck.permissionRequired'), t('aiHealthCheck.galleryPermission'));
       return;
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
+    const pickerResult = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [4, 3],
-      quality: 0.8,
+      quality: 0.72,
     });
 
-    if (!result.canceled) {
-      setSelectedImage(result.assets[0]);
+    if (!pickerResult.canceled) {
+      setSelectedImage(pickerResult.assets[0]);
       setResult(null);
+      setError(null);
     }
   };
 
-  // Take photo with camera
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('परवानगी आवश्यक', 'कृपया कॅमेरा वापरण्यासाठी परवानगी द्या');
+      Alert.alert(t('aiHealthCheck.permissionRequired'), t('aiHealthCheck.cameraPermission'));
       return;
     }
 
-    const result = await ImagePicker.launchCameraAsync({
+    const pickerResult = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
       aspect: [4, 3],
-      quality: 0.8,
+      quality: 0.72,
     });
 
-    if (!result.canceled) {
-      setSelectedImage(result.assets[0]);
+    if (!pickerResult.canceled) {
+      setSelectedImage(pickerResult.assets[0]);
       setResult(null);
+      setError(null);
     }
   };
 
-  // Show image picker options
-  const showImageOptions = () => {
-    Alert.alert(
-      'फोटो निवडा',
-      'तुम्ही कसा फोटो घ्यायचा आहे?',
-      [
-        { text: 'कॅमेरा', onPress: takePhoto },
-        { text: 'गॅलरी', onPress: pickImage },
-        { text: 'रद्द करा', style: 'cancel' },
-      ]
-    );
+  const chooseImageSource = () => {
+    Alert.alert(t('aiHealthCheck.photoOptions'), t('aiHealthCheck.photoOptionsDesc'), [
+      { text: t('aiHealthCheck.takePhoto'), onPress: takePhoto },
+      { text: t('aiHealthCheck.choosePhoto'), onPress: pickImage },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
   };
 
-  // Analyze health
   const analyzeHealth = async () => {
-    if (!selectedImage) {
-      Alert.alert('त्रुटी', 'कृपया प्राण्याचा फोटो निवडा');
+    if (!selectedAnimal) {
+      setError(t('aiHealthCheck.errorSelectAnimal'));
       return;
     }
 
-    if (!selectedAnimal) {
-      Alert.alert('त्रुटी', 'कृपया प्राण्याचा प्रकार निवडा');
+    if (!selectedImage) {
+      setError(t('aiHealthCheck.errorSelectPhoto'));
       return;
     }
 
     setLoading(true);
+    setError(null);
     setResult(null);
 
     try {
       const formData = new FormData();
       formData.append('image', {
         uri: selectedImage.uri,
-        type: 'image/jpeg',
-        name: 'health_check.jpg',
+        type: selectedImage.mimeType || 'image/jpeg',
+        name: selectedImage.fileName || 'health_check.jpg',
       });
       formData.append('animalType', selectedAnimal);
-      if (symptoms) formData.append('symptoms', symptoms);
-      if (age) formData.append('age', age);
-      if (additionalInfo) formData.append('additionalInfo', additionalInfo);
+      formData.append('symptoms', symptoms);
+      formData.append('age', age);
+      formData.append('additionalInfo', additionalInfo);
+      formData.append('customQuestion', customQuestion);
+      formData.append('languageHint', i18n.language);
 
       const response = await healthCheckService.uploadAndAnalyze(formData);
-
       if (response.success) {
         setResult(response.data);
-        setModalVisible(true);
       } else {
-        Alert.alert('त्रुटी', response.message || 'विश्लेषण अयशस्वी');
+        setError(response.message || t('aiHealthCheck.errorAnalysisFailed'));
       }
-    } catch (error) {
-      console.error('Health check error:', error);
-      Alert.alert('त्रुटी', error.message || 'आरोग्य तपासणी अयशस्वी झाली');
+    } catch (err) {
+      setError(err.message || t('aiHealthCheck.errorConnectionFailed'));
     } finally {
       setLoading(false);
     }
   };
 
-  // Reset form
   const resetForm = () => {
-    setSelectedImage(null);
     setSelectedAnimal(null);
+    setSelectedImage(null);
     setSymptoms('');
     setAge('');
     setAdditionalInfo('');
+    setCustomQuestion('');
     setResult(null);
-    setModalVisible(false);
+    setError(null);
   };
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <AppHeader
+        safeArea={false}
+        navigation={navigation}
+        title={t('aiHealthCheck.title')}
+        subtitle={t('aiHealthCheck.uploadPhotoDesc')}
+        rightActions={[
+          {
+            icon: 'help-circle-outline',
+            onPress: () => setHelpVisible(true),
+            color: COLORS.primary,
+            backgroundColor: COLORS.primarySoft,
+            accessibilityLabel: 'Open AI health help',
+          },
+        ]}
+      />
+
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboardView}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[styles.content, { paddingBottom: 32 + insets.bottom }]}
+          showsVerticalScrollIndicator={false}
         >
-          <Ionicons name="arrow-back" size={24} color={COLORS.white} />
-        </TouchableOpacity>
-        <View style={styles.headerTextContainer}>
-          <Text style={styles.headerTitle}>{t('aiHealthCheck.title')}</Text>
-          <Text style={styles.headerSubtitle}>{t('aiHealthCheck.uploadPhotoDesc')}</Text>
-        </View>
-      </View>
+          {!result ? (
+            <>
+              <StepHeader currentStep={selectedAnimal ? selectedImage ? 3 : 2 : 1} t={t} />
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Image Selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>प्राण्याचा फोटो</Text>
-          <TouchableOpacity
-            style={styles.imagePickerContainer}
-            onPress={showImageOptions}
-          >
-            {selectedImage ? (
-              <View style={styles.selectedImageContainer}>
-                <Image
-                  source={{ uri: selectedImage.uri }}
-                  style={styles.selectedImage}
-                />
-                <TouchableOpacity
-                  style={styles.changeImageButton}
-                  onPress={showImageOptions}
-                >
-                  <Ionicons name="camera" size={20} color={COLORS.white} />
-                  <Text style={styles.changeImageText}>बदला</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={styles.imagePlaceholder}>
-                <View style={styles.uploadIconContainer}>
-                  <Ionicons name="camera-outline" size={40} color={COLORS.primary} />
+              <Section title={t('aiHealthCheck.selectAnimal')} step="1">
+                <View style={styles.animalGrid}>
+                  {ANIMAL_TYPES.map((animal) => {
+                    const active = selectedAnimal === animal.id;
+                    return (
+                      <TouchableOpacity
+                        key={animal.id}
+                        style={[styles.animalCard, active && styles.animalCardActive]}
+                        onPress={() => {
+                          setSelectedAnimal(animal.id);
+                          setError(null);
+                        }}
+                        activeOpacity={0.85}
+                      >
+                        <View style={styles.animalImageWrap}>
+                          {animal.image ? (
+                            <Image source={animal.image} style={styles.animalImage} resizeMode="contain" />
+                          ) : (
+                            <Ionicons name={animal.icon} size={30} color={COLORS.primary} />
+                          )}
+                        </View>
+                        <Text style={[styles.animalName, active && styles.animalNameActive]}>
+                          {t(`animalTypes.${animal.id}`, { defaultValue: animal.id })}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
-                <Text style={styles.uploadText}>फोटो काढा किंवा गॅलरीतून निवडा</Text>
-                <Text style={styles.uploadHint}>स्पष्ट फोटो घ्या जेणेकरून AI चांगले विश्लेषण करू शकेल</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
+              </Section>
 
-        {/* Animal Type Selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>प्राण्याचा प्रकार निवडा</Text>
-          <View style={styles.animalGrid}>
-            {ANIMAL_TYPES.map((animal) => (
-              <TouchableOpacity
-                key={animal.id}
-                style={[
-                  styles.animalButton,
-                  selectedAnimal === animal.id && styles.animalButtonSelected,
-                  selectedAnimal === animal.id && { borderColor: animal.color },
-                ]}
-                onPress={() => setSelectedAnimal(animal.id)}
-              >
-                <View style={styles.animalCardContent}>
-                  {animal.image ? (
-                    <Image 
-                      source={animal.image} 
-                      style={styles.animalImage}
-                      resizeMode="cover"
-                    />
+              <Section title={t('aiHealthCheck.uploadPhoto')} step="2">
+                <TouchableOpacity style={styles.uploadBox} onPress={chooseImageSource} activeOpacity={0.9}>
+                  {selectedImage ? (
+                    <View>
+                      <Image source={{ uri: selectedImage.uri }} style={styles.previewImage} />
+                      <View style={styles.changePhotoPill}>
+                        <Ionicons name="camera-outline" size={16} color={COLORS.surface} />
+                        <Text style={styles.changePhotoText}>{t('common.change')}</Text>
+                      </View>
+                    </View>
                   ) : (
-                    <View style={styles.animalIconWrapper}>
-                      <MaterialCommunityIcons 
-                        name={animal.icon} 
-                        size={40} 
-                        color={selectedAnimal === animal.id ? animal.color : COLORS.gray} 
-                      />
+                    <View style={styles.uploadEmpty}>
+                      <View style={styles.uploadIcon}>
+                        <Ionicons name="image-outline" size={30} color={COLORS.primary} />
+                      </View>
+                      <Text style={styles.uploadTitle}>{t('aiHealthCheck.clickOrChoose')}</Text>
+                      <Text style={styles.uploadHint}>{t('aiHealthCheck.fileFormats')}</Text>
+                      <Text style={styles.uploadHintSmall}>{t('aiHealthCheck.autoOptimizeHint')}</Text>
                     </View>
                   )}
+                </TouchableOpacity>
+                <View style={styles.imageActionRow}>
+                  <TouchableOpacity style={styles.secondaryButton} onPress={takePhoto} activeOpacity={0.85}>
+                    <Ionicons name="camera-outline" size={18} color={COLORS.primary} />
+                    <Text style={styles.secondaryButtonText}>{t('aiHealthCheck.takePhoto')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.secondaryButton} onPress={pickImage} activeOpacity={0.85}>
+                    <Ionicons name="images-outline" size={18} color={COLORS.primary} />
+                    <Text style={styles.secondaryButtonText}>{t('aiHealthCheck.choosePhoto')}</Text>
+                  </TouchableOpacity>
                 </View>
-                <View style={styles.animalNameContainer}>
-                  <Text
-                    style={[
-                      styles.animalName,
-                      selectedAnimal === animal.id && styles.animalNameSelected,
-                    ]}
-                  >
-                    {animal.name}
-                  </Text>
+              </Section>
+
+              <Section title={t('aiHealthCheck.additionalInfo')} step="3">
+                <Input
+                  label={t('aiHealthCheck.age')}
+                  value={age}
+                  onChangeText={setAge}
+                  placeholder={t('aiHealthCheck.agePlaceholder')}
+                />
+                <Input
+                  label={t('aiHealthCheck.symptoms')}
+                  value={symptoms}
+                  onChangeText={setSymptoms}
+                  placeholder={t('aiHealthCheck.symptomsPlaceholder')}
+                  multiline
+                />
+                <Input
+                  label={t('aiHealthCheck.moreInfo')}
+                  value={additionalInfo}
+                  onChangeText={setAdditionalInfo}
+                  placeholder={t('aiHealthCheck.additionalInfoPlaceholder')}
+                  multiline
+                />
+
+                <View style={styles.questionBox}>
+                  <View style={styles.questionHeader}>
+                    <View>
+                      <Text style={styles.questionTitle}>{t('aiHealthCheck.askQuestionLabel')}</Text>
+                      <Text style={styles.questionHint}>{t('aiHealthCheck.askQuestionInlineHint')}</Text>
+                    </View>
+                    <Text style={styles.aiBadge}>AI</Text>
+                  </View>
+                  <TextInput
+                    style={[styles.input, styles.textArea]}
+                    value={customQuestion}
+                    onChangeText={setCustomQuestion}
+                    placeholder={t('aiHealthCheck.askQuestionPlaceholder')}
+                    placeholderTextColor={COLORS.borderStrong}
+                    multiline
+                  />
                 </View>
+              </Section>
+
+              {error ? (
+                <View style={styles.errorBox}>
+                  <Ionicons name="alert-circle-outline" size={20} color={COLORS.error} />
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              ) : null}
+
+              <TouchableOpacity
+                style={[styles.analyzeButton, loading && styles.analyzeButtonDisabled]}
+                onPress={analyzeHealth}
+                disabled={loading}
+                activeOpacity={0.9}
+              >
+                {loading ? (
+                  <ActivityIndicator color={COLORS.surface} size="small" />
+                ) : (
+                  <Ionicons name="analytics-outline" size={22} color={COLORS.surface} />
+                )}
+                <Text style={styles.analyzeButtonText}>
+                  {loading ? t('aiHealthCheck.analyzing') : t('aiHealthCheck.analyze')}
+                </Text>
               </TouchableOpacity>
-            ))}
-          </View>
-        </View>
 
-        {/* Additional Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>अतिरिक्त माहिती (पर्यायी)</Text>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>लक्षणे</Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="उदा: भूक कमी, ताप, थकवा..."
-              placeholderTextColor={COLORS.gray}
-              value={symptoms}
-              onChangeText={setSymptoms}
-              multiline
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>वय</Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="उदा: 2 वर्ष, 6 महिने..."
-              placeholderTextColor={COLORS.gray}
-              value={age}
-              onChangeText={setAge}
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>इतर माहिती</Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="इतर कोणतीही महत्त्वाची माहिती..."
-              placeholderTextColor={COLORS.gray}
-              value={additionalInfo}
-              onChangeText={setAdditionalInfo}
-              multiline
-            />
-          </View>
-        </View>
-
-        {/* Analyze Button */}
-        <TouchableOpacity
-          style={[styles.analyzeButton, loading && styles.analyzeButtonDisabled]}
-          onPress={analyzeHealth}
-          disabled={loading}
-        >
-          {loading ? (
-            <>
-              <ActivityIndicator color={COLORS.white} size="small" />
-              <Text style={styles.analyzeButtonText}>विश्लेषण करत आहे...</Text>
+              <View style={styles.disclaimerBox}>
+                <Ionicons name="information-circle-outline" size={18} color={COLORS.textMuted} />
+                <Text style={styles.disclaimerText}>{t('aiHealthCheck.disclaimer')}</Text>
+              </View>
             </>
           ) : (
-            <>
-              <Ionicons name="analytics" size={24} color={COLORS.white} />
-              <Text style={styles.analyzeButtonText}>आरोग्य तपासा</Text>
-            </>
-          )}
-        </TouchableOpacity>
+            <View style={styles.resultsWrap}>
+              <ResultCard title={t('aiHealthCheck.results')} icon="document-text-outline">
+                <Text style={styles.resultHeadline}>
+                  {toDisplayText(result.overallHealth, t('aiHealthCheck.sectionOverview'))}
+                </Text>
+                <Text style={styles.resultLead}>
+                  {toDisplayText(primaryRecommendation || result.whenToSeeVet || result.disclaimer, t('aiHealthCheck.disclaimer'))}
+                </Text>
+                <View style={styles.badgeRow}>
+                  <Badge label={toDisplayText(urgencyLevel)} color={getUrgencyColor(urgencyLevel)} />
+                  <Badge label={toDisplayText(result.animalType || t(`animalTypes.${selectedAnimal}`, { defaultValue: selectedAnimal }))} color={COLORS.primary} />
+                  <Badge label={`${t('aiHealthCheck.bodyCondition')}: ${bodyScore}/5`} color={COLORS.info} />
+                </View>
 
-        <View style={styles.bottomPadding} />
-      </ScrollView>
+                <View style={styles.summaryGrid}>
+                  <SummaryItem
+                    label={t('aiHealthCheck.healthScore')}
+                    value={toDisplayText(healthScore, '?')}
+                    color={getScoreColor(healthScore)}
+                  />
+                  <SummaryItem
+                    label={t('aiHealthCheck.bodyCondition')}
+                    value={getBodyConditionText(bodyScore, t)}
+                    subvalue={`${bodyScore}/5`}
+                    color={COLORS.info}
+                  />
+                  <SummaryItem
+                    label={t('aiHealthCheck.animal')}
+                    value={toDisplayText(result.animalType || t(`animalTypes.${selectedAnimal}`, { defaultValue: '-' }))}
+                    color={COLORS.primary}
+                  />
+                </View>
+              </ResultCard>
 
-      {/* Results Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>विश्लेषण परिणाम</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeButton}>
-                <Ionicons name="close" size={28} color={COLORS.black} />
+              {(result.questionAnswer || result.questionError) ? (
+                <ResultCard title={t('aiHealthCheck.askQuestionResponseTitle')} icon="help-circle-outline">
+                  {result.questionAsked ? (
+                    <View style={styles.questionAskedBox}>
+                      <Text style={styles.questionAskedLabel}>{t('aiHealthCheck.yourQuestion')}</Text>
+                      <Text style={styles.questionAskedText}>{toDisplayText(result.questionAsked)}</Text>
+                    </View>
+                  ) : null}
+                  <Text style={styles.paragraph}>
+                    {toDisplayText(result.questionAnswer || result.questionError || t('aiHealthCheck.errorPromptFailed'))}
+                  </Text>
+                </ResultCard>
+              ) : null}
+
+              {result.estimatedAge ? (
+                <ResultCard title={t('aiHealthCheck.estimatedAge')} icon="calendar-outline">
+                  <InfoRow label={t('aiHealthCheck.age')} value={toDisplayText(result.estimatedAge)} />
+                </ResultCard>
+              ) : null}
+
+              {result.breedingReadiness ? (
+                <ResultCard title={t('aiHealthCheck.breedingReadiness')} icon="git-compare-outline">
+                  <InfoRow label={t('aiHealthCheck.status')} value={toDisplayText(result.breedingReadiness.matingReadinessStatus || result.breedingReadiness.status)} />
+                  <InfoRow label={t('aiHealthCheck.advice')} value={toDisplayText(result.breedingReadiness.matingAdvice || result.breedingReadiness.advice)} />
+                  <InfoRow label={t('aiHealthCheck.details')} value={toDisplayText(result.breedingReadiness)} />
+                </ResultCard>
+              ) : null}
+
+              {result.pregnancyInfo ? (
+                <ResultCard title={t('aiHealthCheck.pregnancyInfo')} icon="paw-outline">
+                  <InfoRow label={t('aiHealthCheck.status')} value={toDisplayText(result.pregnancyInfo.pregnancyReadinessStatus || result.pregnancyInfo.status)} />
+                  <InfoRow label={t('aiHealthCheck.advice')} value={toDisplayText(result.pregnancyInfo.pregnancyAdvice || result.pregnancyInfo.advice)} />
+                  <InfoRow label={t('aiHealthCheck.details')} value={toDisplayText(result.pregnancyInfo)} />
+                </ResultCard>
+              ) : null}
+
+              <ListCard title={t('aiHealthCheck.visibleSigns')} icon="eye-outline" items={result.visibleSigns} />
+              <ListCard title={t('aiHealthCheck.healthyIndicators')} icon="checkmark-circle-outline" items={result.healthyIndicators} color={COLORS.success} />
+              <IssueCard title={t('aiHealthCheck.potentialIssues')} icon="warning-outline" items={result.potentialIssues} />
+              <ListCard title={t('aiHealthCheck.recommendations')} icon="bulb-outline" items={result.recommendations} color={COLORS.primary} />
+              <ListCard title={t('aiHealthCheck.dietarySuggestions')} icon="leaf-outline" items={result.dietarySuggestions} color={COLORS.primaryDark} />
+
+              {result.whenToSeeVet ? (
+                <ResultCard title={t('aiHealthCheck.whenToSeeVet')} icon="medical-outline">
+                  <View style={styles.vetWarning}>
+                    <Ionicons name="warning-outline" size={22} color={COLORS.error} />
+                    <Text style={styles.vetWarningText}>{toDisplayText(result.whenToSeeVet)}</Text>
+                  </View>
+                </ResultCard>
+              ) : null}
+
+              {result.disclaimer ? (
+                <View style={styles.disclaimerBox}>
+                  <Ionicons name="information-circle-outline" size={18} color={COLORS.textMuted} />
+                  <Text style={styles.disclaimerText}>{toDisplayText(result.disclaimer)}</Text>
+                </View>
+              ) : null}
+
+              <TouchableOpacity style={styles.analyzeButton} onPress={resetForm} activeOpacity={0.9}>
+                <Ionicons name="refresh-outline" size={22} color={COLORS.surface} />
+                <Text style={styles.analyzeButtonText}>{t('aiHealthCheck.newCheck')}</Text>
               </TouchableOpacity>
             </View>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
 
-            <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
-              {result && (
-                <>
-                  {/* Overall Health Summary */}
-                  <View style={styles.summaryCard}>
-                    <View style={styles.summaryGrid}>
-                      {/* Health Score */}
-                      <View style={styles.summaryItem}>
-                        <Text style={styles.summaryLabel}>आरोग्य गुण</Text>
-                        <View style={[styles.scoreCircle, { backgroundColor: getScoreColor(result.healthScore) }]}>
-                          <Text style={styles.scoreText}>{result.healthScore || '?'}</Text>
-                        </View>
-                        <Text style={styles.summaryValue}>{result.overallHealth || '-'}</Text>
-                        <View style={[styles.urgencyBadge, { backgroundColor: getUrgencyColor(result.urgencyLevel) + '20' }]}>
-                          <Text style={[styles.urgencyText, { color: getUrgencyColor(result.urgencyLevel) }]}>
-                            {result.urgencyLevel || 'सामान्य'}
-                          </Text>
-                        </View>
-                      </View>
+      <FeatureHelpModal
+        visible={helpVisible}
+        onClose={() => setHelpVisible(false)}
+        title={aiHealthHelp?.localized?.title || t('aiHealthCheck.title', { defaultValue: 'AI Health Check Guide' })}
+        imageSource={aiHealthHelp?.image}
+        helpContent={aiHealthHelp?.localized}
+        t={t}
+      />
+    </SafeAreaView>
+  );
+};
 
-                      {/* Body Condition */}
-                      <View style={[styles.summaryItem, styles.summaryItemBorder]}>
-                        <Text style={styles.summaryLabel}>शरीर स्थिती</Text>
-                        <View style={styles.bodyConditionCircle}>
-                          <Text style={styles.bodyConditionEmoji}>
-                            {Number(result.bodyConditionScore) <= 2 || Number(result.bodyConditionScore) >= 4 ? '⚠️' : '✅'}
-                          </Text>
-                        </View>
-                        <Text style={styles.summaryValue}>{getBodyConditionText(result.bodyConditionScore)}</Text>
-                        <Text style={styles.bodyConditionScore}>{result.bodyConditionScore || '3'}/5</Text>
-                      </View>
-
-                      {/* Animal Type */}
-                      <View style={styles.summaryItem}>
-                        <Text style={styles.summaryLabel}>प्राणी</Text>
-                        <View style={styles.animalTypeCircle}>
-                          <Text style={styles.animalEmoji}>{getAnimalEmoji(selectedAnimal)}</Text>
-                        </View>
-                        <Text style={styles.summaryValue}>{result.animalType || '-'}</Text>
-                      </View>
-                    </View>
-                  </View>
-
-            {/* Age Estimation */}
-            {result.estimatedAge && (
-              <ResultCard title="अंदाजे वय" icon="calendar" color="#8B5CF6">
-                <View style={styles.ageDisplay}>
-                  <Text style={styles.ageValue}>
-                    {result.estimatedAge?.years || 0} वर्षे {result.estimatedAge?.months || 0} महिने
-                  </Text>
-                </View>
-                <InfoRow label="वयाचे वर्णन" value={result.estimatedAge?.ageDescription || 'उपलब्ध नाही'} />
-                <InfoRow label="वय निर्धारण आधार" value={result.estimatedAge?.ageIndicators || 'उपलब्ध नाही'} />
-              </ResultCard>
-            )}
-
-            {/* Breeding Readiness */}
-            {result.breedingReadiness && (
-              <ResultCard title="प्रजनन तयारी" icon="male-female" color="#EC4899">
-                <View style={styles.readinessContainer}>
-                  <Ionicons
-                    name={result.breedingReadiness?.isReadyForMating ? 'checkmark-circle' : 'close-circle'}
-                    size={32}
-                    color={result.breedingReadiness?.isReadyForMating ? '#22C55E' : '#EF4444'}
-                  />
-                  <Text style={styles.readinessStatus}>
-                    {result.breedingReadiness?.matingReadinessStatus || 'उपलब्ध नाही'}
-                  </Text>
-                </View>
-                {result.breedingReadiness?.daysUntilMatingReady > 0 && (
-                  <InfoRow
-                    label="प्रजननासाठी दिवस"
-                    value={`${result.breedingReadiness.daysUntilMatingReady} दिवस`}
-                  />
-                )}
-                <InfoRow label="योग्य प्रजनन वय" value={result.breedingReadiness?.optimalMatingAge || 'उपलब्ध नाही'} />
-                <InfoRow label="सल्ला" value={result.breedingReadiness?.matingAdvice || 'उपलब्ध नाही'} />
-              </ResultCard>
-            )}
-
-            {/* Pregnancy Info */}
-            {result.pregnancyInfo && (
-              <ResultCard title="गर्भधारणा माहिती" icon="woman" color="#F59E0B">
-                <View style={styles.readinessContainer}>
-                  <Ionicons
-                    name={result.pregnancyInfo?.canGetPregnant ? 'checkmark-circle' : 'close-circle'}
-                    size={32}
-                    color={result.pregnancyInfo?.canGetPregnant ? '#22C55E' : '#EF4444'}
-                  />
-                  <Text style={styles.readinessStatus}>
-                    {result.pregnancyInfo?.pregnancyReadinessStatus || 'उपलब्ध नाही'}
-                  </Text>
-                </View>
-                {result.pregnancyInfo?.daysUntilPregnancyReady > 0 && (
-                  <InfoRow
-                    label="गर्भधारणेसाठी दिवस"
-                    value={`${result.pregnancyInfo.daysUntilPregnancyReady} दिवस`}
-                  />
-                )}
-                <InfoRow label="गर्भधारणा कालावधी" value={result.pregnancyInfo?.gestationPeriod || 'उपलब्ध नाही'} />
-                <InfoRow label="सल्ला" value={result.pregnancyInfo?.pregnancyAdvice || 'उपलब्ध नाही'} />
-              </ResultCard>
-            )}
-
-            {/* Visible Signs */}
-            {result.visibleSigns?.length > 0 && (
-              <ResultCard title="दिसलेली चिन्हे" icon="eye" color="#3B82F6">
-                {result.visibleSigns.map((sign, index) => (
-                  <View key={index} style={styles.symptomItem}>
-                    <View style={styles.bulletPoint} />
-                    <Text style={styles.symptomText}>{sign}</Text>
-                  </View>
-                ))}
-              </ResultCard>
-            )}
-
-            {/* Healthy Indicators */}
-            {result.healthyIndicators?.length > 0 && (
-              <ResultCard title="निरोगी चिन्हे" icon="checkmark-circle" color="#22C55E">
-                {result.healthyIndicators.map((indicator, index) => (
-                  <View key={index} style={styles.symptomItem}>
-                    <Ionicons name="checkmark" size={16} color="#22C55E" />
-                    <Text style={styles.symptomText}>{indicator}</Text>
-                  </View>
-                ))}
-              </ResultCard>
-            )}
-
-            {/* Potential Issues */}
-            {result.potentialIssues?.length > 0 && (
-              <ResultCard title="संभाव्य समस्या" icon="warning" color="#F59E0B">
-                {result.potentialIssues.map((issue, index) => (
-                  <View key={index} style={styles.conditionItem}>
-                    <View style={styles.conditionHeader}>
-                      <Text style={styles.conditionName}>{issue.issue || issue.condition}</Text>
-                      <SeverityBadge severity={issue.severity} />
-                    </View>
-                    <Text style={styles.conditionDescription}>{issue.description}</Text>
-                  </View>
-                ))}
-              </ResultCard>
-            )}
-
-            {/* Recommendations */}
-            {result.recommendations?.length > 0 && (
-              <ResultCard title="शिफारसी" icon="bulb" color="#10B981">
-                {result.recommendations.map((rec, index) => (
-                  <View key={index} style={styles.recommendItem}>
-                    <Ionicons name="checkmark-circle" size={18} color="#10B981" />
-                    <Text style={styles.recommendText}>{rec}</Text>
-                  </View>
-                ))}
-              </ResultCard>
-            )}
-
-            {/* Dietary Suggestions */}
-            {result.dietarySuggestions?.length > 0 && (
-              <ResultCard title="आहार सूचना" icon="restaurant" color="#8B5CF6">
-                {result.dietarySuggestions.map((diet, index) => (
-                  <View key={index} style={styles.recommendItem}>
-                    <Ionicons name="leaf" size={18} color="#8B5CF6" />
-                    <Text style={styles.recommendText}>{diet}</Text>
-                  </View>
-                ))}
-              </ResultCard>
-            )}
-
-            {/* When to See Vet */}
-            {result.whenToSeeVet && (
-              <ResultCard title="पशुवैद्यकांना कधी भेटावे" icon="medical" color="#EF4444">
-                <View style={styles.vetWarningContainer}>
-                  <Ionicons name="warning" size={24} color="#EF4444" />
-                  <Text style={styles.vetWarningText}>{result.whenToSeeVet}</Text>
-                </View>
-              </ResultCard>
-            )}
-
-            {/* Disclaimer */}
-            {result.disclaimer && (
-              <View style={styles.disclaimerContainer}>
-                <Ionicons name="information-circle" size={20} color={COLORS.gray} />
-                <Text style={styles.disclaimerText}>{result.disclaimer}</Text>
-              </View>
-            )}
-
-            {/* New Check Button */}
-            <TouchableOpacity style={styles.newCheckButton} onPress={resetForm}>
-              <Ionicons name="refresh" size={20} color={COLORS.white} />
-              <Text style={styles.newCheckButtonText}>नवीन तपासणी</Text>
-            </TouchableOpacity>
-
-            <View style={styles.bottomPadding} />
-                </>
-              )}
-            </ScrollView>
+const StepHeader = ({ currentStep, t }) => (
+  <View style={styles.stepCard}>
+    {[1, 2, 3].map((step) => (
+      <React.Fragment key={step}>
+        <View style={styles.stepItem}>
+          <View style={[styles.stepCircle, currentStep >= step && styles.stepCircleActive]}>
+            <Text style={[styles.stepNumber, currentStep >= step && styles.stepNumberActive]}>{step}</Text>
           </View>
+          <Text style={[styles.stepLabel, currentStep >= step && styles.stepLabelActive]}>
+            {step === 1 ? t('aiHealthCheck.step1') : step === 2 ? t('aiHealthCheck.step2') : t('aiHealthCheck.step3')}
+          </Text>
         </View>
-      </Modal>
+        {step < 3 ? <View style={styles.stepLine} /> : null}
+      </React.Fragment>
+    ))}
+  </View>
+);
+
+const Section = ({ title, step, children }) => (
+  <View style={styles.sectionCard}>
+    <View style={styles.sectionHeader}>
+      <View style={styles.sectionStep}>
+        <Text style={styles.sectionStepText}>{step}</Text>
+      </View>
+      <Text style={styles.sectionTitle}>{title}</Text>
+    </View>
+    {children}
+  </View>
+);
+
+const Input = ({ label, multiline = false, ...props }) => (
+  <View style={styles.inputWrap}>
+    <Text style={styles.inputLabel}>{label}</Text>
+    <TextInput
+      style={[styles.input, multiline && styles.textArea]}
+      placeholderTextColor={COLORS.borderStrong}
+      multiline={multiline}
+      {...props}
+    />
+  </View>
+);
+
+const ResultCard = ({ title, icon, children }) => (
+  <View style={styles.resultCard}>
+    <View style={styles.resultCardHeader}>
+      <View style={styles.resultIcon}>
+        <Ionicons name={icon} size={18} color={COLORS.primary} />
+      </View>
+      <Text style={styles.resultCardTitle}>{title}</Text>
+    </View>
+    <View style={styles.resultCardBody}>{children}</View>
+  </View>
+);
+
+const Badge = ({ label, color }) => (
+  <View style={[styles.badge, { backgroundColor: `${color}18`, borderColor: `${color}55` }]}>
+    <Text style={[styles.badgeText, { color }]}>{label}</Text>
+  </View>
+);
+
+const SummaryItem = ({ label, value, subvalue, color }) => (
+  <View style={styles.summaryItem}>
+    <Text style={styles.summaryLabel}>{label}</Text>
+    <View style={[styles.scoreCircle, { backgroundColor: `${color}18`, borderColor: color }]}>
+      <Text style={[styles.scoreText, { color }]}>{value}</Text>
+    </View>
+    {subvalue ? <Text style={styles.summarySubvalue}>{subvalue}</Text> : null}
+  </View>
+);
+
+const InfoRow = ({ label, value }) => {
+  const text = toDisplayText(value);
+  if (!text || text === '-') return null;
+  return (
+    <View style={styles.infoRow}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={styles.infoValue}>{text}</Text>
     </View>
   );
 };
 
+const ListCard = ({ title, icon, items, color = COLORS.textMuted }) => {
+  const list = normalizeList(items);
+  if (list.length === 0) return null;
+  return (
+    <ResultCard title={title} icon={icon}>
+      {list.map((item, index) => (
+        <View key={`${title}-${index}`} style={styles.listItem}>
+          <View style={[styles.dot, { backgroundColor: color }]} />
+          <Text style={styles.listText}>{toDisplayText(item)}</Text>
+        </View>
+      ))}
+    </ResultCard>
+  );
+};
+
+const IssueCard = ({ title, icon, items }) => {
+  const list = normalizeList(items);
+  if (list.length === 0) return null;
+  return (
+    <ResultCard title={title} icon={icon}>
+      {list.map((issue, index) => {
+        const severity = issue?.severity || issue?.level || '';
+        const severityColor = getUrgencyColor(severity);
+        return (
+          <View key={`${title}-${index}`} style={styles.issueItem}>
+            <View style={styles.issueHeader}>
+              <Text style={styles.issueTitle}>{toDisplayText(issue?.issue || issue?.condition || issue?.title || issue)}</Text>
+              {severity ? <Badge label={toDisplayText(severity)} color={severityColor} /> : null}
+            </View>
+            {issue?.description ? <Text style={styles.issueDescription}>{toDisplayText(issue.description)}</Text> : null}
+          </View>
+        );
+      })}
+    </ResultCard>
+  );
+};
+
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: COLORS.background,
+  },
+  keyboardView: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 15,
-    backgroundColor: '#fff',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: COLORS.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: COLORS.border,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  header: {
-    backgroundColor: COLORS.primary,
-    paddingTop: 50,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.surfaceAlt,
   },
-  backButton: {
-    marginRight: 16,
-    padding: 4,
-  },
-  headerTextContainer: {
+  headerText: {
     flex: 1,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.white,
+  helpButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primarySoft,
   },
-  headerSubtitle: {
-    fontSize: 14,
-    color: COLORS.white + 'CC',
-    marginTop: 2,
+  title: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: COLORS.text,
+  },
+  subtitle: {
+    marginTop: 3,
+    fontSize: 13,
+    color: COLORS.textMuted,
+  },
+  scrollView: {
+    flex: 1,
   },
   content: {
-    flex: 1,
-    padding: 16,
+    padding: 14,
+    gap: 14,
   },
-  section: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.black,
-    marginBottom: 12,
-  },
-  imagePickerContainer: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: COLORS.white,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  imagePlaceholder: {
-    padding: 32,
-    alignItems: 'center',
-  },
-  uploadIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.primary + '15',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  uploadText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: COLORS.black,
-    marginBottom: 4,
-  },
-  uploadHint: {
-    fontSize: 13,
-    color: COLORS.gray,
-    textAlign: 'center',
-  },
-  selectedImageContainer: {
-    position: 'relative',
-  },
-  selectedImage: {
-    width: '100%',
-    height: 250,
-    resizeMode: 'cover',
-  },
-  changeImageButton: {
-    position: 'absolute',
-    bottom: 12,
-    right: 12,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+  stepCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 18,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
-  changeImageText: {
-    color: COLORS.white,
-    fontSize: 14,
-    fontWeight: '500',
+  stepItem: {
+    alignItems: 'center',
+    gap: 5,
+    width: 80,
+  },
+  stepCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.surfaceAlt,
+  },
+  stepCircleActive: {
+    backgroundColor: COLORS.primary,
+  },
+  stepNumber: {
+    color: COLORS.textMuted,
+    fontWeight: '900',
+  },
+  stepNumberActive: {
+    color: COLORS.surface,
+  },
+  stepLabel: {
+    fontSize: 10,
+    color: COLORS.textMuted,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  stepLabelActive: {
+    color: COLORS.text,
+  },
+  stepLine: {
+    width: 24,
+    height: 1,
+    backgroundColor: COLORS.border,
+  },
+  sectionCard: {
+    padding: 14,
+    borderRadius: 18,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  sectionStep: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
+  },
+  sectionStepText: {
+    color: COLORS.surface,
+    fontWeight: '900',
+  },
+  sectionTitle: {
+    flex: 1,
+    fontSize: 17,
+    color: COLORS.text,
+    fontWeight: '900',
   },
   animalGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 12,
+    gap: 10,
   },
-  animalButton: {
-    width: '22.5%',
-    aspectRatio: 1,
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    overflow: 'hidden',
-    borderWidth: 2.5,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
-    position: 'relative',
+  animalCard: {
+    width: '30.8%',
+    minHeight: 112,
+    padding: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surfaceAlt,
+    alignItems: 'center',
   },
-  animalButtonSelected: {
+  animalCardActive: {
     borderColor: COLORS.primary,
-    shadowColor: COLORS.primary,
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 6,
+    backgroundColor: COLORS.primarySoft,
   },
-  animalCardContent: {
-    width: '100%',
-    height: '100%',
+  animalImageWrap: {
+    width: 58,
+    height: 58,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.surface,
   },
   animalImage: {
-    width: '100%',
-    height: '100%',
-  },
-  animalIconWrapper: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-  },
-  animalNameContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingVertical: 6,
-    paddingHorizontal: 4,
+    width: 52,
+    height: 52,
   },
   animalName: {
-    fontSize: 11,
-    color: COLORS.black,
-    fontWeight: '600',
+    marginTop: 8,
+    color: COLORS.textMuted,
+    fontSize: 12,
+    fontWeight: '800',
     textAlign: 'center',
   },
-  animalNameSelected: {
-    color: COLORS.primary,
-    fontWeight: '700',
+  animalNameActive: {
+    color: COLORS.primaryDeep,
   },
-  inputContainer: {
+  uploadBox: {
+    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surfaceAlt,
+  },
+  uploadEmpty: {
+    padding: 26,
+    alignItems: 'center',
+  },
+  uploadIcon: {
+    width: 66,
+    height: 66,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primarySoft,
+    marginBottom: 12,
+  },
+  uploadTitle: {
+    color: COLORS.text,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  uploadHint: {
+    marginTop: 5,
+    color: COLORS.textMuted,
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  uploadHintSmall: {
+    marginTop: 5,
+    color: COLORS.borderStrong,
+    fontSize: 11,
+    textAlign: 'center',
+  },
+  previewImage: {
+    width: '100%',
+    height: 230,
+  },
+  changePhotoPill: {
+    position: 'absolute',
+    right: 12,
+    bottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: COLORS.text,
+  },
+  changePhotoText: {
+    color: COLORS.surface,
+    fontWeight: '800',
+  },
+  imageActionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+  },
+  secondaryButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: COLORS.primarySoft,
+    borderWidth: 1,
+    borderColor: COLORS.secondary,
+  },
+  secondaryButtonText: {
+    color: COLORS.primary,
+    fontWeight: '900',
+    fontSize: 12,
+  },
+  inputWrap: {
     marginBottom: 12,
   },
   inputLabel: {
-    fontSize: 14,
-    color: COLORS.gray,
-    marginBottom: 6,
+    marginBottom: 7,
+    color: COLORS.text,
+    fontWeight: '900',
+    fontSize: 13,
   },
-  textInput: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 15,
-    color: COLORS.black,
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
+  input: {
     minHeight: 48,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    color: COLORS.text,
+    backgroundColor: COLORS.surfaceAlt,
+    fontWeight: '700',
+  },
+  textArea: {
+    minHeight: 92,
+    paddingTop: 12,
+    textAlignVertical: 'top',
+  },
+  questionBox: {
+    padding: 13,
+    borderRadius: 16,
+    backgroundColor: COLORS.surfaceAlt,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  questionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 10,
+  },
+  questionTitle: {
+    color: COLORS.text,
+    fontWeight: '900',
+  },
+  questionHint: {
+    marginTop: 3,
+    color: COLORS.textMuted,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  aiBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    overflow: 'hidden',
+    backgroundColor: COLORS.surface,
+    color: COLORS.primary,
+    fontWeight: '900',
+    fontSize: 11,
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 13,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.error,
+    backgroundColor: COLORS.errorSoft,
+  },
+  errorText: {
+    flex: 1,
+    color: COLORS.error,
+    fontWeight: '700',
+    lineHeight: 19,
   },
   analyzeButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 14,
-    padding: 16,
+    minHeight: 54,
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 20,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    justifyContent: 'center',
+    gap: 9,
+    borderRadius: 16,
+    backgroundColor: COLORS.primary,
   },
   analyzeButtonDisabled: {
     opacity: 0.7,
   },
   analyzeButtonText: {
-    color: COLORS.white,
-    fontSize: 18,
-    fontWeight: '600',
+    color: COLORS.surface,
+    fontSize: 16,
+    fontWeight: '900',
   },
-  resultsContainer: {
-    marginTop: 8,
-  },
-  resultsHeader: {
+  disclaimerBox: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  resultsTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.black,
-  },
-  resetText: {
-    fontSize: 14,
-    color: COLORS.primary,
-    fontWeight: '500',
-  },
-  resultCard: {
-    backgroundColor: COLORS.white,
+    alignItems: 'flex-start',
+    gap: 9,
+    padding: 13,
     borderRadius: 16,
-    marginBottom: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    gap: 10,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  cardContent: {
-    padding: 14,
-    paddingTop: 0,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.lightGray,
-  },
-  infoLabel: {
-    flex: 1,
-    fontSize: 14,
-    color: COLORS.gray,
-  },
-  infoValue: {
-    flex: 2,
-    fontSize: 14,
-    color: COLORS.black,
-    fontWeight: '500',
-  },
-  scoreContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    gap: 10,
-  },
-  scoreLabel: {
-    fontSize: 14,
-    color: COLORS.gray,
-  },
-  scoreBarContainer: {
-    flex: 1,
-    height: 10,
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 5,
-    overflow: 'hidden',
-  },
-  scoreBar: {
-    height: '100%',
-    backgroundColor: COLORS.primary,
-    borderRadius: 5,
-  },
-  scoreValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.primary,
-    minWidth: 50,
-    textAlign: 'right',
-  },
-  ageDisplay: {
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  ageValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#8B5CF6',
-  },
-  readinessContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    gap: 12,
-  },
-  readinessStatus: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '500',
-    color: COLORS.black,
-  },
-  conditionItem: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.lightGray,
-  },
-  conditionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  conditionName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: COLORS.black,
-    flex: 1,
-  },
-  severityBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  severityText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  conditionProbability: {
-    fontSize: 13,
-    color: COLORS.gray,
-    marginBottom: 4,
-  },
-  conditionDescription: {
-    fontSize: 14,
-    color: COLORS.gray,
-    lineHeight: 20,
-  },
-  symptomItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: 6,
-    gap: 10,
-  },
-  bulletPoint: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#3B82F6',
-    marginTop: 6,
-  },
-  symptomText: {
-    flex: 1,
-    fontSize: 14,
-    color: COLORS.black,
-    lineHeight: 20,
-  },
-  recommendSection: {
-    marginBottom: 12,
-  },
-  recommendTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.black,
-    marginBottom: 8,
-  },
-  recommendItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: 4,
-    gap: 8,
-  },
-  recommendText: {
-    flex: 1,
-    fontSize: 14,
-    color: COLORS.gray,
-    lineHeight: 20,
-  },
-  consultationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    gap: 12,
-  },
-  consultationText: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '500',
-    color: COLORS.black,
-  },
-  disclaimerContainer: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.lightGray + '50',
-    borderRadius: 12,
-    padding: 14,
-    marginTop: 8,
-    gap: 10,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   disclaimerText: {
     flex: 1,
+    color: COLORS.textMuted,
+    lineHeight: 19,
     fontSize: 12,
-    color: COLORS.gray,
-    lineHeight: 18,
   },
-  bottomPadding: {
-    height: 30,
+  resultsWrap: {
+    gap: 14,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+  resultCard: {
+    borderRadius: 18,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    overflow: 'hidden',
   },
-  modalContainer: {
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '90%',
-    paddingBottom: 20,
-  },
-  modalHeader: {
+  resultCardHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.lightGray,
+    borderBottomColor: COLORS.border,
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.black,
-  },
-  closeButton: {
-    padding: 4,
-  },
-  modalContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-  },
-  newCheckButton: {
-    backgroundColor: COLORS.primary,
+  resultIcon: {
+    width: 34,
+    height: 34,
     borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
-    marginTop: 16,
+    justifyContent: 'center',
+    backgroundColor: COLORS.primarySoft,
   },
-  newCheckButtonText: {
-    color: COLORS.white,
+  resultCardTitle: {
+    flex: 1,
+    color: COLORS.text,
     fontSize: 16,
+    fontWeight: '900',
+  },
+  resultCardBody: {
+    padding: 14,
+  },
+  resultHeadline: {
+    color: COLORS.text,
+    fontSize: 21,
+    fontWeight: '900',
+    lineHeight: 28,
+  },
+  resultLead: {
+    marginTop: 9,
+    color: COLORS.textMuted,
+    lineHeight: 22,
     fontWeight: '600',
   },
-  summaryCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
+  badgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 13,
+  },
+  badge: {
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: '900',
   },
   summaryGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    gap: 9,
+    marginTop: 14,
   },
   summaryItem: {
     flex: 1,
+    padding: 10,
     alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  summaryItemBorder: {
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: COLORS.lightGray,
+    borderRadius: 16,
+    backgroundColor: COLORS.surfaceAlt,
   },
   summaryLabel: {
-    fontSize: 12,
-    color: COLORS.gray,
-    fontWeight: '600',
-    marginBottom: 8,
+    minHeight: 32,
+    color: COLORS.textMuted,
+    fontSize: 11,
+    textAlign: 'center',
+    fontWeight: '800',
   },
   scoreCircle: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    justifyContent: 'center',
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     alignItems: 'center',
-    marginBottom: 8,
+    justifyContent: 'center',
+    borderWidth: 1,
+    marginTop: 6,
   },
   scoreText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: COLORS.white,
-  },
-  summaryValue: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.black,
-    marginBottom: 6,
+    fontSize: 18,
+    fontWeight: '900',
     textAlign: 'center',
   },
-  urgencyBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginTop: 4,
-  },
-  urgencyText: {
+  summarySubvalue: {
+    marginTop: 5,
+    color: COLORS.textMuted,
     fontSize: 11,
+    fontWeight: '700',
+  },
+  questionAskedBox: {
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: COLORS.surfaceAlt,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: 10,
+  },
+  questionAskedLabel: {
+    color: COLORS.textMuted,
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  questionAskedText: {
+    marginTop: 6,
+    color: COLORS.text,
+    fontWeight: '800',
+    lineHeight: 20,
+  },
+  paragraph: {
+    color: COLORS.text,
+    lineHeight: 22,
     fontWeight: '600',
   },
-  bodyConditionCircle: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
+  infoRow: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
-  bodyConditionEmoji: {
-    fontSize: 36,
+  infoLabel: {
+    color: COLORS.textMuted,
+    fontSize: 12,
+    fontWeight: '900',
   },
-  bodyConditionScore: {
-    fontSize: 11,
-    color: COLORS.gray,
+  infoValue: {
+    marginTop: 4,
+    color: COLORS.text,
+    fontWeight: '700',
+    lineHeight: 20,
   },
-  animalTypeCircle: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: '#EDE9FE',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  animalEmoji: {
-    fontSize: 36,
-  },
-  vetWarningContainer: {
+  listItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
+    gap: 9,
+    paddingVertical: 7,
+  },
+  dot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    marginTop: 7,
+  },
+  listText: {
+    flex: 1,
+    color: COLORS.text,
+    lineHeight: 21,
+    fontWeight: '600',
+  },
+  issueItem: {
     padding: 12,
-    backgroundColor: '#FEE2E2',
-    borderRadius: 12,
+    borderRadius: 14,
+    backgroundColor: COLORS.surfaceAlt,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: 9,
+  },
+  issueHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+    alignItems: 'flex-start',
+  },
+  issueTitle: {
+    flex: 1,
+    color: COLORS.text,
+    fontWeight: '900',
+    lineHeight: 20,
+  },
+  issueDescription: {
+    marginTop: 8,
+    color: COLORS.textMuted,
+    lineHeight: 20,
+    fontWeight: '600',
+  },
+  vetWarning: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: COLORS.errorSoft,
+    borderWidth: 1,
+    borderColor: COLORS.error,
   },
   vetWarningText: {
     flex: 1,
-    fontSize: 14,
-    color: '#991B1B',
-    lineHeight: 20,
+    color: COLORS.error,
+    lineHeight: 21,
+    fontWeight: '700',
   },
 });
 

@@ -10,6 +10,8 @@ import { COLORS } from '../utils/constants';
 // Sleep utility for retry logic
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+const isUnauthorizedError = (error) => error?.response?.status === 401 || error?.status === 401;
+
 // Configure how notifications appear when app is in foreground with error handling
 try {
   Notifications.setNotificationHandler({
@@ -184,16 +186,19 @@ export const getNotifications = async (limit = 50, offset = 0) => {
     const response = await api.get('/api/notifications', {
       params: { limit, offset },
     });
+    const payload = response?.data || response;
 
     // Validate response structure
-    if (response && response.success === true && Array.isArray(response.data)) {
-      return response.data;
+    if (payload && payload.success === true && Array.isArray(payload.data)) {
+      return payload.data;
     } else {
-      logger.error('Invalid API response structure:', response);
+      logger.error('Invalid API response structure:', payload);
       return [];
     }
   } catch (error) {
-    logger.error('Error fetching notifications:', error);
+    if (!isUnauthorizedError(error)) {
+      logger.error('Error fetching notifications:', error);
+    }
     return []; // Return empty array instead of throwing
   }
 };
@@ -204,16 +209,19 @@ export const getNotifications = async (limit = 50, offset = 0) => {
 export const getUnreadCount = async () => {
   try {
     const response = await api.get('/api/notifications/unread-count');
+    const payload = response?.data || response;
 
     // Validate response
-    if (response && typeof response.unread_count === 'number') {
-      return response.unread_count;
+    if (payload && typeof payload.unread_count === 'number') {
+      return payload.unread_count;
     } else {
-      logger.error('Invalid unread count response:', response);
+      logger.error('Invalid unread count response:', payload);
       return 0;
     }
   } catch (error) {
-    logger.error('Error fetching unread count:', error);
+    if (!isUnauthorizedError(error)) {
+      logger.error('Error fetching unread count:', error);
+    }
     return 0; // Return 0 instead of throwing
   }
 };

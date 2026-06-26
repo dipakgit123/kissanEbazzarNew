@@ -17,6 +17,8 @@ import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
 import { veterinarianService } from '../services/api';
 import { useVetAuth } from '../context/VetAuthContext';
+import CowLoader from '../components/CowLoader';
+import AppHeader from '../components/AppHeader';
 
 const EditVetProfileScreen = ({ navigation }) => {
   const { t, ready } = useTranslation();
@@ -69,7 +71,7 @@ const EditVetProfileScreen = ({ navigation }) => {
   if (!ready) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <CowLoader message="" size="large" />
       </View>
     );
   }
@@ -145,14 +147,12 @@ const EditVetProfileScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Profile</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <AppHeader
+        navigation={navigation}
+        title={t('profile.editProfile', { defaultValue: 'Edit Profile' })}
+        subtitle={t('vetProfile.manageDetails', { defaultValue: 'Manage your veterinary profile' })}
+        variant="primary"
+      />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Profile Photo */}

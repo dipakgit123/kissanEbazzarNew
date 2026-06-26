@@ -3,13 +3,14 @@ import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { ActivityIndicator, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { useAuth } from '../context/AuthContext';
 import { useVetAuth } from '../context/VetAuthContext';
 import { COLORS } from '../utils/constants';
+import CowLoader from '../components/CowLoader';
 
 // Auth Screens
 import LoginScreen from '../screens/LoginScreen';
@@ -33,6 +34,7 @@ import MapScreen from '../screens/MapScreen';
 import VeterinarianScreen from '../screens/VeterinarianScreen';
 import VetDetailScreen from '../screens/VetDetailScreen';
 import PregnancyCalendarScreen from '../screens/PregnancyCalendarScreen';
+import MilkReportsScreen from '../screens/MilkReportsScreen';
 import WishlistScreen from '../screens/WishlistScreen';
 import AIHealthCheckScreen from '../screens/AIHealthCheckScreen';
 import AIAssistantScreen from '../screens/AIAssistantScreen';
@@ -362,6 +364,13 @@ const MainStack = () => {
         }}
       />
       <Stack.Screen
+        name="MilkReports"
+        component={MilkReportsScreen}
+        options={{
+          animation: 'slide_from_right',
+        }}
+      />
+      <Stack.Screen
         name="Wishlist"
         component={WishlistScreen}
         options={{
@@ -385,6 +394,13 @@ const MainStack = () => {
       <Stack.Screen
         name="BuyAnimals"
         component={BuyAnimalsScreen}
+        options={{
+          animation: 'slide_from_right',
+        }}
+      />
+      <Stack.Screen
+        name="Map"
+        component={MapScreen}
         options={{
           animation: 'slide_from_right',
         }}
@@ -443,7 +459,7 @@ const AppNavigator = () => {
   if (loading || vetLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background }}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <CowLoader message="" size="large" />
       </View>
     );
   }

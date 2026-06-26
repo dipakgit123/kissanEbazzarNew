@@ -4,13 +4,15 @@ const veterinarianController = require('../controllers/veterinarianController');
 const vetAuthMiddleware = require('../middlewares/vetAuthMiddleware');
 const { createUploadFields } = require('../config/cloudinary');
 
+const VET_REGISTRATION_MAX_FILE_SIZE_BYTES = 6 * 1024 * 1024;
+
 const fileUploadConfig = createUploadFields([
   { name: 'profile_photo', maxCount: 1 },
   { name: 'license_document', maxCount: 1 },
   { name: 'degree_certificate', maxCount: 1 },
   { name: 'aadhar_document', maxCount: 1 }
 ], {
-  maxFileSizeBytes: 10 * 1024 * 1024,
+  maxFileSizeBytes: VET_REGISTRATION_MAX_FILE_SIZE_BYTES,
   fieldTypeMap: {
     profile_photo: ['image'],
     license_document: ['image', 'raw'],
@@ -19,6 +21,29 @@ const fileUploadConfig = createUploadFields([
   }
 });
 
+const handleVeterinarianUpload = (req, res, next) => {
+  fileUploadConfig(req, res, (error) => {
+    if (!error) {
+      next();
+      return;
+    }
+
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({
+        success: false,
+        code: 'VET_UPLOAD_FILE_TOO_LARGE',
+        message: 'Each registration document must be 6MB or smaller.'
+      });
+    }
+
+    return res.status(400).json({
+      success: false,
+      code: 'VET_UPLOAD_INVALID_FILE',
+      message: error.message || 'Invalid registration document upload.'
+    });
+  });
+};
+
 // ============ PUBLIC ROUTES ============
 
 /**
@@ -26,7 +51,7 @@ const fileUploadConfig = createUploadFields([
  * @desc    Register a new veterinarian
  * @access  Public
  */
-router.post('/register', fileUploadConfig, veterinarianController.register.bind(veterinarianController));
+router.post('/register', handleVeterinarianUpload, veterinarianController.register.bind(veterinarianController));
 
 /**
  * @route   POST /api/veterinarians/send-otp
@@ -73,7 +98,7 @@ router.get('/profile/me', vetAuthMiddleware, veterinarianController.getProfile.b
  * @desc    Update own profile
  * @access  Protected (Veterinarian)
  */
-router.put('/profile/me', vetAuthMiddleware, fileUploadConfig, veterinarianController.updateProfile.bind(veterinarianController));
+router.put('/profile/me', vetAuthMiddleware, handleVeterinarianUpload, veterinarianController.updateProfile.bind(veterinarianController));
 
 /**
  * @route   GET /api/veterinarians/dashboard

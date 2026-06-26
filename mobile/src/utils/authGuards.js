@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS } from './constants';
+import CowLoader from '../components/CowLoader';
 
 /**
  * Safe JSON parse with fallback
@@ -44,7 +45,7 @@ const withAuthGuard = (WrappedComponent, userType = 'user') => {
     if (loading) {
       return (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+          <CowLoader message="" size="large" />
         </View>
       );
     }
@@ -101,7 +102,7 @@ const withRoleGuard = (WrappedComponent, allowedRoles = []) => {
     if (loading) {
       return (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+          <CowLoader message="" size="large" />
         </View>
       );
     }

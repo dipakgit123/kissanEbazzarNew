@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
 import { veterinarianService, vetReviewService, vetReportService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import CowLoader from '../components/CowLoader';
 
 const getReportTypes = (t) => [
   { value: 'fake_profile', label: t('vetDetail.reportTypes.fake_profile') },
@@ -41,7 +42,7 @@ const getServiceTypes = (t) => [
 
 const normalizeServices = (services) => {
   if (Array.isArray(services)) {
-    return services.filter(Boolean);
+    return services.map((service) => toDisplayText(service)).filter(Boolean);
   }
 
   if (typeof services === 'string') {
@@ -54,8 +55,35 @@ const normalizeServices = (services) => {
   return [];
 };
 
+const toDisplayText = (value, fallback = '') => {
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+
+  if (typeof value === 'string') {
+    return value.trim() || fallback;
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    const joined = value.map((item) => toDisplayText(item)).filter(Boolean).join(', ');
+    return joined || fallback;
+  }
+
+  if (typeof value === 'object') {
+    const textKeys = ['label', 'name', 'title', 'value', 'text', 'service_type', 'review_text'];
+    const match = textKeys.map((key) => toDisplayText(value[key])).find(Boolean);
+    return match || fallback;
+  }
+
+  return fallback;
+};
+
 const getInitials = (name = '') =>
-  name
+  toDisplayText(name)
     .split(' ')
     .filter(Boolean)
     .slice(0, 2)
@@ -106,6 +134,7 @@ const VetDetailScreen = ({ route, navigation }) => {
   const serviceTypes = getServiceTypes(t);
 
   const getSpecializationLabel = (spec) => {
+    const specialization = toDisplayText(spec);
     const labels = {
       large_animal: t('veterinarian.specializations.largeAnimal'),
       small_animal: t('veterinarian.specializations.smallAnimal'),
@@ -116,17 +145,19 @@ const VetDetailScreen = ({ route, navigation }) => {
       reproduction: t('veterinarian.specializations.reproduction'),
     };
 
-    return labels[spec] || spec || t('veterinarian.title');
+    return labels[specialization] || specialization || t('veterinarian.title');
   };
 
   const translateServiceType = (value) => {
-    if (!value) {
+    const serviceText = toDisplayText(value);
+
+    if (!serviceText) {
       return '';
     }
 
-    const normalizedValue = value.toString().trim().toLowerCase().replace(/\s+/g, '_');
+    const normalizedValue = serviceText.toLowerCase().replace(/\s+/g, '_');
     const matchedType = serviceTypes.find((type) => type.value === normalizedValue);
-    return matchedType?.label || value;
+    return matchedType?.label || serviceText;
   };
 
   const fetchVetDetails = async () => {
@@ -168,7 +199,7 @@ const VetDetailScreen = ({ route, navigation }) => {
       if (response.success && response.data) {
         setMyReview(response.data);
         setReviewRating(response.data.rating);
-        setReviewText(response.data.review_text || '');
+        setReviewText(toDisplayText(response.data.review_text));
         setReviewServiceType(
           response.data.service_type
             ? response.data.service_type.toString().trim().toLowerCase().replace(/\s+/g, '_')
@@ -181,15 +212,19 @@ const VetDetailScreen = ({ route, navigation }) => {
   };
 
   const handleCall = () => {
-    if (vet?.phone_number) {
-      Linking.openURL(`tel:${vet.phone_number.replace('+', '')}`);
+    const phoneNumber = toDisplayText(vet?.phone_number);
+
+    if (phoneNumber) {
+      Linking.openURL(`tel:${phoneNumber.replace('+', '')}`);
     }
   };
 
   const handleWhatsApp = () => {
-    if (vet?.phone_number) {
-      const phone = vet.phone_number.replace('+', '');
-      const message = t('vetDetail.whatsappMessage', { name: vet.full_name });
+    const phoneNumber = toDisplayText(vet?.phone_number);
+
+    if (phoneNumber) {
+      const phone = phoneNumber.replace('+', '');
+      const message = t('vetDetail.whatsappMessage', { name: toDisplayText(vet?.full_name) });
       const url = `whatsapp://send?phone=${phone}&text=${encodeURIComponent(message)}`;
       Linking.openURL(url).catch(() => {
         Linking.openURL(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`);
@@ -355,13 +390,13 @@ const VetDetailScreen = ({ route, navigation }) => {
           ) : (
             <View style={[styles.reviewAvatar, styles.reviewAvatarPlaceholder]}>
               <Text style={styles.reviewAvatarInitial}>
-                {getInitials(item.user?.fullname || t('vetDetail.unknownReviewer'))}
+                {getInitials(toDisplayText(item.user?.fullname, t('vetDetail.unknownReviewer')))}
               </Text>
             </View>
           )}
           <View style={styles.reviewUserText}>
             <Text style={styles.reviewUserName}>
-              {item.user?.fullname || t('vetDetail.unknownReviewer')}
+              {toDisplayText(item.user?.fullname, t('vetDetail.unknownReviewer'))}
             </Text>
             <Text style={styles.reviewDate}>{new Date(item.created_at).toLocaleDateString()}</Text>
           </View>
@@ -375,19 +410,19 @@ const VetDetailScreen = ({ route, navigation }) => {
         </View>
       ) : null}
 
-      <Text style={styles.reviewText}>{item.review_text}</Text>
+      <Text style={styles.reviewText}>{toDisplayText(item.review_text)}</Text>
 
-      {item.vet_response ? (
+      {toDisplayText(item.vet_response) ? (
         <View style={styles.vetResponse}>
           <Text style={styles.vetResponseLabel}>{t('vetDetail.veterinarianResponse')}</Text>
-          <Text style={styles.vetResponseText}>{item.vet_response}</Text>
+          <Text style={styles.vetResponseText}>{toDisplayText(item.vet_response)}</Text>
         </View>
       ) : null}
 
       <TouchableOpacity style={styles.helpfulBtn} onPress={() => handleMarkHelpful(item.id)}>
         <Ionicons name="thumbs-up-outline" size={15} color={COLORS.textMuted} />
         <Text style={styles.helpfulText}>
-          {t('vetDetail.helpful')} ({item.helpful_count || 0})
+          {t('vetDetail.helpful')} ({toDisplayText(item.helpful_count, '0')})
         </Text>
       </TouchableOpacity>
     </View>
@@ -400,35 +435,43 @@ const VetDetailScreen = ({ route, navigation }) => {
 
   const services = useMemo(() => normalizeServices(vet?.services), [vet?.services]);
   const distanceLabel = formatDistance(vet?.distance, t);
+  const vetName = toDisplayText(vet?.full_name, t('veterinarian.title'));
+  const experienceYears = toDisplayText(vet?.experience_years, '0');
+  const totalReviewsText = toDisplayText(vet?.total_reviews, String(totalReviews || 0));
+  const consultationFee = toDisplayText(vet?.consultation_fee);
 
   const clinicItems = useMemo(
     () =>
       [
-        vet?.clinic_name
+        toDisplayText(vet?.clinic_name)
           ? {
               icon: 'business-outline',
               tone: 'primary',
-              title: vet.clinic_name,
+              title: toDisplayText(vet?.clinic_name),
               subtitle: t('services.veterinarian') || 'Veterinarian',
             }
           : null,
-        [vet?.city, vet?.state, vet?.pincode].filter(Boolean).join(', ')
+        [toDisplayText(vet?.city), toDisplayText(vet?.state), toDisplayText(vet?.pincode)]
+          .filter(Boolean)
+          .join(', ')
           ? {
               icon: 'location-outline',
               tone: 'primary',
-              title: [vet?.city, vet?.state, vet?.pincode].filter(Boolean).join(', '),
-              subtitle: distanceLabel || vet?.clinic_address || '',
+              title: [toDisplayText(vet?.city), toDisplayText(vet?.state), toDisplayText(vet?.pincode)]
+                .filter(Boolean)
+                .join(', '),
+              subtitle: distanceLabel || toDisplayText(vet?.clinic_address),
             }
           : null,
-        vet?.available_hours
+        toDisplayText(vet?.available_hours)
           ? {
               icon: 'time-outline',
               tone: 'primary',
-              title: vet.available_hours,
+              title: toDisplayText(vet?.available_hours),
               subtitle: t('veterinarian.available'),
             }
           : null,
-        vet?.specialization
+        toDisplayText(vet?.specialization)
           ? {
               icon: 'medkit-outline',
               tone: 'accent',
@@ -443,7 +486,7 @@ const VetDetailScreen = ({ route, navigation }) => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <CowLoader message="" size="large" />
       </View>
     );
   }
@@ -485,7 +528,7 @@ const VetDetailScreen = ({ route, navigation }) => {
                 <Image source={{ uri: vet.profile_photo }} style={styles.profileImage} />
               ) : (
                 <View style={[styles.profileImage, styles.profileImagePlaceholder]}>
-                  <Text style={styles.profileInitials}>{getInitials(vet.full_name)}</Text>
+                  <Text style={styles.profileInitials}>{getInitials(vetName)}</Text>
                 </View>
               )}
 
@@ -494,9 +537,9 @@ const VetDetailScreen = ({ route, navigation }) => {
               </View>
             </View>
 
-            <Text style={styles.vetName}>Dr. {vet.full_name}</Text>
+            <Text style={styles.vetName}>Dr. {vetName}</Text>
             <Text style={styles.vetSpecialization}>
-              {getSpecializationLabel(vet.specialization)} • {t('services.veterinarian') || 'Veterinarian'}
+              {getSpecializationLabel(vet.specialization)} - {t('services.veterinarian') || 'Veterinarian'}
             </Text>
 
             <View style={styles.heroBadges}>
@@ -512,7 +555,7 @@ const VetDetailScreen = ({ route, navigation }) => {
 
               <View style={[styles.heroBadge, styles.heroBadgeMuted]}>
                 <Text style={styles.heroBadgeText}>
-                  {vet.experience_years || 0}+ {t('vetDetail.years')}
+                  {experienceYears}+ {t('vetDetail.years')}
                 </Text>
               </View>
             </View>
@@ -524,12 +567,12 @@ const VetDetailScreen = ({ route, navigation }) => {
               <Text style={styles.statLabel}>{t('veterinarian.rating')}</Text>
             </View>
             <View style={[styles.statTile, styles.statDivider]}>
-              <Text style={styles.statValue}>{vet.total_reviews || totalReviews || 0}</Text>
+              <Text style={styles.statValue}>{totalReviewsText}</Text>
               <Text style={styles.statLabel}>{t('veterinarian.reviews')}</Text>
             </View>
             <View style={styles.statTile}>
               <Text style={[styles.statValue, styles.feeValue]}>
-                {vet.consultation_fee ? `\u20B9${vet.consultation_fee}` : '--'}
+                {consultationFee ? `\u20B9${consultationFee}` : '--'}
               </Text>
               <Text style={styles.statLabel}>{t('vetDetail.consultationFee')}</Text>
             </View>
@@ -585,7 +628,7 @@ const VetDetailScreen = ({ route, navigation }) => {
           <View style={styles.sectionCard}>
             <View style={styles.reviewSectionHeader}>
               <Text style={styles.sectionTitle}>
-                {t('vetDetail.reviews')} ({vet.total_reviews || totalReviews || 0})
+                {t('vetDetail.reviews')} ({totalReviewsText})
               </Text>
 
               <TouchableOpacity
@@ -607,7 +650,7 @@ const VetDetailScreen = ({ route, navigation }) => {
                 {renderStars(Math.round(vet.rating || 0), 15)}
               </View>
               <Text style={styles.reviewSummaryCount}>
-                {vet.total_reviews || totalReviews || 0} {t('vetDetail.totalReviews')}
+                {totalReviewsText} {t('vetDetail.totalReviews')}
               </Text>
             </View>
 

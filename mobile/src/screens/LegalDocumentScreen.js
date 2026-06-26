@@ -3,13 +3,13 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
+import AppHeader from '../components/AppHeader';
 
 const LegalDocumentScreen = ({ navigation, route }) => {
   const { t } = useTranslation();
@@ -78,19 +78,11 @@ const LegalDocumentScreen = ({ navigation, route }) => {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="arrow-back" size={22} color={COLORS.text} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {title}
-          </Text>
-          <View style={styles.headerSpacer} />
-        </View>
+        <AppHeader
+          safeArea={false}
+          navigation={navigation}
+          title={title}
+        />
 
         <ScrollView
           style={styles.scrollView}

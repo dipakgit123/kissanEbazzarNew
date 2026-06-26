@@ -15,6 +15,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
 import { appointmentService } from '../services/api';
+import AppHeader from '../components/AppHeader';
 
 const AppointmentBookingScreen = ({ route, navigation }) => {
   const { t } = useTranslation();
@@ -163,14 +164,12 @@ const AppointmentBookingScreen = ({ route, navigation }) => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Book Appointment</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <AppHeader
+        navigation={navigation}
+        title={t('appointments.bookAppointment', { defaultValue: 'Book Appointment' })}
+        subtitle={veterinarian?.full_name ? `Dr. ${veterinarian.full_name}` : undefined}
+        variant="primary"
+      />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Vet Info Card */}

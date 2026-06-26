@@ -77,8 +77,6 @@ const OTPVerificationScreen = ({ route, navigation }) => {
 
         if (response.requiresProfileCompletion) {
           navigation.replace('ProfileCompletion');
-        } else {
-          navigation.replace('MainTabs');
         }
         return;
       }

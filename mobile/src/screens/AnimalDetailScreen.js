@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
   Dimensions,
   Linking,
   Alert,
@@ -18,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { COLORS, formatPrice, formatDate, getAnimalTypeLabel } from '../utils/constants';
 import { listingsService, callLogService } from '../services/api';
 import { useWishlist } from '../context/WishlistContext';
+import CowLoader from '../components/CowLoader';
 
 const { width } = Dimensions.get('window');
 
@@ -183,8 +183,7 @@ const AnimalDetailScreen = ({ route, navigation }) => {
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer} edges={['top', 'bottom']}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>{t('animalDetail.loadingListing')}</Text>
+        <CowLoader message={t('animalDetail.loadingListing')} size="large" />
       </SafeAreaView>
     );
   }
@@ -717,11 +716,12 @@ const styles = StyleSheet.create({
   },
   imageGalleryContainer: {
     position: 'relative',
+    backgroundColor: '#F0F8F4',
   },
   galleryImage: {
     width: width,
     height: 300,
-    resizeMode: 'cover',
+    resizeMode: 'contain',
   },
   imageIndicators: {
     position: 'absolute',

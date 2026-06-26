@@ -6,13 +6,14 @@ import {
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
-  ActivityIndicator,
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useNotifications } from '../context/NotificationContext';
 import { COLORS } from '../utils/constants';
+import CowLoader from '../components/CowLoader';
+import AppHeader from '../components/AppHeader';
 
 const NotificationItem = ({ notification, onPress, onDelete }) => {
   const getIcon = () => {
@@ -106,7 +107,7 @@ const NotificationsScreen = ({ navigation }) => {
   if (!ready) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <CowLoader message="" size="large" />
       </View>
     );
   }
@@ -172,27 +173,40 @@ const NotificationsScreen = ({ navigation }) => {
   }, [fetchNotifications]);
 
   const renderHeader = () => (
-    <View style={styles.header}>
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => navigation.goBack()}
-      >
-        <Ionicons name="arrow-back" size={24} color={COLORS.black} />
-      </TouchableOpacity>
-      <Text style={styles.headerTitle}>{t('notifications.title')}</Text>
-      <View style={styles.headerActions}>
-        {unreadCount > 0 && (
-          <TouchableOpacity style={styles.headerButton} onPress={markAllAsRead}>
-            <Ionicons name="checkmark-done" size={22} color={COLORS.primary} />
-          </TouchableOpacity>
-        )}
-        {notifications.length > 0 && (
-          <TouchableOpacity style={styles.headerButton} onPress={handleClearAll}>
-            <Ionicons name="trash-outline" size={22} color={COLORS.red} />
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
+    <AppHeader
+      navigation={navigation}
+      title={t('notifications.title')}
+      subtitle={
+        unreadCount > 0
+          ? t('notifications.unreadCount', {
+              count: unreadCount,
+              defaultValue: `${unreadCount} unread`,
+            })
+          : undefined
+      }
+      rightActions={[
+        ...(unreadCount > 0
+          ? [
+              {
+                icon: 'checkmark-done',
+                onPress: markAllAsRead,
+                color: COLORS.primary,
+                accessibilityLabel: 'Mark all notifications as read',
+              },
+            ]
+          : []),
+        ...(notifications.length > 0
+          ? [
+              {
+                icon: 'trash-outline',
+                onPress: handleClearAll,
+                color: COLORS.error,
+                accessibilityLabel: 'Clear all notifications',
+              },
+            ]
+          : []),
+      ]}
+    />
   );
 
   const renderEmpty = () => (
@@ -211,7 +225,7 @@ const NotificationsScreen = ({ navigation }) => {
 
       {loading && notifications.length === 0 ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+          <CowLoader message={t('common.loading', { defaultValue: '' })} size="medium" />
         </View>
       ) : (
         <FlatList

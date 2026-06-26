@@ -6,13 +6,6 @@ const OTHER_ANIMAL_BREEDS = {
     { value: 'Madgyal', labels: { en: 'Madgyal', mr: 'माडग्याल', hi: 'माडग्याल' } },
     { value: 'Local Sheep', labels: { en: 'Local Sheep', mr: 'स्थानिक मेंढी', hi: 'स्थानीय भेड़' } },
   ],
-  pig: [
-    { value: 'Large White Yorkshire', labels: { en: 'Large White Yorkshire', mr: 'लार्ज व्हाइट यॉर्कशायर', hi: 'लार्ज व्हाइट यॉर्कशायर' } },
-    { value: 'Landrace', labels: { en: 'Landrace', mr: 'लँडरेस', hi: 'लैंडरेस' } },
-    { value: 'Duroc', labels: { en: 'Duroc', mr: 'ड्युरॉक', hi: 'ड्यूरॉक' } },
-    { value: 'Ghungroo', labels: { en: 'Ghungroo', mr: 'घुंगरू', hi: 'घुंगरू' } },
-    { value: 'Local Pig', labels: { en: 'Local Pig', mr: 'स्थानिक डुक्कर', hi: 'स्थानीय सुअर' } },
-  ],
   rabbit: [
     { value: 'New Zealand White', labels: { en: 'New Zealand White', mr: 'न्यूझीलंड व्हाईट', hi: 'न्यूज़ीलैंड व्हाइट' } },
     { value: 'Soviet Chinchilla', labels: { en: 'Soviet Chinchilla', mr: 'सोव्हिएत चिन्चिला', hi: 'सोवियत चिनचिला' } },

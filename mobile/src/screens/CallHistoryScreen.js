@@ -1,27 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
+  DeviceEventEmitter,
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   FlatList,
   ScrollView,
-  ActivityIndicator,
   RefreshControl,
   Linking,
   Alert,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
 import { useAuth } from '../context/AuthContext';
 import { callLogService } from '../services/api';
+import CowLoader from '../components/CowLoader';
+import AppHeader from '../components/AppHeader';
 
 const CallHistoryScreen = ({ navigation }) => {
   const { t, ready } = useTranslation();
   const { user } = useAuth();
-  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [callLogs, setCallLogs] = useState([]);
@@ -31,17 +32,37 @@ const CallHistoryScreen = ({ navigation }) => {
   if (!ready) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <CowLoader message="" size="large" />
       </View>
     );
   }
 
-  useEffect(() => {
-    fetchCallHistory();
-  }, [filter]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchCallHistory({ withLoader: true });
 
-  const fetchCallHistory = async () => {
+      const intervalId = setInterval(() => {
+        fetchCallHistory();
+      }, 10000);
+
+      return () => clearInterval(intervalId);
+    }, [filter, user?.id])
+  );
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('callHistory:updated', () => {
+      fetchCallHistory();
+    });
+
+    return () => subscription.remove();
+  }, [filter, user?.id]);
+
+  const fetchCallHistory = async ({ withLoader = false } = {}) => {
     try {
+      if (withLoader) {
+        setLoading(true);
+      }
+
       // Check if user is authenticated
       if (!user) {
         setCallLogs([]);
@@ -60,11 +81,13 @@ const CallHistoryScreen = ({ navigation }) => {
       // Handle authentication errors
       if (error.message === 'User not found' || error.status === 401) {
         Alert.alert(
-          'Authentication Error',
-          'Please login again to view call history.',
+          t('callHistory.authErrorTitle', { defaultValue: 'Authentication Error' }),
+          t('callHistory.authErrorMessage', {
+            defaultValue: 'Please login again to view call history.',
+          }),
           [
             {
-              text: 'OK',
+              text: t('common.ok'),
               onPress: () => navigation.navigate('Login')
             }
           ]
@@ -86,7 +109,12 @@ const CallHistoryScreen = ({ navigation }) => {
   const makeCall = async (phoneNumber, receiverName, callType) => {
     try {
       if (!phoneNumber) {
-        Alert.alert(t('common.error'), 'Phone number not available');
+        Alert.alert(
+          t('common.error'),
+          t('callHistory.phoneUnavailable', {
+            defaultValue: 'Phone number not available',
+          })
+        );
         return;
       }
 
@@ -133,12 +161,24 @@ const CallHistoryScreen = ({ navigation }) => {
     switch (type) {
       case 'made':
       case 'outgoing':
-        return { name: 'call-outline', color: '#3B82F6', label: 'Called' };
+        return {
+          name: 'call-outline',
+          color: '#3B82F6',
+          label: t('callHistory.calledLabel', { defaultValue: 'Called' }),
+        };
       case 'received':
       case 'incoming':
-        return { name: 'arrow-down-circle', color: '#10B981', label: 'Received' };
+        return {
+          name: 'arrow-down-circle',
+          color: '#10B981',
+          label: t('callHistory.receivedLabel', { defaultValue: 'Received' }),
+        };
       default:
-        return { name: 'call', color: '#6B7280', label: 'Call' };
+        return {
+          name: 'call',
+          color: '#6B7280',
+          label: t('callHistory.callLabel', { defaultValue: 'Call' }),
+        };
     }
   };
 
@@ -171,14 +211,26 @@ const CallHistoryScreen = ({ navigation }) => {
     const icon = getCallIcon(callType);
     
     // Get listing information (what animal was the inquiry about)
-    const animalType = item.listing_type || item.listingType || 'Animal';
-    const listingId = item.listing_id || item.listingId;
+    const animalType =
+      item.listing_type ||
+      item.listingType ||
+      t('callHistory.animalFallback', { defaultValue: 'Animal' });
     
     // For calls made: Show seller's information
     // For calls received: Show buyer's information
     const contactName = isCallMade 
-      ? (item.seller?.full_name || item.seller?.name || item.sellerName || 'Seller')
-      : (item.caller?.full_name || item.caller?.name || item.callerName || 'Buyer');
+      ? (
+          item.seller?.full_name ||
+          item.seller?.name ||
+          item.sellerName ||
+          t('callHistory.sellerFallback', { defaultValue: 'Seller' })
+        )
+      : (
+          item.caller?.full_name ||
+          item.caller?.name ||
+          item.callerName ||
+          t('callHistory.buyerFallback', { defaultValue: 'Buyer' })
+        );
     
     const phoneNumber = isCallMade 
       ? (item.seller_phone || item.sellerPhone)
@@ -205,14 +257,24 @@ const CallHistoryScreen = ({ navigation }) => {
           </View>
           
           {/* Phone Number */}
-          <Text style={styles.phoneNumber}>{phoneNumber || 'No number'}</Text>
+          <Text style={styles.phoneNumber}>
+            {phoneNumber || t('callHistory.noNumber', { defaultValue: 'No number' })}
+          </Text>
           
           {/* Animal Type (what the inquiry was about) */}
           {animalType && (
             <View style={styles.animalInfo}>
               <Ionicons name="paw" size={14} color="#6B7280" />
               <Text style={styles.animalText}>
-                {isCallMade ? `Inquiry about ${animalType}` : `Inquiry about your ${animalType}`}
+                {isCallMade
+                  ? t('callHistory.inquiryAbout', {
+                      animalType,
+                      defaultValue: `Inquiry about ${animalType}`,
+                    })
+                  : t('callHistory.inquiryAboutYour', {
+                      animalType,
+                      defaultValue: `Inquiry about your ${animalType}`,
+                    })}
               </Text>
             </View>
           )}
@@ -254,23 +316,25 @@ const CallHistoryScreen = ({ navigation }) => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <CowLoader message={t('common.loading', { defaultValue: '' })} size="large" />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('callHistory.title')}</Text>
-        <TouchableOpacity onPress={onRefresh}>
-          <Ionicons name="refresh" size={24} color="#6B7280" />
-        </TouchableOpacity>
-      </View>
+      <AppHeader
+        navigation={navigation}
+        title={t('callHistory.title')}
+        rightActions={[
+          {
+            icon: 'refresh',
+            onPress: onRefresh,
+            color: COLORS.primary,
+            accessibilityLabel: 'Refresh call history',
+          },
+        ]}
+      />
 
       {/* Filters */}
       <View style={styles.filtersContainer}>

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
 import { listingsService } from '../services/api';
@@ -28,6 +28,12 @@ const normalizeListingData = (data) => {
     additional_notes: data.additional_notes || data.additionalNotes,
     created_at: data.created_at || data.createdAt,
     updated_at: data.updated_at || data.updatedAt,
+    photo_1: data.photo_1 || data.photo1,
+    photo_2: data.photo_2 || data.photo2,
+    photo_3: data.photo_3 || data.photo3,
+    photo_4: data.photo_4 || data.photo4,
+    photo_5: data.photo_5 || data.photo5,
+    video: data.video || data.video_url || data.videoUrl,
   };
 };
 
@@ -306,26 +312,28 @@ const AnimalDetailPage = () => {
               <div className="absolute bottom-3 sm:bottom-4 left-3 sm:left-4 bg-black/50 text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm">
                 {images[activeImage]?.label}
               </div>
-              {/* Image Counter - Mobile */}
               {images.length > 1 && (
                 <div className="absolute bottom-3 sm:bottom-4 right-3 sm:right-4 bg-black/50 text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm">
                   {activeImage + 1} / {images.length}
                 </div>
               )}
-              {/* Navigation Arrows */}
               {images.length > 1 && (
                 <>
                   <button
-                    onClick={() => setActiveImage(prev => prev === 0 ? images.length - 1 : prev - 1)}
+                    type="button"
+                    onClick={() => setActiveImage((prev) => (prev === 0 ? images.length - 1 : prev - 1))}
                     className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 bg-white/90 rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-colors"
+                    aria-label={t('animalDetail.previousImage', 'Previous image')}
                   >
                     <svg className="w-4 h-4 sm:w-6 sm:h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                     </svg>
                   </button>
                   <button
-                    onClick={() => setActiveImage(prev => prev === images.length - 1 ? 0 : prev + 1)}
+                    type="button"
+                    onClick={() => setActiveImage((prev) => (prev === images.length - 1 ? 0 : prev + 1))}
                     className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 bg-white/90 rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-colors"
+                    aria-label={t('animalDetail.nextImage', 'Next image')}
                   >
                     <svg className="w-4 h-4 sm:w-6 sm:h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -340,13 +348,15 @@ const AnimalDetailPage = () => {
               <div className="flex space-x-2 sm:space-x-3 overflow-x-auto pb-2 scrollbar-hide">
                 {images.map((img, index) => (
                   <button
-                    key={index}
+                    key={`${img.label}-${index}`}
+                    type="button"
                     onClick={() => setActiveImage(index)}
                     className={`flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg sm:rounded-xl overflow-hidden border-2 transition-all ${
                       activeImage === index
                         ? 'border-[#15BB73] shadow-lg scale-105'
                         : 'border-transparent opacity-70 hover:opacity-100'
                     }`}
+                    aria-label={`${t('animalDetail.viewImage', 'View image')} ${index + 1}`}
                   >
                     {img.url ? (
                       <img src={img.url} alt={img.label} className="w-full h-full object-cover" />

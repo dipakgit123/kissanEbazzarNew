@@ -317,12 +317,12 @@ const AnimalCard = ({
       onClick={handleCardClick}
     >
         {/* Image Container */}
-      <div className="relative overflow-hidden h-52 bg-gray-50">
+      <div className="relative overflow-hidden h-52" style={{ backgroundColor: '#F0F8F4' }}>
         {displayImage && (
           <img
             src={displayImage}
             alt={title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-full object-contain transition-transform duration-300"
           />
         )}
         

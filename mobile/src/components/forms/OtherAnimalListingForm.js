@@ -48,7 +48,6 @@ const OtherAnimalListingForm = ({ navigation, onSuccess }) => {
 
   const animalTypeOptions = [
     { value: 'sheep', label: t('animalTypes.sheep') || 'Sheep' },
-    { value: 'pig', label: t('animalTypes.pig') || 'Pig' },
     { value: 'rabbit', label: t('animalTypes.rabbit') || 'Rabbit' },
     { value: 'chicken', label: t('animalTypes.chicken') || 'Chicken' },
     { value: 'duck', label: t('animalTypes.duck') || 'Duck' },
@@ -246,10 +245,7 @@ const OtherAnimalListingForm = ({ navigation, onSuccess }) => {
       let errorMessage = 'Failed to create listing. Please try again.';
       
       if (error.message === 'Network Error') {
-        errorMessage = 'Cannot connect to server. Please check:\n' +
-                      '1. Server is running on port 5000\n' +
-                      '2. Your device is on the same network\n' +
-                      '3. Firewall allows connections';
+        errorMessage = `Cannot connect to server.\n\nServer URL: ${api.defaults.baseURL}\n\nPlease check internet connection and backend access.`;
       } else if (error.response?.status === 404) {
         errorMessage = 'API endpoint not found (404). Server may need to be restarted.';
       } else if (error.response?.status === 401) {

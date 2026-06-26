@@ -8,7 +8,6 @@ import {
   Image,
   ImageBackground,
   Dimensions,
-  ActivityIndicator,
   StatusBar,
   RefreshControl,
 } from 'react-native';
@@ -17,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
 import AnimalCard from '../components/AnimalCard';
+import CowLoader from '../components/CowLoader';
 import { animalListingService } from '../services/api';
 
 const { width } = Dimensions.get('window');
@@ -34,6 +34,15 @@ const HomeScreen = ({ navigation }) => {
   const selectedLanguage = i18n.resolvedLanguage || i18n.language || 'en';
 
   const featureCards = [
+    {
+      key: 'milkReports',
+      title: t('services.milkReports'),
+      subtitle: t('homeScreen.trackMilkReports'),
+      image: require('../assets/milk_report.jpeg'),
+      route: 'MilkReports',
+      backgroundColor: COLORS.primaryDark,
+      iconColor: COLORS.primarySoft,
+    },
     {
       key: 'aiAssistant',
       title: t('services.aiAssistant'),
@@ -333,7 +342,7 @@ const HomeScreen = ({ navigation }) => {
           </View>
 
           {loading ? (
-            <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 20 }} />
+            <CowLoader message={t('home.findingAnimals', { defaultValue: '' })} size="medium" />
           ) : (
             <View style={styles.animalsSection}>
               {animals.map((animal) => (

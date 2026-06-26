@@ -4,6 +4,13 @@ import { wishlistService } from '../services/api';
 
 const WishlistContext = createContext();
 
+const isUnauthorizedError = (error) => (
+    error?.response?.status === 401 ||
+    error?.status === 401 ||
+    error?.message === 'Invalid token' ||
+    error?.message?.toLowerCase?.().includes('unauthorized')
+);
+
 export const WishlistProvider = ({ children }) => {
     const [wishlist, setWishlist] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -32,7 +39,9 @@ export const WishlistProvider = ({ children }) => {
                 }
             }
         } catch (error) {
-            console.error('Error loading wishlist:', error);
+            if (!isUnauthorizedError(error)) {
+                console.error('Error loading wishlist:', error);
+            }
             // Fallback to local storage on error
             try {
                 const savedWishlist = await AsyncStorage.getItem('wishlist');
@@ -92,7 +101,9 @@ export const WishlistProvider = ({ children }) => {
             
             return response;
         } catch (error) {
-            console.error('Error adding to wishlist:', error);
+            if (!isUnauthorizedError(error)) {
+                console.error('Error adding to wishlist:', error);
+            }
             return { success: false, message: error.message };
         }
     };
@@ -130,7 +141,9 @@ export const WishlistProvider = ({ children }) => {
             
             return response;
         } catch (error) {
-            console.error('Error removing from wishlist:', error);
+            if (!isUnauthorizedError(error)) {
+                console.error('Error removing from wishlist:', error);
+            }
             return { success: false, message: error.message };
         }
     };
@@ -159,7 +172,9 @@ export const WishlistProvider = ({ children }) => {
             
             return response;
         } catch (error) {
-            console.error('Error clearing wishlist:', error);
+            if (!isUnauthorizedError(error)) {
+                console.error('Error clearing wishlist:', error);
+            }
             return { success: false, message: error.message };
         }
     };
