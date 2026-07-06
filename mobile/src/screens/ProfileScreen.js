@@ -498,6 +498,30 @@ const ProfileScreen = ({ navigation }) => {
     return emojiMap[type?.toLowerCase()] || '🐾';
   };
 
+  const getAnimalTypeLabel = (type) => {
+    if (!type) {
+      return t('animalTypes.animal', { defaultValue: 'Animal' });
+    }
+
+    const normalizedType = String(type).toLowerCase();
+    return t(`animalTypes.${normalizedType}`, {
+      defaultValue:
+        normalizedType.charAt(0).toUpperCase() + normalizedType.slice(1),
+    });
+  };
+
+  const getListingStatusLabel = (status) => {
+    if (!status) {
+      return '';
+    }
+
+    const normalizedStatus = String(status).toLowerCase();
+    return t(`profile.${normalizedStatus}`, {
+      defaultValue:
+        normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1),
+    });
+  };
+
   const renderMenuItem = (
     icon,
     title,
@@ -587,7 +611,7 @@ const ProfileScreen = ({ navigation }) => {
             <View style={styles.profileImageContainer}>
               {uploadingPhoto ? (
                 <View style={styles.profileImagePlaceholder}>
-                  <ActivityIndicator size="large" color={COLORS.primary} />
+                  <ActivityIndicator size="small" color={COLORS.primary} />
                 </View>
               ) : formData.profilePhoto ? (
                 <Image
@@ -596,7 +620,7 @@ const ProfileScreen = ({ navigation }) => {
                 />
               ) : (
                 <View style={styles.profileImagePlaceholder}>
-                  <Ionicons name="person" size={50} color="#9CA3AF" />
+                  <Ionicons name="person" size={34} color="#9CA3AF" />
                 </View>
               )}
 
@@ -604,26 +628,30 @@ const ProfileScreen = ({ navigation }) => {
                 style={styles.cameraButton}
                 onPress={showPhotoOptions}
               >
-                <Ionicons name="camera" size={18} color="#fff" />
+                <Ionicons name="camera" size={14} color="#fff" />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.userName}>
-              {user?.full_name || t('profile.user', { defaultValue: 'User' })}
-            </Text>
-            <Text style={styles.userPhone}>{user?.phone_number}</Text>
-            {!editing ? (
-              <TouchableOpacity
-                style={styles.logoutProfileButton}
-                onPress={handleLogout}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="log-out-outline" size={18} color="#EF4444" />
-                <Text style={styles.logoutProfileButtonText}>
-                  {t('common.logout')}
-                </Text>
-              </TouchableOpacity>
-            ) : null}
+            <View style={styles.profileIdentity}>
+              <Text style={styles.userName} numberOfLines={1}>
+                {user?.full_name || t('profile.user', { defaultValue: 'User' })}
+              </Text>
+              <Text style={styles.userPhone} numberOfLines={1}>
+                {user?.phone_number}
+              </Text>
+              {!editing ? (
+                <TouchableOpacity
+                  style={styles.logoutProfileButton}
+                  onPress={handleLogout}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="log-out-outline" size={16} color="#EF4444" />
+                  <Text style={styles.logoutProfileButtonText}>
+                    {t('common.logout')}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
           </View>
 
           {editing ? (
@@ -814,7 +842,7 @@ const ProfileScreen = ({ navigation }) => {
                               key={`${animalType}-${listing.id}`}
                               style={styles.myListingCard}
                               onPress={() =>
-                                navigation.navigate('AnimalDetail', {
+                                navigation.navigate('SellerListingInsights', {
                                   animalType,
                                   id: listing.id,
                                 })
@@ -852,9 +880,7 @@ const ProfileScreen = ({ navigation }) => {
                                     ]}
                                   >
                                     <Text style={styles.statusText}>
-                                      {t(
-                                        `profile.${listing.status}`
-                                      )?.toUpperCase()}
+                                      {getListingStatusLabel(listing.status)}
                                     </Text>
                                   </View>
                                 )}
@@ -864,8 +890,7 @@ const ProfileScreen = ({ navigation }) => {
                                 <View style={styles.myListingTopRow}>
                                   <View style={styles.myListingTypeBadge}>
                                     <Text style={styles.myListingTypeText}>
-                                      {animalType.charAt(0).toUpperCase() +
-                                        animalType.slice(1)}
+                                      {getAnimalTypeLabel(animalType)}
                                     </Text>
                                   </View>
 
@@ -1167,8 +1192,10 @@ const styles = StyleSheet.create({
   },
 
   profileHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 30,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
@@ -1176,61 +1203,67 @@ const styles = StyleSheet.create({
 
   profileImageContainer: {
     position: 'relative',
-    marginBottom: 16,
+    marginRight: 14,
   },
 
   profileImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 3,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    borderWidth: 2,
     borderColor: COLORS.primary,
   },
 
   profileImagePlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     backgroundColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: COLORS.primary,
   },
 
   cameraButton: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    bottom: -2,
+    right: -2,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: '#fff',
   },
 
+  profileIdentity: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'flex-start',
+  },
+
   userName: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#1F2937',
-    marginBottom: 4,
+    marginBottom: 3,
   },
 
   userPhone: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#6B7280',
   },
 
   logoutProfileButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginTop: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    gap: 6,
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: 999,
     backgroundColor: '#FEF2F2',
     borderWidth: 1,
@@ -1238,7 +1271,7 @@ const styles = StyleSheet.create({
   },
 
   logoutProfileButtonText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: '#EF4444',
   },

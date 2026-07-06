@@ -5,11 +5,13 @@ import AppLoader from './AppLoader';
 import { listingsService, userService } from '../services/api';
 import { useWishlist } from '../contexts/useWishlist';
 import { safeJsonParse } from '../utils/stringUtils';
+import { API_BASE_URL } from '../config/api';
 import milkReportImage from '../assets/images/milk_report.jpeg';
 import farmerHeroImage from '../assets/images/farmer_fixed_1920x1400.png';
 import veterinarianFeatureImage from '../assets/images/veternarian.png';
 import aiHealthFeatureImage from '../assets/images/AI health.png';
 import pregnancyCalendarFeatureImage from '../assets/images/pregnancy calender.png';
+import petMatingFeatureImage from '../assets/images/cat1.png';
 import playStoreBannerImage from '../assets/images/playstore.png';
 
 import { Link } from 'react-router-dom';
@@ -36,8 +38,10 @@ const HomePage = () => {
   const [filteredAnimals, setFilteredAnimals] = useState([]);
   const [isScrolled, setIsScrolled] = useState(false);
   const [animalData, setAnimalData] = useState([]);
+  const [myListings, setMyListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState(null);
+  const [featuredScheme, setFeaturedScheme] = useState(null);
   const [locationResolved, setLocationResolved] = useState(false);
   const distanceMode = 'all';
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -242,6 +246,50 @@ const HomePage = () => {
     fetchListings({ showLoader: true });
   }, [fetchListings]);
 
+  useEffect(() => {
+    const fetchMyListings = async () => {
+      if (!localStorage.getItem('token')) {
+        setMyListings([]);
+        return;
+      }
+
+      try {
+        const response = await listingsService.getMyListings();
+        if (response?.success) {
+          setMyListings((response.listings || []).slice(0, 4));
+        }
+      } catch (error) {
+        console.error('Failed to load seller listings:', error);
+        setMyListings([]);
+      }
+    };
+
+    fetchMyListings();
+  }, []);
+
+  useEffect(() => {
+    const fetchFeaturedScheme = async () => {
+      try {
+        const featuredResponse = await fetch(`${API_BASE_URL}/api/government-schemes/featured?limit=1`);
+        const featuredData = await featuredResponse.json();
+        const firstFeaturedScheme = featuredData?.data?.schemes?.[0];
+
+        if (firstFeaturedScheme) {
+          setFeaturedScheme(firstFeaturedScheme);
+          return;
+        }
+
+        const response = await fetch(`${API_BASE_URL}/api/government-schemes?limit=1`);
+        const data = await response.json();
+        setFeaturedScheme(data?.data?.schemes?.[0] || null);
+      } catch (error) {
+        console.error('Failed to load government scheme banner:', error);
+      }
+    };
+
+    fetchFeaturedScheme();
+  }, []);
+
   // Refresh latest listings when the user comes back to the tab/page
   useEffect(() => {
     const maybeRefreshListings = () => {
@@ -387,6 +435,9 @@ const HomePage = () => {
   const displayAnimals = filteredAnimals.length > 0 || searchQuery.trim() ? filteredAnimals : categoryFilteredAnimals;
   const isShowingSearchResults = searchQuery.trim() && filteredAnimals.length > 0;
   const isShowingCategoryResults = selectedCategory && !searchQuery.trim();
+  const schemeTarget = '/government-schemes';
+  const schemeTitle = t('home.governmentSchemesBannerTitle');
+  const schemeDescription = t('home.governmentSchemesBannerDesc');
 
   // Handle scroll effect
   useEffect(() => {
@@ -506,7 +557,7 @@ const HomePage = () => {
           </div>
 
           {/* Feature Cards Section */}
-          <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Milk Reports Card */}
             <Link
               to="/milk-reports"
@@ -591,6 +642,34 @@ const HomePage = () => {
               </div>
             </Link>
 
+            {/* Pet Mating Card */}
+            <Link
+              to="/pet-mating"
+              className="group relative bg-gradient-to-br from-[#0F6E56] to-[#D85A30] rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105"
+            >
+              <div className="relative h-44 overflow-hidden">
+                <img
+                  src={petMatingFeatureImage}
+                  alt={t('petMating.title', { defaultValue: 'Pet Mating' })}
+                  className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#082F25]/70 via-[#0F6E56]/30 to-transparent"></div>
+              </div>
+              <div className="absolute inset-0 p-4 flex flex-col justify-end">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xl font-bold text-white drop-shadow-lg">{t('petMating.title', { defaultValue: 'Pet Mating' })}</h3>
+                    <p className="text-xs text-white/80 mt-1">{t('petMating.homeDesc', { defaultValue: 'Find trusted dog and cat mates' })}</p>
+                  </div>
+                  <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all duration-300">
+                    <svg className="w-6 h-6 text-white group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </Link>
+
             {/* Pregnancy Calendar Card */}
             <Link
               to="/pregnancy-calendar"
@@ -619,6 +698,128 @@ const HomePage = () => {
               </div>
             </Link>
           </div>
+
+          {/* Government Schemes Banner */}
+          <Link
+            to={schemeTarget}
+            className="group mt-8 block overflow-hidden rounded-[2rem] border border-amber-200/80 bg-gradient-to-br from-[#FFF7E8] via-[#F8FDF4] to-[#EAF7F0] shadow-xl shadow-amber-900/5 transition-all duration-500 hover:-translate-y-1 hover:shadow-2xl hover:shadow-amber-900/10"
+          >
+            <div className="relative grid gap-6 p-5 sm:p-6 lg:grid-cols-[1fr_18rem] lg:items-center lg:p-8">
+              <div className="absolute inset-0 opacity-50" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(180,111,13,0.18) 1px, transparent 0)', backgroundSize: '26px 26px' }} />
+              <div className="relative z-10">
+                <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-amber-100 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-[#9A5B08]">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21h18M5 21V9l7-4 7 4v12M9 21v-6h6v6" />
+                  </svg>
+                  {t('home.governmentSchemesKicker')}
+                </div>
+                <h2 className="max-w-3xl text-2xl font-black leading-tight text-[#12251D] sm:text-4xl">
+                  {schemeTitle || t('home.governmentSchemesBannerTitle')}
+                </h2>
+                <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
+                  {schemeDescription || t('home.governmentSchemesBannerDesc')}
+                </p>
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <span className="rounded-full bg-white px-4 py-2 text-sm font-bold text-[#126B4F] shadow-sm ring-1 ring-emerald-100">
+                    {t('home.governmentSchemesTagLoan')}
+                  </span>
+                  <span className="rounded-full bg-white px-4 py-2 text-sm font-bold text-[#126B4F] shadow-sm ring-1 ring-emerald-100">
+                    {t('home.governmentSchemesTagSubsidy')}
+                  </span>
+                  <span className="rounded-full bg-white px-4 py-2 text-sm font-bold text-[#126B4F] shadow-sm ring-1 ring-emerald-100">
+                    {t('home.governmentSchemesTagDocs')}
+                  </span>
+                </div>
+              </div>
+
+              <div className="relative z-10 rounded-[1.5rem] bg-white p-4 shadow-lg ring-1 ring-black/5">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-16 w-16 flex-none items-center justify-center rounded-2xl bg-[#126B4F] text-white">
+                    <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6M7 4h10a2 2 0 012 2v14l-4-2-3 2-3-2-4 2V6a2 2 0 012-2z" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-slate-500">{t('home.governmentSchemesCardLabel')}</p>
+                    <p className="mt-1 truncate text-lg font-black text-slate-900">
+                      {featuredScheme?.amount_label || t('home.governmentSchemesCardValue')}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-5 flex items-center justify-between rounded-2xl bg-[#F5F7EF] px-4 py-3 text-sm font-black text-[#126B4F]">
+                  <span>{t('home.governmentSchemesOpen')}</span>
+                  <svg className="h-5 w-5 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </Link>
+
+          {/* Seller Listings Preview */}
+          {myListings.length > 0 && (
+            <div className="mt-8">
+              <div className="mb-5 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0F8F6A]">
+                    {t('profile.sellerDashboard', { defaultValue: 'Seller dashboard' })}
+                  </p>
+                  <h2 className="mt-1 text-2xl font-black text-[#12251D] sm:text-3xl">
+                    {t('profile.myAnimals', { defaultValue: 'My animals' })}
+                  </h2>
+                </div>
+                <Link to="/profile" className="text-sm font-black text-[#0F8F6A] hover:text-[#096B51]">
+                  {t('profile.viewAll', { defaultValue: 'View all' })}
+                </Link>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                {myListings.map((listing) => {
+                  const type = listing.animal_type || listing.type || 'cow';
+                  const image = listing.photo1 || listing.front_photo || listing.photos?.[0];
+                  const isSold = String(listing.status || '').toLowerCase() === 'sold';
+
+                  return (
+                    <Link
+                      key={`${type}-${listing.id}`}
+                      to={`/seller-listings/${type}/${listing.id}/insights`}
+                      className="group overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+                    >
+                      <div className={`flex items-center gap-2 px-5 py-3 text-sm font-black ${isSold ? 'bg-slate-100 text-slate-600' : 'bg-emerald-100 text-emerald-700'}`}>
+                        <span className={`flex h-6 w-6 items-center justify-center rounded-full ${isSold ? 'bg-slate-300' : 'bg-emerald-500'} text-white`}>
+                          ✓
+                        </span>
+                        {isSold
+                          ? t('profile.animalSoldVisible', { defaultValue: 'Animal is marked as sold' })
+                          : t('profile.animalVisibleToBuyers', { defaultValue: 'Animal is visible to buyers' })}
+                      </div>
+                      <div className="flex gap-5 p-5">
+                        <div className="h-28 w-28 flex-none overflow-hidden rounded-2xl bg-slate-100">
+                          <img src={image || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="160" height="160"%3E%3Crect width="160" height="160" fill="%23EDF5EF"/%3E%3C/svg%3E'} alt={listing.breed || listing.breed_name || 'Animal'} className="h-full w-full object-cover" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-xl font-black text-slate-900 line-clamp-1">{listing.breed || listing.breed_name || t('animalTypes.animal')}</p>
+                              <p className="mt-1 text-sm font-bold uppercase tracking-wide text-slate-500">{type}</p>
+                            </div>
+                            <span className="text-2xl text-[#0F8F6A] transition-transform group-hover:translate-x-1">›</span>
+                          </div>
+                          <p className="mt-3 text-2xl font-black text-slate-900">
+                            ₹{Number(listing.price || listing.expected_price || 0).toLocaleString('en-IN')}
+                          </p>
+                          <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-slate-500">
+                            <span className="rounded-full bg-slate-100 px-3 py-1">{listing.views || 0} {t('profile.views', { defaultValue: 'views' })}</span>
+                            <span className="rounded-full bg-slate-100 px-3 py-1">{[listing.city, listing.state].filter(Boolean).join(', ') || t('profile.locationNotSpecified')}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Animal Listings Preview Section */}
           <div className="mt-8">

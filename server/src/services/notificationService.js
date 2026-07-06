@@ -1,14 +1,146 @@
 const { Expo } = require('expo-server-sdk');
 const logger = require('../utils/logger');
+const { getMessaging } = require('../config/firebase');
 
 // Create a new Expo SDK client
 const expo = new Expo();
+
+const FIREBASE_INVALID_TOKEN_CODES = new Set([
+  'messaging/invalid-registration-token',
+  'messaging/registration-token-not-registered',
+  'messaging/invalid-argument',
+]);
+
+const isExpoToken = (token) => Expo.isExpoPushToken(token);
+const isFirebaseToken = (token) => typeof token === 'string' && token.trim() && !isExpoToken(token);
+
+const toFirebaseData = (data = {}) => (
+  Object.entries(data || {}).reduce((payload, [key, value]) => {
+    if (value === undefined || value === null) {
+      return payload;
+    }
+
+    payload[key] = typeof value === 'string' ? value : JSON.stringify(value);
+    return payload;
+  }, {})
+);
+
+const deactivateInvalidToken = async (token) => {
+  try {
+    const db = require('../models');
+    if (db.DeviceToken && token) {
+      await db.DeviceToken.update({ is_active: false }, { where: { token } });
+      logger.log(`Deactivated invalid push token: ${token.substring(0, 20)}...`);
+    }
+  } catch (error) {
+    logger.error('Error deactivating invalid push token:', error.message);
+  }
+};
+
+const sendFirebasePushNotification = async (token, title, body, data = {}) => {
+  const messaging = getMessaging();
+
+  if (!messaging) {
+    logger.warn('Skipping FCM notification because Firebase Admin is not configured.');
+    return null;
+  }
+
+  try {
+    const response = await messaging.send({
+      token,
+      notification: { title, body },
+      data: toFirebaseData(data),
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: data.channelId || data.channel_id || 'default',
+          sound: 'default',
+        },
+      },
+      apns: {
+        payload: {
+          aps: {
+            sound: 'default',
+          },
+        },
+      },
+    });
+
+    return response;
+  } catch (error) {
+    logger.error('Firebase push notification error:', error.code || error.message);
+    if (FIREBASE_INVALID_TOKEN_CODES.has(error.code)) {
+      await deactivateInvalidToken(token);
+    }
+    return null;
+  }
+};
+
+const sendFirebaseBulkPushNotifications = async (tokens, title, body, data = {}) => {
+  const messaging = getMessaging();
+
+  if (!messaging) {
+    logger.warn('Skipping FCM bulk notification because Firebase Admin is not configured.');
+    return [];
+  }
+
+  const validTokens = [...new Set((tokens || []).filter(isFirebaseToken))];
+  if (validTokens.length === 0) {
+    return [];
+  }
+
+  const results = [];
+  const chunkSize = 500;
+
+  for (let index = 0; index < validTokens.length; index += chunkSize) {
+    const chunk = validTokens.slice(index, index + chunkSize);
+
+    try {
+      const response = await messaging.sendEachForMulticast({
+        tokens: chunk,
+        notification: { title, body },
+        data: toFirebaseData(data),
+        android: {
+          priority: 'high',
+          notification: {
+            channelId: data.channelId || data.channel_id || 'default',
+            sound: 'default',
+          },
+        },
+        apns: {
+          payload: {
+            aps: {
+              sound: 'default',
+            },
+          },
+        },
+      });
+
+      response.responses.forEach((sendResponse, responseIndex) => {
+        const token = chunk[responseIndex];
+        if (!sendResponse.success && FIREBASE_INVALID_TOKEN_CODES.has(sendResponse.error?.code)) {
+          deactivateInvalidToken(token);
+        }
+      });
+
+      results.push(response);
+    } catch (error) {
+      logger.error('Firebase bulk push notification error:', error.code || error.message);
+    }
+  }
+
+  return results;
+};
 
 /**
  * Send push notification to a single device
  */
 const sendPushNotification = async (pushToken, title, body, data = {}) => {
-  if (!Expo.isExpoPushToken(pushToken)) {
+  if (isFirebaseToken(pushToken)) {
+    return sendFirebasePushNotification(pushToken, title, body, data);
+  }
+
+  if (!isExpoToken(pushToken)) {
     logger.error(`Push token ${pushToken} is not a valid Expo push token`);
     return null;
   }
@@ -41,8 +173,16 @@ const sendPushNotification = async (pushToken, title, body, data = {}) => {
  * Send push notifications to multiple devices
  */
 const sendBulkPushNotifications = async (tokens, title, body, data = {}) => {
-  const messages = tokens
-    .filter(token => Expo.isExpoPushToken(token))
+  const expoTokens = (tokens || []).filter(isExpoToken);
+  const firebaseTokens = (tokens || []).filter(isFirebaseToken);
+  const results = [];
+
+  if (firebaseTokens.length > 0) {
+    const firebaseResults = await sendFirebaseBulkPushNotifications(firebaseTokens, title, body, data);
+    results.push(...firebaseResults);
+  }
+
+  const messages = expoTokens
     .map(token => ({
       to: token,
       sound: 'default',
@@ -52,8 +192,10 @@ const sendBulkPushNotifications = async (tokens, title, body, data = {}) => {
     }));
 
   if (messages.length === 0) {
-    logger.log('No valid push tokens to send to');
-    return [];
+    if (results.length === 0) {
+      logger.log('No valid push tokens to send to');
+    }
+    return results;
   }
 
   try {
@@ -65,10 +207,11 @@ const sendBulkPushNotifications = async (tokens, title, body, data = {}) => {
       tickets.push(...ticketChunk);
     }
 
-    return tickets;
+    results.push(...tickets);
+    return results;
   } catch (error) {
     logger.error('Error sending bulk push notifications:', error);
-    return [];
+    return results;
   }
 };
 
@@ -414,6 +557,8 @@ const sendBulkRealtimeNotification = async (userIds, title, body, data = {}, db 
 module.exports = {
   sendPushNotification,
   sendBulkPushNotifications,
+  sendFirebasePushNotification,
+  sendFirebaseBulkPushNotifications,
   notifyNewListingNearby,
   notifyContactInquiry,
   notifyPregnancyReminder,

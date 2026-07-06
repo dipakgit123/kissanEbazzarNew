@@ -8,6 +8,9 @@ server/.env.*
 frontend/.env
 frontend/.env.*
 !frontend/.env.example
+mobile/google-services.json
+mobile/GoogleService-Info.plist
+server/firebase-service-account*.json
 
 # Dependencies
 node_modules/

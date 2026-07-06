@@ -34,6 +34,10 @@ import AdminDashboard from './components/admin/AdminDashboard';
 import BuyAnimalsPage from './components/BuyAnimalsPage';
 import BlogList from './components/BlogList';
 import BlogDetail from './components/BlogDetail';
+import GovernmentSchemesPage from './components/GovernmentSchemesPage';
+import GovernmentSchemeDetail from './components/GovernmentSchemeDetail';
+import SellerListingInsightsPage from './components/SellerListingInsightsPage';
+import PetMatingPage from './components/PetMatingPage';
 import AuthenticatedRoute from './components/AuthenticatedRoute';
 import UserAppRoute from './components/UserAppRoute';
 import AdminAppRoute from './components/AdminAppRoute';
@@ -169,10 +173,12 @@ function App() {
             <Route path="/buy-animals" element={<BuyAnimalsPage />} />
             <Route path="/sell-animal" element={<AnimalListingPage />} />
             <Route path="/animal/:animalType/:id" element={<AnimalDetailPage />} />
+            <Route path="/seller-listings/:animalType/:id/insights" element={<SellerListingInsightsPage />} />
             <Route path="/veterinarian" element={<VeterinarianPage />} />
             <Route path="/pregnancy-calendar" element={<PregnancyCalendar />} />
             <Route path="/milk-reports" element={<MilkReportsPage />} />
             <Route path="/ai-health-check" element={<AIHealthCheck />} />
+            <Route path="/pet-mating" element={<PetMatingPage />} />
             <Route path="/call-history" element={<CallHistory />} />
             <Route path="/wishlist" element={<WishlistPage />} />
             <Route path="/map" element={<MapView />} />
@@ -188,6 +194,8 @@ function App() {
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/blogs" element={<BlogList />} />
           <Route path="/blog/:slug" element={<BlogDetail />} />
+          <Route path="/government-schemes" element={<GovernmentSchemesPage />} />
+          <Route path="/government-schemes/:slug" element={<GovernmentSchemeDetail />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

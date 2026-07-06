@@ -18,6 +18,8 @@ import { Line, Bar, Doughnut, Pie } from 'react-chartjs-2';
 import toast from 'react-hot-toast';
 import { API_BASE_URL } from '../../config/api';
 import BlogManagement from './BlogManagement';
+import GovernmentSchemeManagement from './GovernmentSchemeManagement';
+import PetMatingManagement from './PetMatingManagement';
 import { safeJsonParse } from '../../utils/stringUtils';
 import { localizeApiMessage } from '../../utils/localizeApiMessage';
 
@@ -157,10 +159,14 @@ const AdminDashboard = () => {
     { id: 'analytics', label: 'Analytics', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
     { id: 'users', label: 'Users', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
     { id: 'listings', label: 'Listings', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' },
+    { id: 'reports', label: 'Listing Reports', icon: 'M3 3l1.664 3.328A4 4 0 008.242 8.5H19a1 1 0 01.8 1.6l-2.4 3.2a1 1 0 000 1.2l2.4 3.2a1 1 0 01-.8 1.6H8.242a4 4 0 01-3.578-2.211L3 13.764V3z' },
     { id: 'veterinarians', label: 'Veterinarians', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
+    { id: 'petMating', label: 'Pet Mating', icon: 'M12 21s-6-4.35-8.5-8.5C1.78 9.64 3.76 6 7 6c1.74 0 3.09.94 4 2.06C11.91 6.94 13.26 6 15 6c3.24 0 5.22 3.64 3.5 6.5C18 13.33 17.33 14.13 16.58 14.9M5 21h14' },
+    { id: 'schemes', label: 'Schemes', icon: 'M8 10h8M8 14h8M7 4h10a2 2 0 012 2v13l-4-2-4 2-4-2-4 2V6a2 2 0 012-2z' },
     { id: 'blogs', label: 'Blogs', icon: 'M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z' },
-    { id: 'reports', label: 'Reports', icon: 'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
   ];
+
+  const activeMenuItem = menuItems.find((item) => item.id === activeTab);
 
   if (loading) {
     return (
@@ -212,10 +218,11 @@ const AdminDashboard = () => {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           {menuItems.map((item) => (
             <button
               key={item.id}
+              title={item.label}
               onClick={() => {
                 setActiveTab(item.id);
                 setMobileSidebarOpen(false);
@@ -268,7 +275,9 @@ const AdminDashboard = () => {
                   </svg>
                 </button>
                 <div className="min-w-0">
-                <h2 className="text-xl sm:text-2xl font-bold text-white capitalize break-words">{activeTab === 'overview' ? 'Dashboard' : activeTab}</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-white capitalize break-words">
+                  {activeMenuItem?.label || (activeTab === 'overview' ? 'Dashboard' : activeTab)}
+                </h2>
                 <p className="text-xs sm:text-sm text-slate-400 mt-1">
                   {currentTime.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                 </p>
@@ -333,6 +342,8 @@ const AdminDashboard = () => {
           {activeTab === 'users' && <UsersTab API_URL={API_URL} />}
           {activeTab === 'listings' && <ListingsTab API_URL={API_URL} getAnimalEmoji={getAnimalEmoji} formatPrice={formatPrice} />}
           {activeTab === 'veterinarians' && <VeterinariansTab API_URL={API_URL} formatDate={formatDate} />}
+          {activeTab === 'petMating' && <PetMatingManagement />}
+          {activeTab === 'schemes' && <GovernmentSchemeManagement />}
           {activeTab === 'blogs' && <BlogManagement />}
           {activeTab === 'reports' && <ReportsTab stats={stats} />}
         </main>
@@ -1818,6 +1829,120 @@ const VeterinariansTab = ({ API_URL, formatDate }) => {
 };
 
 const ReportsTab = ({ stats }) => {
+  const [listingReports, setListingReports] = useState([]);
+  const [listingReportStats, setListingReportStats] = useState(null);
+  const [listingReportsLoading, setListingReportsLoading] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('pending');
+  const [updatingReportId, setUpdatingReportId] = useState(null);
+
+  const reportReasonLabels = {
+    fraud: 'Fraud or scam',
+    wrong_information: 'Wrong information',
+    already_sold: 'Already sold',
+    inappropriate_content: 'Inappropriate content',
+    suspicious_price: 'Suspicious price',
+    seller_not_responding: 'Seller not responding',
+    animal_welfare: 'Animal welfare concern',
+    other: 'Other issue'
+  };
+
+  const statusLabels = {
+    pending: 'Pending',
+    under_review: 'Under review',
+    resolved: 'Resolved',
+    dismissed: 'Dismissed'
+  };
+
+  const formatReportPrice = (price) => new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0
+  }).format(price || 0);
+
+  const formatReportDate = (date) => {
+    if (!date) return '-';
+    return new Date(date).toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const fetchListingReports = useCallback(async () => {
+    const token = localStorage.getItem('adminToken');
+    setListingReportsLoading(true);
+
+    try {
+      const query = new URLSearchParams({
+        page: '1',
+        limit: '25',
+        ...(statusFilter !== 'all' ? { status: statusFilter } : {})
+      });
+
+      const [reportsResponse, statsResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/listing-reports?${query.toString()}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        fetch(`${API_BASE_URL}/api/listing-reports/stats`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ]);
+
+      const [reportsData, statsData] = await Promise.all([
+        reportsResponse.json(),
+        statsResponse.json()
+      ]);
+
+      if (reportsData.success) {
+        setListingReports(reportsData.data?.reports || []);
+      } else {
+        toast.error(reportsData.message || 'Failed to load listing reports');
+      }
+
+      if (statsData.success) {
+        setListingReportStats(statsData.data);
+      }
+    } catch (error) {
+      console.error('Fetch listing reports error:', error);
+      toast.error('Failed to load listing reports');
+    } finally {
+      setListingReportsLoading(false);
+    }
+  }, [statusFilter]);
+
+  useEffect(() => {
+    fetchListingReports();
+  }, [fetchListingReports]);
+
+  const updateListingReportStatus = async (reportId, status) => {
+    const token = localStorage.getItem('adminToken');
+    setUpdatingReportId(reportId);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/listing-reports/${reportId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ status })
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Failed to update report');
+      }
+
+      toast.success('Listing report updated');
+      fetchListingReports();
+    } catch (error) {
+      toast.error(error.message || 'Failed to update report');
+    } finally {
+      setUpdatingReportId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Quick Summary */}
@@ -1857,6 +1982,123 @@ const ReportsTab = ({ stats }) => {
             <p className="text-slate-400">Total Listing Views</p>
             <p className="text-sm text-blue-400 mt-2">{stats?.contacts?.total || 0} contact interactions</p>
           </div>
+        </div>
+      </div>
+
+      <div className="bg-[#1e293b] rounded-2xl p-6 border border-slate-700/50">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-white">Listing Safety Reports</h3>
+            <p className="text-sm text-slate-400 mt-1">Review user reports for suspicious or incorrect animal listings.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {['all', 'pending', 'under_review', 'resolved', 'dismissed'].map((status) => (
+              <button
+                key={status}
+                type="button"
+                onClick={() => setStatusFilter(status)}
+                className={`rounded-xl px-3 py-2 text-xs font-bold transition ${
+                  statusFilter === status
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                {status === 'all' ? 'All' : statusLabels[status]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid gap-3 mt-5 sm:grid-cols-2 lg:grid-cols-5">
+          {[
+            ['Total', listingReportStats?.total || 0],
+            ['Pending', listingReportStats?.pending || 0],
+            ['Under review', listingReportStats?.under_review || 0],
+            ['Resolved', listingReportStats?.resolved || 0],
+            ['Dismissed', listingReportStats?.dismissed || 0]
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-xl bg-slate-800/60 p-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">{label}</p>
+              <p className="mt-1 text-2xl font-black text-white">{value}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-6 overflow-hidden rounded-2xl border border-slate-700/50">
+          {listingReportsLoading ? (
+            <div className="p-8 text-center text-slate-400">Loading listing reports...</div>
+          ) : listingReports.length === 0 ? (
+            <div className="p-8 text-center text-slate-400">No listing reports found for this filter.</div>
+          ) : (
+            <div className="divide-y divide-slate-700/50">
+              {listingReports.map((report) => {
+                const snapshot = report.listing_snapshot || {};
+                return (
+                  <div key={report.id} className="bg-slate-900/30 p-4">
+                    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-red-500/15 px-3 py-1 text-xs font-bold text-red-300">
+                            {reportReasonLabels[report.report_type] || report.report_type}
+                          </span>
+                          <span className="rounded-full bg-slate-800 px-3 py-1 text-xs font-bold text-slate-300 capitalize">
+                            {report.listing_type}
+                          </span>
+                          <span className="rounded-full bg-amber-500/15 px-3 py-1 text-xs font-bold text-amber-300">
+                            {statusLabels[report.status] || report.status}
+                          </span>
+                        </div>
+                        <h4 className="mt-3 text-base font-black text-white">
+                          {snapshot.breed_name || 'Listing'} #{report.listing_id}
+                        </h4>
+                        <p className="mt-1 text-sm text-slate-300">{report.description}</p>
+                        <div className="mt-3 grid gap-2 text-xs text-slate-400 md:grid-cols-2">
+                          <p>Reporter: {report.reporter?.full_name || report.reporter?.phone_number || `User #${report.reporter_id}`}</p>
+                          <p>Seller: {report.seller?.full_name || report.seller?.phone_number || `User #${report.seller_id || '-'}`}</p>
+                          <p>Price: {snapshot.expected_price ? formatReportPrice(snapshot.expected_price) : '-'}</p>
+                          <p>Location: {[snapshot.city, snapshot.state, snapshot.pincode].filter(Boolean).join(', ') || '-'}</p>
+                          <p>Reported: {formatReportDate(report.created_at)}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 xl:justify-end">
+                        {report.status !== 'under_review' && (
+                          <button
+                            type="button"
+                            onClick={() => updateListingReportStatus(report.id, 'under_review')}
+                            disabled={updatingReportId === report.id}
+                            className="rounded-xl bg-blue-500/15 px-3 py-2 text-xs font-bold text-blue-300 transition hover:bg-blue-500/25 disabled:opacity-50"
+                          >
+                            Review
+                          </button>
+                        )}
+                        {report.status !== 'resolved' && (
+                          <button
+                            type="button"
+                            onClick={() => updateListingReportStatus(report.id, 'resolved')}
+                            disabled={updatingReportId === report.id}
+                            className="rounded-xl bg-emerald-500/15 px-3 py-2 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/25 disabled:opacity-50"
+                          >
+                            Resolve
+                          </button>
+                        )}
+                        {report.status !== 'dismissed' && (
+                          <button
+                            type="button"
+                            onClick={() => updateListingReportStatus(report.id, 'dismissed')}
+                            disabled={updatingReportId === report.id}
+                            className="rounded-xl bg-slate-700 px-3 py-2 text-xs font-bold text-slate-200 transition hover:bg-slate-600 disabled:opacity-50"
+                          >
+                            Dismiss
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 

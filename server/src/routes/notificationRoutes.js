@@ -9,6 +9,7 @@ router.use(authMiddleware);
 // Device token management
 router.post('/register-token', notificationController.registerToken);
 router.post('/unregister-token', notificationController.unregisterToken);
+router.post('/test-push', notificationController.sendTestNotification);
 
 // Notification management
 router.get('/', notificationController.getNotifications);

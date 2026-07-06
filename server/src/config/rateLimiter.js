@@ -20,6 +20,8 @@ const authLimiter = rateLimit({
     success: false,
     message: 'Too many OTP attempts from this IP, please try again later.'
   },
+  standardHeaders: true,
+  legacyHeaders: false,
   skipSuccessfulRequests: true,
 });
 
@@ -31,6 +33,8 @@ const uploadLimiter = rateLimit({
     success: false,
     message: 'Too many upload attempts, please try again later.'
   },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 // Rate limiter for public contact submissions that trigger email delivery

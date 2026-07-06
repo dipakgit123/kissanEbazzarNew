@@ -3,6 +3,7 @@ const router = express.Router();
 const veterinarianController = require('../controllers/veterinarianController');
 const vetAuthMiddleware = require('../middlewares/vetAuthMiddleware');
 const { createUploadFields } = require('../config/cloudinary');
+const { authLimiter, uploadLimiter } = require('../config/rateLimiter');
 
 const VET_REGISTRATION_MAX_FILE_SIZE_BYTES = 6 * 1024 * 1024;
 
@@ -51,30 +52,30 @@ const handleVeterinarianUpload = (req, res, next) => {
  * @desc    Register a new veterinarian
  * @access  Public
  */
-router.post('/register', handleVeterinarianUpload, veterinarianController.register.bind(veterinarianController));
+router.post('/register', uploadLimiter, handleVeterinarianUpload, veterinarianController.register.bind(veterinarianController));
 
 /**
  * @route   POST /api/veterinarians/send-otp
  * @desc    Send OTP for login
  * @access  Public
  */
-router.post('/send-otp', veterinarianController.sendOtp.bind(veterinarianController));
+router.post('/send-otp', authLimiter, veterinarianController.sendOtp.bind(veterinarianController));
 
 /**
  * @route   POST /api/veterinarians/verify-otp
  * @desc    Verify OTP and login
  * @access  Public
  */
-router.post('/verify-otp', veterinarianController.verifyOtp.bind(veterinarianController));
+router.post('/verify-otp', authLimiter, veterinarianController.verifyOtp.bind(veterinarianController));
 
 /**
  * @route   POST /api/veterinarians/login
  * @desc    Login with email and password (for verified veterinarians)
  * @access  Public
  */
-router.post('/login', veterinarianController.login.bind(veterinarianController));
-router.post('/forgot-password', veterinarianController.requestPasswordReset.bind(veterinarianController));
-router.post('/reset-password', veterinarianController.resetPassword.bind(veterinarianController));
+router.post('/login', authLimiter, veterinarianController.login.bind(veterinarianController));
+router.post('/forgot-password', authLimiter, veterinarianController.requestPasswordReset.bind(veterinarianController));
+router.post('/reset-password', authLimiter, veterinarianController.resetPassword.bind(veterinarianController));
 
 /**
  * @route   GET /api/veterinarians/nearby
@@ -98,7 +99,7 @@ router.get('/profile/me', vetAuthMiddleware, veterinarianController.getProfile.b
  * @desc    Update own profile
  * @access  Protected (Veterinarian)
  */
-router.put('/profile/me', vetAuthMiddleware, handleVeterinarianUpload, veterinarianController.updateProfile.bind(veterinarianController));
+router.put('/profile/me', vetAuthMiddleware, uploadLimiter, handleVeterinarianUpload, veterinarianController.updateProfile.bind(veterinarianController));
 
 /**
  * @route   GET /api/veterinarians/dashboard

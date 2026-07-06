@@ -1,14 +1,16 @@
 const db = require('../models');
 const { Notification, DeviceToken } = db;
 const logger = require('../utils/logger');
+const { sendRealtimeNotification } = require('../services/notificationService');
 
 /**
  * Register device token for push notifications
  */
 const registerToken = async (req, res) => {
   try {
-    const { token, platform = 'android' } = req.body;
+    const { token, platform = 'android', provider = 'expo' } = req.body;
     const userId = req.user.id;
+    const normalizedProvider = provider === 'firebase' ? 'firebase' : 'expo';
 
     if (!token) {
       return res.status(400).json({
@@ -25,6 +27,7 @@ const registerToken = async (req, res) => {
       await deviceToken.update({
         user_id: userId,
         platform,
+        provider: normalizedProvider,
         is_active: true,
       });
     } else {
@@ -33,6 +36,7 @@ const registerToken = async (req, res) => {
         user_id: userId,
         token,
         platform,
+        provider: normalizedProvider,
         is_active: true,
       });
     }
@@ -86,6 +90,57 @@ const unregisterToken = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to unregister device token',
+    });
+  }
+};
+
+/**
+ * Send a test notification to the authenticated user's registered devices.
+ * This is intended for local/staging verification, not public production use.
+ */
+const sendTestNotification = async (req, res) => {
+  try {
+    const enabled =
+      process.env.NODE_ENV !== 'production' ||
+      process.env.ENABLE_TEST_NOTIFICATIONS === 'true';
+
+    if (!enabled) {
+      return res.status(403).json({
+        success: false,
+        message: 'Test notifications are disabled',
+      });
+    }
+
+    const userId = req.user.id;
+    const title = req.body?.title || 'Animal E Bazar test';
+    const body = req.body?.body || 'Your local push notification setup is working.';
+
+    const activeTokenCount = await DeviceToken.count({
+      where: { user_id: userId, is_active: true },
+    });
+
+    const sent = await sendRealtimeNotification(
+      userId,
+      title,
+      body,
+      {
+        type: 'test_notification',
+        source: 'local_test',
+        sentAt: new Date().toISOString(),
+      },
+      db
+    );
+
+    res.json({
+      success: sent,
+      message: sent ? 'Test notification sent' : 'Test notification could not be sent',
+      active_token_count: activeTokenCount,
+    });
+  } catch (error) {
+    logger.error('Error sending test notification:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send test notification',
     });
   }
 };
@@ -274,6 +329,7 @@ const clearAllNotifications = async (req, res) => {
 module.exports = {
   registerToken,
   unregisterToken,
+  sendTestNotification,
   getNotifications,
   getUnreadCount,
   markAsRead,

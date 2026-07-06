@@ -17,7 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
 import AnimalCard from '../components/AnimalCard';
 import CowLoader from '../components/CowLoader';
-import { animalListingService } from '../services/api';
+import { animalListingService, governmentSchemeService, userService } from '../services/api';
 
 const { width } = Dimensions.get('window');
 const LANGUAGE_OPTIONS = [
@@ -26,10 +26,17 @@ const LANGUAGE_OPTIONS = [
   { code: 'en', label: 'English' },
 ];
 
+const getLocalizedSchemeValue = (scheme, field, language) => {
+  const translations = scheme?.translations || {};
+  return translations[language]?.[field] || translations.en?.[field] || scheme?.[field] || '';
+};
+
 const HomeScreen = ({ navigation }) => {
   const { t, i18n } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [animals, setAnimals] = useState([]);
+  const [myListings, setMyListings] = useState([]);
+  const [schemes, setSchemes] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const selectedLanguage = i18n.resolvedLanguage || i18n.language || 'en';
 
@@ -71,6 +78,15 @@ const HomeScreen = ({ navigation }) => {
       iconColor: COLORS.accentSoft,
     },
     {
+      key: 'petMating',
+      title: t('petMating.title', { defaultValue: 'Pet Mating' }),
+      subtitle: t('petMating.homeDesc', { defaultValue: 'Find trusted dog and cat mates' }),
+      image: require('../assets/cat1.png'),
+      route: 'PetMating',
+      backgroundColor: COLORS.primaryDeep,
+      iconColor: COLORS.primarySoft,
+    },
+    {
       key: 'pregnancy',
       title: t('services.pregnancy'),
       subtitle: t('homeScreen.trackPregnancy'),
@@ -83,6 +99,8 @@ const HomeScreen = ({ navigation }) => {
 
   useEffect(() => {
     fetchAnimals();
+    fetchSchemes();
+    fetchMyListings();
   }, []);
 
   const fetchAnimals = async () => {
@@ -103,9 +121,45 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
+  const fetchSchemes = async () => {
+    try {
+      const featuredResponse = await governmentSchemeService.getFeatured(4);
+      const featuredSchemes = featuredResponse?.data?.schemes || [];
+
+      if (featuredSchemes.length > 0) {
+        setSchemes(featuredSchemes);
+        return;
+      }
+
+      const response = await governmentSchemeService.getSchemes({
+        limit: 4,
+        sortBy: 'published_at',
+        order: 'DESC',
+      });
+      setSchemes(response?.data?.schemes || []);
+    } catch (error) {
+      console.error('Error fetching government schemes:', error);
+      setSchemes([]);
+    }
+  };
+
+  const fetchMyListings = async () => {
+    try {
+      const response = await userService.getMyListings();
+      if (response?.success) {
+        setMyListings((response.listings || []).slice(0, 4));
+      }
+    } catch (error) {
+      console.error('Error fetching my listings:', error);
+      setMyListings([]);
+    }
+  };
+
   const onRefresh = () => {
     setRefreshing(true);
     fetchAnimals();
+    fetchSchemes();
+    fetchMyListings();
   };
 
   const handleLanguageChange = async (languageCode) => {
@@ -274,6 +328,178 @@ const HomeScreen = ({ navigation }) => {
             </View>
           </View>
         </View>
+
+        {/* Government Schemes */}
+        <View style={styles.schemesSection}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleRow}>
+              <View style={styles.schemeSectionIcon}>
+                <Ionicons name="business-outline" size={18} color="#B66F0D" />
+              </View>
+              <Text style={styles.sectionTitle}>{t('governmentSchemes.title')}</Text>
+              <View style={styles.newBadge}>
+                <Text style={styles.newBadgeText}>{t('governmentSchemes.newBadge')}</Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={() => navigation.navigate('GovernmentSchemes')} activeOpacity={0.85}>
+              <Text style={styles.textViewAll}>{t('common.viewAll')}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {schemes.length > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.schemesScrollContent}
+            >
+              {schemes.map((scheme) => {
+                const title = getLocalizedSchemeValue(scheme, 'title', selectedLanguage);
+                const description = getLocalizedSchemeValue(scheme, 'short_description', selectedLanguage);
+
+                return (
+                  <TouchableOpacity
+                    key={scheme.id}
+                    style={styles.schemePreviewCard}
+                    onPress={() => navigation.navigate('GovernmentSchemeDetail', { slug: scheme.slug })}
+                    activeOpacity={0.9}
+                  >
+                    <View style={styles.schemePreviewTop}>
+                      {scheme.image_url ? (
+                        <Image
+                          source={{ uri: scheme.image_url }}
+                          style={styles.schemePreviewImage}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={styles.schemePreviewIcon}>
+                          <Ionicons name="leaf-outline" size={22} color="#B66F0D" />
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.schemePreviewBody}>
+                      <Text style={styles.schemePreviewDepartment} numberOfLines={1}>
+                        {scheme.department || t(`governmentSchemes.levels.${scheme.government_level}`, { defaultValue: scheme.government_level || '' })}
+                      </Text>
+                      <Text style={styles.schemePreviewTitle} numberOfLines={2}>
+                        {title}
+                      </Text>
+                      <Text style={styles.schemePreviewDesc} numberOfLines={2}>
+                        {description}
+                      </Text>
+                      <View style={styles.schemePreviewMetaRow}>
+                        <View style={styles.schemeAmountPill}>
+                          <Text style={styles.schemeAmountText} numberOfLines={1}>
+                            {scheme.amount_label || t('governmentSchemes.verified')}
+                          </Text>
+                        </View>
+                        <View style={styles.schemeAnimalPill}>
+                          <Text style={styles.schemeAnimalText} numberOfLines={1}>
+                            {t(`governmentSchemes.animalCategories.${scheme.animal_category}`, { defaultValue: scheme.animal_category || 'both' })}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.schemeApplyButton}>
+                        <Ionicons name="open-outline" size={14} color={COLORS.surface} />
+                        <Text style={styles.schemeApplyText}>{t('governmentSchemes.viewDetails')}</Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          ) : (
+            <TouchableOpacity
+              style={styles.schemeEmptyBanner}
+              onPress={() => navigation.navigate('GovernmentSchemes')}
+              activeOpacity={0.9}
+            >
+              <Ionicons name="document-text-outline" size={24} color={COLORS.primary} />
+              <Text style={styles.schemeEmptyText}>{t('governmentSchemes.homeEmpty')}</Text>
+              <Ionicons name="chevron-forward" size={18} color={COLORS.primary} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Seller Listings */}
+        {myListings.length > 0 ? (
+          <View style={styles.myAnimalsSection}>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionKicker}>
+                  {t('profile.sellerDashboard', { defaultValue: 'Seller dashboard' })}
+                </Text>
+                <Text style={styles.sectionTitle}>
+                  {t('profile.myAnimals', { defaultValue: 'My animals' })}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => navigation.navigate('Profile')} activeOpacity={0.85}>
+                <Text style={styles.textViewAll}>{t('common.viewAll')}</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.myAnimalsScroll}
+            >
+              {myListings.map((listing) => {
+                const type = listing.animal_type || listing.type || 'cow';
+                const imageUri = listing.photo1 || listing.front_photo || listing.photos?.[0];
+                const isSold = String(listing.status || '').toLowerCase() === 'sold';
+
+                return (
+                  <TouchableOpacity
+                    key={`${type}-${listing.id}`}
+                    style={styles.sellerAnimalCard}
+                    onPress={() =>
+                      navigation.navigate('SellerListingInsights', {
+                        animalType: type,
+                        id: listing.id,
+                      })
+                    }
+                    activeOpacity={0.9}
+                  >
+                    <View style={[styles.sellerStatusStrip, isSold && styles.sellerStatusStripSold]}>
+                      <Ionicons
+                        name={isSold ? 'checkmark-circle' : 'radio-button-on'}
+                        size={16}
+                        color={isSold ? '#64748B' : COLORS.primary}
+                      />
+                      <Text style={[styles.sellerStatusText, isSold && styles.sellerStatusTextSold]}>
+                        {isSold
+                          ? t('profile.animalSoldVisible', { defaultValue: 'Sold listing' })
+                          : t('profile.animalVisibleToBuyers', { defaultValue: 'Visible to buyers' })}
+                      </Text>
+                    </View>
+                    <View style={styles.sellerAnimalBody}>
+                      <View style={styles.sellerAnimalImageWrap}>
+                        {imageUri ? (
+                          <Image source={{ uri: imageUri }} style={styles.sellerAnimalImage} />
+                        ) : (
+                          <View style={styles.sellerAnimalPlaceholder}>
+                            <Ionicons name="paw-outline" size={26} color={COLORS.primary} />
+                          </View>
+                        )}
+                      </View>
+                      <View style={styles.sellerAnimalInfo}>
+                        <Text style={styles.sellerAnimalBreed} numberOfLines={1}>
+                          {listing.breed || listing.breed_name || t('animalTypes.animal', { defaultValue: 'Animal' })}
+                        </Text>
+                        <Text style={styles.sellerAnimalPrice}>
+                          ₹{Number(listing.price || listing.expected_price || 0).toLocaleString('en-IN')}
+                        </Text>
+                        <Text style={styles.sellerAnimalMeta} numberOfLines={1}>
+                          {(listing.views || 0)} {t('profile.views', { defaultValue: 'views' })} · {type}
+                        </Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={22} color={COLORS.primary} />
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        ) : null}
 
         {/* Feature Cards */}
         <View style={styles.featuresSection}>
@@ -594,6 +820,248 @@ const styles = StyleSheet.create({
   featuresSection: {
     paddingHorizontal: 20,
     marginTop: 24,
+  },
+  myAnimalsSection: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+  },
+  sectionKicker: {
+    color: COLORS.primary,
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    marginBottom: 3,
+  },
+  myAnimalsScroll: {
+    gap: 12,
+    paddingRight: 20,
+  },
+  sellerAnimalCard: {
+    width: width * 0.78,
+    borderRadius: 22,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    overflow: 'hidden',
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  sellerStatusStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    backgroundColor: '#D6FBE2',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  sellerStatusStripSold: {
+    backgroundColor: '#E2E8F0',
+  },
+  sellerStatusText: {
+    color: COLORS.primary,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  sellerStatusTextSold: {
+    color: '#64748B',
+  },
+  sellerAnimalBody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+  },
+  sellerAnimalImageWrap: {
+    width: 82,
+    height: 82,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: COLORS.primarySoft,
+  },
+  sellerAnimalImage: {
+    width: '100%',
+    height: '100%',
+  },
+  sellerAnimalPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sellerAnimalInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  sellerAnimalBreed: {
+    color: COLORS.text,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  sellerAnimalPrice: {
+    color: COLORS.primary,
+    fontSize: 18,
+    fontWeight: '900',
+    marginTop: 5,
+  },
+  sellerAnimalMeta: {
+    color: COLORS.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  schemesSection: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 6,
+    marginTop: 0,
+    backgroundColor: COLORS.surface,
+  },
+  sectionTitleRow: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  schemeSectionIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    backgroundColor: '#FFF2D6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  newBadge: {
+    borderRadius: 999,
+    backgroundColor: COLORS.accent,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  newBadgeText: {
+    color: COLORS.surface,
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  schemesScrollContent: {
+    gap: 12,
+  },
+  schemePreviewCard: {
+    width: width * 0.48,
+    minHeight: 228,
+    borderRadius: 18,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    overflow: 'hidden',
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  schemePreviewTop: {
+    height: 72,
+    backgroundColor: '#FFF0D4',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  schemePreviewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  schemePreviewIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 18,
+    backgroundColor: COLORS.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  schemePreviewBody: {
+    padding: 11,
+  },
+  schemePreviewDepartment: {
+    color: COLORS.primaryDark,
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  schemePreviewTitle: {
+    marginTop: 4,
+    color: COLORS.text,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '900',
+  },
+  schemePreviewDesc: {
+    marginTop: 5,
+    color: COLORS.textMuted,
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: '600',
+  },
+  schemePreviewMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+  },
+  schemeAmountPill: {
+    borderRadius: 999,
+    backgroundColor: '#FFF7E8',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  schemeAmountText: {
+    color: '#B66F0D',
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  schemeAnimalPill: {
+    borderRadius: 999,
+    backgroundColor: COLORS.primarySoft,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  schemeAnimalText: {
+    color: COLORS.primaryDark,
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  schemeApplyButton: {
+    marginTop: 9,
+    borderRadius: 11,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    backgroundColor: '#C5770F',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+  },
+  schemeApplyText: {
+    color: COLORS.surface,
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  schemeEmptyBanner: {
+    minHeight: 68,
+    borderRadius: 18,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  schemeEmptyText: {
+    flex: 1,
+    color: COLORS.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
   },
   textViewAll: {
     fontSize: 14,

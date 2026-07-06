@@ -1,3 +1,5 @@
+import { repairMojibakeText } from '../utils/textEncoding';
+
 export const COW_BREEDS = [
   {
     value: 'Holstein Friesian (HF)',
@@ -162,13 +164,13 @@ export const COW_BREEDS = [
 ];
 
 export const getCowBreedOptions = (language, selectLabel) => {
-  const locale = language === 'mr' || language === 'hi' ? language : 'en';
+  const locale = language?.startsWith('mr') ? 'mr' : language?.startsWith('hi') ? 'hi' : 'en';
 
   return [
     { value: '', label: selectLabel },
     ...COW_BREEDS.map((breed) => ({
       value: breed.value,
-      label: breed.labels[locale] || breed.labels.en
+      label: repairMojibakeText(breed.labels[locale] || breed.labels.en)
     }))
   ];
 };

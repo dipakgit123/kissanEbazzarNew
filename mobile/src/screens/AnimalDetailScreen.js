@@ -9,17 +9,31 @@ import {
   Dimensions,
   Linking,
   Alert,
+  Modal,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Video } from 'expo-av';
 import { useTranslation } from 'react-i18next';
 import { COLORS, formatPrice, formatDate, getAnimalTypeLabel } from '../utils/constants';
-import { listingsService, callLogService } from '../services/api';
+import { listingsService, callLogService, listingReportService } from '../services/api';
 import { useWishlist } from '../context/WishlistContext';
 import CowLoader from '../components/CowLoader';
 
 const { width } = Dimensions.get('window');
+
+const REPORT_REASONS = [
+  { value: 'fraud', label: 'Fraud or scam' },
+  { value: 'wrong_information', label: 'Wrong information' },
+  { value: 'already_sold', label: 'Already sold' },
+  { value: 'inappropriate_content', label: 'Inappropriate content' },
+  { value: 'suspicious_price', label: 'Suspicious price' },
+  { value: 'seller_not_responding', label: 'Seller not responding' },
+  { value: 'animal_welfare', label: 'Animal welfare concern' },
+  { value: 'other', label: 'Other issue' },
+];
 
 const AnimalDetailScreen = ({ route, navigation }) => {
   const { animalType, id } = route.params;
@@ -28,6 +42,10 @@ const AnimalDetailScreen = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [reportReason, setReportReason] = useState('wrong_information');
+  const [reportDescription, setReportDescription] = useState('');
+  const [reportSubmitting, setReportSubmitting] = useState(false);
   const videoRef = useRef(null);
   
   const { addToWishlist, removeFromWishlist, isInWishlist: checkIsInWishlist } = useWishlist();
@@ -166,6 +184,87 @@ const AnimalDetailScreen = ({ route, navigation }) => {
     }
   };
 
+  const openReportModal = () => {
+    setReportReason('wrong_information');
+    setReportDescription('');
+    setReportModalVisible(true);
+  };
+
+  const submitReport = async () => {
+    const description = reportDescription.trim();
+
+    if (description.length < 10) {
+      Alert.alert(
+        t('animalDetail.reportDescriptionRequired', { defaultValue: 'Add a little more detail' }),
+        t('animalDetail.reportDescriptionRequiredDesc', { defaultValue: 'Please describe the issue in at least 10 characters.' })
+      );
+      return;
+    }
+
+    setReportSubmitting(true);
+    try {
+      const response = await listingReportService.createReport({
+        listing_id: id,
+        listing_type: animalType,
+        report_type: reportReason,
+        description,
+      });
+
+      setReportModalVisible(false);
+      Alert.alert(
+        t('animalDetail.reportSubmitted', { defaultValue: 'Report submitted' }),
+        response?.message || t('animalDetail.reportSubmittedDesc', { defaultValue: 'Our team will review this listing shortly.' })
+      );
+    } catch (error) {
+      Alert.alert(
+        t('common.error', { defaultValue: 'Error' }),
+        error?.message || t('animalDetail.reportFailed', { defaultValue: 'Failed to submit report. Please try again.' })
+      );
+    } finally {
+      setReportSubmitting(false);
+    }
+  };
+
+  const getListingGender = () => (
+    listing?.gender ||
+    listing?.goat_type ||
+    listing?.goatType ||
+    listing?.dog_type ||
+    listing?.dogType ||
+    listing?.cat_type ||
+    listing?.catType ||
+    ''
+  );
+
+  const formatGender = (value) => {
+    if (!value) return '';
+
+    const normalized = String(value).toLowerCase();
+    if (normalized === 'male') return t('common.male', { defaultValue: 'Male' });
+    if (normalized === 'female') return t('common.female', { defaultValue: 'Female' });
+
+    return String(value).replace(/_/g, ' ');
+  };
+
+  const getPregnancyMonths = () => {
+    const source = `${listing?.additional_notes || ''} ${listing?.description || ''}`;
+    if (!source.trim()) return '';
+
+    const labelMatch = source.match(/(?:months?|महीने|महिने)[^0-9]{0,24}(\d+(?:\.\d+)?)/i);
+    if (labelMatch?.[1]) return labelMatch[1];
+
+    const finalValueMatch = source.match(/;\s*[^0-9]*(\d+(?:\.\d+)?)\s*$/);
+    return finalValueMatch?.[1] || '';
+  };
+
+  const formatPregnancyStatus = (value) => {
+    const normalized = String(value || '').toLowerCase();
+    if (normalized === 'pregnant') return t('common.yes', { defaultValue: 'Yes' });
+    if (normalized === 'not_pregnant') return t('common.no', { defaultValue: 'No' });
+
+    return String(value || '').replace(/_/g, ' ');
+  };
+
   const handlePreviousImage = () => {
     setActiveImageIndex((prevIndex) => {
       const images = getImages();
@@ -202,6 +301,8 @@ const AnimalDetailScreen = ({ route, navigation }) => {
   }
 
   const images = getImages();
+  const listingGender = getListingGender();
+  const pregnancyMonths = getPregnancyMonths();
   const hasVideo = listing.video && listing.video.trim() !== '';
 
   return (
@@ -232,6 +333,14 @@ const AnimalDetailScreen = ({ route, navigation }) => {
           <View style={styles.typeBadge}>
             <Text style={styles.typeBadgeText}>{getAnimalTypeLabel(animalType)}</Text>
           </View>
+
+          <TouchableOpacity
+            style={styles.reportHeaderButton}
+            onPress={openReportModal}
+            activeOpacity={0.86}
+          >
+            <Ionicons name="flag-outline" size={22} color={COLORS.error} />
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
 
@@ -382,92 +491,28 @@ const AnimalDetailScreen = ({ route, navigation }) => {
                 <Text style={styles.detailValue}>{listing.breed_name}</Text>
               </View>
             )}
-            {listing.age && (
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>{t('animalDetail.age')}</Text>
-                <Text style={styles.detailValue}>{listing.age}</Text>
-              </View>
-            )}
-            {listing.milk_capacity && (
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>{t('animalDetail.milkCapacity')}</Text>
-                <Text style={styles.detailValue}>{listing.milk_capacity} {t('animalDetail.lPerDay')}</Text>
-              </View>
-            )}
-            {listing.pregnancy_status && (
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>{t('animalDetail.pregnancy')}</Text>
-                <Text style={styles.detailValue}>{listing.pregnancy_status.replace('_', ' ')}</Text>
-              </View>
-            )}
-            {listing.health_condition && (
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>{t('animalDetail.health')}</Text>
-                <Text style={styles.detailValue}>{listing.health_condition}</Text>
-              </View>
-            )}
-            {listing.gender && (
+            {listingGender ? (
               <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>{t('animalDetail.gender')}</Text>
-                <Text style={styles.detailValue}>{listing.gender}</Text>
+                <Text style={styles.detailValue}>{formatGender(listingGender)}</Text>
               </View>
-            )}
-            {listing.weight && (
+            ) : null}
+            {(listing.pregnancy_status || pregnancyMonths) && (
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>{t('animalDetail.weight')}</Text>
-                <Text style={styles.detailValue}>{listing.weight} kg</Text>
-              </View>
-            )}
-            {listing.color && (
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>{t('animalDetail.color')}</Text>
-                <Text style={styles.detailValue}>{listing.color}</Text>
-              </View>
-            )}
-            {listing.purpose && (
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>{t('animalDetail.purpose')}</Text>
-                <Text style={styles.detailValue}>{listing.purpose}</Text>
-              </View>
-            )}
-            {listing.delivery_available !== undefined && (
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>{t('animalDetail.delivery')}</Text>
+                <Text style={styles.detailLabel}>{t('animalDetail.pregnancy')}</Text>
                 <Text style={styles.detailValue}>
-                  {listing.delivery_available ? t('animalDetail.available') : t('animalDetail.notAvailable')}
+                  {formatPregnancyStatus(listing.pregnancy_status || 'pregnant')}
                 </Text>
               </View>
             )}
+            {pregnancyMonths ? (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>{t('pregnancy.months', { defaultValue: 'How many months?' })}</Text>
+                <Text style={styles.detailValue}>{pregnancyMonths}</Text>
+              </View>
+            ) : null}
           </View>
         </View>
-
-        {/* Description Card */}
-        {(listing.additional_notes || listing.description || listing.vaccination_details) && (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="information-circle-outline" size={20} color={COLORS.primary} />
-              <Text style={styles.cardTitle}>{t('animalDetail.additionalInformation')}</Text>
-            </View>
-            {listing.description && (
-              <View style={styles.infoSection}>
-                <Text style={styles.infoLabel}>{t('animalDetail.description')}</Text>
-                <Text style={styles.infoText}>{listing.description}</Text>
-              </View>
-            )}
-            {listing.vaccination_details && (
-              <View style={styles.infoSection}>
-                <Text style={styles.infoLabel}>{t('animalDetail.vaccinationDetails')}</Text>
-                <Text style={styles.infoText}>{listing.vaccination_details}</Text>
-              </View>
-            )}
-            {listing.additional_notes && (
-              <View style={styles.infoSection}>
-                <Text style={styles.infoLabel}>{t('animalDetail.notes')}</Text>
-                <Text style={styles.infoText}>{listing.additional_notes}</Text>
-              </View>
-            )}
-          </View>
-        )}
 
         {/* Seller Card */}
         {listing.seller && (
@@ -505,6 +550,108 @@ const AnimalDetailScreen = ({ route, navigation }) => {
         {/* Spacer for bottom bar */}
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      <Modal
+        visible={reportModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setReportModalVisible(false)}
+      >
+        <View style={styles.reportBackdrop}>
+          <View style={styles.reportSheet}>
+            <View style={styles.reportSheetHandle} />
+            <View style={styles.reportTitleRow}>
+              <View style={styles.reportIconWrap}>
+                <Ionicons name="flag-outline" size={24} color={COLORS.error} />
+              </View>
+              <View style={styles.reportTitleTextWrap}>
+                <Text style={styles.reportTitle}>
+                  {t('animalDetail.reportListing', { defaultValue: 'Report this listing' })}
+                </Text>
+                <Text style={styles.reportSubtitle}>
+                  {t('animalDetail.reportListingDesc', { defaultValue: 'Tell us what looks wrong. Reports are reviewed by our team.' })}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.reportCloseButton}
+                onPress={() => setReportModalVisible(false)}
+              >
+                <Ionicons name="close" size={22} color={COLORS.textMuted || COLORS.gray} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={styles.reportFormScroll}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Text style={styles.reportFieldLabel}>
+                {t('animalDetail.reportReason', { defaultValue: 'Reason' })}
+              </Text>
+              <View style={styles.reportReasonGrid}>
+                {REPORT_REASONS.map((reason) => {
+                  const selected = reportReason === reason.value;
+                  return (
+                    <TouchableOpacity
+                      key={reason.value}
+                      style={[styles.reportReasonChip, selected && styles.reportReasonChipSelected]}
+                      onPress={() => setReportReason(reason.value)}
+                      activeOpacity={0.86}
+                    >
+                      <Text style={[styles.reportReasonText, selected && styles.reportReasonTextSelected]}>
+                        {t(`animalDetail.reportReasons.${reason.value}`, { defaultValue: reason.label })}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.reportFieldLabel}>
+                {t('animalDetail.reportDetails', { defaultValue: 'Details' })}
+              </Text>
+              <TextInput
+                value={reportDescription}
+                onChangeText={setReportDescription}
+                placeholder={t('animalDetail.reportDetailsPlaceholder', { defaultValue: 'Example: seller shared wrong age, fake photo, already sold, or suspicious price...' })}
+                placeholderTextColor={COLORS.gray}
+                style={styles.reportInput}
+                multiline
+                textAlignVertical="top"
+                maxLength={600}
+              />
+              <Text style={styles.reportCounter}>{reportDescription.trim().length}/600</Text>
+            </ScrollView>
+
+            <View style={styles.reportActions}>
+              <TouchableOpacity
+                style={styles.reportCancelButton}
+                onPress={() => setReportModalVisible(false)}
+                disabled={reportSubmitting}
+              >
+                <Text style={styles.reportCancelText}>
+                  {t('common.cancel', { defaultValue: 'Cancel' })}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.reportSubmitButton, reportSubmitting && styles.reportSubmitButtonDisabled]}
+                onPress={submitReport}
+                disabled={reportSubmitting}
+              >
+                {reportSubmitting ? (
+                  <ActivityIndicator color={COLORS.white} />
+                ) : (
+                  <>
+                    <Ionicons name="send" size={18} color={COLORS.white} />
+                    <Text style={styles.reportSubmitText}>
+                      {t('animalDetail.submitReport', { defaultValue: 'Submit report' })}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Bottom Contact Bar with Safe Area */}
       <SafeAreaView edges={['bottom']} style={styles.bottomBarSafeArea}>
@@ -647,6 +794,172 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontWeight: '700',
     fontSize: 12,
+  },
+  reportHeaderButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  reportBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.46)',
+  },
+  reportSheet: {
+    maxHeight: '88%',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 24,
+    backgroundColor: COLORS.white,
+  },
+  reportSheetHandle: {
+    width: 48,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: COLORS.border || '#E5E7EB',
+    alignSelf: 'center',
+    marginBottom: 18,
+  },
+  reportTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+  },
+  reportIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
+    backgroundColor: COLORS.errorSoft || '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  reportTitleTextWrap: {
+    flex: 1,
+  },
+  reportTitle: {
+    color: COLORS.black,
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  reportSubtitle: {
+    marginTop: 4,
+    color: COLORS.gray,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '600',
+  },
+  reportCloseButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.surfaceAlt || '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  reportFieldLabel: {
+    color: COLORS.black,
+    fontSize: 14,
+    fontWeight: '900',
+    marginBottom: 10,
+  },
+  reportFormScroll: {
+    maxHeight: 390,
+  },
+  reportReasonGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 18,
+  },
+  reportReasonChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: COLORS.border || '#E5E7EB',
+    backgroundColor: COLORS.surfaceAlt || '#F9FAFB',
+  },
+  reportReasonChipSelected: {
+    borderColor: COLORS.error,
+    backgroundColor: COLORS.errorSoft || '#FEE2E2',
+  },
+  reportReasonText: {
+    color: COLORS.gray,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  reportReasonTextSelected: {
+    color: COLORS.error,
+  },
+  reportInput: {
+    minHeight: 118,
+    borderWidth: 1,
+    borderColor: COLORS.border || '#E5E7EB',
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: COLORS.black,
+    backgroundColor: COLORS.surfaceAlt || '#F9FAFB',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
+  },
+  reportCounter: {
+    alignSelf: 'flex-end',
+    marginTop: 6,
+    color: COLORS.gray,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  reportActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 18,
+  },
+  reportCancelButton: {
+    flex: 1,
+    height: 52,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.surfaceAlt || '#F9FAFB',
+    borderWidth: 1,
+    borderColor: COLORS.border || '#E5E7EB',
+  },
+  reportCancelText: {
+    color: COLORS.gray,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  reportSubmitButton: {
+    flex: 1.4,
+    height: 52,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    backgroundColor: COLORS.error,
+  },
+  reportSubmitButtonDisabled: {
+    opacity: 0.7,
+  },
+  reportSubmitText: {
+    color: COLORS.white,
+    fontSize: 15,
+    fontWeight: '900',
   },
   photosSection: {
     backgroundColor: COLORS.white,

@@ -26,42 +26,76 @@ export const NotificationProvider = ({ children, navigation }) => {
   const responseListener = useRef();
   const socketRef = useRef(null);
 
-  // Register for push notifications when authenticated
-  useEffect(() => {
-    if (isAuthenticated && token) {
-      setupNotifications();
-      connectSocket();
-    } else {
-      disconnectSocket();
+  const fetchNotifications = useCallback(async () => {
+    if (!isAuthenticated || !token) return;
+
+    setLoading(true);
+    try {
+      const nextNotifications = await notificationService.getNotifications();
+      const nextUnreadCount = await notificationService.getUnreadCount();
+
+      if (Array.isArray(nextNotifications)) {
+        setNotifications(nextNotifications);
+        setUnreadCount(nextUnreadCount);
+        await notificationService.setBadgeCount(nextUnreadCount);
+      }
+    } catch (error) {
+      logger.error('Error fetching notifications:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [isAuthenticated, token]);
+
+  const handleNotificationTap = useCallback((data) => {
+    if (!navigation) {
+      logger.log('Navigation not available - cannot navigate from notification');
+      return;
     }
 
-    return () => {
-      // Cleanup listeners
-      if (notificationListener.current) {
-        notificationListener.current.remove();
-      }
-      if (responseListener.current) {
-        responseListener.current.remove();
-      }
-      disconnectSocket();
-    };
-  }, [isAuthenticated, token, user?.id, setupNotifications, connectSocket, disconnectSocket]); // ✅ Include all dependencies
+    if (!data || typeof data !== 'object') {
+      logger.log('Invalid notification data:', data);
+      return;
+    }
 
-  // Connect to Socket.IO for real-time notifications
+    try {
+      switch (data.type) {
+        case 'new_listing':
+        case 'contact':
+          if (data.listing_id && data.animal_type) {
+            navigation.navigate('AnimalDetail', {
+              id: data.listing_id,
+              animalType: data.animal_type,
+            });
+          }
+          break;
+        case 'pregnancy':
+          navigation.navigate('PregnancyCalendar');
+          break;
+        default:
+          navigation.navigate('Notifications');
+          break;
+      }
+    } catch (error) {
+      logger.error('Error navigating from notification:', error);
+    }
+  }, [navigation]);
+
   const connectSocket = useCallback(() => {
     if (!user?.id || socketRef.current) return;
 
     try {
       const socket = io(API_URL, {
-        transports: ['websocket', 'polling'],
+        // Polling succeeds on more local Expo networks; Socket.IO can upgrade after connecting.
+        transports: ['polling', 'websocket'],
+        tryAllTransports: true,
+        timeout: 10000,
         reconnection: true,
         reconnectionDelay: 1000,
-        reconnectionAttempts: 5
+        reconnectionAttempts: 5,
       });
 
       socket.on('connect', () => {
-        logger.log('✅ Socket.IO connected:', socket.id);
-        // ✅ Validate user.id before emitting
+        logger.log('Socket.IO connected:', socket.id);
         if (user?.id) {
           socket.emit('register', user.id);
         } else {
@@ -70,36 +104,33 @@ export const NotificationProvider = ({ children, navigation }) => {
       });
 
       socket.on('notification', (data) => {
-        logger.log('🔔 Real-time notification received:', data);
+        logger.log('Real-time notification received:', data);
 
-        // Add notification to local state
         const newNotification = {
           id: Date.now(),
           title: data.title,
           message: data.body,
           data: data.data,
           is_read: false,
-          created_at: data.timestamp
+          created_at: data.timestamp,
         };
 
         setNotifications(prev => [newNotification, ...prev]);
         setUnreadCount(prev => prev + 1);
 
-        // Show local notification with channelId
         notificationService.scheduleLocalNotification(
           data.title,
           data.body,
           data.data,
-          null, // trigger
-          'default' // channelId
+          null,
+          'default'
         );
 
-        // Refresh from server to get complete data
         fetchNotifications();
       });
 
       socket.on('disconnect', () => {
-        logger.log('❌ Socket.IO disconnected');
+        logger.log('Socket.IO disconnected');
       });
 
       socket.on('connect_error', (error) => {
@@ -122,125 +153,73 @@ export const NotificationProvider = ({ children, navigation }) => {
 
   const setupNotifications = useCallback(async () => {
     try {
-      // Register for push notifications
-      const token = await notificationService.registerForPushNotifications();
+      const pushRegistration = await notificationService.registerForPushNotifications();
+      const nextPushToken = typeof pushRegistration === 'string'
+        ? pushRegistration
+        : pushRegistration?.token;
+      const provider = typeof pushRegistration === 'string'
+        ? 'expo'
+        : pushRegistration?.provider || 'expo';
 
-      if (token) {
-        setPushToken(token);
+      if (nextPushToken) {
+        setPushToken(nextPushToken);
 
-        // Check if token needs re-registration
-        const shouldReregister = await notificationService.shouldReregisterToken(token);
+        const shouldReregister = await notificationService.shouldReregisterToken(nextPushToken);
 
         if (shouldReregister) {
-          // Register token with backend - wrap in try/catch to prevent network errors from crashing
           try {
-            await notificationService.registerTokenWithBackend(token);
-            logger.log('✅ Push token registered with backend');
+            await notificationService.registerTokenWithBackend(nextPushToken, provider);
+            logger.log('Push token registered with backend');
           } catch (backendError) {
-            logger.log('Could not register token with backend (offline or server issue):', backendError.message);
-            // Continue anyway - app should work without backend token registration
+            logger.log('Could not register token with backend:', backendError.message);
           }
         } else {
           logger.log('Token already registered, skipping re-registration');
         }
       }
 
-      // Set up notification listeners
-      notificationListener.current = notificationService.addNotificationReceivedListener(
-        (notification) => {
-          logger.log('Notification received:', notification);
-          // Refresh notifications when new one arrives
-          fetchNotifications();
-        }
-      );
-
-      responseListener.current = notificationService.addNotificationResponseListener(
-        (response) => {
-          logger.log('Notification tapped:', response);
-          // ✅ Safe property access with null checks
-          const data = response?.notification?.request?.content?.data || {};
-          handleNotificationTap(data);
-        }
-      );
-
-      // Fetch initial notifications - wrap in try/catch
-      try {
-        await fetchNotifications();
-      } catch (fetchError) {
-        logger.log('Could not fetch notifications (offline or server issue):', fetchError.message);
+      if (notificationListener.current) {
+        notificationListener.current.remove();
       }
+      if (responseListener.current) {
+        responseListener.current.remove();
+      }
+
+      notificationListener.current = notificationService.addNotificationReceivedListener(() => {
+        fetchNotifications();
+      });
+
+      responseListener.current = notificationService.addNotificationResponseListener((response) => {
+        const data = response?.notification?.request?.content?.data || {};
+        handleNotificationTap(data);
+      });
+
+      await fetchNotifications();
     } catch (error) {
       logger.log('Error setting up notifications (non-fatal):', error.message);
-      // Don't crash the app - notifications are optional
     }
-  }, [user?.id, fetchNotifications, handleNotificationTap]); // ✅ Add dependencies
+  }, [fetchNotifications, handleNotificationTap]);
 
-  const handleNotificationTap = useCallback((data) => {
-    // ✅ Handle missing navigation prop gracefully
-    if (!navigation) {
-      logger.log('Navigation not available - cannot navigate from notification');
-      return;
-    }
-
-    // Validate data
-    if (!data || typeof data !== 'object') {
-      logger.log('Invalid notification data:', data);
-      return;
+  useEffect(() => {
+    if (isAuthenticated && token) {
+      setupNotifications();
+      connectSocket();
+    } else {
+      disconnectSocket();
     }
 
-    // Navigate based on notification type
-    try {
-      switch (data.type) {
-        case 'new_listing':
-          if (data.listing_id && data.animal_type) {
-            navigation.navigate('AnimalDetail', {
-              id: data.listing_id,
-              animalType: data.animal_type,
-            });
-          }
-          break;
-        case 'contact':
-          // Navigate to messages or listing
-          if (data.listing_id && data.animal_type) {
-            navigation.navigate('AnimalDetail', {
-              id: data.listing_id,
-              animalType: data.animal_type,
-            });
-          }
-          break;
-        case 'pregnancy':
-          navigation.navigate('PregnancyCalendar');
-          break;
-        default:
-          navigation.navigate('Notifications');
-          break;
+    return () => {
+      if (notificationListener.current) {
+        notificationListener.current.remove();
+        notificationListener.current = null;
       }
-    } catch (error) {
-      logger.error('Error navigating from notification:', error);
-    }
-  }, [navigation]);
-
-  const fetchNotifications = useCallback(async () => {
-    if (!isAuthenticated || !token) return;
-
-    setLoading(true);
-    try {
-      // ✅ getNotifications now returns validated data
-      const notifications = await notificationService.getNotifications();
-      const unreadCount = await notificationService.getUnreadCount();
-
-      if (Array.isArray(notifications)) {
-        setNotifications(notifications);
-        setUnreadCount(unreadCount);
-        // Update badge
-        await notificationService.setBadgeCount(unreadCount);
+      if (responseListener.current) {
+        responseListener.current.remove();
+        responseListener.current = null;
       }
-    } catch (error) {
-      logger.error('Error fetching notifications:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [isAuthenticated, token]);
+      disconnectSocket();
+    };
+  }, [isAuthenticated, token, user?.id, setupNotifications, connectSocket, disconnectSocket]);
 
   const refreshUnreadCount = async () => {
     if (!isAuthenticated || !token) return;
@@ -257,15 +236,15 @@ export const NotificationProvider = ({ children, navigation }) => {
   const markAsRead = async (notificationId) => {
     try {
       await notificationService.markAsRead(notificationId);
-      let newUnreadCount;
+      let nextUnreadCount;
       setNotifications(prev =>
         prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
       );
       setUnreadCount(prev => {
-        newUnreadCount = Math.max(0, prev - 1);
-        return newUnreadCount;
+        nextUnreadCount = Math.max(0, prev - 1);
+        return nextUnreadCount;
       });
-      await notificationService.setBadgeCount(newUnreadCount);
+      await notificationService.setBadgeCount(nextUnreadCount);
     } catch (error) {
       logger.error('Error marking as read:', error);
     }

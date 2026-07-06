@@ -48,6 +48,10 @@ import ServicesScreen from '../screens/ServicesScreen';
 import AppointmentBookingScreen from '../screens/AppointmentBookingScreen';
 import MyAppointmentsScreen from '../screens/MyAppointmentsScreen';
 import LegalDocumentScreen from '../screens/LegalDocumentScreen';
+import GovernmentSchemesScreen from '../screens/GovernmentSchemesScreen';
+import GovernmentSchemeDetailScreen from '../screens/GovernmentSchemeDetailScreen';
+import SellerListingInsightsScreen from '../screens/SellerListingInsightsScreen';
+import PetMatingScreen from '../screens/PetMatingScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -322,6 +326,13 @@ const MainStack = () => {
         }}
       />
       <Stack.Screen
+        name="SellerListingInsights"
+        component={SellerListingInsightsScreen}
+        options={{
+          animation: 'slide_from_right',
+        }}
+      />
+      <Stack.Screen
         name="CategoryListings"
         component={CategoryListingsScreen}
         options={{
@@ -408,6 +419,27 @@ const MainStack = () => {
       <Stack.Screen
         name="Services"
         component={ServicesScreen}
+        options={{
+          animation: 'slide_from_right',
+        }}
+      />
+      <Stack.Screen
+        name="GovernmentSchemes"
+        component={GovernmentSchemesScreen}
+        options={{
+          animation: 'slide_from_right',
+        }}
+      />
+      <Stack.Screen
+        name="GovernmentSchemeDetail"
+        component={GovernmentSchemeDetailScreen}
+        options={{
+          animation: 'slide_from_right',
+        }}
+      />
+      <Stack.Screen
+        name="PetMating"
+        component={PetMatingScreen}
         options={{
           animation: 'slide_from_right',
         }}

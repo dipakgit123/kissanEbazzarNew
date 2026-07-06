@@ -11,11 +11,24 @@ const otpService = require('./src/services/otpService');
 const { startBalanceMonitoring, usesTwilioProvider } = require('./src/utils/twilioMonitor');
 const { startAutoReactivation } = require('./src/utils/whatsappReactivate');
 const logger = require('./src/utils/logger');
+const { logSystemError } = require('./src/utils/systemErrorLogger');
 require('./src/services/scheduledNotifications'); // Start scheduled notification jobs
 require('dotenv').config();
 
 const app = express();
 const server = http.createServer(app);
+const fatalLogTimeoutMs = 1500;
+
+const logFatalAndExit = (error, metadata) => {
+  Promise.race([
+    logSystemError(error, {
+      source: 'process',
+      severity: 'fatal',
+      metadata
+    }),
+    new Promise((resolve) => setTimeout(resolve, fatalLogTimeoutMs))
+  ]).finally(() => process.exit(1));
+};
 
 // Setup middleware and get CORS origins
 const corsOrigins = setupMiddleware(app);
@@ -50,6 +63,11 @@ setInterval(async () => {
     await otpService.cleanupExpiredOTPs();
   } catch (error) {
     logger.error('Cleanup error:', error);
+    await logSystemError(error, {
+      source: 'background',
+      severity: 'error',
+      metadata: { job: 'cleanupExpiredOTPs' }
+    });
   }
 }, 5 * 60 * 1000);
 
@@ -186,6 +204,10 @@ Notes:
     });
   } catch (error) {
     console.error('Failed to start server:', error);
+    await logSystemError(error, {
+      source: 'startup',
+      severity: 'fatal'
+    });
     process.exit(1);
   }
 };
@@ -202,11 +224,11 @@ process.on('SIGINT', async () => {
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
-  process.exit(1);
+  logFatalAndExit(error, { event: 'uncaughtException' });
 });
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (error) => {
   console.error('Unhandled Promise Rejection:', error);
-  process.exit(1);
+  logFatalAndExit(error, { event: 'unhandledRejection' });
 });

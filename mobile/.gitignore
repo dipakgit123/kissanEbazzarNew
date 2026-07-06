@@ -28,6 +28,8 @@ yarn-error.log
 *.p12
 *.key
 *.mobileprovision
+google-services.json
+GoogleService-Info.plist
 
 # Debug
 npm-debug.*

@@ -7,8 +7,8 @@
   --blog-muted: #6e7f77;
   --blog-accent: #15744e;
   --blog-accent-soft: rgba(21, 116, 78, 0.1);
-  --blog-serif: "Charter", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
-  --blog-sans: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --blog-serif: var(--font-primary);
+  --blog-sans: var(--font-primary);
   background:
     radial-gradient(circle at top left, rgba(21, 116, 78, 0.08), transparent 28%),
     radial-gradient(circle at top right, rgba(168, 124, 47, 0.08), transparent 22%),

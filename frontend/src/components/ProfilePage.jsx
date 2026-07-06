@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import EditProfileForm from './EditProfileForm';
 import CallHistory from './CallHistory';
@@ -17,6 +17,7 @@ const FALLBACK_ANIMAL_IMAGE = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.or
 
 const ProfilePage = ({ onBack }) => {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const { wishlist } = useWishlist();
   const [editing, setEditing] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -764,10 +765,10 @@ const ProfilePage = ({ onBack }) => {
                       </div>
                       <div className="mt-4 grid grid-cols-3 gap-2">
                         <button
-                          onClick={() => setSelectedAnimal(animal)}
+                          onClick={() => navigate(`/seller-listings/${getListingType(animal)}/${animal.id}/insights`)}
                           className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
                         >
-                          {t('profile.viewDetails') || 'View Details'}
+                          {t('profile.viewInsights') || 'View Insights'}
                         </button>
                         <button
                           onClick={() => handleMarkAsSold(animal.id, getListingType(animal))}

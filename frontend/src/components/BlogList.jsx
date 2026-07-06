@@ -475,6 +475,7 @@ const BlogList = () => {
                       setSearchParams(nextParams);
                       setCurrentPage(1);
                     }}
+
                     className="blog-chip rounded-full px-4 py-2 text-sm font-medium"
                   >
                     #{getTopicLabel(topic)}

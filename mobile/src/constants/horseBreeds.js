@@ -1,3 +1,5 @@
+import { repairMojibakeText } from '../utils/textEncoding';
+
 export const HORSE_BREEDS = [
   {
     value: 'Marwari',
@@ -130,13 +132,13 @@ export const HORSE_BREEDS = [
 ];
 
 export const getHorseBreedOptions = (language, selectLabel) => {
-  const locale = language === 'mr' || language === 'hi' ? language : 'en';
+  const locale = language?.startsWith('mr') ? 'mr' : language?.startsWith('hi') ? 'hi' : 'en';
 
   return [
     { value: '', label: selectLabel },
     ...HORSE_BREEDS.map((breed) => ({
       value: breed.value,
-      label: breed.labels[locale] || breed.labels.en
+      label: repairMojibakeText(breed.labels[locale] || breed.labels.en)
     }))
   ];
 };

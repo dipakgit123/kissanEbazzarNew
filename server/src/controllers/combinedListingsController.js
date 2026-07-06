@@ -17,6 +17,139 @@ const ANIMAL_TABLE_MAP = {
   other: { table: 'other_animal_listings', model: 'OtherAnimalListing', type: 'other' }
 };
 
+const normalizeOwnListing = (listing, type) => {
+  const data = listing.toJSON ? listing.toJSON() : listing;
+
+  return {
+    id: data.id,
+    type,
+    animal_type: type,
+    breed: data.breed_name || data.breedName,
+    breed_name: data.breed_name || data.breedName,
+    age: data.age,
+    price: data.expected_price || data.expectedPrice,
+    expected_price: data.expected_price || data.expectedPrice,
+    milk_capacity: data.milk_capacity || data.milkCapacity,
+    pregnancy_status: data.pregnancy_status || data.pregnancyStatus,
+    gender: data.gender,
+    photo1: data.front_photo || data.frontPhoto || data.photo_1 || data.photo1,
+    photo2: data.side_photo || data.sidePhoto || data.photo_2 || data.photo2,
+    photos: [
+      data.front_photo || data.frontPhoto || data.photo_1 || data.photo1,
+      data.side_photo || data.sidePhoto || data.photo_2 || data.photo2,
+      data.photo_3 || data.photo3,
+      data.photo_4 || data.photo4,
+      data.photo_5 || data.photo5
+    ].filter(Boolean),
+    city: data.city,
+    state: data.state,
+    pincode: data.pincode,
+    latitude: data.latitude,
+    longitude: data.longitude,
+    status: data.status,
+    views: Number(data.views || 0),
+    created_at: data.created_at || data.createdAt,
+    updated_at: data.updated_at || data.updatedAt
+  };
+};
+
+const buildDailySeriesFromDate = (rows, startDateValue, fallbackTotal = 0) => {
+  const byDay = new Map(rows.map((row) => [row.day, Number(row.count || 0)]));
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+
+  const today = new Date();
+  const startDate = startDateValue ? new Date(startDateValue) : today;
+  const safeStartDate = Number.isNaN(startDate.getTime()) || startDate > today ? today : startDate;
+  const millisecondsPerDay = 24 * 60 * 60 * 1000;
+  const dayCount = Math.max(1, Math.floor((today - safeStartDate) / millisecondsPerDay) + 1);
+
+  const series = Array.from({ length: dayCount }).map((_, index) => {
+    const date = new Date(safeStartDate);
+    date.setDate(safeStartDate.getDate() + index);
+    const day = formatter.format(date);
+    return {
+      day,
+      count: byDay.get(day) || 0
+    };
+  });
+
+  const loggedTotal = series.reduce((sum, item) => sum + Number(item.count || 0), 0);
+  const missingTotal = Number(fallbackTotal || 0) - loggedTotal;
+  if (missingTotal > 0) {
+    series[series.length - 1].count += missingTotal;
+  }
+
+  return series;
+};
+
+const getIndiaDateString = (dateValue = new Date()) => new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Kolkata',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit'
+}).format(new Date(dateValue));
+
+const getRequestIp = (req) => {
+  const forwardedFor = req.headers['x-forwarded-for'];
+  if (forwardedFor) {
+    return String(forwardedFor).split(',')[0].trim();
+  }
+
+  return req.ip || req.connection?.remoteAddress || null;
+};
+
+const recordListingView = async (req, listing, listingType) => {
+  if (!db.ListingViewLog || !listing?.user_id) {
+    return false;
+  }
+
+  const viewerId = getAuthUserIdFromRequest(req);
+  if (viewerId && Number(viewerId) === Number(listing.user_id)) {
+    return false;
+  }
+
+  const viewerIp = getRequestIp(req);
+  const viewerKey = viewerId ? `user:${viewerId}` : viewerIp ? `ip:${viewerIp}` : null;
+  if (!viewerKey) {
+    return false;
+  }
+
+  const viewDate = getIndiaDateString();
+
+  try {
+    const [, created] = await db.ListingViewLog.findOrCreate({
+      where: {
+        listing_id: listing.id,
+        listing_type: listingType,
+        view_date: viewDate,
+        viewer_key: viewerKey
+      },
+      defaults: {
+        listing_id: listing.id,
+        listing_type: listingType,
+        seller_id: listing.user_id,
+        viewer_id: viewerId || null,
+        viewer_ip: viewerIp,
+        view_date: viewDate,
+        viewer_key: viewerKey,
+        user_agent: req.headers['user-agent'] || null
+      }
+    });
+    return created;
+  } catch (error) {
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      return false;
+    }
+    console.error('Failed to log listing view:', error.message);
+    return false;
+  }
+};
+
 const parsePositiveInt = (value, fallback, max = 100) => {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -990,8 +1123,12 @@ class CombinedListingsController {
         attributes: SELLER_ATTRIBUTES
       });
 
-      // Increment views
-      await listing.incrementViews();
+      // Count one view per unique viewer per listing per India calendar day.
+      const countedView = await recordListingView(req, listingData, animalType.toLowerCase());
+      if (countedView) {
+        await listing.incrementViews();
+        listingData.views = Number(listingData.views || 0) + 1;
+      }
 
       // Normalize field names to snake_case for frontend consistency
       const normalizedData = {
@@ -1381,47 +1518,42 @@ class CombinedListingsController {
         })
       ]);
 
-      // Helper function to format listings
-      const formatListing = (listing, type) => {
-        const data = listing.toJSON ? listing.toJSON() : listing;
-        return {
-          id: data.id,
-          type: type,
-          animal_type: type,
-          breed: data.breed_name || data.breedName,
-          age: data.age,
-          price: data.expected_price || data.expectedPrice,
-          photo1: data.front_photo || data.frontPhoto || data.photo_1 || data.photo1,
-          photo2: data.side_photo || data.sidePhoto || data.photo_2 || data.photo2,
-          photos: [
-            data.front_photo || data.frontPhoto || data.photo_1 || data.photo1,
-            data.side_photo || data.sidePhoto || data.photo_2 || data.photo2,
-            data.photo_3 || data.photo3,
-            data.photo_4 || data.photo4,
-            data.photo_5 || data.photo5
-          ].filter(Boolean),
-          city: data.city,
-          state: data.state,
-          pincode: data.pincode,
-          status: data.status,
-          created_at: data.created_at || data.createdAt,
-          updated_at: data.updated_at || data.updatedAt
-        };
-      };
-
       // Combine and format all listings
       const allListings = [
-        ...cowListings.map(listing => formatListing(listing, 'cow')),
-        ...buffaloListings.map(listing => formatListing(listing, 'buffalo')),
-        ...goatListings.map(listing => formatListing(listing, 'goat')),
-        ...horseListings.map(listing => formatListing(listing, 'horse')),
-        ...dogListings.map(listing => formatListing(listing, 'dog')),
-        ...catListings.map(listing => formatListing(listing, 'cat')),
-        ...otherListings.map(listing => formatListing(listing, 'other'))
+        ...cowListings.map(listing => normalizeOwnListing(listing, 'cow')),
+        ...buffaloListings.map(listing => normalizeOwnListing(listing, 'buffalo')),
+        ...goatListings.map(listing => normalizeOwnListing(listing, 'goat')),
+        ...horseListings.map(listing => normalizeOwnListing(listing, 'horse')),
+        ...dogListings.map(listing => normalizeOwnListing(listing, 'dog')),
+        ...catListings.map(listing => normalizeOwnListing(listing, 'cat')),
+        ...otherListings.map(listing => normalizeOwnListing(listing, 'other'))
       ];
 
       // Sort by created_at descending
       allListings.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+      if (db.ListingViewLog && allListings.length > 0) {
+        const uniqueViewRows = await db.sequelize.query(
+          `
+            SELECT listing_id, listing_type, COUNT(*)::int AS count
+            FROM listing_view_logs
+            WHERE seller_id = :sellerId
+            GROUP BY listing_id, listing_type
+          `,
+          {
+            replacements: { sellerId: userId },
+            type: db.sequelize.QueryTypes.SELECT
+          }
+        );
+
+        const uniqueViewsByListing = new Map(
+          uniqueViewRows.map((row) => [`${row.listing_type}:${row.listing_id}`, Number(row.count || 0)])
+        );
+
+        allListings.forEach((listing) => {
+          listing.views = uniqueViewsByListing.get(`${listing.animal_type}:${listing.id}`) || 0;
+        });
+      }
 
       console.log(`Found ${allListings.length} listings for user ${userId}`);
 
@@ -1512,32 +1644,185 @@ class CombinedListingsController {
   }
 
   /**
+   * Get owner-only listing analytics
+   * GET /api/listings/:animalType/:id/insights
+   */
+  async getListingInsights(req, res) {
+    try {
+      const { animalType, id } = req.params;
+      const userId = req.user?.userId || req.user?.id;
+      const normalizedType = String(animalType || '').toLowerCase();
+      const tableInfo = ANIMAL_TABLE_MAP[normalizedType];
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: 'User not authenticated'
+        });
+      }
+
+      if (!tableInfo || !db[tableInfo.model]) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid animal type'
+        });
+      }
+
+      const listing = await db[tableInfo.model].findByPk(id);
+
+      if (!listing) {
+        return res.status(404).json({
+          success: false,
+          message: 'Listing not found'
+        });
+      }
+
+      const listingData = listing.toJSON ? listing.toJSON() : listing;
+
+      if (Number(listingData.user_id) !== Number(userId)) {
+        return res.status(403).json({
+          success: false,
+          message: 'You are not authorized to view this listing analytics'
+        });
+      }
+
+      const listingCreatedAt = listingData.created_at || listingData.createdAt || new Date();
+
+      const [callCount, recentCalls, uniqueViewTotalRows, viewRows, callRows, buyerLocations] = await Promise.all([
+        db.CallLog.count({
+          where: {
+            listing_id: id,
+            listing_type: normalizedType
+          }
+        }),
+        db.CallLog.findAll({
+          where: {
+            listing_id: id,
+            listing_type: normalizedType
+          },
+          include: [{
+            model: db.User,
+            as: 'caller',
+            attributes: ['id', 'full_name', 'phone_number', 'profile_photo']
+          }],
+          order: [['created_at', 'DESC']],
+          limit: 10
+        }),
+        db.ListingViewLog
+          ? db.sequelize.query(
+            `
+              SELECT COUNT(*)::int AS count
+              FROM listing_view_logs
+              WHERE listing_id = :listingId
+                AND listing_type = :listingType
+                AND view_date >= DATE(:fromDate)
+            `,
+            {
+              replacements: { listingId: id, listingType: normalizedType, fromDate: listingCreatedAt },
+              type: db.sequelize.QueryTypes.SELECT
+            }
+          )
+          : Promise.resolve([{ count: 0 }]),
+        db.ListingViewLog
+          ? db.sequelize.query(
+            `
+              SELECT view_date::text AS day, COUNT(*)::int AS count
+              FROM listing_view_logs
+              WHERE listing_id = :listingId
+                AND listing_type = :listingType
+                AND view_date >= DATE(:fromDate)
+              GROUP BY view_date
+              ORDER BY day ASC
+            `,
+            {
+              replacements: { listingId: id, listingType: normalizedType, fromDate: listingCreatedAt },
+              type: db.sequelize.QueryTypes.SELECT
+            }
+          )
+          : Promise.resolve([]),
+        db.sequelize.query(
+          `
+            SELECT TO_CHAR(DATE(created_at AT TIME ZONE 'Asia/Kolkata'), 'YYYY-MM-DD') AS day, COUNT(*)::int AS count
+            FROM call_logs
+            WHERE listing_id = :listingId
+              AND listing_type = :listingType
+              AND created_at >= :fromDate
+            GROUP BY DATE(created_at AT TIME ZONE 'Asia/Kolkata')
+            ORDER BY day ASC
+          `,
+          {
+            replacements: { listingId: id, listingType: normalizedType, fromDate: listingCreatedAt },
+            type: db.sequelize.QueryTypes.SELECT
+          }
+        ),
+        db.CallLog.findAll({
+          where: {
+            listing_id: id,
+            listing_type: normalizedType,
+            callerLatitude: { [Op.ne]: null },
+            callerLongitude: { [Op.ne]: null }
+          },
+          include: [{
+            model: db.User,
+            as: 'caller',
+            attributes: ['id', 'full_name', 'profile_photo']
+          }],
+          order: [['created_at', 'DESC']],
+          limit: 12
+        })
+      ]);
+
+      const listingView = normalizeOwnListing(listingData, normalizedType);
+      const uniqueViewTotal = Number(uniqueViewTotalRows?.[0]?.count || 0);
+
+      res.json({
+        success: true,
+        data: {
+          listing: listingView,
+          summary: {
+            views: uniqueViewTotal,
+            calls: callCount,
+            status: listingData.status,
+            isSold: String(listingData.status || '').toLowerCase() === 'sold'
+          },
+          trends: {
+            fromDate: listingView.created_at,
+            views: buildDailySeriesFromDate(viewRows, listingView.created_at, uniqueViewTotal),
+            calls: buildDailySeriesFromDate(callRows, listingView.created_at)
+          },
+          buyerLocations: buyerLocations.map((call) => ({
+            id: call.id,
+            latitude: Number(call.callerLatitude),
+            longitude: Number(call.callerLongitude),
+            buyerName: call.caller?.full_name || null,
+            buyerPhoto: call.caller?.profile_photo || null,
+            createdAt: call.created_at || call.createdAt
+          })),
+          recentCalls: recentCalls.map((call) => ({
+            id: call.id,
+            buyerName: call.caller?.full_name || 'Buyer',
+            buyerPhone: call.caller?.phone_number || '',
+            buyerPhoto: call.caller?.profile_photo || null,
+            status: call.callStatus || call.call_status,
+            createdAt: call.created_at || call.createdAt
+          }))
+        }
+      });
+    } catch (error) {
+      console.error('Get listing insights error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch listing analytics',
+        error: error.message
+      });
+    }
+  }
+
+  /**
    * Helper method to format listing data
    */
   formatListing(listing, type) {
-    return {
-      id: listing.id,
-      type: type,
-      animal_type: type,
-      breed: listing.breed_name || listing.breedName,
-      age: listing.age,
-      price: listing.expected_price || listing.expectedPrice,
-      photo1: listing.front_photo || listing.frontPhoto || listing.photo_1 || listing.photo1,
-      photo2: listing.side_photo || listing.sidePhoto || listing.photo_2 || listing.photo2,
-      photos: [
-        listing.front_photo || listing.frontPhoto || listing.photo_1 || listing.photo1,
-        listing.side_photo || listing.sidePhoto || listing.photo_2 || listing.photo2,
-        listing.photo_3 || listing.photo3,
-        listing.photo_4 || listing.photo4,
-        listing.photo_5 || listing.photo5
-      ].filter(Boolean),
-      city: listing.city,
-      state: listing.state,
-      pincode: listing.pincode,
-      status: listing.status,
-      created_at: listing.created_at || listing.createdAt,
-      updated_at: listing.updated_at || listing.updatedAt
-    };
+    return normalizeOwnListing(listing, type);
   }
 }
 

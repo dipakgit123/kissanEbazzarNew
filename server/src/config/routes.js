@@ -21,6 +21,9 @@ const appointmentRoutes = require('../routes/appointmentRoutes');
 const wishlistRoutes = require('../routes/wishlistRoutes');
 const blogRoutes = require('../routes/blogRoutes');
 const contactRoutes = require('../routes/contactRoutes');
+const governmentSchemeRoutes = require('../routes/governmentSchemeRoutes');
+const listingReportRoutes = require('../routes/listingReportRoutes');
+const petMatingRoutes = require('../routes/petMatingRoutes');
 
 const setupRoutes = (app) => {
   // Routes
@@ -46,6 +49,9 @@ const setupRoutes = (app) => {
   app.use('/api/appointments', appointmentRoutes);
   app.use('/api/wishlist', wishlistRoutes);
   app.use('/api/blogs', blogRoutes);
+  app.use('/api/government-schemes', governmentSchemeRoutes);
+  app.use('/api/listing-reports', listingReportRoutes);
+  app.use('/api/pet-mating', petMatingRoutes);
   app.use('/api/contact', contactRoutes);
 
   // Health check endpoint

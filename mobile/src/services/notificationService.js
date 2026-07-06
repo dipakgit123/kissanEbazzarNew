@@ -37,10 +37,17 @@ try {
 }
 
 /**
- * Register for push notifications and get the Expo push token
+ * Register for push notifications and get the configured push token.
+ * Android can use direct Firebase FCM; Expo tokens remain supported as fallback.
  */
 export const registerForPushNotifications = async () => {
   let token = null;
+  let provider = 'expo';
+  const configuredProvider = (
+    process.env.EXPO_PUBLIC_PUSH_PROVIDER ||
+    Constants.expoConfig?.extra?.pushProvider ||
+    'firebase'
+  ).toLowerCase();
 
   if (Platform.OS === 'android' && Constants.appOwnership === 'expo') {
     logger.log('Skipping remote push registration in Expo Go on Android; use a development build for push notifications.');
@@ -68,18 +75,38 @@ export const registerForPushNotifications = async () => {
     return null;
   }
 
-  // Get Expo push token with validation
-  try {
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+  // Get Firebase FCM token on Android when configured.
+  if (Platform.OS === 'android' && configuredProvider === 'firebase') {
+    try {
+      const devicePushToken = await Notifications.getDevicePushTokenAsync();
+      token = devicePushToken?.data;
+      provider = 'firebase';
 
-    // Validate projectId exists
-    if (!projectId) {
-      logger.error('EAS Project ID not found in app.json - check app.json configuration');
-      return null;
+      if (token) {
+        logger.log('Firebase FCM token obtained:', token.substring(0, 20) + '...');
+      }
+    } catch (error) {
+      logger.error('Error getting Firebase FCM token, falling back to Expo token:', error);
+      token = null;
+      provider = 'expo';
     }
+  }
 
-    token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-    logger.log('Expo push token obtained:', token.substring(0, 20) + '...');
+  // Get Expo push token with validation as fallback or for iOS/Expo provider.
+  try {
+    if (!token) {
+      const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+
+      // Validate projectId exists
+      if (!projectId) {
+        logger.error('EAS Project ID not found in app.json - check app.json configuration');
+        return null;
+      }
+
+      token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+      provider = 'expo';
+      logger.log('Expo push token obtained:', token.substring(0, 20) + '...');
+    }
   } catch (error) {
     logger.error('Error getting push token:', error);
     return null;
@@ -107,24 +134,26 @@ export const registerForPushNotifications = async () => {
     }
   }
 
-  return token;
+  return { token, provider };
 };
 
 /**
  * Register device token with backend (with retry logic)
  */
-export const registerTokenWithBackend = async (token, retries = 3) => {
+export const registerTokenWithBackend = async (token, provider = 'expo', retries = 3) => {
   for (let i = 0; i < retries; i++) {
     try {
       const response = await api.post('/api/notifications/register-token', {
         token,
         platform: Platform.OS,
+        provider,
       });
       logger.log('Token registered with backend');
 
       // Save token to AsyncStorage
       await AsyncStorage.setItem('pushToken', token);
       await AsyncStorage.setItem('pushTokenPlatform', Platform.OS);
+      await AsyncStorage.setItem('pushTokenProvider', provider);
 
       return response.data;
     } catch (error) {
@@ -145,7 +174,8 @@ export const getSavedToken = async () => {
   try {
     const token = await AsyncStorage.getItem('pushToken');
     const platform = await AsyncStorage.getItem('pushTokenPlatform');
-    return { token, platform };
+    const provider = await AsyncStorage.getItem('pushTokenProvider');
+    return { token, platform, provider };
   } catch (error) {
     logger.error('Error getting saved token:', error);
     return { token: null, platform: null };

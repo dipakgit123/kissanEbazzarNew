@@ -5,7 +5,20 @@ const crypto = require('crypto');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
 const adminAuth = require('../middleware/adminAuth');
+const governmentSchemeController = require('../controllers/governmentSchemeController');
+const petMatingController = require('../controllers/petMatingController');
+const { createUploadFields } = require('../config/cloudinary');
 const { authLimiter } = require('../config/rateLimiter');
+const { uploadLimiter } = require('../config/rateLimiter');
+
+const schemeUploadFields = createUploadFields([
+  { name: 'image', maxCount: 1 }
+], {
+  maxFileSizeBytes: 5 * 1024 * 1024,
+  fieldTypeMap: {
+    image: ['image']
+  }
+});
 
 const requireAdminInitSecret = (req, res, next) => {
   const configuredSecret = process.env.ADMIN_INIT_SECRET;
@@ -62,6 +75,30 @@ router.patch('/users/:userId/block', adminController.toggleUserBlock);
 // Listing Management
 router.get('/listings', adminController.getListings);
 router.delete('/listings/:animalType/:listingId', adminController.deleteListing);
+
+// Government Scheme Management
+router.get('/government-schemes/stats', governmentSchemeController.getSchemeStats.bind(governmentSchemeController));
+router.get('/government-schemes', governmentSchemeController.getSchemes.bind(governmentSchemeController));
+router.post(
+  '/government-schemes',
+  uploadLimiter,
+  schemeUploadFields,
+  governmentSchemeController.createScheme.bind(governmentSchemeController)
+);
+router.get('/government-schemes/:id', governmentSchemeController.getSchemeById.bind(governmentSchemeController));
+router.put(
+  '/government-schemes/:id',
+  uploadLimiter,
+  schemeUploadFields,
+  governmentSchemeController.updateScheme.bind(governmentSchemeController)
+);
+router.delete('/government-schemes/:id', governmentSchemeController.deleteScheme.bind(governmentSchemeController));
+router.patch('/government-schemes/:id/status', governmentSchemeController.updateSchemeStatus.bind(governmentSchemeController));
+
+// Pet Mating Management
+router.get('/pet-mating', petMatingController.adminGetProfiles.bind(petMatingController));
+router.get('/pet-mating/reports', petMatingController.adminGetReports.bind(petMatingController));
+router.patch('/pet-mating/:id/status', petMatingController.adminUpdateStatus.bind(petMatingController));
 
 // Veterinarian Management
 const veterinarianController = require('../controllers/veterinarianController');

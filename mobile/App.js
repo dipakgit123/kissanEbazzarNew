@@ -9,7 +9,11 @@ import { NotificationProvider } from './src/context/NotificationContext';
 import { WishlistProvider } from './src/context/WishlistContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import AnimatedSplash from './src/components/AnimatedSplash';
+import { BeautifulFeedbackProvider, beautifulToastConfig } from './src/components/BeautifulFeedback';
+import { applyGlobalTypography } from './src/utils/typography';
 import './src/i18n/config'; // Initialize i18n
+
+applyGlobalTypography();
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -53,9 +57,11 @@ export default function App() {
         <VetAuthProvider>
           <NotificationProvider>
             <WishlistProvider>
-              <StatusBar style="light" backgroundColor="#15BB73" />
-              <AppNavigator />
-              <Toast />
+              <BeautifulFeedbackProvider>
+                <StatusBar style="light" backgroundColor="#15BB73" />
+                <AppNavigator />
+                <Toast config={beautifulToastConfig} />
+              </BeautifulFeedbackProvider>
             </WishlistProvider>
           </NotificationProvider>
         </VetAuthProvider>

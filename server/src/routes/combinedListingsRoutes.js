@@ -33,6 +33,10 @@ router.get('/my-listings', authMiddleware, combinedListingsController.getMyListi
 // PATCH /api/listings/:animalType/:id/sold
 router.patch('/:animalType/:id/sold', authMiddleware, combinedListingsController.markListingAsSold);
 
+// Get seller analytics for a listing
+// GET /api/listings/:animalType/:id/insights
+router.get('/:animalType/:id/insights', authMiddleware, combinedListingsController.getListingInsights);
+
 // Get single listing by animal type and ID
 // GET /api/listings/:animalType/:id
 router.get('/:animalType/:id', combinedListingsController.getListingById);

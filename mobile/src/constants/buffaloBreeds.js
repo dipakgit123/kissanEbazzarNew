@@ -1,3 +1,5 @@
+import { repairMojibakeText } from '../utils/textEncoding';
+
 export const BUFFALO_BREEDS = [
   {
     value: 'Murrah',
@@ -162,13 +164,13 @@ export const BUFFALO_BREEDS = [
 ];
 
 export const getBuffaloBreedOptions = (language, selectLabel) => {
-  const locale = language === 'mr' || language === 'hi' ? language : 'en';
+  const locale = language?.startsWith('mr') ? 'mr' : language?.startsWith('hi') ? 'hi' : 'en';
 
   return [
     { value: '', label: selectLabel },
     ...BUFFALO_BREEDS.map((breed) => ({
       value: breed.value,
-      label: breed.labels[locale] || breed.labels.en
+      label: repairMojibakeText(breed.labels[locale] || breed.labels.en)
     }))
   ];
 };

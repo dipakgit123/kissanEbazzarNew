@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
-import { listingsService } from '../services/api';
+import toast from 'react-hot-toast';
+import { listingsService, listingReportService } from '../services/api';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
 import { FullPageLoader } from './AppLoader';
@@ -50,6 +51,17 @@ const normalizeRelatedListing = (data, fallbackAnimalType) => {
   };
 };
 
+const REPORT_REASONS = [
+  { value: 'fraud', label: 'Fraud or scam' },
+  { value: 'wrong_information', label: 'Wrong information' },
+  { value: 'already_sold', label: 'Already sold' },
+  { value: 'inappropriate_content', label: 'Inappropriate content' },
+  { value: 'suspicious_price', label: 'Suspicious price' },
+  { value: 'seller_not_responding', label: 'Seller not responding' },
+  { value: 'animal_welfare', label: 'Animal welfare concern' },
+  { value: 'other', label: 'Other issue' },
+];
+
 const AnimalDetailPage = () => {
   const { t } = useTranslation();
   const { animalType, id } = useParams();
@@ -60,6 +72,10 @@ const AnimalDetailPage = () => {
   const [activeImage, setActiveImage] = useState(0);
   const [relatedListings, setRelatedListings] = useState([]);
   const [relatedLoading, setRelatedLoading] = useState(false);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportReason, setReportReason] = useState('wrong_information');
+  const [reportDescription, setReportDescription] = useState('');
+  const [reportSubmitting, setReportSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchListing = async () => {
@@ -163,6 +179,45 @@ const AnimalDetailPage = () => {
       month: 'long',
       year: 'numeric'
     });
+  };
+
+  const openReportModal = () => {
+    if (!localStorage.getItem('token')) {
+      toast.error(t('animalDetail.loginToReport', 'Please login to report a listing.'));
+      navigate('/login');
+      return;
+    }
+
+    setReportReason('wrong_information');
+    setReportDescription('');
+    setReportModalOpen(true);
+  };
+
+  const submitReport = async (event) => {
+    event.preventDefault();
+    const description = reportDescription.trim();
+
+    if (description.length < 10) {
+      toast.error(t('animalDetail.reportDescriptionRequiredDesc', 'Please describe the issue in at least 10 characters.'));
+      return;
+    }
+
+    setReportSubmitting(true);
+    try {
+      const response = await listingReportService.createReport({
+        listing_id: id,
+        listing_type: animalType,
+        report_type: reportReason,
+        description,
+      });
+
+      setReportModalOpen(false);
+      toast.success(response?.message || t('animalDetail.reportSubmittedDesc', 'Our team will review this listing shortly.'));
+    } catch (error) {
+      toast.error(error?.message || t('animalDetail.reportFailed', 'Failed to submit report. Please try again.'));
+    } finally {
+      setReportSubmitting(false);
+    }
   };
 
   const formatTimeAgo = (dateString) => {
@@ -273,6 +328,17 @@ const AnimalDetailPage = () => {
               <span className="font-medium text-sm sm:text-base hidden xs:inline">{t('animalDetail.back')}</span>
             </button>
             <div className="flex items-center space-x-1.5 sm:space-x-2">
+              <button
+                type="button"
+                onClick={openReportModal}
+                className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2.5 sm:px-3 py-1 text-xs sm:text-sm font-bold text-red-600 transition hover:bg-red-100"
+                title={t('animalDetail.reportListing', 'Report this listing')}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3v18m0-18h13l-1 5 1 5H3" />
+                </svg>
+                <span className="hidden sm:inline">{t('animalDetail.report', 'Report')}</span>
+              </button>
               <span className="bg-[#15BB73]/10 text-[#15BB73] px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium">
                 {getAnimalTypeLabel(currentAnimalType)}
               </span>
@@ -658,6 +724,109 @@ const AnimalDetailPage = () => {
           </section>
         )}
       </div>
+
+      {reportModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/60 px-3 py-4 backdrop-blur-sm sm:items-center">
+          <form
+            onSubmit={submitReport}
+            className="w-full max-w-2xl overflow-hidden rounded-[2rem] bg-white shadow-2xl"
+          >
+            <div className="bg-gradient-to-r from-red-600 to-orange-500 px-5 py-5 text-white sm:px-7">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.24em] text-red-100">
+                    {t('animalDetail.safetyReview', 'Safety review')}
+                  </p>
+                  <h2 className="mt-2 text-2xl font-black">
+                    {t('animalDetail.reportListing', 'Report this listing')}
+                  </h2>
+                  <p className="mt-2 text-sm font-semibold text-red-50">
+                    {t('animalDetail.reportListingDesc', 'Tell us what looks wrong. Reports are reviewed by our team.')}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReportModalOpen(false)}
+                  className="rounded-full bg-white/15 p-2 text-white transition hover:bg-white/25"
+                  aria-label={t('common.close', 'Close')}
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-5 px-5 py-6 sm:px-7">
+              <div>
+                <label className="mb-3 block text-sm font-black text-slate-800">
+                  {t('animalDetail.reportReason', 'Reason')}
+                </label>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {REPORT_REASONS.map((reason) => {
+                    const selected = reportReason === reason.value;
+                    return (
+                      <button
+                        key={reason.value}
+                        type="button"
+                        onClick={() => setReportReason(reason.value)}
+                        className={`rounded-2xl border px-4 py-3 text-left text-sm font-bold transition ${
+                          selected
+                            ? 'border-red-400 bg-red-50 text-red-700 shadow-sm'
+                            : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-red-200 hover:bg-red-50/60'
+                        }`}
+                      >
+                        {t(`animalDetail.reportReasons.${reason.value}`, reason.label)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-3 block text-sm font-black text-slate-800">
+                  {t('animalDetail.reportDetails', 'Details')}
+                </label>
+                <textarea
+                  value={reportDescription}
+                  onChange={(event) => setReportDescription(event.target.value)}
+                  maxLength={600}
+                  rows={5}
+                  className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
+                  placeholder={t('animalDetail.reportDetailsPlaceholder', 'Example: seller shared wrong age, fake photo, already sold, or suspicious price...')}
+                />
+                <div className="mt-2 flex items-center justify-between text-xs font-bold text-slate-400">
+                  <span>{t('animalDetail.reportMinimumHint', 'Minimum 10 characters')}</span>
+                  <span>{reportDescription.trim().length}/600</span>
+                </div>
+              </div>
+
+              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setReportModalOpen(false)}
+                  disabled={reportSubmitting}
+                  className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-black text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
+                >
+                  {t('common.cancel', 'Cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={reportSubmitting}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-red-600/20 transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {reportSubmitting && (
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                  )}
+                  {reportSubmitting
+                    ? t('animalDetail.submittingReport', 'Submitting...')
+                    : t('animalDetail.submitReport', 'Submit report')}
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Fixed Bottom Contact Bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">

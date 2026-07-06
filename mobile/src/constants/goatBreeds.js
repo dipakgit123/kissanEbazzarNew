@@ -1,3 +1,5 @@
+import { repairMojibakeText } from '../utils/textEncoding';
+
 export const GOAT_BREEDS = [
   {
     value: 'Osmanabadi',
@@ -242,13 +244,13 @@ export const GOAT_BREEDS = [
 ];
 
 export const getGoatBreedOptions = (language, selectLabel) => {
-  const locale = language === 'mr' || language === 'hi' ? language : 'en';
+  const locale = language?.startsWith('mr') ? 'mr' : language?.startsWith('hi') ? 'hi' : 'en';
 
   return [
     { value: '', label: selectLabel },
     ...GOAT_BREEDS.map((breed) => ({
       value: breed.value,
-      label: breed.labels[locale] || breed.labels.en
+      label: repairMojibakeText(breed.labels[locale] || breed.labels.en)
     }))
   ];
 };

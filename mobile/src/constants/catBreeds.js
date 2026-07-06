@@ -1,3 +1,5 @@
+import { repairMojibakeText } from '../utils/textEncoding';
+
 export const CAT_BREEDS = [
   {
     value: 'Persian Cat',
@@ -170,13 +172,13 @@ export const CAT_BREEDS = [
 ];
 
 export const getCatBreedOptions = (language, selectLabel) => {
-  const locale = language === 'mr' || language === 'hi' ? language : 'en';
+  const locale = language?.startsWith('mr') ? 'mr' : language?.startsWith('hi') ? 'hi' : 'en';
 
   return [
     { value: '', label: selectLabel },
     ...CAT_BREEDS.map((breed) => ({
       value: breed.value,
-      label: breed.labels[locale] || breed.labels.en
+      label: repairMojibakeText(breed.labels[locale] || breed.labels.en)
     }))
   ];
 };

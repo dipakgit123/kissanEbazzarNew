@@ -374,7 +374,125 @@ export const listingsService = {
     } catch (error) {
       throw error.response?.data || error;
     }
+  },
+
+  getListingInsights: async (animalType, id) => {
+    try {
+      const response = await api.get(`/api/listings/${animalType}/${id}/insights`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
   }
+};
+
+export const listingReportService = {
+  createReport: async (reportData) => {
+    try {
+      const response = await api.post('/api/listing-reports', reportData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  getMyReports: async (page = 1, limit = 10) => {
+    try {
+      const response = await api.get('/api/listing-reports/my-reports', {
+        params: { page, limit }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  }
+};
+
+export const petMatingService = {
+  getProfiles: async (params = {}) => {
+    try {
+      const response = await api.get('/api/pet-mating', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  getProfile: async (id) => {
+    try {
+      const response = await api.get(`/api/pet-mating/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  getMyProfiles: async () => {
+    try {
+      const response = await api.get('/api/pet-mating/my-profiles');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  createProfile: async (profileData) => {
+    try {
+      const response = await api.post('/api/pet-mating', profileData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  updateProfile: async (id, profileData) => {
+    try {
+      const response = await api.put(`/api/pet-mating/${id}`, profileData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  markMatched: async (id) => {
+    try {
+      const response = await api.patch(`/api/pet-mating/${id}/matched`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  deleteProfile: async (id) => {
+    try {
+      const response = await api.delete(`/api/pet-mating/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  trackContact: async (id) => {
+    try {
+      const response = await api.post(`/api/pet-mating/${id}/contact`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  reportProfile: async (id, reportData) => {
+    try {
+      const response = await api.post(`/api/pet-mating/${id}/report`, reportData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
 };
 
 // Pregnancy Calendar Service

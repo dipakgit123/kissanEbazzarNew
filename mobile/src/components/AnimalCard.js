@@ -7,6 +7,9 @@ import {
   StyleSheet,
   Linking,
   ActivityIndicator,
+  Modal,
+  TextInput,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -14,9 +17,19 @@ import { useTranslation } from 'react-i18next';
 import Toast from 'react-native-toast-message';
 import { COLORS, formatPrice, formatTimeAgo, getAnimalTypeIcon } from '../utils/constants';
 import { useWishlist } from '../context/WishlistContext';
-import { callLogService } from '../services/api';
+import { callLogService, listingReportService } from '../services/api';
 
 const OTP_DOT = '\u00B7';
+const REPORT_REASONS = [
+  { value: 'fraud', label: 'Fraud or scam' },
+  { value: 'wrong_information', label: 'Wrong information' },
+  { value: 'already_sold', label: 'Already sold' },
+  { value: 'inappropriate_content', label: 'Inappropriate content' },
+  { value: 'suspicious_price', label: 'Suspicious price' },
+  { value: 'seller_not_responding', label: 'Seller not responding' },
+  { value: 'animal_welfare', label: 'Animal welfare concern' },
+  { value: 'other', label: 'Other issue' },
+];
 
 const AnimalCard = ({ listing, onPress }) => {
   if (!listing) {
@@ -27,6 +40,10 @@ const AnimalCard = ({ listing, onPress }) => {
   const navigation = useNavigation();
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
   const [isWishlistLoading, setIsWishlistLoading] = useState(false);
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [reportReason, setReportReason] = useState('wrong_information');
+  const [reportDescription, setReportDescription] = useState('');
+  const [isReportSubmitting, setIsReportSubmitting] = useState(false);
   const inWishlist = isInWishlist(listing.id);
 
   const {
@@ -194,6 +211,56 @@ const AnimalCard = ({ listing, onPress }) => {
     navigation.navigate('Map', mapParams);
   };
 
+  const openReportModal = () => {
+    setReportReason('wrong_information');
+    setReportDescription('');
+    setReportModalVisible(true);
+  };
+
+  const submitReport = async () => {
+    const description = reportDescription.trim();
+
+    if (description.length < 10) {
+      Toast.show({
+        type: 'error',
+        text1: t('animalDetail.reportDescriptionRequired', { defaultValue: 'Add more detail' }),
+        text2: t('animalDetail.reportDescriptionRequiredDesc', { defaultValue: 'Please describe the issue in at least 10 characters.' }),
+        visibilityTime: 2500,
+        topOffset: 60,
+      });
+      return;
+    }
+
+    setIsReportSubmitting(true);
+    try {
+      const response = await listingReportService.createReport({
+        listing_id: listing.id,
+        listing_type: animal_type,
+        report_type: reportReason,
+        description,
+      });
+
+      setReportModalVisible(false);
+      Toast.show({
+        type: 'success',
+        text1: t('animalDetail.reportSubmitted', { defaultValue: 'Report submitted' }),
+        text2: response?.message || t('animalDetail.reportSubmittedDesc', { defaultValue: 'Our team will review this listing shortly.' }),
+        visibilityTime: 2500,
+        topOffset: 60,
+      });
+    } catch (error) {
+      Toast.show({
+        type: 'error',
+        text1: t('common.error', { defaultValue: 'Error' }),
+        text2: error?.message || t('animalDetail.reportFailed', { defaultValue: 'Failed to submit report.' }),
+        visibilityTime: 3000,
+        topOffset: 60,
+      });
+    } finally {
+      setIsReportSubmitting(false);
+    }
+  };
+
   const numericDistance = Number(distance);
   const distanceText =
     Number.isFinite(numericDistance) && numericDistance > 0
@@ -237,6 +304,14 @@ const AnimalCard = ({ listing, onPress }) => {
               color={inWishlist ? COLORS.error : COLORS.borderStrong}
             />
           )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.reportButton}
+          onPress={openReportModal}
+          activeOpacity={0.78}
+        >
+          <Ionicons name="flag-outline" size={17} color={COLORS.error} />
         </TouchableOpacity>
 
         <View style={styles.thumbnailWrap}>
@@ -304,6 +379,105 @@ const AnimalCard = ({ listing, onPress }) => {
           </View>
         </View>
       </View>
+
+      <Modal
+        visible={reportModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setReportModalVisible(false)}
+      >
+        <View style={styles.reportBackdrop}>
+          <View style={styles.reportSheet}>
+            <View style={styles.reportTitleRow}>
+              <View style={styles.reportIconWrap}>
+                <Ionicons name="flag-outline" size={22} color={COLORS.error} />
+              </View>
+              <View style={styles.reportTitleTextWrap}>
+                <Text style={styles.reportTitle}>
+                  {t('animalDetail.reportListing', { defaultValue: 'Report this listing' })}
+                </Text>
+                <Text style={styles.reportSubtitle} numberOfLines={2}>
+                  {breed_name || animalTypeLabel}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.reportCloseButton}
+                onPress={() => setReportModalVisible(false)}
+              >
+                <Ionicons name="close" size={20} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={styles.reportFormScroll}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Text style={styles.reportFieldLabel}>
+                {t('animalDetail.reportReason', { defaultValue: 'Reason' })}
+              </Text>
+              <View style={styles.reportReasonGrid}>
+                {REPORT_REASONS.map((reason) => {
+                  const selected = reportReason === reason.value;
+                  return (
+                    <TouchableOpacity
+                      key={reason.value}
+                      style={[styles.reportReasonChip, selected && styles.reportReasonChipSelected]}
+                      onPress={() => setReportReason(reason.value)}
+                      activeOpacity={0.86}
+                    >
+                      <Text style={[styles.reportReasonText, selected && styles.reportReasonTextSelected]}>
+                        {t(`animalDetail.reportReasons.${reason.value}`, { defaultValue: reason.label })}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.reportFieldLabel}>
+                {t('animalDetail.reportDetails', { defaultValue: 'Details' })}
+              </Text>
+              <TextInput
+                value={reportDescription}
+                onChangeText={setReportDescription}
+                placeholder={t('animalDetail.reportDetailsPlaceholder', { defaultValue: 'Explain the issue with this listing...' })}
+                placeholderTextColor={COLORS.gray}
+                style={styles.reportInput}
+                multiline
+                textAlignVertical="top"
+                maxLength={600}
+              />
+              <Text style={styles.reportCounter}>{reportDescription.trim().length}/600</Text>
+            </ScrollView>
+
+            <View style={styles.reportActions}>
+              <TouchableOpacity
+                style={styles.reportCancelButton}
+                onPress={() => setReportModalVisible(false)}
+                disabled={isReportSubmitting}
+              >
+                <Text style={styles.reportCancelText}>{t('common.cancel', { defaultValue: 'Cancel' })}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.reportSubmitButton, isReportSubmitting && styles.reportSubmitButtonDisabled]}
+                onPress={submitReport}
+                disabled={isReportSubmitting}
+              >
+                {isReportSubmitting ? (
+                  <ActivityIndicator color={COLORS.white} />
+                ) : (
+                  <>
+                    <Ionicons name="send" size={17} color={COLORS.white} />
+                    <Text style={styles.reportSubmitText}>
+                      {t('animalDetail.submitReport', { defaultValue: 'Submit' })}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </TouchableOpacity>
   );
 };
@@ -390,6 +564,20 @@ const styles = StyleSheet.create({
   },
   wishlistButtonLoading: {
     backgroundColor: COLORS.borderStrong,
+  },
+  reportButton: {
+    position: 'absolute',
+    left: 12,
+    bottom: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: COLORS.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.errorSoft,
+    zIndex: 2,
   },
   thumbnailWrap: {
     position: 'absolute',
@@ -526,6 +714,151 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontWeight: '700',
     fontSize: 13,
+  },
+  reportBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.46)',
+  },
+  reportSheet: {
+    maxHeight: '88%',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 24,
+    backgroundColor: COLORS.surface,
+  },
+  reportTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 18,
+  },
+  reportIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    backgroundColor: COLORS.errorSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  reportTitleTextWrap: {
+    flex: 1,
+  },
+  reportTitle: {
+    color: COLORS.text,
+    fontSize: 19,
+    fontWeight: '900',
+  },
+  reportSubtitle: {
+    marginTop: 3,
+    color: COLORS.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
+  reportCloseButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: COLORS.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  reportFormScroll: {
+    maxHeight: 390,
+  },
+  reportFieldLabel: {
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: '900',
+    marginBottom: 10,
+  },
+  reportReasonGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 18,
+  },
+  reportReasonChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surfaceAlt,
+  },
+  reportReasonChipSelected: {
+    borderColor: COLORS.error,
+    backgroundColor: COLORS.errorSoft,
+  },
+  reportReasonText: {
+    color: COLORS.textMuted,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  reportReasonTextSelected: {
+    color: COLORS.error,
+  },
+  reportInput: {
+    minHeight: 112,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: COLORS.text,
+    backgroundColor: COLORS.surfaceAlt,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
+  },
+  reportCounter: {
+    alignSelf: 'flex-end',
+    marginTop: 6,
+    color: COLORS.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  reportActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 18,
+  },
+  reportCancelButton: {
+    flex: 1,
+    height: 50,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.surfaceAlt,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  reportCancelText: {
+    color: COLORS.textMuted,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  reportSubmitButton: {
+    flex: 1.35,
+    height: 50,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    backgroundColor: COLORS.error,
+  },
+  reportSubmitButtonDisabled: {
+    opacity: 0.7,
+  },
+  reportSubmitText: {
+    color: COLORS.white,
+    fontSize: 15,
+    fontWeight: '900',
   },
 });
 

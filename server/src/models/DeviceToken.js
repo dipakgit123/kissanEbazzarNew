@@ -12,8 +12,13 @@ module.exports = (sequelize) => {
       allowNull: false,
     },
     token: {
-      type: DataTypes.STRING(500),
+      type: DataTypes.STRING(2048),
       allowNull: false,
+    },
+    provider: {
+      type: DataTypes.STRING(40),
+      allowNull: false,
+      defaultValue: 'expo',
     },
     platform: {
       type: DataTypes.ENUM('android', 'ios', 'web'),
