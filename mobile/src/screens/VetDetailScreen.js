@@ -18,7 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
 import { veterinarianService, vetReviewService, vetReportService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import CowLoader from '../components/CowLoader';
+import SkeletonLoader from '../components/SkeletonLoader';
 
 const getReportTypes = (t) => [
   { value: 'fake_profile', label: t('vetDetail.reportTypes.fake_profile') },
@@ -486,7 +486,7 @@ const VetDetailScreen = ({ route, navigation }) => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <CowLoader message="" size="large" />
+        <SkeletonLoader variant="detail" />
       </View>
     );
   }

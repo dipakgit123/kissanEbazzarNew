@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import AppHeader from '../components/AppHeader';
-import CowLoader from '../components/CowLoader';
+import SkeletonLoader from '../components/SkeletonLoader';
 import { governmentSchemeService } from '../services/api';
 import { COLORS } from '../utils/constants';
 
@@ -286,7 +286,7 @@ const GovernmentSchemesScreen = ({ navigation }) => {
 
           {loading ? (
             <View style={styles.loadingWrap}>
-              <CowLoader message={t('governmentSchemes.loading')} size="medium" />
+              <SkeletonLoader variant="schemeList" count={4} />
             </View>
           ) : schemes.length === 0 ? (
             <View style={styles.emptyState}>

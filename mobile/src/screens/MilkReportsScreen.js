@@ -20,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
 import { milkReportService } from '../services/api';
-import CowLoader from '../components/CowLoader';
+import SkeletonLoader from '../components/SkeletonLoader';
 import AppHeader from '../components/AppHeader';
 import FeatureHelpModal from '../components/FeatureHelpModal';
 import { getLocalizedFeatureHelp } from '../constants/featureHelp';
@@ -713,7 +713,7 @@ const MilkReportsScreen = ({ navigation }) => {
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingScreen}>
-        <CowLoader message={t('milkReports.loading')} size="large" />
+        <SkeletonLoader variant="dashboard" style={{ padding: 16 }} />
       </SafeAreaView>
     );
   }

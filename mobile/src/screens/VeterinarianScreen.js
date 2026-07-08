@@ -16,7 +16,7 @@ import { useTranslation } from 'react-i18next';
 import * as Location from 'expo-location';
 import { COLORS } from '../utils/constants';
 import { veterinarianService } from '../services/api';
-import CowLoader from '../components/CowLoader';
+import SkeletonLoader from '../components/SkeletonLoader';
 import FeatureHelpModal from '../components/FeatureHelpModal';
 import { getLocalizedFeatureHelp } from '../constants/featureHelp';
 
@@ -304,7 +304,7 @@ const VeterinarianScreen = ({ navigation }) => {
   if (!ready) {
     return (
       <View style={[styles.loadingScreen, styles.centered]}>
-        <CowLoader message="" size="large" />
+        <SkeletonLoader variant="vetList" count={5} style={{ padding: 16 }} />
       </View>
     );
   }
@@ -455,7 +455,7 @@ const VeterinarianScreen = ({ navigation }) => {
         <View style={styles.listSection}>
           {loading ? (
             <View style={styles.loadingContainer}>
-              <CowLoader message={t('veterinarian.findingVets')} size="medium" />
+              <SkeletonLoader variant="vetList" count={4} />
             </View>
           ) : filteredVets.length === 0 ? (
             <View style={styles.emptyContainer}>

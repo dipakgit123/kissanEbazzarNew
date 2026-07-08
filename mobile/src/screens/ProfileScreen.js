@@ -24,7 +24,7 @@ import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import { listingsService, userService } from '../services/api';
 import { COLORS } from '../utils/constants';
-import CowLoader from '../components/CowLoader';
+import SkeletonLoader from '../components/SkeletonLoader';
 import AppHeader from '../components/AppHeader';
 
 const ProfileScreen = ({ navigation }) => {
@@ -801,7 +801,7 @@ const ProfileScreen = ({ navigation }) => {
                   <View style={styles.expandedListingsContainer}>
                     {loadingListings ? (
                       <View style={styles.loadingContainer}>
-                        <CowLoader message={t('profile.loadingListings')} size="medium" />
+                        <SkeletonLoader variant="profileList" count={3} compact />
                       </View>
                     ) : myListings.length > 0 ? (
                       <View style={styles.listingsContainer}>

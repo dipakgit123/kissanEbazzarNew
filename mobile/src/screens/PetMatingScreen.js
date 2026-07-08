@@ -18,7 +18,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Picker } from '@react-native-picker/picker';
 import { useTranslation } from 'react-i18next';
 import AppHeader from '../components/AppHeader';
-import CowLoader from '../components/CowLoader';
+import SkeletonLoader from '../components/SkeletonLoader';
 import { getCatBreedOptions } from '../constants/catBreeds';
 import { getDogBreedOptions } from '../constants/dogBreeds';
 import { useAuth } from '../context/AuthContext';
@@ -430,7 +430,7 @@ const PetMatingScreen = ({ navigation }) => {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingCenter}>
-          <CowLoader message={t('petMating.loading', { defaultValue: 'Loading pet mating profiles...' })} size="medium" />
+          <SkeletonLoader variant="animalList" count={3} compact />
         </View>
       </SafeAreaView>
     );

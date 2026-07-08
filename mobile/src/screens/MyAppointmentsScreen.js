@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
 import { appointmentService } from '../services/api';
-import CowLoader from '../components/CowLoader';
+import SkeletonLoader from '../components/SkeletonLoader';
 import AppHeader from '../components/AppHeader';
 
 const MyAppointmentsScreen = ({ navigation }) => {
@@ -26,7 +26,7 @@ const MyAppointmentsScreen = ({ navigation }) => {
   if (!ready) {
     return (
       <View style={styles.loadingContainer}>
-        <CowLoader message="" size="large" />
+        <SkeletonLoader variant="list" count={5} />
       </View>
     );
   }
@@ -240,7 +240,7 @@ const MyAppointmentsScreen = ({ navigation }) => {
       {/* Content */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <CowLoader message={t('appointments.loadingAppointments')} size="medium" />
+          <SkeletonLoader variant="list" count={5} />
         </View>
       ) : appointments.length === 0 ? (
         <View style={styles.emptyContainer}>

@@ -17,7 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
 import { veterinarianService } from '../services/api';
 import { useVetAuth } from '../context/VetAuthContext';
-import CowLoader from '../components/CowLoader';
+import SkeletonLoader from '../components/SkeletonLoader';
 import AppHeader from '../components/AppHeader';
 
 const EditVetProfileScreen = ({ navigation }) => {
@@ -71,7 +71,7 @@ const EditVetProfileScreen = ({ navigation }) => {
   if (!ready) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <CowLoader message="" size="large" />
+        <SkeletonLoader variant="detail" />
       </View>
     );
   }

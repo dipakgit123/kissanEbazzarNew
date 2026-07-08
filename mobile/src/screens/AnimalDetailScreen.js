@@ -20,7 +20,7 @@ import { useTranslation } from 'react-i18next';
 import { COLORS, formatPrice, formatDate, getAnimalTypeLabel } from '../utils/constants';
 import { listingsService, callLogService, listingReportService } from '../services/api';
 import { useWishlist } from '../context/WishlistContext';
-import CowLoader from '../components/CowLoader';
+import SkeletonLoader from '../components/SkeletonLoader';
 
 const { width } = Dimensions.get('window');
 
@@ -282,7 +282,7 @@ const AnimalDetailScreen = ({ route, navigation }) => {
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer} edges={['top', 'bottom']}>
-        <CowLoader message={t('animalDetail.loadingListing')} size="large" />
+        <SkeletonLoader variant="detail" />
       </SafeAreaView>
     );
   }

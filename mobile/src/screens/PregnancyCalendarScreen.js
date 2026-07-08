@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import CowLoader from '../components/CowLoader';
+import SkeletonLoader from '../components/SkeletonLoader';
 import AppHeader from '../components/AppHeader';
 import FeatureHelpModal from '../components/FeatureHelpModal';
 import { getLocalizedFeatureHelp } from '../constants/featureHelp';
@@ -878,7 +878,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
       <SafeAreaView style={styles.loaderSafeArea}>
         <StatusBar barStyle="dark-content" />
         <View style={styles.loaderContent}>
-          <CowLoader message={t('pregnancy.loadingCalendar')} size="large" />
+          <SkeletonLoader variant="dashboard" />
         </View>
       </SafeAreaView>
     );

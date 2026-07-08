@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  ActivityIndicator,
   Alert,
   Dimensions,
   Image,
@@ -21,6 +20,7 @@ import { getDogBreedOptions } from '../constants/dogBreeds';
 import { getGoatBreedOptions } from '../constants/goatBreeds';
 import { getHorseBreedOptions } from '../constants/horseBreeds';
 import { listingsService } from '../services/api';
+import SkeletonLoader from '../components/SkeletonLoader';
 import { COLORS } from '../utils/constants';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -482,8 +482,7 @@ const SellerListingInsightsScreen = ({ navigation, route }) => {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.loadingWrap}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>{t('profile.loadingInsights', { defaultValue: 'Loading listing analytics...' })}</Text>
+          <SkeletonLoader variant="dashboard" />
         </View>
       </View>
     );

@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
 import { useVetAuth } from '../context/VetAuthContext';
 import { veterinarianService } from '../services/api';
-import CowLoader from '../components/CowLoader';
+import SkeletonLoader from '../components/SkeletonLoader';
 import AppHeader from '../components/AppHeader';
 
 const localeMap = {
@@ -546,7 +546,7 @@ const VetDashboardScreen = ({ navigation }) => {
   if (!ready || (loading && !refreshing)) {
     return (
       <View style={styles.loadingContainer}>
-        <CowLoader message={t('vetDashboard.loadingDashboard', { defaultValue: '' })} size="large" />
+        <SkeletonLoader variant="dashboard" />
       </View>
     );
   }

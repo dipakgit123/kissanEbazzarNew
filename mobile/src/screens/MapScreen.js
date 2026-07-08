@@ -16,7 +16,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { COLORS, formatPrice } from '../utils/constants';
 import { listingsService } from '../services/api';
-import CowLoader from '../components/CowLoader';
+import SkeletonLoader from '../components/SkeletonLoader';
 import AppHeader from '../components/AppHeader';
 
 const { width, height } = Dimensions.get('window');
@@ -474,7 +474,7 @@ const MapScreen = ({ navigation, route }) => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <CowLoader message="Loading map" size="large" />
+        <SkeletonLoader variant="map" />
       </View>
     );
   }

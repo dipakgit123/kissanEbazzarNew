@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
 import AnimalCard from '../components/AnimalCard';
-import CowLoader from '../components/CowLoader';
+import SkeletonLoader from '../components/SkeletonLoader';
 import { animalListingService, governmentSchemeService, userService } from '../services/api';
 
 const { width } = Dimensions.get('window');
@@ -81,7 +81,7 @@ const HomeScreen = ({ navigation }) => {
       key: 'petMating',
       title: t('petMating.title', { defaultValue: 'Pet Mating' }),
       subtitle: t('petMating.homeDesc', { defaultValue: 'Find trusted dog and cat mates' }),
-      image: require('../assets/cat1.png'),
+      image: require('../assets/mating_feature.png'),
       route: 'PetMating',
       backgroundColor: COLORS.primaryDeep,
       iconColor: COLORS.primarySoft,
@@ -568,7 +568,7 @@ const HomeScreen = ({ navigation }) => {
           </View>
 
           {loading ? (
-            <CowLoader message={t('home.findingAnimals', { defaultValue: '' })} size="medium" />
+            <SkeletonLoader variant="animalList" count={3} />
           ) : (
             <View style={styles.animalsSection}>
               {animals.map((animal) => (

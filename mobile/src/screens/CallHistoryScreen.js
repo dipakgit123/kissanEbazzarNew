@@ -17,7 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
 import { useAuth } from '../context/AuthContext';
 import { callLogService } from '../services/api';
-import CowLoader from '../components/CowLoader';
+import SkeletonLoader from '../components/SkeletonLoader';
 import AppHeader from '../components/AppHeader';
 
 const CallHistoryScreen = ({ navigation }) => {
@@ -32,7 +32,7 @@ const CallHistoryScreen = ({ navigation }) => {
   if (!ready) {
     return (
       <View style={styles.loadingContainer}>
-        <CowLoader message="" size="large" />
+        <SkeletonLoader variant="list" count={5} />
       </View>
     );
   }
@@ -316,7 +316,7 @@ const CallHistoryScreen = ({ navigation }) => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <CowLoader message={t('common.loading', { defaultValue: '' })} size="large" />
+        <SkeletonLoader variant="list" count={5} />
       </View>
     );
   }

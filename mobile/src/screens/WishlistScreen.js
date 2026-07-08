@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, formatPrice, getAnimalTypeIcon } from '../utils/constants';
 import { useWishlist } from '../context/WishlistContext';
 import { callLogService } from '../services/api';
-import CowLoader from '../components/CowLoader';
+import SkeletonLoader from '../components/SkeletonLoader';
 import AppHeader from '../components/AppHeader';
 
 const CATEGORY_ORDER = ['all', 'cow', 'buffalo', 'goat', 'horse', 'dog', 'cat', 'other'];
@@ -546,7 +546,7 @@ const WishlistScreen = ({ navigation }) => {
     if (loading) {
       return (
         <View style={styles.loadingContainer}>
-          <CowLoader message={t('wishlist.loadingWishlist')} size="large" />
+          <SkeletonLoader variant="animalList" count={4} />
         </View>
       );
     }

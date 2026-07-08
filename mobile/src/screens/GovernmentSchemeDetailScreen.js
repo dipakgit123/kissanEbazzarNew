@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import AppHeader from '../components/AppHeader';
-import CowLoader from '../components/CowLoader';
+import SkeletonLoader from '../components/SkeletonLoader';
 import { governmentSchemeService } from '../services/api';
 import { COLORS } from '../utils/constants';
 
@@ -130,7 +130,7 @@ const GovernmentSchemeDetailScreen = ({ navigation, route }) => {
         <StatusBar barStyle="dark-content" />
         <AppHeader safeArea={false} navigation={navigation} title={t('governmentSchemes.title')} />
         <View style={styles.centerState}>
-          <CowLoader message={t('governmentSchemes.loadingDetails')} size="large" />
+          <SkeletonLoader variant="detail" />
         </View>
       </SafeAreaView>
     );

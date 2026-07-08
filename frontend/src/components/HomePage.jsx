@@ -11,7 +11,7 @@ import farmerHeroImage from '../assets/images/farmer_fixed_1920x1400.png';
 import veterinarianFeatureImage from '../assets/images/veternarian.png';
 import aiHealthFeatureImage from '../assets/images/AI health.png';
 import pregnancyCalendarFeatureImage from '../assets/images/pregnancy calender.png';
-import petMatingFeatureImage from '../assets/images/cat1.png';
+import petMatingFeatureImage from '../assets/images/mating_feature.png';
 import playStoreBannerImage from '../assets/images/playstore.png';
 
 import { Link } from 'react-router-dom';

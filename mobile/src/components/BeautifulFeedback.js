@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Toast from 'react-native-toast-message';
 import { COLORS } from '../utils/constants';
 
 const FeedbackContext = createContext(null);
@@ -80,6 +81,25 @@ const normalizeButtons = (buttons) => {
     }));
 };
 
+const isPlainToastAlert = (buttons, options) => {
+  if (options?.forceDialog) {
+    return false;
+  }
+
+  if (!Array.isArray(buttons) || buttons.length === 0) {
+    return true;
+  }
+
+  const normalizedButtons = normalizeButtons(buttons);
+  if (normalizedButtons.length !== 1) {
+    return false;
+  }
+
+  const [button] = normalizedButtons;
+  const isDefaultOk = !button.style || button.style === 'default' || button.style === 'cancel';
+  return isDefaultOk && !button.onPress;
+};
+
 export const useFeedback = () => {
   const context = useContext(FeedbackContext);
   if (!context) {
@@ -98,13 +118,27 @@ export const BeautifulFeedbackProvider = ({ children }) => {
 
   const showAlert = useCallback((title, message, buttons, options = {}) => {
     const normalizedButtons = normalizeButtons(buttons);
+    const variant = inferAlertVariant(title, message, normalizedButtons);
     Keyboard.dismiss();
+
+    if (isPlainToastAlert(buttons, options)) {
+      Toast.show({
+        type: variant === 'warning' ? 'info' : variant,
+        text1: title ? String(title) : '',
+        text2: message ? String(message) : '',
+        position: 'top',
+        visibilityTime: variant === 'error' ? 3200 : 2300,
+        topOffset: 48,
+      });
+      return;
+    }
+
     setAlertState({
       title: title ? String(title) : '',
       message: message ? String(message) : '',
       buttons: normalizedButtons,
       options: options || {},
-      variant: inferAlertVariant(title, message, normalizedButtons),
+      variant,
     });
   }, []);
 
@@ -345,29 +379,29 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
   },
   toastCard: {
-    width: '92%',
-    minHeight: 68,
-    borderRadius: 22,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    width: '88%',
+    minHeight: 52,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
     backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.border,
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.13,
-    shadowRadius: 18,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 7 },
+    shadowOpacity: 0.11,
+    shadowRadius: 14,
+    elevation: 8,
   },
   toastIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 10,
   },
   toastTextWrap: {
     flex: 1,
@@ -375,14 +409,14 @@ const styles = StyleSheet.create({
   },
   toastTitle: {
     color: COLORS.text,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '900',
   },
   toastMessage: {
-    marginTop: 3,
+    marginTop: 2,
     color: COLORS.textMuted,
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 11,
+    lineHeight: 15,
     fontWeight: '600',
   },
 });

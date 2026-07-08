@@ -10,7 +10,7 @@ import {
 import { COLORS } from '../utils/constants';
 import { listingsService } from '../services/api';
 import AnimalCard from '../components/AnimalCard';
-import CowLoader from '../components/CowLoader';
+import SkeletonLoader from '../components/SkeletonLoader';
 import AppHeader from '../components/AppHeader';
 
 const CategoryListingsScreen = ({ route, navigation }) => {
@@ -92,7 +92,7 @@ const CategoryListingsScreen = ({ route, navigation }) => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <CowLoader message={`Loading ${category.name}...`} size="large" />
+        <SkeletonLoader variant="animalList" count={4} />
       </View>
     );
   }

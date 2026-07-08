@@ -18,7 +18,7 @@ import Slider from '@react-native-community/slider';
 import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
 import AnimalCard from '../components/AnimalCard';
-import CowLoader from '../components/CowLoader';
+import SkeletonLoader from '../components/SkeletonLoader';
 import FeatureHelpModal from '../components/FeatureHelpModal';
 import { getLocalizedFeatureHelp } from '../constants/featureHelp';
 import { animalListingService, userService } from '../services/api';
@@ -464,7 +464,7 @@ const BuyAnimalsScreen = ({ navigation }) => {
         {/* Animals Grid */}
         <View style={styles.animalsSection}>
           {loading && !refreshing ? (
-            <CowLoader message={t('buyAnimals.loadingAnimals', { defaultValue: '' })} size="medium" />
+            <SkeletonLoader variant="animalList" count={4} />
           ) : filteredAnimals.length > 0 ? (
             <View style={styles.animalsList}>
               {filteredAnimals.map((animal) => (

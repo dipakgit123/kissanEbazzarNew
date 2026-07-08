@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useNotifications } from '../context/NotificationContext';
 import { COLORS } from '../utils/constants';
-import CowLoader from '../components/CowLoader';
+import SkeletonLoader from '../components/SkeletonLoader';
 import AppHeader from '../components/AppHeader';
 
 const NotificationItem = ({ notification, onPress, onDelete }) => {
@@ -107,7 +107,7 @@ const NotificationsScreen = ({ navigation }) => {
   if (!ready) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <CowLoader message="" size="large" />
+        <SkeletonLoader variant="list" count={5} />
       </View>
     );
   }
@@ -225,7 +225,7 @@ const NotificationsScreen = ({ navigation }) => {
 
       {loading && notifications.length === 0 ? (
         <View style={styles.loadingContainer}>
-          <CowLoader message={t('common.loading', { defaultValue: '' })} size="medium" />
+          <SkeletonLoader variant="list" count={5} />
         </View>
       ) : (
         <FlatList

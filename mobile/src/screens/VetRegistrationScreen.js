@@ -8,7 +8,7 @@ import * as Location from 'expo-location';
 import { COLORS } from '../utils/constants';
 import { veterinarianService } from '../services/api';
 import LanguageSwitcher from '../components/LanguageSwitcher';
-import CowLoader from '../components/CowLoader';
+import SkeletonLoader from '../components/SkeletonLoader';
 import AppHeader from '../components/AppHeader';
 
 const { width } = Dimensions.get('window');
@@ -32,7 +32,7 @@ const VetRegistrationScreen = ({ navigation }) => {
   if (!ready) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <CowLoader message="" size="large" />
+        <SkeletonLoader variant="detail" />
       </View>
     );
   }
