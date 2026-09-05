@@ -1,27 +1,32 @@
 {
   "cli": {
-    "version": ">= 3.0.0"
+    "version": ">= 3.0.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://184.73.111.59"
+        "EXPO_PUBLIC_API_URL": "http://184.73.111.59",
+        "EXPO_PUBLIC_ALLOW_CLEARTEXT": "true"
       }
     },
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://184.73.111.59"
+        "EXPO_PUBLIC_API_URL": "http://184.73.111.59",
+        "EXPO_PUBLIC_PUSH_PROVIDER": "firebase",
+        "EXPO_PUBLIC_ALLOW_CLEARTEXT": "true"
       },
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "autoIncrement": true
       }
     },
     "production": {
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://184.73.111.59"
+        "EXPO_PUBLIC_API_URL": "https://api.kissanebazzar.example"
       },
       "android": {
         "buildType": "apk"

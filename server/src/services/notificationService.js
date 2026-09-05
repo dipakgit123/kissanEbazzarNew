@@ -1,570 +1,456 @@
 const { Expo } = require('expo-server-sdk');
+const { Op } = require('sequelize');
 const logger = require('../utils/logger');
 const { getMessaging } = require('../config/firebase');
 
-// Create a new Expo SDK client
 const expo = new Expo();
-
+const MAX_SEND_ATTEMPTS = 3;
+const EXPO_RECEIPT_DELAY_MS = 15 * 60 * 1000;
 const FIREBASE_INVALID_TOKEN_CODES = new Set([
   'messaging/invalid-registration-token',
   'messaging/registration-token-not-registered',
-  'messaging/invalid-argument',
 ]);
+const EXPO_INVALID_TOKEN_ERRORS = new Set(['DeviceNotRegistered']);
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const isExpoToken = (token) => Expo.isExpoPushToken(token);
 const isFirebaseToken = (token) => typeof token === 'string' && token.trim() && !isExpoToken(token);
-
-const toFirebaseData = (data = {}) => (
-  Object.entries(data || {}).reduce((payload, [key, value]) => {
-    if (value === undefined || value === null) {
-      return payload;
-    }
-
-    payload[key] = typeof value === 'string' ? value : JSON.stringify(value);
-    return payload;
-  }, {})
+const normalizeRecipientType = (value = 'user') => (
+  value === 'veterinarian' ? 'veterinarian' : 'user'
+);
+const getSocketKey = (recipientId, recipientType = 'user') => (
+  `${normalizeRecipientType(recipientType)}:${recipientId}`
+);
+const getSocketRoom = (recipientId, recipientType = 'user') => (
+  `recipient:${getSocketKey(recipientId, recipientType)}`
 );
 
-const deactivateInvalidToken = async (token) => {
+const buildRecipientPayload = (recipientId, recipientType = 'user') => {
+  const normalizedType = normalizeRecipientType(recipientType);
+  return {
+    user_id: normalizedType === 'user' ? recipientId : null,
+    recipient_type: normalizedType,
+    recipient_id: recipientId,
+  };
+};
+
+const buildRecipientWhere = (recipientId, recipientType = 'user', extra = {}) => {
+  const normalizedType = normalizeRecipientType(recipientType);
+  const currentRecipient = {
+    recipient_type: normalizedType,
+    recipient_id: recipientId,
+  };
+
+  if (normalizedType !== 'user') return { ...currentRecipient, ...extra };
+
+  return {
+    ...extra,
+    [Op.or]: [currentRecipient, { user_id: recipientId }],
+  };
+};
+
+const buildRecipientTokenWhere = (recipientId, recipientType = 'user') => (
+  buildRecipientWhere(recipientId, recipientType, { is_active: true })
+);
+
+const normalizeNotificationData = (type, data = {}) => {
+  const { dedupe_key: _dedupeKey, ...publicData } = data;
+  const normalized = { ...publicData, type: type || data.type || 'system' };
+  if (normalized.listingId && !normalized.listing_id) normalized.listing_id = normalized.listingId;
+  if (normalized.animalType && !normalized.animal_type) normalized.animal_type = normalized.animalType;
+  if (normalized.appointmentId && !normalized.appointment_id) normalized.appointment_id = normalized.appointmentId;
+  if (normalized.recordId && !normalized.record_id) normalized.record_id = normalized.recordId;
+  return normalized;
+};
+
+const toFirebaseData = (data = {}) => Object.entries(data).reduce((payload, [key, value]) => {
+  if (value !== undefined && value !== null) {
+    payload[key] = typeof value === 'string' ? value : JSON.stringify(value);
+  }
+  return payload;
+}, {});
+
+const getCategoryPreference = (type = 'system') => {
+  if (type === 'appointment_reminder' || type.includes('reminder') || type.includes('pregnancy')) {
+    return 'reminders_enabled';
+  }
+  if (type.includes('appointment')) return 'appointments_enabled';
+  if (['new_listing', 'price_drop', 'listing_sold'].includes(type)) return 'marketplace_enabled';
+  if (type === 'contact' || type.includes('call') || type.includes('message') || type.includes('inquiry')) {
+    return 'communication_enabled';
+  }
+  return 'system_enabled';
+};
+
+const getChannelForType = (type = 'system') => {
+  if (type.includes('appointment') || type.includes('call')) return 'high-priority';
+  if (type.includes('reminder') || type.includes('pregnancy')) return 'reminders';
+  if (['new_listing', 'price_drop', 'listing_sold'].includes(type)) return 'marketplace';
+  if (type === 'contact' || type.includes('message') || type.includes('inquiry')) return 'communications';
+  return 'default';
+};
+
+const getNotificationPreferences = async (db, recipientId, recipientType) => {
+  if (!db?.NotificationPreference) return null;
+  return db.NotificationPreference.findOne({
+    where: {
+      recipient_type: normalizeRecipientType(recipientType),
+      recipient_id: recipientId,
+    },
+  });
+};
+
+const recordTokenFailure = async (token, errorCode, deactivate = false) => {
+  if (!token) return;
   try {
     const db = require('../models');
-    if (db.DeviceToken && token) {
-      await db.DeviceToken.update({ is_active: false }, { where: { token } });
-      logger.log(`Deactivated invalid push token: ${token.substring(0, 20)}...`);
-    }
+    if (!db.DeviceToken) return;
+    await db.DeviceToken.increment('failure_count', { where: { token } });
+    await db.DeviceToken.update({
+      last_error: String(errorCode || 'push_failed').slice(0, 255),
+      ...(deactivate ? { is_active: false } : {}),
+    }, { where: { token } });
   } catch (error) {
-    logger.error('Error deactivating invalid push token:', error.message);
+    logger.error('Unable to update push token health:', error.message);
   }
 };
 
-const sendFirebasePushNotification = async (token, title, body, data = {}) => {
-  const messaging = getMessaging();
-
-  if (!messaging) {
-    logger.warn('Skipping FCM notification because Firebase Admin is not configured.');
-    return null;
-  }
-
-  try {
-    const response = await messaging.send({
-      token,
-      notification: { title, body },
-      data: toFirebaseData(data),
-      android: {
-        priority: 'high',
-        notification: {
-          channelId: data.channelId || data.channel_id || 'default',
-          sound: 'default',
-        },
-      },
-      apns: {
-        payload: {
-          aps: {
-            sound: 'default',
-          },
-        },
-      },
-    });
-
-    return response;
-  } catch (error) {
-    logger.error('Firebase push notification error:', error.code || error.message);
-    if (FIREBASE_INVALID_TOKEN_CODES.has(error.code)) {
-      await deactivateInvalidToken(token);
-    }
-    return null;
-  }
-};
-
-const sendFirebaseBulkPushNotifications = async (tokens, title, body, data = {}) => {
-  const messaging = getMessaging();
-
-  if (!messaging) {
-    logger.warn('Skipping FCM bulk notification because Firebase Admin is not configured.');
-    return [];
-  }
-
-  const validTokens = [...new Set((tokens || []).filter(isFirebaseToken))];
-  if (validTokens.length === 0) {
-    return [];
-  }
-
-  const results = [];
-  const chunkSize = 500;
-
-  for (let index = 0; index < validTokens.length; index += chunkSize) {
-    const chunk = validTokens.slice(index, index + chunkSize);
-
+const sendWithRetry = async (operation, label) => {
+  let lastError;
+  for (let attempt = 1; attempt <= MAX_SEND_ATTEMPTS; attempt += 1) {
     try {
-      const response = await messaging.sendEachForMulticast({
-        tokens: chunk,
-        notification: { title, body },
-        data: toFirebaseData(data),
-        android: {
-          priority: 'high',
-          notification: {
-            channelId: data.channelId || data.channel_id || 'default',
-            sound: 'default',
-          },
-        },
-        apns: {
-          payload: {
-            aps: {
-              sound: 'default',
-            },
-          },
-        },
-      });
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (attempt < MAX_SEND_ATTEMPTS) await sleep(500 * (2 ** (attempt - 1)));
+    }
+  }
+  logger.error(`${label} failed after ${MAX_SEND_ATTEMPTS} attempts:`, lastError?.message || lastError);
+  throw lastError;
+};
 
-      response.responses.forEach((sendResponse, responseIndex) => {
-        const token = chunk[responseIndex];
-        if (!sendResponse.success && FIREBASE_INVALID_TOKEN_CODES.has(sendResponse.error?.code)) {
-          deactivateInvalidToken(token);
+const checkExpoReceipts = async (receiptEntries) => {
+  const validEntries = receiptEntries.filter((entry) => entry.id && entry.token);
+  if (validEntries.length === 0) return;
+  try {
+    const receipts = await expo.getPushNotificationReceiptsAsync(validEntries.map((entry) => entry.id));
+    for (const entry of validEntries) {
+      const receipt = receipts[entry.id];
+      if (receipt?.status !== 'error') continue;
+      const errorCode = receipt.details?.error || receipt.message || 'expo_receipt_failed';
+      await recordTokenFailure(entry.token, errorCode, EXPO_INVALID_TOKEN_ERRORS.has(errorCode));
+    }
+  } catch (error) {
+    logger.error('Expo receipt check failed:', error.message);
+  }
+};
+
+const scheduleExpoReceiptCheck = (entries) => {
+  if (entries.length === 0) return;
+  const timer = setTimeout(() => checkExpoReceipts(entries), EXPO_RECEIPT_DELAY_MS);
+  timer.unref?.();
+};
+
+const sendExpoMessages = async (messages) => {
+  const receiptEntries = [];
+  const results = [];
+  for (const chunk of expo.chunkPushNotifications(messages)) {
+    try {
+      const tickets = await sendWithRetry(
+        () => expo.sendPushNotificationsAsync(chunk),
+        'Expo push batch'
+      );
+      tickets.forEach((ticket, index) => {
+        const token = chunk[index]?.to;
+        results.push(ticket);
+        if (ticket.status === 'ok' && ticket.id) {
+          receiptEntries.push({ id: ticket.id, token });
+        } else if (ticket.status === 'error') {
+          const errorCode = ticket.details?.error || ticket.message || 'expo_ticket_failed';
+          recordTokenFailure(token, errorCode, EXPO_INVALID_TOKEN_ERRORS.has(errorCode));
         }
       });
-
-      results.push(response);
     } catch (error) {
-      logger.error('Firebase bulk push notification error:', error.code || error.message);
+      await Promise.all(chunk.map((message) => recordTokenFailure(message.to, error.message)));
     }
   }
-
+  scheduleExpoReceiptCheck(receiptEntries);
   return results;
 };
 
-/**
- * Send push notification to a single device
- */
-const sendPushNotification = async (pushToken, title, body, data = {}) => {
-  if (isFirebaseToken(pushToken)) {
-    return sendFirebasePushNotification(pushToken, title, body, data);
+const buildExpoMessage = (token, title, body, data, options = {}) => ({
+  to: token,
+  title: String(title).slice(0, 255),
+  body: String(body).slice(0, 1000),
+  data,
+  sound: options.sound === false ? undefined : 'default',
+  priority: options.priority || 'high',
+  ttl: options.ttl || 86400,
+  channelId: options.channelId || 'default',
+  ...(Number.isInteger(options.badge) ? { badge: options.badge } : {}),
+});
+
+const sendFirebaseBulkPushNotifications = async (tokens, title, body, data = {}, options = {}) => {
+  const messaging = getMessaging();
+  const validTokens = [...new Set((tokens || []).filter(isFirebaseToken))];
+  if (!messaging || validTokens.length === 0) return [];
+
+  const results = [];
+  for (let index = 0; index < validTokens.length; index += 500) {
+    const chunk = validTokens.slice(index, index + 500);
+    try {
+      const response = await sendWithRetry(() => messaging.sendEachForMulticast({
+        tokens: chunk,
+        notification: { title: String(title).slice(0, 255), body: String(body).slice(0, 1000) },
+        data: toFirebaseData(data),
+        android: {
+          priority: options.priority || 'high',
+          notification: {
+            channelId: options.channelId || 'default',
+            sound: options.sound === false ? undefined : 'default',
+          },
+        },
+        apns: {
+          headers: { 'apns-priority': options.priority === 'normal' ? '5' : '10' },
+          payload: {
+            aps: {
+              sound: options.sound === false ? undefined : 'default',
+              ...(Number.isInteger(options.badge) ? { badge: options.badge } : {}),
+            },
+          },
+        },
+      }), 'Firebase push batch');
+      await Promise.all(response.responses.map(async (sendResponse, responseIndex) => {
+        if (sendResponse.success) return;
+        const token = chunk[responseIndex];
+        const code = sendResponse.error?.code || 'firebase_send_failed';
+        await recordTokenFailure(token, code, FIREBASE_INVALID_TOKEN_CODES.has(code));
+      }));
+      results.push(response);
+    } catch (error) {
+      await Promise.all(chunk.map((token) => recordTokenFailure(token, error.code || error.message)));
+    }
+  }
+  return results;
+};
+
+const sendFirebasePushNotification = async (token, title, body, data = {}, options = {}) => {
+  const results = await sendFirebaseBulkPushNotifications([token], title, body, data, options);
+  return results[0] || null;
+};
+
+const sendBulkPushNotifications = async (tokens, title, body, data = {}, options = {}) => {
+  const uniqueTokens = [...new Set((tokens || []).filter(Boolean))];
+  const expoTokens = uniqueTokens.filter(isExpoToken);
+  const firebaseTokens = uniqueTokens.filter(isFirebaseToken);
+  const results = [];
+  if (firebaseTokens.length > 0) {
+    results.push(...await sendFirebaseBulkPushNotifications(firebaseTokens, title, body, data, options));
+  }
+  if (expoTokens.length > 0) {
+    const messages = expoTokens.map((token) => buildExpoMessage(token, title, body, data, options));
+    results.push(...await sendExpoMessages(messages));
+  }
+  return results;
+};
+
+const sendPushNotification = async (token, title, body, data = {}, options = {}) => {
+  const results = await sendBulkPushNotifications([token], title, body, data, options);
+  return results.length > 0 ? results : null;
+};
+
+const deliverNotification = async ({
+  db, recipientId, recipientType = 'user', title, body, type, data = {}, pushOptions = {},
+}) => {
+  const normalizedRecipientType = normalizeRecipientType(recipientType);
+  const notificationType = type || data.type || 'system';
+  const preferences = await getNotificationPreferences(db, recipientId, normalizedRecipientType);
+  const categoryFlag = getCategoryPreference(notificationType);
+
+  if (preferences && preferences[categoryFlag] === false) {
+    return { delivered: false, suppressed: true, notification: null };
   }
 
-  if (!isExpoToken(pushToken)) {
-    logger.error(`Push token ${pushToken} is not a valid Expo push token`);
-    return null;
+  let notification = null;
+  let payloadData = normalizeNotificationData(notificationType, data);
+  if (db?.Notification) {
+    const notificationValues = {
+      ...buildRecipientPayload(recipientId, normalizedRecipientType), title, message: body,
+      type: notificationType, data: payloadData, is_read: false,
+      dedupe_key: data.dedupe_key || null,
+    };
+    if (data.dedupe_key) {
+      const [storedNotification, created] = await db.Notification.findOrCreate({
+        where: { dedupe_key: data.dedupe_key },
+        defaults: notificationValues,
+      });
+      if (!created) {
+        return { delivered: false, suppressed: false, duplicate: true, notification: storedNotification };
+      }
+      notification = storedNotification;
+    } else {
+      notification = await db.Notification.create(notificationValues);
+    }
+    payloadData = { ...payloadData, notification_id: notification.id };
+    await notification.update({ data: payloadData });
   }
 
-  const message = {
-    to: pushToken,
-    sound: 'default',
+  const socketPayload = {
+    id: notification?.id || null,
     title,
     body,
-    data,
+    type: notificationType,
+    data: payloadData,
+    timestamp: notification?.created_at || new Date().toISOString(),
   };
-
-  try {
-    const chunks = expo.chunkPushNotifications([message]);
-    const tickets = [];
-
-    for (const chunk of chunks) {
-      const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
-      tickets.push(...ticketChunk);
-    }
-
-    return tickets;
-  } catch (error) {
-    logger.error('Error sending push notification:', error);
-    return null;
+  if (global.io) {
+    global.io.to(getSocketRoom(recipientId, normalizedRecipientType)).emit('notification', socketPayload);
   }
+
+  const pushEnabled = !preferences || preferences.push_enabled !== false;
+  if (pushEnabled && db?.DeviceToken) {
+    const tokens = await db.DeviceToken.findAll({
+      where: buildRecipientTokenWhere(recipientId, normalizedRecipientType),
+      attributes: ['token'],
+    });
+    if (tokens.length > 0) {
+      const badge = db.Notification
+        ? await db.Notification.count({
+          where: buildRecipientWhere(recipientId, normalizedRecipientType, { is_read: false }),
+        })
+        : undefined;
+      await sendBulkPushNotifications(tokens.map((row) => row.token), title, body, payloadData, {
+        badge,
+        ...pushOptions,
+      });
+    }
+  }
+
+  return { delivered: true, suppressed: false, notification };
 };
 
-/**
- * Send push notifications to multiple devices
- */
-const sendBulkPushNotifications = async (tokens, title, body, data = {}) => {
-  const expoTokens = (tokens || []).filter(isExpoToken);
-  const firebaseTokens = (tokens || []).filter(isFirebaseToken);
-  const results = [];
-
-  if (firebaseTokens.length > 0) {
-    const firebaseResults = await sendFirebaseBulkPushNotifications(firebaseTokens, title, body, data);
-    results.push(...firebaseResults);
-  }
-
-  const messages = expoTokens
-    .map(token => ({
-      to: token,
-      sound: 'default',
+const sendRealtimeNotification = async (
+  recipientId, title, body, data = {}, db = null, recipientType = 'user'
+) => {
+  try {
+    const notificationType = String(data.type || 'system');
+    await deliverNotification({
+      db,
+      recipientId,
+      recipientType,
       title,
       body,
+      type: notificationType,
       data,
-    }));
-
-  if (messages.length === 0) {
-    if (results.length === 0) {
-      logger.log('No valid push tokens to send to');
-    }
-    return results;
-  }
-
-  try {
-    const chunks = expo.chunkPushNotifications(messages);
-    const tickets = [];
-
-    for (const chunk of chunks) {
-      const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
-      tickets.push(...ticketChunk);
-    }
-
-    results.push(...tickets);
-    return results;
+      pushOptions: {
+        channelId: data.channelId || data.channel_id || getChannelForType(notificationType),
+      },
+    });
+    return true;
   } catch (error) {
-    logger.error('Error sending bulk push notifications:', error);
-    return results;
+    logger.error('Notification delivery failed:', error);
+    return false;
   }
 };
 
-/**
- * Create and send notification for new listing nearby
- */
-const notifyNewListingNearby = async (db, userId, listing) => {
-  const { Notification, DeviceToken } = db;
-
-  // Create notification in database
-  const notification = await Notification.create({
-    user_id: userId,
-    title: 'New Listing Nearby!',
-    message: `A new ${listing.animal_type} has been listed near you - ${listing.breed_name || listing.animal_type}`,
-    type: 'new_listing',
-    data: {
-      listing_id: listing.id,
-      animal_type: listing.animal_type,
-    },
-  });
-
-  // Get user's device tokens and send push
-  const tokens = await DeviceToken.findAll({
-    where: { user_id: userId, is_active: true },
-  });
-
-  if (tokens.length > 0) {
-    const pushTokens = tokens.map(t => t.token);
-    await sendBulkPushNotifications(
-      pushTokens,
-      'New Listing Nearby!',
-      `A new ${listing.animal_type} has been listed near you`,
-      { type: 'new_listing', listing_id: listing.id, animal_type: listing.animal_type }
-    );
-  }
-
-  return notification;
+const sendBulkRealtimeNotification = async (
+  recipientIds, title, body, data = {}, db = null, recipientType = 'user'
+) => {
+  const results = await Promise.allSettled(
+    recipientIds.map((id) => sendRealtimeNotification(id, title, body, data, db, recipientType))
+  );
+  return results.every((result) => result.status === 'fulfilled' && result.value === true);
 };
 
-/**
- * Create and send notification for contact inquiry
- */
-const notifyContactInquiry = async (db, sellerId, buyerName, listing) => {
-  const { Notification, DeviceToken } = db;
+const notifyNewListingNearby = (db, userId, listing) => sendRealtimeNotification(
+  userId,
+  'New Listing Nearby!',
+  `A new ${listing.animal_type} has been listed near you - ${listing.breed_name || listing.animal_type}`,
+  { type: 'new_listing', listing_id: listing.id, animal_type: listing.animal_type },
+  db
+);
 
-  const notification = await Notification.create({
-    user_id: sellerId,
-    title: 'New Inquiry!',
-    message: `${buyerName} is interested in your ${listing.animal_type} - ${listing.breed_name || listing.animal_type}`,
-    type: 'contact',
-    data: {
-      listing_id: listing.id,
-      animal_type: listing.animal_type,
-    },
-  });
+const notifyContactInquiry = (db, sellerId, buyerName, listing) => sendRealtimeNotification(
+  sellerId,
+  'New Inquiry!',
+  `${buyerName} is interested in your ${listing.animal_type} - ${listing.breed_name || listing.animal_type}`,
+  { type: 'contact', listing_id: listing.id, animal_type: listing.animal_type },
+  db
+);
 
-  const tokens = await DeviceToken.findAll({
-    where: { user_id: sellerId, is_active: true },
-  });
+const notifyPregnancyReminder = (db, userId, animalName, dueDate, daysRemaining) => sendRealtimeNotification(
+  userId,
+  'Pregnancy Reminder',
+  `${animalName} is due in ${daysRemaining} days (${dueDate})`,
+  { type: 'pregnancy_reminder', animal_name: animalName, due_date: dueDate, days_remaining: daysRemaining },
+  db
+);
 
-  if (tokens.length > 0) {
-    const pushTokens = tokens.map(t => t.token);
-    await sendBulkPushNotifications(
-      pushTokens,
-      'New Inquiry!',
-      `${buyerName} is interested in your listing`,
-      { type: 'contact', listing_id: listing.id }
-    );
-  }
-
-  return notification;
-};
-
-/**
- * Create and send pregnancy reminder notification
- */
-const notifyPregnancyReminder = async (db, userId, animalName, dueDate, daysRemaining) => {
-  const { Notification, DeviceToken } = db;
-
-  const notification = await Notification.create({
-    user_id: userId,
-    title: 'Pregnancy Reminder',
-    message: `${animalName} is due in ${daysRemaining} days (${dueDate})`,
-    type: 'pregnancy',
-    data: {
-      animal_name: animalName,
-      due_date: dueDate,
-      days_remaining: daysRemaining,
-    },
-  });
-
-  const tokens = await DeviceToken.findAll({
-    where: { user_id: userId, is_active: true },
-  });
-
-  if (tokens.length > 0) {
-    const pushTokens = tokens.map(t => t.token);
-    await sendBulkPushNotifications(
-      pushTokens,
-      'Pregnancy Reminder',
-      `${animalName} is due in ${daysRemaining} days`,
-      { type: 'pregnancy', due_date: dueDate }
-    );
-  }
-
-  return notification;
-};
-
-/**
- * Create system notification
- */
 const createSystemNotification = async (db, userId, title, message, data = {}) => {
-  const { Notification } = db;
-
-  return await Notification.create({
-    user_id: userId,
-    title,
-    message,
-    type: 'system',
-    data,
+  const result = await deliverNotification({
+    db, recipientId: userId, title, body: message, type: 'system', data,
   });
+  return result.notification;
 };
 
-/**
- * Send appointment notification to veterinarian or user
- * @param {Object} recipient - Veterinarian or User object
- * @param {Object} appointment - Appointment object
- * @param {String} type - 'new', 'confirmed', 'cancelled', 'completed'
- */
-async function sendAppointmentNotification(recipient, appointment, type) {
-  try {
-    let title, body, data;
+const sendAppointmentNotification = async (recipient, appointment, status) => {
+  const recipientType = recipient?.type === 'veterinarian' || recipient?.license_number
+    ? 'veterinarian'
+    : 'user';
+  const labels = {
+    new: ['New Appointment Request', `${appointment.farmer_name} booked an appointment on ${appointment.appointment_date} at ${appointment.appointment_time}`],
+    confirmed: ['Appointment Confirmed', `Your appointment on ${appointment.appointment_date} at ${appointment.appointment_time} was confirmed`],
+    cancelled: ['Appointment Cancelled', `Your appointment on ${appointment.appointment_date} at ${appointment.appointment_time} was cancelled`],
+    completed: ['Appointment Completed', `The appointment on ${appointment.appointment_date} was completed`],
+  };
+  const [title, body] = labels[status] || ['Appointment Update', 'Your appointment has been updated'];
+  const db = require('../models');
+  return sendRealtimeNotification(
+    recipient.id,
+    title,
+    body,
+    { type: status === 'new' ? 'new_appointment' : `appointment_${status}`, appointment_id: appointment.id },
+    db,
+    recipientType
+  );
+};
 
-    switch (type) {
-      case 'new':
-        title = '🔔 New Appointment Request';
-        body = `${appointment.farmer_name} has booked an appointment for ${appointment.animal_type} on ${appointment.appointment_date} at ${appointment.appointment_time}`;
-        data = {
-          type: 'new_appointment',
-          appointment_id: appointment.id,
-          action: 'view_appointment'
-        };
-        break;
-
-      case 'confirmed':
-        title = '✅ Appointment Confirmed';
-        body = `Dr. ${appointment.veterinarian?.full_name || 'Veterinarian'} has confirmed your appointment for ${appointment.appointment_date} at ${appointment.appointment_time}`;
-        data = {
-          type: 'appointment_confirmed',
-          appointment_id: appointment.id,
-          action: 'view_appointment'
-        };
-        break;
-
-      case 'cancelled':
-        title = '❌ Appointment Cancelled';
-        body = `Appointment for ${appointment.appointment_date} at ${appointment.appointment_time} has been cancelled`;
-        data = {
-          type: 'appointment_cancelled',
-          appointment_id: appointment.id,
-          action: 'view_appointment'
-        };
-        break;
-
-      case 'completed':
-        title = '✔️ Appointment Completed';
-        body = `Appointment with ${appointment.farmer_name} has been marked as completed`;
-        data = {
-          type: 'appointment_completed',
-          appointment_id: appointment.id,
-          action: 'view_appointment'
-        };
-        break;
-
-      default:
-        title = 'Appointment Update';
-        body = `Your appointment status has been updated`;
-        data = {
-          type: 'appointment_update',
-          appointment_id: appointment.id
-        };
-    }
-
-    // Send push notification if recipient has device tokens
-    const db = require('../models');
-    if (db.DeviceToken) {
-      const tokens = await db.DeviceToken.findAll({
-        where: { user_id: recipient.id, is_active: true }
-      });
-
-      if (tokens.length > 0) {
-        const pushTokens = tokens.map(t => t.token);
-        await sendBulkPushNotifications(pushTokens, title, body, data);
-      }
-    }
-
-    // Create in-app notification
-    if (db.Notification) {
-      await db.Notification.create({
-        user_id: recipient.id,
-        title,
-        message: body,
-        type: data.type,
-        data: data,
-        is_read: false
-      });
-    }
-
-    return true;
-  } catch (error) {
-    logger.error('Send appointment notification error:', error);
-    return false;
-  }
-}
-
-/**
- * Send call notification when user initiates a call
- * @param {Object} veterinarian - Veterinarian object
- * @param {Object} caller - User/Farmer object
- */
-async function sendCallNotification(veterinarian, caller) {
-  try {
-    const title = '📞 Incoming Call';
-    const body = `${caller.full_name || 'A farmer'} is calling you regarding their animal`;
-    const data = {
-      type: 'incoming_call',
-      caller_id: caller.id,
-      caller_name: caller.full_name,
+const sendCallNotification = async (veterinarian, caller) => {
+  const db = require('../models');
+  return sendRealtimeNotification(
+    veterinarian.id,
+    'Incoming Call',
+    `${caller.full_name || 'A farmer'} is calling you regarding their animal`,
+    {
+      type: 'incoming_call', caller_id: caller.id, caller_name: caller.full_name,
       caller_phone: caller.phone_number,
-      action: 'answer_call'
-    };
-
-    // Send push notification to veterinarian's devices
-    const db = require('../models');
-    if (db.DeviceToken) {
-      const tokens = await db.DeviceToken.findAll({
-        where: { user_id: veterinarian.id, is_active: true }
-      });
-
-      if (tokens.length > 0) {
-        const pushTokens = tokens.map(t => t.token);
-        await sendBulkPushNotifications(pushTokens, title, body, data);
-      }
-    }
-
-    // Create in-app notification
-    if (db.Notification) {
-      await db.Notification.create({
-        user_id: veterinarian.id,
-        title,
-        message: body,
-        type: 'incoming_call',
-        data: data,
-        is_read: false
-      });
-    }
-
-    return true;
-  } catch (error) {
-    logger.error('Send call notification error:', error);
-    return false;
-  }
-}
-
-/**
- * Send real-time notification via Socket.IO + Expo Push
- * @param {Number} userId - User ID to send notification to
- * @param {String} title - Notification title
- * @param {String} body - Notification body/message
- * @param {Object} data - Additional data
- * @param {Object} db - Database models
- */
-const sendRealtimeNotification = async (userId, title, body, data = {}, db = null) => {
-  try {
-    // 1. Send via Socket.IO for instant in-app notification
-    if (global.io && global.connectedUsers) {
-      const socketId = global.connectedUsers.get(userId.toString());
-      if (socketId) {
-        global.io.to(socketId).emit('notification', {
-          title,
-          body,
-          data,
-          timestamp: new Date().toISOString()
-        });
-        logger.log(`🔔 Real-time notification sent to user ${userId} via Socket.IO`);
-      }
-    }
-
-    // 2. Save notification to database
-    if (db && db.Notification) {
-      await db.Notification.create({
-        user_id: userId,
-        title,
-        message: body,
-        type: data.type || 'general',
-        data,
-        is_read: false
-      });
-    }
-
-    // 3. Send Expo push notification (for background/closed app)
-    if (db && db.DeviceToken) {
-      const tokens = await db.DeviceToken.findAll({
-        where: { user_id: userId, is_active: true }
-      });
-
-      if (tokens.length > 0) {
-        const pushTokens = tokens.map(t => t.token);
-        await sendBulkPushNotifications(pushTokens, title, body, data);
-        logger.log(`📱 Expo push notification sent to user ${userId}`);
-      }
-    }
-
-    return true;
-  } catch (error) {
-    logger.error('Error sending real-time notification:', error);
-    return false;
-  }
+    },
+    db,
+    'veterinarian'
+  );
 };
 
-/**
- * Send real-time notification to multiple users
- * @param {Array} userIds - Array of user IDs
- * @param {String} title - Notification title
- * @param {String} body - Notification body/message
- * @param {Object} data - Additional data
- * @param {Object} db - Database models
- */
-const sendBulkRealtimeNotification = async (userIds, title, body, data = {}, db = null) => {
-  try {
-    const promises = userIds.map(userId => 
-      sendRealtimeNotification(userId, title, body, data, db)
-    );
-    await Promise.all(promises);
-    logger.log(`📢 Bulk notification sent to ${userIds.length} users`);
-    return true;
-  } catch (error) {
-    logger.error('Error sending bulk real-time notification:', error);
-    return false;
-  }
+const cleanupInactiveTokens = async (db = require('../models'), days = 30) => {
+  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  return db.DeviceToken.destroy({
+    where: { is_active: false, updated_at: { [Op.lt]: cutoff } },
+  });
 };
 
 module.exports = {
-  sendPushNotification,
-  sendBulkPushNotifications,
-  sendFirebasePushNotification,
-  sendFirebaseBulkPushNotifications,
-  notifyNewListingNearby,
-  notifyContactInquiry,
-  notifyPregnancyReminder,
+  buildRecipientTokenWhere,
+  cleanupInactiveTokens,
   createSystemNotification,
+  deliverNotification,
+  notifyContactInquiry,
+  notifyNewListingNearby,
+  notifyPregnancyReminder,
   sendAppointmentNotification,
+  sendBulkPushNotifications,
+  sendBulkRealtimeNotification,
   sendCallNotification,
+  sendFirebaseBulkPushNotifications,
+  sendFirebasePushNotification,
+  sendPushNotification,
   sendRealtimeNotification,
-  sendBulkRealtimeNotification
 };

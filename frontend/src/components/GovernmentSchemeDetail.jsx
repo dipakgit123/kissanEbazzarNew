@@ -64,7 +64,7 @@ const GovernmentSchemeDetail = () => {
     } finally {
       setLoading(false);
     }
-  }, [navigate, slug]);
+  }, [navigate, slug, t]);
 
   useEffect(() => {
     fetchScheme();

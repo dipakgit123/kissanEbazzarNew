@@ -15,6 +15,7 @@ import { useVetAuth } from '../context/VetAuthContext';
 import { veterinarianService } from '../services/api';
 import SkeletonLoader from '../components/SkeletonLoader';
 import AppHeader from '../components/AppHeader';
+import { useNotifications } from '../context/NotificationContext';
 
 const localeMap = {
   en: 'en-IN',
@@ -93,6 +94,7 @@ const getProfilePhoto = (profile) => profile?.profile_photo || profile?.profileP
 const VetDashboardScreen = ({ navigation }) => {
   const { t, i18n, ready } = useTranslation();
   const { veterinarian, logout, updateVeterinarian } = useVetAuth();
+  const { unreadCount } = useNotifications();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -564,6 +566,13 @@ const VetDashboardScreen = ({ navigation }) => {
           />
         )}
         rightActions={[
+          {
+            icon: 'notifications-outline',
+            onPress: () => navigation.navigate('Notifications'),
+            color: COLORS.text,
+            badge: unreadCount > 0 ? (unreadCount > 99 ? '99+' : String(unreadCount)) : null,
+            accessibilityLabel: 'Notifications',
+          },
           {
             icon: 'refresh-outline',
             onPress: () => loadDashboard({ showLoader: false }),

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import {
@@ -22,14 +22,14 @@ const SPECIALIZATION_OPTIONS = ['general', 'large_animal', 'small_animal', 'live
 const NEARBY_RADIUS_KM = 50;
 
 const VeterinarianPage = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [veterinarians, setVeterinarians] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
-  const [specializationFilter, setSpecializationFilter] = useState('');
+  const [specializationFilter] = useState('');
   const [selectedVet, setSelectedVet] = useState(null);
   const [viewMode, setViewMode] = useState('nearby');
   const [selectedVetReviews, setSelectedVetReviews] = useState([]);
@@ -211,7 +211,7 @@ const VeterinarianPage = () => {
     window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank');
   };
 
-  const loadSelectedVetReviewData = async (vetId) => {
+  const loadSelectedVetReviewData = useCallback(async (vetId) => {
     setReviewsLoading(true);
 
     try {
@@ -255,7 +255,7 @@ const VeterinarianPage = () => {
     } finally {
       setReviewsLoading(false);
     }
-  };
+  }, [hasUserToken, t]);
 
   useEffect(() => {
     if (!selectedVet?.id) {
@@ -266,7 +266,7 @@ const VeterinarianPage = () => {
     }
 
     loadSelectedVetReviewData(selectedVet.id);
-  }, [selectedVet?.id, hasUserToken]);
+  }, [selectedVet?.id, loadSelectedVetReviewData]);
 
   const handleReviewSubmit = async () => {
     if (!selectedVet?.id) {

@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DeviceEventEmitter } from 'react-native';
 import { userService } from '../services/api';
+import notificationService from '../services/notificationService';
 
 const AuthContext = createContext({});
 
@@ -75,6 +76,10 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
+      const savedPushToken = await notificationService.getSavedToken();
+      if (token && savedPushToken.token) {
+        await notificationService.unregisterToken(savedPushToken.token, token).catch(() => {});
+      }
       await AsyncStorage.removeItem('token');
       await AsyncStorage.removeItem('userData');
       setToken(null);

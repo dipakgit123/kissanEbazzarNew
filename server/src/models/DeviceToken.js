@@ -9,7 +9,16 @@ module.exports = (sequelize) => {
     },
     user_id: {
       type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    recipient_type: {
+      type: DataTypes.ENUM('user', 'veterinarian'),
       allowNull: false,
+      defaultValue: 'user',
+    },
+    recipient_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
     },
     token: {
       type: DataTypes.STRING(2048),
@@ -29,6 +38,27 @@ module.exports = (sequelize) => {
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: true,
+    },
+    device_id: {
+      type: DataTypes.STRING(120),
+      allowNull: true,
+    },
+    app_version: {
+      type: DataTypes.STRING(40),
+      allowNull: true,
+    },
+    last_seen_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    failure_count: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    last_error: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
     },
   }, {
     tableName: 'device_tokens',

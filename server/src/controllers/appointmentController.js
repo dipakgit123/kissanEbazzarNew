@@ -7,6 +7,41 @@ const notificationService = require('../services/notificationService');
 const VALID_APPOINTMENT_STATUSES = ['pending', 'confirmed', 'cancelled', 'completed', 'no-show'];
 const VALID_APPOINTMENT_TYPES = ['consultation', 'emergency', 'vaccination', 'surgery', 'checkup', 'other'];
 const VALID_CONTACT_PREFERENCES = ['call', 'visit', 'both'];
+const BLOCKING_APPOINTMENT_STATUSES = ['cancelled', 'completed', 'no-show'];
+const RESCHEDULABLE_STATUSES = ['pending', 'confirmed'];
+
+const normalizeTime = (time) => {
+  if (!time || typeof time !== 'string') return null;
+  const match = time.trim().match(/^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/);
+  if (!match) return null;
+  return `${match[1]}:${match[2]}:00`;
+};
+
+const isFutureAppointment = (date, time) => {
+  const normalizedTime = normalizeTime(time);
+  if (!date || !normalizedTime) return false;
+  return new Date(`${date}T${normalizedTime}`) > new Date();
+};
+
+const mapUserAppointmentFilter = (filter) => {
+  if (!filter || filter === 'all') return {};
+  if (filter === 'upcoming') {
+    return {
+      appointment_date: { [Op.gte]: new Date().toISOString().split('T')[0] },
+      status: { [Op.notIn]: ['cancelled', 'completed', 'no-show'] },
+    };
+  }
+  if (filter === 'past') {
+    return {
+      [Op.or]: [
+        { appointment_date: { [Op.lt]: new Date().toISOString().split('T')[0] } },
+        { status: { [Op.in]: ['completed', 'no-show'] } },
+      ],
+    };
+  }
+  if (VALID_APPOINTMENT_STATUSES.includes(filter)) return { status: filter };
+  return null;
+};
 
 class AppointmentController {
 
@@ -17,34 +52,44 @@ class AppointmentController {
   async createAppointment(req, res) {
     try {
       const userId = req.user.id;
+      const currentUser = req.user || {};
       const {
         veterinarian_id,
         animal_type,
         animal_name,
         animal_age,
         animal_breed,
+        age,
+        breed,
         appointment_date,
         appointment_time,
         appointment_type,
         symptoms,
+        reason,
         contact_preference,
         farmer_name,
         farmer_phone,
         farmer_address,
         farmer_latitude,
         farmer_longitude,
+        urgency,
         notes
       } = req.body;
+      const normalizedAppointmentTime = normalizeTime(appointment_time);
+      const resolvedFarmerName = farmer_name || currentUser.full_name;
+      const resolvedFarmerPhone = farmer_phone || currentUser.phone_number;
+      const resolvedSymptoms = symptoms || reason;
+      const resolvedAppointmentType = appointment_type || (urgency === 'emergency' ? 'emergency' : 'consultation');
 
       // Validate required fields
-      if (!veterinarian_id || !animal_type || !appointment_date || !appointment_time || !farmer_name || !farmer_phone) {
+      if (!veterinarian_id || !animal_type || !appointment_date || !normalizedAppointmentTime || !resolvedFarmerName || !resolvedFarmerPhone) {
         return res.status(400).json({
           success: false,
           message: 'Required fields: veterinarian_id, animal_type, appointment_date, appointment_time, farmer_name, farmer_phone'
         });
       }
 
-      if (appointment_type && !VALID_APPOINTMENT_TYPES.includes(appointment_type)) {
+      if (!VALID_APPOINTMENT_TYPES.includes(resolvedAppointmentType)) {
         return res.status(400).json({
           success: false,
           message: 'Invalid appointment type'
@@ -75,8 +120,7 @@ class AppointmentController {
       }
 
       // Check if appointment date is in the future
-      const appointmentDateTime = new Date(`${appointment_date} ${appointment_time}`);
-      if (appointmentDateTime < new Date()) {
+      if (!isFutureAppointment(appointment_date, normalizedAppointmentTime)) {
         return res.status(400).json({
           success: false,
           message: 'Appointment date and time must be in the future'
@@ -88,9 +132,9 @@ class AppointmentController {
         where: {
           veterinarian_id,
           appointment_date,
-          appointment_time,
+          appointment_time: normalizedAppointmentTime,
           status: {
-            [Op.notIn]: ['cancelled', 'completed', 'no-show']
+            [Op.notIn]: BLOCKING_APPOINTMENT_STATUSES
           }
         }
       });
@@ -108,20 +152,20 @@ class AppointmentController {
         veterinarian_id,
         animal_type,
         animal_name,
-        animal_age,
-        animal_breed,
+        animal_age: animal_age || age,
+        animal_breed: animal_breed || breed,
         appointment_date,
-        appointment_time,
-        appointment_type: appointment_type || 'consultation',
-        symptoms,
+        appointment_time: normalizedAppointmentTime,
+        appointment_type: resolvedAppointmentType,
+        symptoms: resolvedSymptoms,
         contact_preference: contact_preference || 'both',
-        farmer_name,
-        farmer_phone,
-        farmer_address,
+        farmer_name: resolvedFarmerName,
+        farmer_phone: resolvedFarmerPhone,
+        farmer_address: farmer_address || currentUser.address,
         farmer_latitude: farmer_latitude ? parseFloat(farmer_latitude) : null,
         farmer_longitude: farmer_longitude ? parseFloat(farmer_longitude) : null,
         consultation_fee: veterinarian.consultation_fee,
-        notes,
+        notes: notes || reason,
         status: 'pending'
       });
 
@@ -130,15 +174,16 @@ class AppointmentController {
         await notificationService.sendRealtimeNotification(
           veterinarian.id,
           '🔔 New Appointment Request',
-          `${farmer_name} has booked an appointment for ${animal_type} on ${appointment_date} at ${appointment_time}`,
+          `${resolvedFarmerName} has booked an appointment for ${animal_type} on ${appointment_date} at ${normalizedAppointmentTime}`,
           {
             type: 'new_appointment',
             appointmentId: appointment.id,
             animalType: animal_type,
             appointmentDate: appointment_date,
-            appointmentTime: appointment_time
+            appointmentTime: normalizedAppointmentTime
           },
-          db
+          db,
+          'veterinarian'
         );
       } catch (notifError) {
         console.error('Failed to send notification:', notifError);
@@ -180,17 +225,19 @@ class AppointmentController {
   async getUserAppointments(req, res) {
     try {
       const userId = req.user.id;
-      const { status, page = 1, limit = 10 } = req.query;
+      const { status, filter, page = 1, limit = 10 } = req.query;
 
       const where = { user_id: userId };
-      if (status) {
-        if (!VALID_APPOINTMENT_STATUSES.includes(status)) {
+      const requestedFilter = status || filter;
+      if (requestedFilter) {
+        const filterWhere = mapUserAppointmentFilter(requestedFilter);
+        if (!filterWhere) {
           return res.status(400).json({
             success: false,
-            message: 'Invalid appointment status filter'
+            message: 'Invalid appointment filter'
           });
         }
-        where.status = status;
+        Object.assign(where, filterWhere);
       }
 
       const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -235,17 +282,18 @@ class AppointmentController {
   async getVetAppointments(req, res) {
     try {
       const vetId = req.vet.id;
-      const { status, date, page = 1, limit = 20 } = req.query;
+      const { status, filter, date, page = 1, limit = 20 } = req.query;
 
       const where = { veterinarian_id: vetId };
-      if (status) {
-        if (!VALID_APPOINTMENT_STATUSES.includes(status)) {
+      const requestedStatus = status || (filter === 'all' ? null : filter);
+      if (requestedStatus) {
+        if (!VALID_APPOINTMENT_STATUSES.includes(requestedStatus)) {
           return res.status(400).json({
             success: false,
             message: 'Invalid appointment status filter'
           });
         }
-        where.status = status;
+        where.status = requestedStatus;
       }
       if (date) where.appointment_date = date;
 
@@ -540,7 +588,8 @@ class AppointmentController {
             cancelledBy: 'user',
             reason: cancellation_reason
           },
-          db
+          db,
+          'veterinarian'
         );
       } catch (notifError) {
         console.error('Failed to send notification:', notifError);
@@ -556,6 +605,203 @@ class AppointmentController {
       res.status(500).json({
         success: false,
         message: 'Failed to cancel appointment',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Reschedule appointment (User chooses a new slot)
+   * PATCH /api/appointments/:id/reschedule
+   */
+  async rescheduleAppointment(req, res) {
+    try {
+      const { id } = req.params;
+      const { appointment_date, appointment_time } = req.body;
+      const userId = req.user.id;
+      const normalizedAppointmentTime = normalizeTime(appointment_time);
+
+      if (!appointment_date || !normalizedAppointmentTime) {
+        return res.status(400).json({
+          success: false,
+          message: 'appointment_date and appointment_time are required'
+        });
+      }
+
+      if (!isFutureAppointment(appointment_date, normalizedAppointmentTime)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Appointment date and time must be in the future'
+        });
+      }
+
+      const appointment = await db.Appointment.findByPk(id, {
+        include: [
+          {
+            model: db.Veterinarian,
+            as: 'veterinarian'
+          }
+        ]
+      });
+
+      if (!appointment) {
+        return res.status(404).json({
+          success: false,
+          message: 'Appointment not found'
+        });
+      }
+
+      if (appointment.user_id !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
+
+      if (!RESCHEDULABLE_STATUSES.includes(appointment.status)) {
+        return res.status(400).json({
+          success: false,
+          message: `Cannot reschedule ${appointment.status} appointment`
+        });
+      }
+
+      const conflictingAppointment = await db.Appointment.findOne({
+        where: {
+          id: { [Op.ne]: appointment.id },
+          veterinarian_id: appointment.veterinarian_id,
+          appointment_date,
+          appointment_time: normalizedAppointmentTime,
+          status: {
+            [Op.notIn]: BLOCKING_APPOINTMENT_STATUSES
+          }
+        }
+      });
+
+      if (conflictingAppointment) {
+        return res.status(400).json({
+          success: false,
+          message: 'This time slot is already booked. Please choose another time.'
+        });
+      }
+
+      await appointment.update({
+        appointment_date,
+        appointment_time: normalizedAppointmentTime,
+        status: 'pending',
+        confirmed_at: null,
+        reminder_sent_at: null
+      });
+
+      try {
+        await notificationService.sendRealtimeNotification(
+          appointment.veterinarian.id,
+          'Appointment Rescheduled',
+          `${appointment.farmer_name} rescheduled appointment to ${appointment_date} at ${normalizedAppointmentTime}`,
+          {
+            type: 'appointment_rescheduled',
+            appointmentId: appointment.id,
+            appointmentDate: appointment_date,
+            appointmentTime: normalizedAppointmentTime
+          },
+          db,
+          'veterinarian'
+        );
+      } catch (notifError) {
+        console.error('Failed to send notification:', notifError);
+      }
+
+      res.json({
+        success: true,
+        message: 'Appointment rescheduled successfully',
+        data: appointment
+      });
+    } catch (error) {
+      console.error('Reschedule appointment error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to reschedule appointment',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Get available appointment slots for a veterinarian
+   * GET /api/appointments/available-slots/:vetId?date=YYYY-MM-DD
+   */
+  async getAvailableSlots(req, res) {
+    try {
+      const { vetId } = req.params;
+      const { date } = req.query;
+
+      if (!date) {
+        return res.status(400).json({
+          success: false,
+          message: 'date query parameter is required'
+        });
+      }
+
+      const veterinarian = await db.Veterinarian.findOne({
+        where: {
+          id: vetId,
+          verification_status: 'verified',
+          is_active: true
+        }
+      });
+
+      if (!veterinarian) {
+        return res.status(404).json({
+          success: false,
+          message: 'Veterinarian not found or not available'
+        });
+      }
+
+      const bookedAppointments = await db.Appointment.findAll({
+        attributes: ['appointment_time'],
+        where: {
+          veterinarian_id: vetId,
+          appointment_date: date,
+          status: {
+            [Op.notIn]: BLOCKING_APPOINTMENT_STATUSES
+          }
+        }
+      });
+
+      const bookedTimes = new Set(
+        bookedAppointments.map((appointment) => normalizeTime(String(appointment.appointment_time)))
+      );
+      const slots = [];
+      const now = new Date();
+
+      for (let hour = 9; hour <= 18; hour += 1) {
+        for (let minute = 0; minute < 60; minute += 30) {
+          const time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+          const normalizedTime = `${time}:00`;
+          const slotDateTime = new Date(`${date}T${normalizedTime}`);
+
+          if (slotDateTime <= now) {
+            continue;
+          }
+
+          slots.push({
+            time,
+            available: !bookedTimes.has(normalizedTime)
+          });
+        }
+      }
+
+      res.json({
+        success: true,
+        data: {
+          date,
+          slots
+        }
+      });
+    } catch (error) {
+      console.error('Get available slots error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch available slots',
         error: error.message
       });
     }

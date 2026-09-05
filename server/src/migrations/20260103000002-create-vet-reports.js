@@ -1,5 +1,15 @@
 'use strict';
 
+const addIndexIfMissing = async (queryInterface, tableName, fields, options = {}) => {
+  try {
+    await queryInterface.addIndex(tableName, fields, options);
+  } catch (error) {
+    if (error?.parent?.code !== '42P07' && !/already exists|duplicate/i.test(error.message)) {
+      throw error;
+    }
+  }
+};
+
 module.exports = {
   up: async (queryInterface, Sequelize) => {
     await queryInterface.createTable('vet_reports', {
@@ -85,10 +95,10 @@ module.exports = {
     });
 
     // Add indexes
-    await queryInterface.addIndex('vet_reports', ['veterinarian_id']);
-    await queryInterface.addIndex('vet_reports', ['user_id']);
-    await queryInterface.addIndex('vet_reports', ['status']);
-    await queryInterface.addIndex('vet_reports', ['report_type']);
+    await addIndexIfMissing(queryInterface, 'vet_reports', ['veterinarian_id']);
+    await addIndexIfMissing(queryInterface, 'vet_reports', ['user_id']);
+    await addIndexIfMissing(queryInterface, 'vet_reports', ['status']);
+    await addIndexIfMissing(queryInterface, 'vet_reports', ['report_type']);
   },
 
   down: async (queryInterface, Sequelize) => {

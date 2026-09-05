@@ -15,10 +15,6 @@ import { useTranslation } from 'react-i18next';
 import { COLORS } from '../utils/constants';
 import { otpService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import {
-  registerForPushNotifications,
-  registerTokenWithBackend,
-} from '../services/notificationService';
 
 const OTP_LENGTH = 6;
 
@@ -49,17 +45,6 @@ const OTPVerificationScreen = ({ route, navigation }) => {
     return () => clearTimeout(focusTimer);
   }, []);
 
-  const registerPushToken = async () => {
-    try {
-      const pushToken = await registerForPushNotifications();
-      if (pushToken) {
-        await registerTokenWithBackend(pushToken);
-      }
-    } catch (error) {
-      console.log('Push token registration failed:', error?.message || error);
-    }
-  };
-
   const handleVerifyOTP = async (otpCode = null) => {
     const otpString = otpCode || otpValue;
 
@@ -73,7 +58,6 @@ const OTPVerificationScreen = ({ route, navigation }) => {
       const response = await otpService.verifyOTP(phoneNumber, otpString);
       if (response.success) {
         await login(response.token, response.user);
-        await registerPushToken();
 
         if (response.requiresProfileCompletion) {
           navigation.replace('ProfileCompletion');

@@ -18,6 +18,7 @@ import { COLORS } from '../utils/constants';
 import AnimalCard from '../components/AnimalCard';
 import SkeletonLoader from '../components/SkeletonLoader';
 import { animalListingService, governmentSchemeService, userService } from '../services/api';
+import { useNotifications } from '../context/NotificationContext';
 
 const { width } = Dimensions.get('window');
 const LANGUAGE_OPTIONS = [
@@ -33,6 +34,7 @@ const getLocalizedSchemeValue = (scheme, field, language) => {
 
 const HomeScreen = ({ navigation }) => {
   const { t, i18n } = useTranslation();
+  const { unreadCount } = useNotifications();
   const [loading, setLoading] = useState(false);
   const [animals, setAnimals] = useState([]);
   const [myListings, setMyListings] = useState([]);
@@ -197,7 +199,13 @@ const HomeScreen = ({ navigation }) => {
               activeOpacity={0.85}
             >
               <Ionicons name="notifications-outline" size={20} color={COLORS.white} />
-              <View style={styles.notificationDot} />
+              {unreadCount > 0 && (
+                <View style={styles.notificationDot}>
+                  <Text style={styles.notificationCount}>
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -667,14 +675,22 @@ const styles = StyleSheet.create({
   },
   notificationDot: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.accentLight,
+    top: -3,
+    right: -3,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.error,
     borderWidth: 1,
     borderColor: COLORS.primary,
+  },
+  notificationCount: {
+    color: COLORS.white,
+    fontSize: 9,
+    fontWeight: '800',
   },
   languageBar: {
     flexDirection: 'row',

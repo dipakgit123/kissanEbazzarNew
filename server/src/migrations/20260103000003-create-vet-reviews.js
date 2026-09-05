@@ -1,5 +1,15 @@
 'use strict';
 
+const addIndexIfMissing = async (queryInterface, tableName, fields, options = {}) => {
+  try {
+    await queryInterface.addIndex(tableName, fields, options);
+  } catch (error) {
+    if (error?.parent?.code !== '42P07' && !/already exists|duplicate/i.test(error.message)) {
+      throw error;
+    }
+  }
+};
+
 module.exports = {
   up: async (queryInterface, Sequelize) => {
     await queryInterface.createTable('vet_reviews', {
@@ -76,13 +86,13 @@ module.exports = {
     });
 
     // Add indexes
-    await queryInterface.addIndex('vet_reviews', ['veterinarian_id']);
-    await queryInterface.addIndex('vet_reviews', ['user_id']);
-    await queryInterface.addIndex('vet_reviews', ['rating']);
-    await queryInterface.addIndex('vet_reviews', ['is_visible']);
+    await addIndexIfMissing(queryInterface, 'vet_reviews', ['veterinarian_id']);
+    await addIndexIfMissing(queryInterface, 'vet_reviews', ['user_id']);
+    await addIndexIfMissing(queryInterface, 'vet_reviews', ['rating']);
+    await addIndexIfMissing(queryInterface, 'vet_reviews', ['is_visible']);
 
     // Add unique constraint - one review per user per veterinarian
-    await queryInterface.addIndex('vet_reviews', ['veterinarian_id', 'user_id'], {
+    await addIndexIfMissing(queryInterface, 'vet_reviews', ['veterinarian_id', 'user_id'], {
       unique: true,
       name: 'unique_vet_user_review'
     });

@@ -75,7 +75,7 @@ const connectDB = async () => {
     }
   } catch (error) {
     console.error('Unable to connect to Neon database:', error);
-    process.exit(1);
+    throw error;
   }
 };
 

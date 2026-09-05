@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DeviceEventEmitter } from 'react-native';
 import { veterinarianService } from '../services/api';
+import notificationService from '../services/notificationService';
 
 const VetAuthContext = createContext({});
 
@@ -79,6 +80,10 @@ export const VetAuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
+      const savedPushToken = await notificationService.getSavedToken();
+      if (vetToken && savedPushToken.token) {
+        await notificationService.unregisterToken(savedPushToken.token, vetToken).catch(() => {});
+      }
       await AsyncStorage.removeItem('vetToken');
       await AsyncStorage.removeItem('veterinarianData');
       setVetToken(null);

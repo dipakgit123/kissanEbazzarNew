@@ -1,15 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const notificationController = require('../controllers/notificationController');
-const authMiddleware = require('../middlewares/authMiddleware');
+const userOrVetAuthMiddleware = require('../middlewares/userOrVetAuthMiddleware');
 
-// All routes require authentication
-router.use(authMiddleware);
+// All routes require authenticated farmers or veterinarians
+router.use(userOrVetAuthMiddleware);
 
 // Device token management
 router.post('/register-token', notificationController.registerToken);
 router.post('/unregister-token', notificationController.unregisterToken);
 router.post('/test-push', notificationController.sendTestNotification);
+router.get('/preferences', notificationController.getPreferences);
+router.put('/preferences', notificationController.updatePreferences);
 
 // Notification management
 router.get('/', notificationController.getNotifications);

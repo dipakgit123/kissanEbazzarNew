@@ -29,7 +29,7 @@ const PetMatingManagement = () => {
       const reportsData = await reportsResponse.json();
       setProfiles(profilesData?.data?.profiles || []);
       setReports(reportsData?.data?.reports || []);
-    } catch (error) {
+    } catch {
       toast.error('Failed to load pet mating moderation');
     } finally {
       setLoading(false);

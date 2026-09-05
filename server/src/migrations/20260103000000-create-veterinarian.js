@@ -1,5 +1,15 @@
 'use strict';
 
+const addIndexIfMissing = async (queryInterface, tableName, fields, options = {}) => {
+  try {
+    await queryInterface.addIndex(tableName, fields, options);
+  } catch (error) {
+    if (error?.parent?.code !== '42P07' && !/already exists|duplicate/i.test(error.message)) {
+      throw error;
+    }
+  }
+};
+
 module.exports = {
   async up(queryInterface, Sequelize) {
     await queryInterface.createTable('veterinarians', {
@@ -196,16 +206,16 @@ module.exports = {
     });
 
     // Add indexes
-    await queryInterface.addIndex('veterinarians', ['phone_number'], { unique: true });
-    await queryInterface.addIndex('veterinarians', ['license_number'], { unique: true });
-    await queryInterface.addIndex('veterinarians', ['email'], { unique: true });
-    await queryInterface.addIndex('veterinarians', ['verification_status']);
-    await queryInterface.addIndex('veterinarians', ['specialization']);
-    await queryInterface.addIndex('veterinarians', ['city']);
-    await queryInterface.addIndex('veterinarians', ['state']);
-    await queryInterface.addIndex('veterinarians', ['latitude', 'longitude']);
-    await queryInterface.addIndex('veterinarians', ['is_active']);
-    await queryInterface.addIndex('veterinarians', ['rating']);
+    await addIndexIfMissing(queryInterface, 'veterinarians', ['phone_number'], { unique: true });
+    await addIndexIfMissing(queryInterface, 'veterinarians', ['license_number'], { unique: true });
+    await addIndexIfMissing(queryInterface, 'veterinarians', ['email'], { unique: true });
+    await addIndexIfMissing(queryInterface, 'veterinarians', ['verification_status']);
+    await addIndexIfMissing(queryInterface, 'veterinarians', ['specialization']);
+    await addIndexIfMissing(queryInterface, 'veterinarians', ['city']);
+    await addIndexIfMissing(queryInterface, 'veterinarians', ['state']);
+    await addIndexIfMissing(queryInterface, 'veterinarians', ['latitude', 'longitude']);
+    await addIndexIfMissing(queryInterface, 'veterinarians', ['is_active']);
+    await addIndexIfMissing(queryInterface, 'veterinarians', ['rating']);
   },
 
   async down(queryInterface, Sequelize) {

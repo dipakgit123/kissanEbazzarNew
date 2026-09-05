@@ -73,7 +73,7 @@ const MobileVerification = ({ onBack, onSuccess }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [onSuccess, otp, otpLength, phoneNumber, t]);
+  }, [i18n, onSuccess, otp, otpLength, phoneNumber, t]);
 
   // Auto-read OTP from SMS (for browsers that support it)
   useEffect(() => {

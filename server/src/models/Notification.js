@@ -9,7 +9,7 @@ module.exports = (sequelize) => {
     },
     user_id: {
       type: DataTypes.INTEGER,
-      allowNull: false,
+      allowNull: true,
     },
     title: {
       type: DataTypes.STRING(255),
@@ -20,9 +20,23 @@ module.exports = (sequelize) => {
       allowNull: false,
     },
     type: {
-      type: DataTypes.ENUM('new_listing', 'price_drop', 'contact', 'reminder', 'pregnancy', 'system'),
+      type: DataTypes.STRING(80),
       allowNull: false,
       defaultValue: 'system',
+    },
+    recipient_type: {
+      type: DataTypes.ENUM('user', 'veterinarian'),
+      allowNull: false,
+      defaultValue: 'user',
+    },
+    recipient_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    dedupe_key: {
+      type: DataTypes.STRING(180),
+      allowNull: true,
+      unique: true,
     },
     data: {
       type: DataTypes.JSONB,

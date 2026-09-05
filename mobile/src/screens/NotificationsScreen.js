@@ -7,6 +7,7 @@ import {
   StyleSheet,
   RefreshControl,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -27,7 +28,17 @@ const NotificationItem = ({ notification, onPress, onDelete }) => {
       case 'pregnancy':
         return { name: 'calendar', color: '#9C27B0' };
       case 'reminder':
+      case 'appointment_reminder':
+      case 'pregnancy_reminder':
         return { name: 'alarm', color: '#F44336' };
+      case 'new_appointment':
+      case 'appointment_confirmed':
+      case 'appointment_cancelled':
+      case 'appointment_completed':
+      case 'appointment_rescheduled':
+        return { name: 'medkit', color: COLORS.info };
+      case 'incoming_call':
+        return { name: 'call', color: COLORS.success };
       default:
         return { name: 'notifications', color: COLORS.primary };
     }
@@ -60,7 +71,10 @@ const NotificationItem = ({ notification, onPress, onDelete }) => {
       {!notification.is_read && <View style={styles.unreadDot} />}
       <TouchableOpacity
         style={styles.deleteButton}
-        onPress={() => onDelete(notification.id)}
+        onPress={(event) => {
+          event.stopPropagation();
+          onDelete(notification.id);
+        }}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
         <Ionicons name="close" size={18} color={COLORS.gray} />
@@ -96,11 +110,13 @@ const NotificationsScreen = ({ navigation }) => {
     notifications,
     unreadCount,
     loading,
+    loadingMore,
+    hasMore,
     fetchNotifications,
-    markAsRead,
     markAllAsRead,
     deleteNotification,
     clearAll,
+    openNotification,
   } = useNotifications();
 
   // Show loading while translations are loading
@@ -113,29 +129,7 @@ const NotificationsScreen = ({ navigation }) => {
   }
 
   const handleNotificationPress = async (notification) => {
-    if (!notification.is_read) {
-      await markAsRead(notification.id);
-    }
-
-    // Navigate based on notification type
-    if (notification.data) {
-      const { type, listing_id, animal_type } = notification.data;
-
-      switch (type) {
-        case 'new_listing':
-        case 'contact':
-          if (listing_id && animal_type) {
-            navigation.navigate('AnimalDetail', {
-              id: listing_id,
-              animalType: animal_type,
-            });
-          }
-          break;
-        case 'pregnancy':
-          navigation.navigate('PregnancyCalendar');
-          break;
-      }
-    }
+    await openNotification(notification);
   };
 
   const handleDelete = (notificationId) => {
@@ -185,6 +179,12 @@ const NotificationsScreen = ({ navigation }) => {
           : undefined
       }
       rightActions={[
+        {
+          icon: 'settings-outline',
+          onPress: () => navigation.navigate('NotificationSettings'),
+          color: COLORS.textMuted,
+          accessibilityLabel: 'Notification settings',
+        },
         ...(unreadCount > 0
           ? [
               {
@@ -230,7 +230,7 @@ const NotificationsScreen = ({ navigation }) => {
       ) : (
         <FlatList
           data={notifications}
-          keyExtractor={(item) => item?.id?.toString() || Math.random().toString()}
+          keyExtractor={(item, index) => item?.id?.toString() || `notification-${index}`}
           renderItem={({ item }) => (
             <NotificationItem
               notification={item}
@@ -239,6 +239,13 @@ const NotificationsScreen = ({ navigation }) => {
             />
           )}
           ListEmptyComponent={renderEmpty}
+          ListFooterComponent={loadingMore ? (
+            <ActivityIndicator style={styles.footerLoader} color={COLORS.primary} />
+          ) : null}
+          onEndReached={() => {
+            if (hasMore && !loadingMore) fetchNotifications({ append: true });
+          }}
+          onEndReachedThreshold={0.35}
           contentContainerStyle={
             notifications.length === 0 ? styles.emptyList : styles.listContent
           }
@@ -372,6 +379,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.gray,
     textAlign: 'center',
+  },
+  footerLoader: {
+    paddingVertical: 18,
   },
 });
 

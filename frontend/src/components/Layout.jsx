@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import logo from '../assets/images/animal_logog.jpeg';
-import AIAssistant from './AIAssistant';
 import LanguageSwitcher from './LanguageSwitcher';
 import Footer from './Footer';
 import { useWishlist } from '../contexts/useWishlist';
+
+const AIAssistant = lazy(() => import('./AIAssistant'));
 
 const Layout = ({ showHeaderFooter = true }) => {
   const { pathname } = useLocation();
@@ -306,7 +307,11 @@ const Layout = ({ showHeaderFooter = true }) => {
       {showHeaderFooter && <Footer />}
 
       {/* AI Assistant - Show only after login */}
-      {showHeaderFooter && <AIAssistant />}
+      {showHeaderFooter && (
+        <Suspense fallback={null}>
+          <AIAssistant />
+        </Suspense>
+      )}
     </div>
   );
 };

@@ -1,49 +1,54 @@
 // App.js - Corrected to work with your LoginForm that has built-in OTP
-import { useState } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { safeJsonParse } from './utils/stringUtils';
 import './App.css';
-import HomePage from './components/HomePage';
-import Layout from './components/Layout';
-import LoginForm from './components/LoginForm'; // Your LoginForm with OTP built-in
-import ProfileCompletion from './components/ProfileCompletion'; // Profile completion for first-time users
-import MapView from './components/MapView';
-import PregnancyCalendar from './components/PregnancyCalendar';
-import MilkReportsPage from './components/MilkReportsPage';
-import ProfilePage from './components/ProfilePage';
-import AnimalListingPage from './components/AnimalListingPage';
-import AnimalDetailPage from './components/AnimalDetailPage';
-import VeterinarianPage from './components/VeterinarianPage';
-import VeterinarianRegistrationForm from './components/VeterinarianRegistrationForm';
-import VeterinarianLogin from './components/VeterinarianLogin';
-import VeterinarianForgotPassword from './components/VeterinarianForgotPassword';
-import VeterinarianResetPassword from './components/VeterinarianResetPassword';
-import VeterinarianDashboard from './components/VeterinarianDashboard';
-import NearbyVeterinarians from './components/NearbyVeterinarians';
-import AppointmentBookingForm from './components/AppointmentBookingForm';
-import WishlistPage from './components/WishlistPage';
-import AIHealthCheck from './components/AIHealthCheck';
-import CallHistory from './components/CallHistory';
-import HelpCenter from './components/HelpCenter';
-import TermsPage from './components/TermsPage';
-import PrivacyPage from './components/PrivacyPage';
-import AboutPage from './components/AboutPage';
-import ContactPage from './components/ContactPage';
-import AdminLogin from './components/admin/AdminLogin';
-import AdminDashboard from './components/admin/AdminDashboard';
-import BuyAnimalsPage from './components/BuyAnimalsPage';
-import BlogList from './components/BlogList';
-import BlogDetail from './components/BlogDetail';
-import GovernmentSchemesPage from './components/GovernmentSchemesPage';
-import GovernmentSchemeDetail from './components/GovernmentSchemeDetail';
-import SellerListingInsightsPage from './components/SellerListingInsightsPage';
-import PetMatingPage from './components/PetMatingPage';
 import AuthenticatedRoute from './components/AuthenticatedRoute';
 import UserAppRoute from './components/UserAppRoute';
 import AdminAppRoute from './components/AdminAppRoute';
 import VeterinarianAppRoute from './components/VeterinarianAppRoute';
 import ScrollToTop from './components/ScrollToTop';
 import { WishlistProvider } from './contexts/WishlistContext.jsx';
+
+const Layout = lazy(() => import('./components/Layout'));
+const HomePage = lazy(() => import('./components/HomePage'));
+const LoginForm = lazy(() => import('./components/LoginForm'));
+const ProfileCompletion = lazy(() => import('./components/ProfileCompletion'));
+const MapView = lazy(() => import('./components/MapView'));
+const PregnancyCalendar = lazy(() => import('./components/PregnancyCalendar'));
+const MilkReportsPage = lazy(() => import('./components/MilkReportsPage'));
+const ProfilePage = lazy(() => import('./components/ProfilePage'));
+const AnimalListingPage = lazy(() => import('./components/AnimalListingPage'));
+const AnimalDetailPage = lazy(() => import('./components/AnimalDetailPage'));
+const VeterinarianPage = lazy(() => import('./components/VeterinarianPage'));
+const VeterinarianRegistrationForm = lazy(() => import('./components/VeterinarianRegistrationForm'));
+const VeterinarianLogin = lazy(() => import('./components/VeterinarianLogin'));
+const VeterinarianForgotPassword = lazy(() => import('./components/VeterinarianForgotPassword'));
+const VeterinarianResetPassword = lazy(() => import('./components/VeterinarianResetPassword'));
+const VeterinarianDashboard = lazy(() => import('./components/VeterinarianDashboard'));
+const NearbyVeterinarians = lazy(() => import('./components/NearbyVeterinarians'));
+const AppointmentBookingForm = lazy(() => import('./components/AppointmentBookingForm'));
+const WishlistPage = lazy(() => import('./components/WishlistPage'));
+const AIHealthCheck = lazy(() => import('./components/AIHealthCheck'));
+const CallHistory = lazy(() => import('./components/CallHistory'));
+const HelpCenter = lazy(() => import('./components/HelpCenter'));
+const TermsPage = lazy(() => import('./components/TermsPage'));
+const PrivacyPage = lazy(() => import('./components/PrivacyPage'));
+const AboutPage = lazy(() => import('./components/AboutPage'));
+const ContactPage = lazy(() => import('./components/ContactPage'));
+const AdminLogin = lazy(() => import('./components/admin/AdminLogin'));
+const AdminDashboard = lazy(() => import('./components/admin/AdminDashboard'));
+const BuyAnimalsPage = lazy(() => import('./components/BuyAnimalsPage'));
+const BlogList = lazy(() => import('./components/BlogList'));
+const BlogDetail = lazy(() => import('./components/BlogDetail'));
+const GovernmentSchemesPage = lazy(() => import('./components/GovernmentSchemesPage'));
+const GovernmentSchemeDetail = lazy(() => import('./components/GovernmentSchemeDetail'));
+const SellerListingInsightsPage = lazy(() => import('./components/SellerListingInsightsPage'));
+const PetMatingPage = lazy(() => import('./components/PetMatingPage'));
+
+const routeFallback = (
+  <div className="min-h-screen bg-slate-50" />
+);
 
 function App() {
   // Initialize state from localStorage
@@ -70,7 +75,7 @@ function App() {
     return 'login';
   });
 
-  const [userData, setUserData] = useState(() => {
+  const [, setUserData] = useState(() => {
     return safeJsonParse(localStorage.getItem('userData'), null);
   });
 
@@ -119,7 +124,8 @@ function App() {
   return (
     <WishlistProvider>
       <ScrollToTop />
-      <Routes>
+      <Suspense fallback={routeFallback}>
+        <Routes>
         {/* Admin Routes - No Layout */}
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route element={<AdminAppRoute />}>
@@ -198,7 +204,8 @@ function App() {
           <Route path="/government-schemes/:slug" element={<GovernmentSchemeDetail />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
-      </Routes>
+        </Routes>
+      </Suspense>
     </WishlistProvider>
   );
 }

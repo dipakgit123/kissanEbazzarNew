@@ -86,7 +86,7 @@ const AboutPage = () => {
                     key={label}
                     className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-medium text-white shadow-[0_12px_30px_rgba(0,0,0,0.12)] backdrop-blur"
                   >
-                    <Icon className="shrink-0 text-base text-emerald-300" />
+                    {React.createElement(Icon, { className: 'shrink-0 text-base text-emerald-300' })}
                     <span>{label}</span>
                   </div>
                 ))}
@@ -101,7 +101,7 @@ const AboutPage = () => {
                     <div className={`absolute inset-0 bg-gradient-to-br ${accent}`} />
                     <div className="relative">
                       <div className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 ${iconClass}`}>
-                        <Icon className="text-xl" />
+                        {React.createElement(Icon, { className: 'text-xl' })}
                       </div>
                       <h2 className="mt-4 text-lg font-bold text-white">{title}</h2>
                       <p className="mt-2 text-sm leading-6 text-white/75">{description}</p>

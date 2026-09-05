@@ -1,4 +1,11 @@
-const admin = require('firebase-admin');
+const {
+  applicationDefault,
+  cert,
+  getApp,
+  getApps,
+  initializeApp,
+} = require('firebase-admin/app');
+const { getMessaging: getFirebaseMessaging } = require('firebase-admin/messaging');
 const logger = require('../utils/logger');
 
 let firebaseApp = null;
@@ -32,8 +39,8 @@ const initializeFirebase = () => {
     return firebaseApp;
   }
 
-  if (admin.apps.length > 0) {
-    firebaseApp = admin.app();
+  if (getApps().length > 0) {
+    firebaseApp = getApp();
     return firebaseApp;
   }
 
@@ -41,12 +48,12 @@ const initializeFirebase = () => {
     const serviceAccount = getServiceAccount();
 
     if (serviceAccount) {
-      firebaseApp = admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
+      firebaseApp = initializeApp({
+        credential: cert(serviceAccount),
       });
     } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      firebaseApp = admin.initializeApp({
-        credential: admin.credential.applicationDefault(),
+      firebaseApp = initializeApp({
+        credential: applicationDefault(),
       });
     } else {
       logger.warn('Firebase Admin is not configured. FCM notifications will be skipped.');
@@ -63,7 +70,7 @@ const initializeFirebase = () => {
 
 const getMessaging = () => {
   const app = initializeFirebase();
-  return app ? admin.messaging(app) : null;
+  return app ? getFirebaseMessaging(app) : null;
 };
 
 module.exports = {

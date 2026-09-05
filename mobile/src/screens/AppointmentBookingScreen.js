@@ -60,7 +60,7 @@ const AppointmentBookingScreen = ({ route, navigation }) => {
     generateTimeSlots();
   }, [formData.date]);
 
-  const generateTimeSlots = () => {
+  const generateLocalTimeSlots = () => {
     const slots = [];
     const selectedDate = new Date(formData.date);
     const today = new Date();
@@ -87,7 +87,19 @@ const AppointmentBookingScreen = ({ route, navigation }) => {
       }
     }
 
-    setTimeSlots(slots);
+    return slots;
+  };
+
+  const generateTimeSlots = async () => {
+    const selectedDate = formData.date.toISOString().split('T')[0];
+
+    try {
+      const response = await appointmentService.getAvailableSlots(veterinarian.id, selectedDate);
+      const slots = Array.isArray(response?.data?.slots) ? response.data.slots : null;
+      setTimeSlots(slots || generateLocalTimeSlots());
+    } catch (error) {
+      setTimeSlots(generateLocalTimeSlots());
+    }
   };
 
   const handleDateChange = (event, selectedDate) => {

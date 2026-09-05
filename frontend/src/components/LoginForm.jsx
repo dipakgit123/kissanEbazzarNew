@@ -39,7 +39,7 @@ const LoginForm = ({ onLoginSuccess }) => {
   const [otpLength, setOtpLength] = useState(DEFAULT_OTP_LENGTH);
   const [otp, setOtp] = useState(() => createEmptyOtp(DEFAULT_OTP_LENGTH));
   const [otpError, setOtpError] = useState('');
-  const [deliveryInfo, setDeliveryInfo] = useState(null);
+  const [, setDeliveryInfo] = useState(null);
   
   // Constants
   const OTP_RESEND_DELAY = 60; // seconds
@@ -89,7 +89,7 @@ const LoginForm = ({ onLoginSuccess }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [fullPhoneNumber, onLoginSuccess, otp, otpLength, t]);
+  }, [fullPhoneNumber, i18n, onLoginSuccess, otp, otpLength, t]);
 
   // Auto-read OTP from SMS (for browsers that support it)
   useEffect(() => {

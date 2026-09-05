@@ -14,8 +14,8 @@ const TokenTester = () => {
   const getToken = async () => {
     setLoading(true);
     try {
-      const pushToken = await registerForPushNotifications();
-      setToken(pushToken);
+      const registration = await registerForPushNotifications();
+      setToken(registration?.token || null);
       
       // Show in alert
       Alert.alert(

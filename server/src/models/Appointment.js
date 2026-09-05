@@ -120,6 +120,10 @@ module.exports = (sequelize, DataTypes) => {
     completed_at: {
       type: DataTypes.DATE,
       allowNull: true
+    },
+    reminder_sent_at: {
+      type: DataTypes.DATE,
+      allowNull: true
     }
   }, {
     tableName: 'appointments',

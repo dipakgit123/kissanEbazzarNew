@@ -90,7 +90,7 @@ const ContactPage = () => {
       } else {
         toast.error(t('contactPage.submitError'));
       }
-    } catch (error) {
+    } catch {
       toast.error(t('contactPage.submitError'));
     } finally {
       setSubmitting(false);
@@ -123,7 +123,7 @@ const ContactPage = () => {
                     <div className={`rounded-[24px] border p-4 ${accent}`}>
                       <div className="flex items-start gap-4">
                         <div className="inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm">
-                          <Icon className="text-lg" />
+                          {React.createElement(Icon, { className: 'text-lg' })}
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-bold text-slate-900">{title}</p>

@@ -52,6 +52,11 @@ import GovernmentSchemesScreen from '../screens/GovernmentSchemesScreen';
 import GovernmentSchemeDetailScreen from '../screens/GovernmentSchemeDetailScreen';
 import SellerListingInsightsScreen from '../screens/SellerListingInsightsScreen';
 import PetMatingScreen from '../screens/PetMatingScreen';
+import NotificationSettingsScreen from '../screens/NotificationSettingsScreen';
+import {
+  navigationRef,
+  flushPendingNotificationNavigation,
+} from './notificationNavigation';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -305,6 +310,11 @@ const VetStack = () => {
         options={{ animation: 'slide_from_right' }}
       />
       <Stack.Screen
+        name="NotificationSettings"
+        component={NotificationSettingsScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
         name="LegalDocument"
         component={LegalDocumentScreen}
         options={{ animation: 'slide_from_right' }}
@@ -410,6 +420,11 @@ const MainStack = () => {
         }}
       />
       <Stack.Screen
+        name="NotificationSettings"
+        component={NotificationSettingsScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
         name="Map"
         component={MapScreen}
         options={{
@@ -508,7 +523,11 @@ const AppNavigator = () => {
   };
 
   return (
-    <NavigationContainer theme={navigationTheme}>
+    <NavigationContainer
+      ref={navigationRef}
+      theme={navigationTheme}
+      onReady={flushPendingNotificationNavigation}
+    >
       {getActiveStack()}
     </NavigationContainer>
   );

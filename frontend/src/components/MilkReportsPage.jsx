@@ -548,7 +548,7 @@ const MilkReportsPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [activeRange, selectedAnimalTypeFilter, selectedCowFilter, selectedReportTypeFilter, t]);
+  }, [activeRange, i18n, selectedAnimalTypeFilter, selectedCowFilter, selectedReportTypeFilter, t]);
 
   useEffect(() => {
     fetchData();

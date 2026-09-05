@@ -90,6 +90,11 @@ const authMiddleware = async (req, res, next) => {
         id: decoded.userId,
         userId: decoded.userId,
         phoneNumber: decoded.phoneNumber,
+        phone_number: user.phone_number,
+        full_name: user.full_name,
+        address: user.address,
+        latitude: user.latitude,
+        longitude: user.longitude,
         isVerified: decoded.isVerified
       };
     } else {

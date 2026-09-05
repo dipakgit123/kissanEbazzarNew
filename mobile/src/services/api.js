@@ -81,7 +81,7 @@ api.interceptors.request.use(
       token = await AsyncStorage.getItem('vetToken');
     }
     
-    if (token) {
+    if (token && !config.headers.Authorization) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -1062,6 +1062,42 @@ export const wishlistService = {
   },
 };
 
+const normalizeAppointment = (appointment) => ({
+  ...appointment,
+  age: appointment.age || appointment.animal_age,
+  breed: appointment.breed || appointment.animal_breed,
+  reason: appointment.reason || appointment.symptoms || appointment.notes,
+  urgency: appointment.urgency || (appointment.appointment_type === 'emergency' ? 'emergency' : 'normal'),
+  user: appointment.user
+    ? {
+        ...appointment.user,
+        fullname: appointment.user.fullname || appointment.user.full_name,
+      }
+    : appointment.user,
+});
+
+const normalizeAppointmentListResponse = (payload) => {
+  const appointments = (Array.isArray(payload?.data?.appointments)
+    ? payload.data.appointments
+    : Array.isArray(payload?.data)
+      ? payload.data
+      : []).map(normalizeAppointment);
+
+  return {
+    ...payload,
+    data: appointments,
+    pagination: payload?.data && !Array.isArray(payload.data)
+      ? {
+          totalCount: payload.data.totalCount,
+          currentPage: payload.data.currentPage,
+          totalPages: payload.data.totalPages,
+          todayCount: payload.data.todayCount,
+          pendingCount: payload.data.pendingCount,
+        }
+      : undefined,
+  };
+};
+
 // Appointment Service
 export const appointmentService = {
   // Create new appointment (for users)
@@ -1080,7 +1116,7 @@ export const appointmentService = {
       const response = await api.get('/api/appointments/my-appointments', {
         params: { filter }
       });
-      return response.data;
+      return normalizeAppointmentListResponse(response.data);
     } catch (error) {
       throw error.response?.data || error;
     }
@@ -1092,7 +1128,7 @@ export const appointmentService = {
       const response = await api.get('/api/appointments/vet-appointments', {
         params: { filter }
       });
-      return response.data;
+      return normalizeAppointmentListResponse(response.data);
     } catch (error) {
       throw error.response?.data || error;
     }

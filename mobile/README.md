@@ -1,146 +1,57 @@
-# Kissan E-Bazzar Mobile App
+# Kissan Ebazzar Mobile App
 
-React Native mobile app for Kissan E-Bazzar - A farmers marketplace for buying and selling animals.
+Expo React Native app for Kissan Ebazzar farmer, marketplace, veterinarian, notification, and appointment workflows.
 
-## Prerequisites
+## Setup
 
-- Node.js (v16 or higher)
-- npm or yarn
-- Expo CLI (`npm install -g expo-cli`)
-- Android Studio (for Android development)
-- Xcode (for iOS development, macOS only)
+```bash
+cd mobile
+npm install
+copy .env.example .env
+```
 
-## Installation
+Set the backend URL in `.env`:
 
-1. Navigate to the mobile folder:
-   ```bash
-   cd mobile
-   ```
+```env
+EXPO_PUBLIC_API_URL=http://localhost:5000
+EXPO_PUBLIC_PUSH_PROVIDER=firebase
+EXPO_PUBLIC_ALLOW_CLEARTEXT=true
+```
 
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+For Android physical devices, use your computer or server IP instead of `localhost`.
 
-3. Configure the API URL:
-   - Open `src/services/api.js`
-   - Update the `API_URL` to point to your backend server:
-     - For Android Emulator: `http://10.0.2.2:5000`
-     - For iOS Simulator: `http://localhost:5000`
-     - For Physical Device: `http://YOUR_COMPUTER_IP:5000`
+## Development
 
-## Running the App
-
-### Start the development server:
 ```bash
 npm start
-# or
-expo start
-```
-
-### Run on specific platform:
-```bash
-# Android
 npm run android
-
-# iOS (macOS only)
 npm run ios
-
-# Web
-npm run web
 ```
 
-## Project Structure
+## Production Builds
 
-```
-mobile/
-├── App.js                    # Main entry point
-├── app.json                  # Expo configuration
-├── package.json              # Dependencies
-├── assets/                   # App icons and images
-└── src/
-    ├── components/           # Reusable UI components
-    │   └── AnimalCard.js
-    ├── context/              # React Context providers
-    │   └── AuthContext.js
-    ├── navigation/           # Navigation setup
-    │   └── AppNavigator.js
-    ├── screens/              # App screens
-    │   ├── LoginScreen.js
-    │   ├── OTPVerificationScreen.js
-    │   ├── ProfileCompletionScreen.js
-    │   ├── HomeScreen.js
-    │   ├── AnimalDetailScreen.js
-    │   ├── ProfileScreen.js
-    │   └── SellAnimalScreen.js
-    ├── services/             # API services
-    │   └── api.js
-    └── utils/                # Utility functions
-        └── constants.js
-```
-
-## Features
-
-- **Authentication**: Phone number login with OTP verification
-- **Home Screen**: Browse featured and nearby animal listings
-- **Animal Detail**: View complete details of an animal listing
-- **Profile Management**: View and edit user profile, upload photo
-- **Sell Animals**: List your animals for sale (6 categories supported)
-- **Search & Filter**: Search by breed, type, or location
-
-## Backend Connection
-
-This app connects to the same backend as the web frontend. Make sure:
-
-1. The backend server is running on port 5000
-2. The API URL in `src/services/api.js` is correctly configured
-3. Your firewall allows connections to the backend
-
-## Supported Animal Categories
-
-- Cow
-- Buffalo
-- Horse
-- Goat
-- Dog
-- Cat
-
-## Building for Production
-
-### Android:
 ```bash
-expo build:android
-# or
-eas build --platform android
+npx eas build --platform android --profile production
 ```
 
-### iOS:
+Production and preview builds should use an HTTPS API URL. Cleartext HTTP is disabled by default in the Android config plugin; set `EXPO_PUBLIC_ALLOW_CLEARTEXT=true` only for development builds that need a local HTTP backend.
+
+## Configuration
+
+- Runtime config is merged in `app.config.js`.
+- Default Expo config lives in `app.json`.
+- EAS profile env vars live in `eas.json`; replace the placeholder production API URL with the deployed HTTPS backend before release.
+- Push notifications support Firebase FCM on Android and Expo push tokens as fallback.
+- Notification taps route to listings, appointments, calls, or pregnancy records from foreground, background, and cold start states.
+- Farmers and veterinarians have separate inboxes, badges, device-token ownership, and server-synced category preferences.
+- Remote push registration requires a physical device and an Expo development or production build; Android Expo Go does not support it.
+- Uploaded media is handled by the backend storage configuration, currently AWS S3 compatible env vars.
+
+## Checks
+
 ```bash
-expo build:ios
-# or
-eas build --platform ios
+npx expo config --type public
+npx expo export --platform android
 ```
 
-## Troubleshooting
-
-### Connection Issues
-- Make sure your phone and computer are on the same network
-- Check if the backend server is running
-- Verify the API URL is correct for your platform
-
-### OTP Not Receiving
-- Check backend SMS configuration
-- Verify phone number format (should be 10 digits without country code)
-
-### Images Not Loading
-- Check Cloudinary configuration in backend
-- Verify image URLs are accessible
-
-## Tech Stack
-
-- React Native with Expo
-- React Navigation (Stack + Bottom Tabs)
-- Axios for API calls
-- AsyncStorage for local storage
-- Expo Location for geolocation
-- Expo Image Picker for photo uploads
+The mobile JavaScript source can also be syntax-checked with Node for quick smoke validation.

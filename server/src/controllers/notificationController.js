@@ -1,22 +1,88 @@
 const db = require('../models');
-const { Notification, DeviceToken } = db;
+const { Notification, DeviceToken, NotificationPreference } = db;
+const { Op } = require('sequelize');
 const logger = require('../utils/logger');
 const { sendRealtimeNotification } = require('../services/notificationService');
+
+const getRequestRecipient = (req) => {
+  if (req.vet) {
+    return {
+      id: req.vet.id,
+      type: 'veterinarian',
+      legacyUserId: null,
+    };
+  }
+
+  return {
+    id: req.user.id,
+    type: 'user',
+    legacyUserId: req.user.id,
+  };
+};
+
+const buildRecipientWhere = ({ id, type, legacyUserId }, extra = {}) => {
+  const recipientWhere = {
+    recipient_type: type,
+    recipient_id: id,
+  };
+
+  if (type !== 'user') {
+    return {
+      ...recipientWhere,
+      ...extra,
+    };
+  }
+
+  return {
+    ...extra,
+    [Op.or]: [
+      recipientWhere,
+      { user_id: legacyUserId },
+    ],
+  };
+};
+
+const buildRecipientPayload = ({ id, type, legacyUserId }) => ({
+  user_id: type === 'user' ? legacyUserId : null,
+  recipient_type: type,
+  recipient_id: id,
+});
+
+const DEFAULT_PREFERENCES = {
+  push_enabled: true,
+  appointments_enabled: true,
+  marketplace_enabled: true,
+  reminders_enabled: true,
+  communication_enabled: true,
+  system_enabled: true,
+};
+const PREFERENCE_FIELDS = Object.keys(DEFAULT_PREFERENCES);
 
 /**
  * Register device token for push notifications
  */
 const registerToken = async (req, res) => {
   try {
-    const { token, platform = 'android', provider = 'expo' } = req.body;
-    const userId = req.user.id;
+    const {
+      token,
+      platform = 'android',
+      provider = 'expo',
+      device_id = null,
+      app_version = null,
+    } = req.body;
+    const recipient = getRequestRecipient(req);
     const normalizedProvider = provider === 'firebase' ? 'firebase' : 'expo';
+    const normalizedPlatform = ['android', 'ios', 'web'].includes(platform) ? platform : null;
 
-    if (!token) {
+    if (typeof token !== 'string' || token.trim().length < 20 || token.length > 2048) {
       return res.status(400).json({
         success: false,
-        message: 'Device token is required',
+        message: 'A valid device token is required',
       });
+    }
+
+    if (!normalizedPlatform) {
+      return res.status(400).json({ success: false, message: 'Invalid device platform' });
     }
 
     // Check if token already exists
@@ -25,19 +91,29 @@ const registerToken = async (req, res) => {
     if (deviceToken) {
       // Update existing token
       await deviceToken.update({
-        user_id: userId,
-        platform,
+        ...buildRecipientPayload(recipient),
+        platform: normalizedPlatform,
         provider: normalizedProvider,
         is_active: true,
+        device_id: device_id ? String(device_id).slice(0, 120) : null,
+        app_version: app_version ? String(app_version).slice(0, 40) : null,
+        last_seen_at: new Date(),
+        failure_count: 0,
+        last_error: null,
       });
     } else {
       // Create new token
       deviceToken = await DeviceToken.create({
-        user_id: userId,
+        ...buildRecipientPayload(recipient),
         token,
-        platform,
+        platform: normalizedPlatform,
         provider: normalizedProvider,
         is_active: true,
+        device_id: device_id ? String(device_id).slice(0, 120) : null,
+        app_version: app_version ? String(app_version).slice(0, 40) : null,
+        last_seen_at: new Date(),
+        failure_count: 0,
+        last_error: null,
       });
     }
 
@@ -54,12 +130,64 @@ const registerToken = async (req, res) => {
   }
 };
 
+const getPreferences = async (req, res) => {
+  try {
+    const recipient = getRequestRecipient(req);
+    const [preferences] = await NotificationPreference.findOrCreate({
+      where: {
+        recipient_type: recipient.type,
+        recipient_id: recipient.id,
+      },
+      defaults: DEFAULT_PREFERENCES,
+    });
+
+    res.json({ success: true, data: preferences });
+  } catch (error) {
+    logger.error('Error fetching notification preferences:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch notification preferences' });
+  }
+};
+
+const updatePreferences = async (req, res) => {
+  try {
+    const recipient = getRequestRecipient(req);
+    const updates = {};
+
+    for (const field of PREFERENCE_FIELDS) {
+      if (Object.prototype.hasOwnProperty.call(req.body || {}, field)) {
+        if (typeof req.body[field] !== 'boolean') {
+          return res.status(400).json({ success: false, message: `${field} must be a boolean` });
+        }
+        updates[field] = req.body[field];
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ success: false, message: 'No valid preference fields provided' });
+    }
+
+    const [preferences] = await NotificationPreference.findOrCreate({
+      where: {
+        recipient_type: recipient.type,
+        recipient_id: recipient.id,
+      },
+      defaults: { ...DEFAULT_PREFERENCES, ...updates },
+    });
+    await preferences.update(updates);
+
+    res.json({ success: true, data: preferences });
+  } catch (error) {
+    logger.error('Error updating notification preferences:', error);
+    res.status(500).json({ success: false, message: 'Failed to update notification preferences' });
+  }
+};
+
 /**
  * Unregister device token
  */
 const unregisterToken = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const recipient = getRequestRecipient(req);
     const { token } = req.body;
 
     if (!token) {
@@ -71,13 +199,13 @@ const unregisterToken = async (req, res) => {
 
     const [updatedCount] = await DeviceToken.update(
       { is_active: false },
-      { where: { token, user_id: userId } }
+      { where: buildRecipientWhere(recipient, { token }) }
     );
 
     if (updatedCount === 0) {
       return res.status(404).json({
         success: false,
-        message: 'Device token not found for this user',
+        message: 'Device token not found for this account',
       });
     }
 
@@ -111,16 +239,16 @@ const sendTestNotification = async (req, res) => {
       });
     }
 
-    const userId = req.user.id;
+    const recipient = getRequestRecipient(req);
     const title = req.body?.title || 'Animal E Bazar test';
     const body = req.body?.body || 'Your local push notification setup is working.';
 
     const activeTokenCount = await DeviceToken.count({
-      where: { user_id: userId, is_active: true },
+      where: buildRecipientWhere(recipient, { is_active: true }),
     });
 
     const sent = await sendRealtimeNotification(
-      userId,
+      recipient.id,
       title,
       body,
       {
@@ -128,7 +256,8 @@ const sendTestNotification = async (req, res) => {
         source: 'local_test',
         sentAt: new Date().toISOString(),
       },
-      db
+      db,
+      recipient.type
     );
 
     res.json({
@@ -150,7 +279,7 @@ const sendTestNotification = async (req, res) => {
  */
 const getNotifications = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const recipient = getRequestRecipient(req);
     let { limit = 50, offset = 0 } = req.query;
 
     // Validate and sanitize limit (max 100 to prevent DoS)
@@ -160,14 +289,14 @@ const getNotifications = async (req, res) => {
     offset = Math.max(parseInt(offset) || 0, 0);
 
     const notifications = await Notification.findAndCountAll({
-      where: { user_id: userId },
+      where: buildRecipientWhere(recipient),
       order: [['created_at', 'DESC']],
       limit,
       offset,
     });
 
     const unreadCount = await Notification.count({
-      where: { user_id: userId, is_read: false },
+      where: buildRecipientWhere(recipient, { is_read: false }),
     });
 
     res.json({
@@ -190,10 +319,10 @@ const getNotifications = async (req, res) => {
  */
 const getUnreadCount = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const recipient = getRequestRecipient(req);
 
     const count = await Notification.count({
-      where: { user_id: userId, is_read: false },
+      where: buildRecipientWhere(recipient, { is_read: false }),
     });
 
     res.json({
@@ -215,10 +344,10 @@ const getUnreadCount = async (req, res) => {
 const markAsRead = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
+    const recipient = getRequestRecipient(req);
 
     const notification = await Notification.findOne({
-      where: { id, user_id: userId },
+      where: buildRecipientWhere(recipient, { id }),
     });
 
     if (!notification) {
@@ -248,11 +377,11 @@ const markAsRead = async (req, res) => {
  */
 const markAllAsRead = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const recipient = getRequestRecipient(req);
 
     await Notification.update(
       { is_read: true },
-      { where: { user_id: userId, is_read: false } }
+      { where: buildRecipientWhere(recipient, { is_read: false }) }
     );
 
     res.json({
@@ -274,10 +403,10 @@ const markAllAsRead = async (req, res) => {
 const deleteNotification = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
+    const recipient = getRequestRecipient(req);
 
     const notification = await Notification.findOne({
-      where: { id, user_id: userId },
+      where: buildRecipientWhere(recipient, { id }),
     });
 
     if (!notification) {
@@ -307,10 +436,10 @@ const deleteNotification = async (req, res) => {
  */
 const clearAllNotifications = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const recipient = getRequestRecipient(req);
 
     await Notification.destroy({
-      where: { user_id: userId },
+      where: buildRecipientWhere(recipient),
     });
 
     res.json({
@@ -336,4 +465,6 @@ module.exports = {
   markAllAsRead,
   deleteNotification,
   clearAllNotifications,
+  getPreferences,
+  updatePreferences,
 };

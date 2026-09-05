@@ -379,7 +379,7 @@ const HomePage = () => {
     } finally {
       setIsSearching(false);
     }
-  }, [transformListing, performLocalSearch]);
+  }, [transformListing, performLocalSearch, userLocation?.latitude, userLocation?.longitude, userLocation?.postalCode]);
 
   // Real-time search effect (debounced)
   useEffect(() => {

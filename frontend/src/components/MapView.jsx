@@ -96,7 +96,6 @@ const getDistanceColor = (distance) => {
 
 const MapComponent = ({
   animalData,
-  getAnimalTypeLabel,
   onAnimalSelect,
   onMapReady,
   selectedAnimal,
@@ -511,7 +510,6 @@ const MapView = ({ addToWishlist, removeFromWishlist, isInWishlist }) => {
         return (
           <MapComponent
             animalData={filteredAnimals}
-            getAnimalTypeLabel={getAnimalTypeLabel}
             onAnimalSelect={setSelectedAnimal}
             onMapReady={(map) => { mapInstanceRef.current = map; }}
             selectedAnimal={selectedAnimal}
