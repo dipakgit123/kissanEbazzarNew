@@ -1,4 +1,8 @@
-﻿import React, { useState, useEffect } from 'react';
+import ExperienceBar from '../components/ExperienceBar';
+import { assistantExperienceCopy } from '../utils/experienceAssistant';
+import { featureAllowed, getAnimalGroup } from '../utils/animalExperience';
+import { useExperienceText } from '../context/AnimalExperienceContext';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -34,6 +38,8 @@ const getLocalizedSchemeValue = (scheme, field, language) => {
 
 const HomeScreen = ({ navigation }) => {
   const { t, i18n } = useTranslation();
+  const pet = getAnimalGroup() === 'pet';
+  const experienceText = useExperienceText();
   const { unreadCount } = useNotifications();
   const [loading, setLoading] = useState(false);
   const [animals, setAnimals] = useState([]);
@@ -54,7 +60,7 @@ const HomeScreen = ({ navigation }) => {
     },
     {
       key: 'aiAssistant',
-      title: t('services.aiAssistant'),
+      title: assistantExperienceCopy(i18n.language).title,
       subtitle: t('homeScreen.instantAiSupport'),
       image: require('../assets/ai_assistant.png'),
       route: 'AIAssistant',
@@ -124,6 +130,7 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const fetchSchemes = async () => {
+    if (pet) return;
     try {
       const featuredResponse = await governmentSchemeService.getFeatured(4);
       const featuredSchemes = featuredResponse?.data?.schemes || [];
@@ -263,24 +270,25 @@ const HomeScreen = ({ navigation }) => {
       >
 
         {/* Hero Section */}
+        <ExperienceBar navigation={navigation} />
         <View style={styles.heroSection}>
           {/* Hero Image */}
-          <View style={styles.heroImageContainer}>
+          <View style={[styles.heroImageContainer, pet && { height: undefined, aspectRatio: 3 / 2 }]}>
             <Image
-              source={require('../assets/farmer_banner.png')}
+              source={pet ? require('../assets/pet-features/home-hero.jpg') : require('../assets/farmer_banner.png')}
               style={styles.heroImage}
-              resizeMode="cover"
+              resizeMode={pet ? 'contain' : 'cover'}
             />
           </View>
 
           {/* Hero Content */}
           <View style={styles.heroContent}>
             <Text style={styles.heroTitle}>
-              {t('home.heroTitle')}{'\n'}
-              <Text style={styles.heroTitleGreen}>{t('home.heroTitleHighlight')}</Text>
+              {pet ? experienceText.petTitle : t('home.heroTitle')}{'\n'}
+              <Text style={styles.heroTitleGreen}>{!pet && t('home.heroTitleHighlight')}</Text>
             </Text>
             <Text style={styles.heroSubtitle}>
-              {t('home.heroSubtitle')}
+              {pet ? experienceText.petHint : t('home.heroSubtitle')}
             </Text>
 
             {/* Trust Indicators */}
@@ -290,8 +298,8 @@ const HomeScreen = ({ navigation }) => {
                   <Ionicons name="people" size={20} color={COLORS.white} />
                 </View>
                 <View>
-                  <Text style={styles.trustValue}>50,000+</Text>
-                  <Text style={styles.trustLabel}>{t('home.farmers')}</Text>
+                  <Text style={styles.trustValue}>{pet ? experienceText.pet : '50,000+'}</Text>
+                  <Text style={styles.trustLabel}>{pet ? t('animalTypes.dog') + ' / ' + t('animalTypes.cat') : t('home.farmers')}</Text>
                 </View>
               </View>
 
@@ -338,7 +346,7 @@ const HomeScreen = ({ navigation }) => {
         </View>
 
         {/* Government Schemes */}
-        <View style={styles.schemesSection}>
+        {!pet && (<View style={styles.schemesSection}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
               <View style={styles.schemeSectionIcon}>
@@ -354,7 +362,7 @@ const HomeScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
-          {schemes.length > 0 ? (
+          {!pet && schemes.length > 0 ? (
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -426,7 +434,7 @@ const HomeScreen = ({ navigation }) => {
               <Ionicons name="chevron-forward" size={18} color={COLORS.primary} />
             </TouchableOpacity>
           )}
-        </View>
+        </View>)}
 
         {/* Seller Listings */}
         {myListings.length > 0 ? (
@@ -523,7 +531,7 @@ const HomeScreen = ({ navigation }) => {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.featuresScrollContent}
           >
-            {featureCards.map((card) => (
+            {featureCards.filter(card => featureAllowed(card.route)).map((card) => (
               <TouchableOpacity
                 key={card.key}
                 style={styles.featureCardHorizontal}
@@ -531,7 +539,7 @@ const HomeScreen = ({ navigation }) => {
                 activeOpacity={0.9}
               >
                 <ImageBackground
-                  source={card.image}
+                  source={pet ? petFeatureImages[card.route] : card.image}
                   style={[styles.featureBackgroundImage, { backgroundColor: card.backgroundColor }]}
                   imageStyle={styles.featureBackgroundImageInner}
                   resizeMode="cover"
@@ -1204,3 +1212,4 @@ const styles = StyleSheet.create({
 });
 
 export default HomeScreen;
+import { petFeatureImages } from '../utils/petFeatureImages';

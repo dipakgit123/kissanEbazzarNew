@@ -471,8 +471,8 @@ const ProfileScreen = ({ navigation }) => {
       const message =
         'Check out Kissan eBazaar - Buy and Sell Animals Online!\n\n' +
         'Download the app now:\n' +
-        'Android: https://play.google.com/store/apps/details?id=com.kissanebazaar\n' +
-        'iOS: https://apps.apple.com/app/kissan-ebazaar/id123456789';
+        'Android: https://play.google.com/store/apps/details?id=com.kissanebazzar.app' +
+        (process.env.EXPO_PUBLIC_IOS_STORE_URL ? '\n' + process.env.EXPO_PUBLIC_IOS_STORE_URL : '');
 
       await Share.share({
         message,

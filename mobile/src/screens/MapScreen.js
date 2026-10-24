@@ -93,10 +93,13 @@ const MapScreen = ({ navigation, route }) => {
   const targetParams = route?.params || {};
   const targetListingId = targetParams.listingId || targetParams.id || targetParams.listing?.id;
   const targetAnimalType = targetParams.animalType || targetParams.listing?.animal_type;
-  const targetLatitude = Number(targetParams.latitude ?? targetParams.lat);
-  const targetLongitude = Number(targetParams.longitude ?? targetParams.lng);
+  const rawLatitude = targetParams.latitude ?? targetParams.lat;
+  const rawLongitude = targetParams.longitude ?? targetParams.lng;
+  const targetLatitude = rawLatitude == null || rawLatitude === '' ? NaN : Number(rawLatitude);
+  const targetLongitude = rawLongitude == null || rawLongitude === '' ? NaN : Number(rawLongitude);
   const hasTargetCoordinates =
-    Number.isFinite(targetLatitude) && Number.isFinite(targetLongitude);
+    Number.isFinite(targetLatitude) && Math.abs(targetLatitude) <= 90 &&
+    Number.isFinite(targetLongitude) && Math.abs(targetLongitude) <= 180;
 
   const [userLocation, setUserLocation] = useState(null);
   const [listings, setListings] = useState([]);

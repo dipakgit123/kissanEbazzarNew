@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { VetAnimalGroupPicker } from './VetAnimalGroups';
+import React, { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import {
@@ -26,6 +27,7 @@ import {
 } from 'react-icons/fa6';
 import LanguageSwitcher from './LanguageSwitcher';
 import { API_BASE_URL } from '../config/api';
+import './VeterinarianRegistrationForm.css';
 
 const API_URL = API_BASE_URL;
 const MB = 1024 * 1024;
@@ -38,8 +40,11 @@ const VeterinarianRegistrationForm = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const errorRef = useRef(null);
+  const submitLock = useRef(false);
   const [error, setError] = useState(null);
   const [registrationConflict, setRegistrationConflict] = useState(null);
+  useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
   const [locationLoading, setLocationLoading] = useState(false);
   const [pincodeLookupLoading, setPincodeLookupLoading] = useState(false);
   const [lastResolvedPincode, setLastResolvedPincode] = useState('');
@@ -54,7 +59,7 @@ const VeterinarianRegistrationForm = () => {
     email: '',
 
     // Professional Info
-    specialization: 'general',
+    specialization: 'general', animal_groups: [],
     experience_years: '',
     qualification: 'BVSc',
     services: [],
@@ -124,7 +129,7 @@ const VeterinarianRegistrationForm = () => {
   ];
 
   const getServiceIcon = (serviceValue) => serviceCards.find((item) => item.value === serviceValue)?.Icon || FaUserDoctor;
-  const personalSectionComplete = Boolean(formData.full_name && formData.phone_number);
+  const personalSectionComplete = Boolean(formData.full_name.trim() && /^\+91[0-9]{10}$/.test(formData.phone_number) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim()) && formData.experience_years !== '' && formData.animal_groups.length);
   const licenseSectionComplete = Boolean(formData.license_number && files.license_document);
   const locationSectionComplete = Boolean(
     formData.latitude &&
@@ -404,6 +409,10 @@ const VeterinarianRegistrationForm = () => {
   };
 
   const validateForm = () => {
+    if (!formData.animal_groups.length) {
+      setError(t('vetRegistration.animalGroupsRequired'));
+      return false;
+    }
     if (!formData.full_name?.trim() || !formData.phone_number || !formData.email?.trim()) {
       setRegistrationConflict(null);
       setError(t('vetRegistration.fillAllRequired'));
@@ -453,7 +462,8 @@ const VeterinarianRegistrationForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    if (submitLock.current || !validateForm()) return;
+    submitLock.current = true;
 
     let shouldRedirectToLogin = false;
     setLoading(true);
@@ -468,7 +478,7 @@ const VeterinarianRegistrationForm = () => {
 
       // Append all form fields
       Object.keys(formData).forEach(key => {
-        if (key === 'services') {
+        if (key === 'services' || key === 'animal_groups') {
           formDataToSend.append(key, JSON.stringify(formData[key]));
         } else if (formData[key] !== null && formData[key] !== '') {
           formDataToSend.append(key, formData[key]);
@@ -532,6 +542,7 @@ const VeterinarianRegistrationForm = () => {
       );
     } finally {
       if (!shouldRedirectToLogin) {
+        submitLock.current = false;
         setLoading(false);
         setSubmitStage('idle');
       }
@@ -546,12 +557,12 @@ const VeterinarianRegistrationForm = () => {
 
   if (submitStage === 'success') {
     return (
-      <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center p-4">
+      <div className="site-background min-h-screen flex items-center justify-center p-4">
         <div className="bg-white rounded-3xl shadow-2xl p-12 max-w-lg w-full text-center border border-gray-100">
           {/* Success Icon */}
           <div className="relative inline-flex items-center justify-center mb-8">
             <div className="absolute w-24 h-24 bg-green-100 rounded-full animate-ping opacity-20"></div>
-            <div className="relative w-24 h-24 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center shadow-xl">
+            <div className="relative w-24 h-24 bg-primary rounded-full flex items-center justify-center shadow-xl">
               <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
               </svg>
@@ -571,7 +582,7 @@ const VeterinarianRegistrationForm = () => {
           </p>
 
           {/* Timeline */}
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 mb-8 border border-blue-100">
+          <div className="bg-blue-50 rounded-2xl p-6 mb-8 border border-blue-100">
             <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center justify-center">
               <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -614,7 +625,7 @@ const VeterinarianRegistrationForm = () => {
           {/* Actions */}
           <button
             onClick={() => navigate('/veterinarian/login')}
-            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-4 rounded-xl font-semibold hover:shadow-xl transition-all transform hover:-translate-y-0.5 mb-4"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-semibold hover:shadow-xl transition-all transform hover:-translate-y-0.5 mb-4"
           >
             {t('vetRegistration.goToLogin')}
           </button>
@@ -630,7 +641,7 @@ const VeterinarianRegistrationForm = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#eef7f2_0%,#f8fbff_30%,#ffffff_100%)] py-6 px-4 sm:px-6 lg:px-8">
+    <div className="vet-registration-page site-background min-h-screen py-6 px-4 sm:px-6 lg:px-8">
       {loading && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 backdrop-blur-[2px]">
           <div className="mx-4 w-full max-w-sm rounded-2xl border border-white/70 bg-white p-6 shadow-2xl">
@@ -658,7 +669,7 @@ const VeterinarianRegistrationForm = () => {
             </div>
             <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-green-600 transition-all duration-300"
+                className="h-full rounded-full bg-primary transition-all duration-300"
                 style={{ width: `${submitStage === 'preparing' ? 20 : submitStage === 'success' ? 100 : Math.max(uploadProgress, 8)}%` }}
               />
             </div>
@@ -672,7 +683,7 @@ const VeterinarianRegistrationForm = () => {
           <LanguageSwitcher />
         </div>
         
-        <div className="mx-auto mb-6 max-w-4xl">
+        <div className="vet-registration-heading mb-6">
           <div className="px-1 py-1 sm:px-0">
             <div>
               <h1 className="text-2xl font-semibold leading-tight text-slate-900 sm:text-3xl">
@@ -684,7 +695,7 @@ const VeterinarianRegistrationForm = () => {
 
         {/* Error Message */}
         {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 rounded-xl p-4 mb-6 shadow-sm">
+          <div ref={errorRef} role="alert" tabIndex={-1} className="bg-red-50 border-l-4 border-red-500 rounded-xl p-4 mb-6 shadow-sm">
               <div className="flex items-start">
                 <svg className="w-5 h-5 text-red-500 mr-3 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
@@ -706,14 +717,16 @@ const VeterinarianRegistrationForm = () => {
           )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-6 xl:grid xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start xl:gap-6 xl:space-y-0">
-
-          <div className="space-y-6 xl:min-w-0">
+        <form onSubmit={handleSubmit} className="vet-registration-layout">
+          <div className="vet-registration-fields space-y-6">
+            <div className="vet-registration-groups bg-white rounded-2xl border border-gray-100 p-5 sm:p-6">
+              <VetAnimalGroupPicker value={formData.animal_groups} onChange={value => setFormData(previous => ({ ...previous, animal_groups: value }))} />
+            </div>
           <div className="space-y-6">
               {/* Section Card: Personal Information */}
               <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm sm:p-6">
                 <div className="flex items-center mb-6">
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center mr-3">
+                  <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center mr-3">
                     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
@@ -724,7 +737,7 @@ const VeterinarianRegistrationForm = () => {
                   </div>
                 </div>
                 
-                <div className="h-px bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 mb-6"></div>
+                <div className="h-px bg-gray-200 mb-6"></div>
                 
                 <div className="space-y-5">
 
@@ -805,7 +818,7 @@ const VeterinarianRegistrationForm = () => {
               {/* Section Card: Professional Information */}
               <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm sm:p-6">
                 <div className="flex items-center mb-6">
-                  <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center mr-3">
+                  <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center mr-3">
                     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
@@ -816,7 +829,7 @@ const VeterinarianRegistrationForm = () => {
                   </div>
                 </div>
                 
-                <div className="h-px bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 mb-6"></div>
+                <div className="h-px bg-gray-200 mb-6"></div>
                 
                 <div className="space-y-5">
 
@@ -959,7 +972,7 @@ const VeterinarianRegistrationForm = () => {
               {/* Section Card: Services Offered */}
               <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm sm:p-6">
                 <div className="flex items-center mb-6">
-                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl flex items-center justify-center mr-3">
+                  <div className="w-10 h-10 bg-purple-600 rounded-xl flex items-center justify-center mr-3">
                     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                     </svg>
@@ -970,23 +983,24 @@ const VeterinarianRegistrationForm = () => {
                   </div>
                 </div>
                 
-                <div className="h-px bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 mb-6"></div>
+                <div className="h-px bg-gray-200 mb-6"></div>
 
                 {/* Services - Pill Style Chips */}
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="vet-registration-services">
                   {serviceOptions.map(service => (
                     <button
                       key={service.value}
                       type="button"
                       onClick={() => handleServiceChange(service.value)}
+                      aria-pressed={formData.services.includes(service.value)}
                       className={`flex items-center gap-3 rounded-2xl border px-4 py-4 text-left font-medium transition-all duration-200 ${
                         formData.services.includes(service.value)
-                          ? 'border-violet-200 bg-gradient-to-r from-purple-500 to-violet-600 text-white shadow-lg'
-                          : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-violet-200 hover:bg-violet-50'
+                          ? 'border-primary bg-primary text-white'
+                          : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-primary'
                       }`}
                     >
                       <span className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
-                        formData.services.includes(service.value) ? 'bg-white/20 text-white' : 'bg-white text-violet-600 shadow-sm'
+                        formData.services.includes(service.value) ? 'bg-white/20 text-white' : 'bg-white text-primary'
                       }`}>
                         {React.createElement(getServiceIcon(service.value), { className: 'text-lg' })}
                       </span>
@@ -1005,7 +1019,7 @@ const VeterinarianRegistrationForm = () => {
               <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm sm:p-6">
                 <div className="space-y-5 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-5 lg:space-y-0">
                   {/* Emergency Toggle */}
-                  <div className="flex items-start p-4 bg-gradient-to-r from-red-50 to-orange-50 rounded-xl border border-red-200">
+                  <div className="flex items-start p-4 bg-red-50 rounded-xl border border-red-200">
                     <input
                       type="checkbox"
                       id="emergency_available"
@@ -1032,7 +1046,7 @@ const VeterinarianRegistrationForm = () => {
                     </label>
                     <div className="flex items-center space-x-6">
                       <div className="relative">
-                        <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center overflow-hidden border-4 border-white shadow-lg">
+                        <div className="w-24 h-24 rounded-2xl bg-blue-100 flex items-center justify-center overflow-hidden border-4 border-white shadow-lg">
                           {files.profile_photo ? (
                             <img
                               src={URL.createObjectURL(files.profile_photo)}
@@ -1058,7 +1072,7 @@ const VeterinarianRegistrationForm = () => {
                         )}
                       </div>
                       <div className="flex-1">
-                        <label className="cursor-pointer inline-flex items-center px-5 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl font-semibold transition-all shadow-md hover:shadow-lg">
+                        <label className="cursor-pointer inline-flex items-center px-5 py-3 bg-blue-600 hover:bg-blue-600 text-white rounded-xl font-semibold transition-all shadow-md hover:shadow-lg">
                           <input
                             type="file"
                             accept="image/*"
@@ -1082,7 +1096,7 @@ const VeterinarianRegistrationForm = () => {
               {/* Section Card: License Information */}
               <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm sm:p-6">
                 <div className="flex items-center mb-6">
-                  <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center mr-3">
+                  <div className="w-10 h-10 bg-amber-700 rounded-xl flex items-center justify-center mr-3">
                     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
@@ -1093,7 +1107,7 @@ const VeterinarianRegistrationForm = () => {
                   </div>
                 </div>
                 
-                <div className="h-px bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 mb-6"></div>
+                <div className="h-px bg-gray-200 mb-6"></div>
 
                 <div className="space-y-5">
                   {/* License Number */}
@@ -1194,7 +1208,7 @@ const VeterinarianRegistrationForm = () => {
               {/* Section Card: Additional Documents */}
               <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm sm:p-6">
                 <div className="flex items-center mb-6">
-                  <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-xl flex items-center justify-center mr-3">
+                  <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center mr-3">
                     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
@@ -1205,7 +1219,7 @@ const VeterinarianRegistrationForm = () => {
                   </div>
                 </div>
                 
-                <div className="h-px bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 mb-6"></div>
+                <div className="h-px bg-gray-200 mb-6"></div>
 
                 <div className="space-y-5">
                   {/* Degree Certificate */}
@@ -1343,7 +1357,7 @@ const VeterinarianRegistrationForm = () => {
               {/* Section Card: Location Setup */}
               <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm sm:p-6">
                 <div className="flex items-center mb-6">
-                  <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center mr-3">
+                  <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center mr-3">
                     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -1355,12 +1369,12 @@ const VeterinarianRegistrationForm = () => {
                   </div>
                 </div>
                 
-                <div className="h-px bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 mb-6"></div>
+                <div className="h-px bg-gray-200 mb-6"></div>
 
                 {/* Get Current Location - Prominent Action Card */}
-                <div className="mb-6 rounded-2xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-5 sm:p-6">
+                <div className="mb-6 rounded-2xl border-2 border-indigo-200 bg-indigo-50 p-5 sm:p-6">
                   <div className="flex items-start mb-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center mr-4 flex-shrink-0">
+                    <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center mr-4 flex-shrink-0">
                       <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
                       </svg>
@@ -1375,7 +1389,7 @@ const VeterinarianRegistrationForm = () => {
                     type="button"
                     onClick={getCurrentLocation}
                     disabled={locationLoading || pincodeLookupLoading}
-                    className="w-full flex items-center justify-center space-x-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white py-4 rounded-xl font-semibold transition-all disabled:opacity-50 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                    className="w-full flex items-center justify-center space-x-3 bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-xl font-semibold transition-all disabled:opacity-50 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                   >
                     {locationLoading ? (
                       <>
@@ -1423,6 +1437,44 @@ const VeterinarianRegistrationForm = () => {
                     <span className="px-4 bg-white text-sm text-gray-500 font-medium">{t('vetRegistration.orEnterManually')}</span>
                   </div>
                 </div>
+
+              {/* Manual Lat/Long */}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5">
+                  <div>
+                    <label htmlFor="vet-latitude" className="block text-sm font-medium text-gray-700 mb-2">
+                      {t('vetRegistration.latitude')}
+                    </label>
+                    <input
+                      type="number"
+                      id="vet-latitude"
+                      name="latitude"
+                      min="-90" max="90"
+                      value={formData.latitude}
+                      onChange={handleChange}
+                      placeholder={t('vetRegistration.latitudePlaceholder')}
+                      step="any"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="vet-longitude" className="block text-sm font-medium text-gray-700 mb-2">
+                      {t('vetRegistration.longitude')}
+                    </label>
+                    <input
+                      type="number"
+                      id="vet-longitude"
+                      name="longitude"
+                      min="-180" max="180"
+                      value={formData.longitude}
+                      onChange={handleChange}
+                      placeholder={t('vetRegistration.longitudePlaceholder')}
+                      step="any"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
 
                 {/* Address Fields */}
                 <div className="space-y-5">
@@ -1532,10 +1584,10 @@ const VeterinarianRegistrationForm = () => {
               </div>
 
               {/* Trust Element: Security Badge */}
-              <div className="hidden bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-200">
+              <div className="hidden bg-blue-50 rounded-2xl p-6 border border-blue-200">
                 <div className="flex items-start">
                   <div className="flex-shrink-0">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                    <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center">
                       <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                       </svg>
@@ -1553,44 +1605,12 @@ const VeterinarianRegistrationForm = () => {
                 </div>
               </div>
 
-              {/* Manual Lat/Long */}
-              {!formData.latitude && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {t('vetRegistration.latitude')}
-                    </label>
-                    <input
-                      type="number"
-                      name="latitude"
-                      value={formData.latitude}
-                      onChange={handleChange}
-                      placeholder={t('vetRegistration.latitudePlaceholder')}
-                      step="any"
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#15BB73] focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {t('vetRegistration.longitude')}
-                    </label>
-                    <input
-                      type="number"
-                      name="longitude"
-                      value={formData.longitude}
-                      onChange={handleChange}
-                      placeholder={t('vetRegistration.longitudePlaceholder')}
-                      step="any"
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#15BB73] focus:border-transparent"
-                    />
-                  </div>
-                </div>
-              )}
+
           </div>
 
           </div>
 
-          <aside className="hidden xl:block xl:sticky xl:top-6">
+          <aside className="vet-registration-checklist">
             <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
               <div className="flex items-start gap-3">
                 <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
@@ -1620,7 +1640,7 @@ const VeterinarianRegistrationForm = () => {
                     <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full ${
                       item.done ? 'bg-emerald-500 text-white' : 'border border-gray-200 bg-white text-gray-400'
                     }`}>
-                      <FaCheck className="text-xs" />
+                      <span aria-hidden="true">{item.done ? <FaCheck className="text-xs" /> : <span className="inline-block w-2 h-2 rounded-full bg-gray-300" />}</span>
                     </span>
                   </div>
                 ))}
@@ -1637,7 +1657,7 @@ const VeterinarianRegistrationForm = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="mt-5 flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 px-6 py-3.5 font-bold text-white transition-all hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-5 flex w-full items-center justify-center rounded-xl bg-primary px-6 py-3.5 font-bold text-white transition-all hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? (
                   <>
@@ -1661,11 +1681,11 @@ const VeterinarianRegistrationForm = () => {
             </div>
           </aside>
 
-          <div className="mt-8 flex justify-end pt-2 xl:hidden">
+          <div className="vet-registration-mobile-submit mt-8 flex justify-end pt-2">
             <button
               type="submit"
               disabled={loading}
-              className="flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 px-8 py-3.5 font-bold text-white transition-all hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+              className="flex w-full items-center justify-center rounded-xl bg-primary px-8 py-3.5 font-bold text-white transition-all hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
             >
               {loading ? (
                 <>
@@ -1690,7 +1710,7 @@ const VeterinarianRegistrationForm = () => {
         </form>
 
         {/* Info Box */}
-        <div className="hidden mt-8 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-200">
+        <div className="hidden mt-8 bg-blue-50 rounded-2xl p-6 border border-blue-200">
           <div className="flex items-start">
             <svg className="w-6 h-6 text-blue-600 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />

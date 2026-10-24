@@ -52,4 +52,6 @@ router.get('/listing/:listingType/:listingId', authMiddleware, callLogController
  */
 router.put('/:id/status', authMiddleware, callLogController.updateCallStatus);
 
+router.delete('/:id', authMiddleware, callLogController.deleteCallLog);
+
 module.exports = router;

@@ -4,7 +4,7 @@ const FormAlert = ({ type, message }) => {
   if (!message) return null;
 
   return (
-    <div className={`alert alert-${type}`}>
+    <div role={type === 'success' ? 'status' : 'alert'} aria-atomic="true" className={`alert alert-${type}`}>
       {type === 'success' ? '✅' : '❌'} {message}
     </div>
   );

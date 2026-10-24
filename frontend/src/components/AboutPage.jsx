@@ -61,9 +61,9 @@ const AboutPage = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f4f8f4] text-slate-900">
+    <div className="site-background min-h-screen text-slate-900">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
-        <section className="relative overflow-hidden rounded-[32px] border border-[#15361f] bg-[#07150b] shadow-[0_28px_80px_rgba(7,21,11,0.28)]">
+        <section className="relative overflow-hidden rounded-[32px] border border-forest bg-[#07150b] shadow-[0_28px_80px_rgba(7,21,11,0.28)]">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(52,211,153,0.24),_transparent_38%),radial-gradient(circle_at_bottom_right,_rgba(56,189,248,0.18),_transparent_34%)]" />
           <div className="relative px-5 py-6 sm:px-8 sm:py-8 lg:px-10 lg:py-12">
             <div className="space-y-6">
@@ -193,7 +193,7 @@ const AboutPage = () => {
               <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                 <Link
                   to="/buy-animals"
-                  className="inline-flex items-center justify-center gap-2 rounded-full bg-[#0f2b17] px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-emerald-950/15 transition hover:bg-[#12381e]"
+                  className="inline-flex items-center justify-center gap-2 rounded-full bg-forest px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-emerald-950/15 transition hover:bg-forest"
                 >
                   <span>{t('aboutPage.buyAnimalsCta')}</span>
                   <FaArrowRight className="text-sm" />

@@ -1,5 +1,5 @@
 import React from 'react';
-import PropTypes from 'prop-types';
+import { withTranslation } from 'react-i18next';
 
 /**
  * Error Boundary Component
@@ -34,18 +34,17 @@ class ErrorBoundary extends React.Component {
   }
 
   handleReset = () => {
-    this.setState({ hasError: false, error: null, errorInfo: null });
-    if (this.props.onReset) {
-      this.props.onReset();
-    }
+    // A rejected lazy import stays cached until the document is reloaded.
+    window.location.reload();
   };
 
   render() {
+    const { t } = this.props;
     if (this.state.hasError) {
       // Custom fallback UI
       return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+        <div className="site-background min-h-screen flex items-center justify-center p-4">
+          <div role="alert" className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg
                 className="w-8 h-8 text-red-600"
@@ -63,11 +62,11 @@ class ErrorBoundary extends React.Component {
             </div>
 
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Something went wrong
+              {t('common.pageErrorTitle')}
             </h2>
 
             <p className="text-gray-600 mb-6">
-              We're sorry for the inconvenience. An unexpected error has occurred.
+              {t('common.pageErrorHelp')}
             </p>
 
             {import.meta.env.DEV && this.state.error && (
@@ -93,13 +92,13 @@ class ErrorBoundary extends React.Component {
                 onClick={this.handleReset}
                 className="flex-1 bg-emerald-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-emerald-700 transition-colors"
               >
-                Try Again
+                {t('common.reloadPage')}
               </button>
               <button
                 onClick={() => window.location.href = '/'}
                 className="flex-1 bg-gray-200 text-gray-800 px-6 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
               >
-                Go Home
+                {t('common.goHome')}
               </button>
             </div>
           </div>
@@ -111,9 +110,5 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-ErrorBoundary.propTypes = {
-  children: PropTypes.node.isRequired,
-  onReset: PropTypes.func
-};
-
-export default ErrorBoundary;
+const TranslatedErrorBoundary = withTranslation()(ErrorBoundary);
+export default TranslatedErrorBoundary;

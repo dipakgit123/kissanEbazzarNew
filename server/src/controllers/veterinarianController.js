@@ -1,3 +1,4 @@
+const { pickFields } = require('../utils/editableFields');
 'use strict';
 
 const db = require('../models');
@@ -128,38 +129,8 @@ class VeterinarianController {
   /**
    * Generate random password
    */
-  generatePassword(email, fullName = '') {
-    const fallbackWords = [
-      'Animal', 'Health', 'Vet', 'Clinic', 'Care',
-      'Doctor', 'Farm', 'Guardian', 'Trusted', 'Rescue'
-    ];
-    const symbols = ['!', '@', '#'];
-    const pick = (items) => items[crypto.randomInt(items.length)];
-    const normalizeWord = (word) => {
-      if (!word) return '';
-      const cleanWord = word.replace(/[^a-zA-Z]/g, '');
-      if (!cleanWord) return '';
-      const clipped = cleanWord.slice(0, 10);
-      return clipped.charAt(0).toUpperCase() + clipped.slice(1).toLowerCase();
-    };
-
-    const emailWords = String(email || '')
-      .split('@')[0]
-      .split(/[^a-zA-Z]+/)
-      .map(normalizeWord)
-      .filter((word) => word.length >= 3);
-
-    const nameWords = String(fullName || '')
-      .split(/[^a-zA-Z]+/)
-      .map(normalizeWord)
-      .filter((word) => word.length >= 3);
-
-    const meaningfulWords = [...emailWords, ...nameWords].filter(Boolean);
-    const primaryWord = meaningfulWords[0] || pick(fallbackWords);
-    const secondaryWord = meaningfulWords[1] || 'Vet';
-    const digits = String(crypto.randomInt(10, 100));
-
-    return `${primaryWord}${secondaryWord}${digits}${pick(symbols)}`;
+  generatePassword() {
+    return crypto.randomBytes(24).toString('base64url');
   }
 
   /**
@@ -490,6 +461,7 @@ class VeterinarianController {
         phone_number,
         email: normalizedEmail,
         specialization: specialization || 'general',
+        animal_groups: req.body.animal_groups || [],
         experience_years: parseInt(experience_years) || 0,
         qualification: qualification || 'BVSc',
         services: parsedServices || [],
@@ -557,118 +529,29 @@ class VeterinarianController {
    */
   async sendOtp(req, res) {
     try {
-      const { phone_number } = req.body;
-
-      const veterinarian = await db.Veterinarian.findByPhoneNumber(phone_number);
-      if (!veterinarian) {
-        return res.status(404).json({
-          success: false,
-          message: 'Veterinarian not found. Please register first.'
-        });
-      }
-
-      // Generate OTP
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-      // Hash OTP
-      const hashedOtp = await bcrypt.hash(otp, 10);
-
-      await veterinarian.update({
-        otp: hashedOtp,
-        otp_expiry: otpExpiry
-      });
-
-      // TODO: Send OTP via SMS service
-      console.log(`OTP for ${phone_number}: ${otp}`);
-
-      res.json({
-        success: true,
-        message: 'OTP sent successfully',
-        // Remove in production
-        otp: process.env.NODE_ENV === 'development' ? otp : undefined
-      });
+      const result = await require('../services/vetOtpService').sendOtp(req.body.phone_number);
+      return res.status(result.status).json(result.body);
     } catch (error) {
-      console.error('Send OTP error:', error);
-      res.status(500).json(buildServerErrorResponse('Failed to send OTP', error));
+      console.error('Veterinarian OTP delivery failed:', error.message);
+      return res.status(503).json({ success: false, message: 'OTP delivery is unavailable. Please try again later.' });
     }
   }
 
-  /**
-   * Verify OTP and login
-   * POST /api/veterinarians/verify-otp
-   */
   async verifyOtp(req, res) {
     try {
-      const { phone_number, otp } = req.body;
-
-      const veterinarian = await db.Veterinarian.findByPhoneNumber(phone_number);
-      if (!veterinarian) {
-        return res.status(404).json({
-          success: false,
-          message: 'Veterinarian not found'
-        });
-      }
-
-      // Check OTP expiry
-      if (!veterinarian.isOtpValid()) {
-        return res.status(400).json({
-          success: false,
-          message: 'OTP has expired'
-        });
-      }
-
-      // Verify OTP
-      const isValidOtp = await bcrypt.compare(otp, veterinarian.otp);
-      if (!isValidOtp) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid OTP'
-        });
-      }
-
-      // Update verification status
-      await veterinarian.update({
-        otp: null,
-        otp_expiry: null,
-        is_phone_verified: true
-      });
-
-      // Generate JWT token
-      const token = jwt.sign(
-        {
-          id: veterinarian.id,
-          phone_number: veterinarian.phone_number,
-          type: 'veterinarian'
-        },
-        getJwtSecret(),
-        { expiresIn: '30d' }
-      );
-
-      res.json({
-        success: true,
-        message: 'Login successful',
-        data: {
-          token,
-          veterinarian: {
-            id: veterinarian.id,
-            full_name: veterinarian.full_name,
-            phone_number: veterinarian.phone_number,
-            verification_status: veterinarian.verification_status,
-            is_active: veterinarian.is_active
-          }
-        }
-      });
+      const result = await require('../services/vetOtpService').verifyOtp(req.body.phone_number, req.body.otp);
+      if (!result.veterinarian) return res.status(result.status).json(result.body);
+      const vet = result.veterinarian;
+      const token = jwt.sign({ id: vet.id, type: 'veterinarian' }, getJwtSecret(), { expiresIn: '30d' });
+      return res.json({ success: true, message: 'Login successful', data: { token, veterinarian: {
+        id: vet.id, full_name: vet.full_name, phone_number: vet.phone_number,
+        verification_status: vet.verification_status, is_active: vet.is_active,
+      } } });
     } catch (error) {
-      console.error('Verify OTP error:', error);
-      res.status(500).json(buildServerErrorResponse('Verification failed', error));
+      return res.status(500).json(buildServerErrorResponse('Verification failed', error));
     }
   }
 
-  /**
-   * Login with email and password (for verified veterinarians)
-   * POST /api/veterinarians/login
-   */
   async login(req, res) {
     try {
       const { email, password } = req.body;
@@ -990,7 +873,11 @@ class VeterinarianController {
         where.specialization = specialization;
       }
 
-      const offset = (parseInt(page) - 1) * parseInt(limit);
+      const pageNumber = Number(page), pageSize = Number(limit);
+      if (!Number.isInteger(pageNumber) || pageNumber < 1 || !Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100) return res.status(400).json({ success: false, message: 'Invalid pagination' });
+      const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 100) : '';
+      if (search) where[Op.or] = ['full_name', 'clinic_name', 'city', 'specialization'].map(field => ({ [field]: { [Op.iLike]: `%${search}%` } }));
+      const offset = (pageNumber - 1) * pageSize;
 
       const veterinarians = await db.Veterinarian.findAndCountAll({
         where,
@@ -1002,7 +889,7 @@ class VeterinarianController {
         ],
         limit: parseInt(limit),
         offset,
-        order: [[sanitizedSortBy, sanitizedOrder]]
+        order: [[sanitizedSortBy, sanitizedOrder], ['id', 'ASC']]
       });
 
       res.json({
@@ -1411,8 +1298,21 @@ class VeterinarianController {
   async updateProfile(req, res) {
     try {
       const vetId = req.vet.id;
-      const updates = req.body;
+      const updates = pickFields(req.body, [
+        'full_name', 'email', 'specialization', 'experience_years', 'services', 'animal_groups',
+        'consultation_fee', 'emergency_available', 'clinic_name', 'clinic_address',
+        'latitude', 'longitude', 'city', 'state', 'pincode', 'bio', 'languages',
+        'available_days', 'available_hours'
+      ]);
 
+      if (typeof updates.services === 'string') {
+        try { updates.services = JSON.parse(updates.services); } catch { return res.status(400).json({ success: false, message: 'Invalid services' }); }
+      }
+      if (updates.services !== undefined && (!Array.isArray(updates.services) || updates.services.some(item => typeof item !== 'string'))) return res.status(400).json({ success: false, message: 'Invalid services' });
+      if (typeof updates.emergency_available === 'string') updates.emergency_available = updates.emergency_available === 'true';
+      for (const key of ['consultation_fee', 'experience_years']) {
+        if (updates[key] !== undefined && (!Number.isFinite(Number(updates[key])) || Number(updates[key]) < 0)) return res.status(400).json({ success: false, message: 'Fee and experience must be non-negative numbers' });
+      }
       const veterinarian = await db.Veterinarian.findByPk(vetId);
       if (!veterinarian) {
         return res.status(404).json({
@@ -1449,6 +1349,7 @@ class VeterinarianController {
         data: veterinarian
       });
     } catch (error) {
+      if (error.status === 400) return res.status(400).json({ success: false, message: error.message });
       console.error('Update profile error:', error);
       res.status(500).json(buildServerErrorResponse('Failed to update profile', error));
     }

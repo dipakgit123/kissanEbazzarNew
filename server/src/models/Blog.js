@@ -4,6 +4,7 @@ const { DataTypes } = require('sequelize');
 
 module.exports = (sequelize) => {
   const Blog = sequelize.define('Blog', {
+    audience: { type: DataTypes.STRING(16), allowNull: false, defaultValue: 'unassigned', validate: { isIn: [['farm', 'pet', 'both', 'unassigned']] } },
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,

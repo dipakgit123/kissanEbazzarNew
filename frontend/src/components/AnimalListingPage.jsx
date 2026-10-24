@@ -1,3 +1,4 @@
+import { getAnimalGroup, allowedSpecies } from '../utils/animalExperience';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import './AnimalListingPage.css';
@@ -18,7 +19,7 @@ import otherAnimalLogo from '../assets/images/other_animal.png';
 
 const AnimalListingPage = () => {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState('animal');
+  const [activeTab, setActiveTab] = useState(getAnimalGroup() === 'pet' ? 'dog' : 'animal');
 
   const cowImg = cowLogo;
   const buffaloImg = buffaloLogo;
@@ -70,6 +71,7 @@ const AnimalListingPage = () => {
       category: 'Fast-moving',
       summary: 'Ideal for compact, high-demand market listings.',
     },
+    { id: 'sheep', label: t('animalTypes.sheep'), icon: '\uD83D\uDC11', color: 'from-emerald-500 to-emerald-600' },
     {
       id: 'horse',
       label: t('animalTypes.horse'),
@@ -115,7 +117,7 @@ const AnimalListingPage = () => {
     {
       id: 'other',
       label: t('animalTypes.other') || 'Other',
-      image: otherAnimalLogo,
+      image: getAnimalGroup() === 'pet' ? null : otherAnimalLogo,
       icon: '🐾',
       color: 'from-blue-500 to-blue-600',
       accent: 'text-blue-700',
@@ -142,8 +144,10 @@ const AnimalListingPage = () => {
         return <GoatListingForm />;
       case 'horse':
         return <HorseListingForm />;
+      case 'sheep':
+        return <OtherAnimalListingForm key="sheep" initialSpecies="sheep" />;
       case 'other':
-        return <OtherAnimalListingForm />;
+        return <OtherAnimalListingForm key="other" />;
       default:
         return <AnimalListingForm />;
     }
@@ -158,34 +162,35 @@ const AnimalListingPage = () => {
       <button
         key={tab.id}
         type="button"
+        aria-label={tab.label}
         aria-pressed={isActive}
         onClick={() => setActiveTab(tab.id)}
         className={`group relative flex flex-col items-center text-center transition-all duration-300 ${
           compact
             ? `w-[96px] sm:w-[108px] md:w-[124px] flex-shrink-0 ${
                 isActive
-                  ? 'text-[#15BB73]'
+                  ? 'text-primary'
                   : 'text-slate-700 hover:-translate-y-0.5'
               }`
             : `${
                 isActive
-                  ? 'w-[104px] text-[#15BB73]'
+                  ? 'w-[104px] text-primary'
                   : 'w-[104px] text-slate-700 hover:-translate-y-0.5'
               }`
         }`}
       >
         <div className={`relative ${compact ? 'space-y-2' : 'space-y-2.5'}`}>
           <div
-            className={`relative flex items-center justify-center rounded-full border bg-gradient-to-br ${tab.panelBg} ${
+            className={`relative flex items-center justify-center rounded-full border bg-white ${
               compact ? 'h-[90px] w-[90px] sm:h-[102px] sm:w-[102px] md:h-[114px] md:w-[114px]' : 'h-[94px] w-[94px]'
             } ${
               isActive
-                ? 'border-[#15BB73] shadow-[0_16px_30px_-18px_rgba(21,187,115,0.7)] ring-4 ring-emerald-100'
-                : `${tab.borderColor} shadow-sm group-hover:shadow-[0_14px_28px_-20px_rgba(15,23,42,0.28)]`
+                ? 'border-primary ring-2 ring-primary'
+                : `${tab.borderColor} group-hover:border-primary`
             } transition-all duration-300`}
           >
             {isActive && (
-              <span className="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#15BB73] text-white shadow-md sm:right-1.5 sm:top-1.5">
+              <span className="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white shadow-md sm:right-1.5 sm:top-1.5">
                 <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
                   <path
                     fillRule="evenodd"
@@ -199,7 +204,7 @@ const AnimalListingPage = () => {
             <div
               className={`flex items-center justify-center overflow-hidden rounded-full ${
                 compact ? 'h-[76px] w-[76px] sm:h-[86px] sm:w-[86px] md:h-[96px] md:w-[96px]' : 'h-[78px] w-[78px]'
-              } ${isActive ? 'bg-white/85 shadow-md shadow-white/70' : tab.iconBg} transition-transform duration-300 ${
+              } ${isActive ? 'bg-white' : tab.iconBg} transition-colors ${
                 compact ? '' : 'group-hover:scale-105'
               }`}
             >
@@ -230,8 +235,8 @@ const AnimalListingPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-6">
+    <div className="site-background min-h-screen">
+      <div className="max-w-4xl mx-auto px-3 py-6 sm:px-6">
         <div className="mb-8">
           <div className="mb-5">
             <h2 className="text-xl font-bold text-gray-900 mb-2">
@@ -242,17 +247,17 @@ const AnimalListingPage = () => {
             </p>
           </div>
 
-          <div className="overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0">
+          <div className="overflow-x-auto pb-2">
             <div className="flex flex-nowrap items-start gap-1 min-w-max md:w-fit md:mx-auto">
-              {tabs.map((tab) => renderAnimalCard(tab, true))}
+              {tabs.filter(tab => allowedSpecies(tab.id)).map((tab) => renderAnimalCard(tab, true))}
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className={`px-6 py-4 border-b border-gray-200 bg-gradient-to-r ${activeTabData?.color}`}>
+        <div className="listing-form-panel">
+          <div className="listing-panel-header">
             <div className="flex items-center gap-3">
-              <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+              <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center flex-shrink-0">
                 {activeTabData?.image ? (
                   <div className="h-11 w-11 overflow-hidden rounded-full bg-white">
                     <img
@@ -266,17 +271,17 @@ const AnimalListingPage = () => {
                 )}
               </div>
               <div>
-                <h3 className="text-lg font-bold text-white">
+                <h3 className="text-lg font-bold text-slate-900">
                   {activeTabData?.label} {t('listing.details') || 'Details'}
                 </h3>
-                <p className="text-sm text-white/90">
+                <p className="mt-1 text-sm text-slate-500">
                   {t('listing.formSubtitle') || 'Fill in the information below to create your listing'}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="p-6">
+          <div className="listing-panel-body">
             {renderForm()}
           </div>
         </div>

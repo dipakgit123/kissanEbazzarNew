@@ -3,8 +3,7 @@
  * Consolidates blog-related logic used across multiple components
  */
 
-// Re-export formatCategory from stringUtils for backward compatibility
-import { formatCategory as formatCategoryUtil } from './stringUtils.js';
+import { toTitleCase } from './stringUtils.js';
 
 /**
  * Get color classes for blog categories
@@ -43,11 +42,11 @@ export const getReadingTime = (content) => {
 
 /**
  * Format category name for display
- * Uses stringUtils.formatCategory for consistency
+ * Convert category slugs into readable fallback labels.
  * @param {string} category - The category slug
  * @returns {string} Formatted category name
  */
-export const formatCategory = formatCategoryUtil;
+export const formatCategory = (category) => toTitleCase(String(category || 'general').replace(/-/g, ' '));
 
 /**
  * Blog categories configuration

@@ -16,6 +16,7 @@ const authenticateSocket = async (socket, next) => {
     }
 
     const decoded = jwt.verify(token, getJwtSecret());
+    socket.data.expiresAt = decoded.exp ? decoded.exp * 1000 : null;
 
     if (decoded.type === 'veterinarian') {
       const veterinarian = await db.Veterinarian.findByPk(decoded.id);
@@ -36,7 +37,7 @@ const authenticateSocket = async (socket, next) => {
     }
 
     const user = await db.User.findByPk(userId);
-    if (!user || !user.is_verified || user.is_blocked) {
+    if (!user || !user.is_verified || (user.is_blocked && (!user.blocked_until || new Date(user.blocked_until) > new Date()))) {
       return next(new Error('User account is not allowed'));
     }
 
@@ -77,9 +78,24 @@ const setupSocketIO = (io) => {
     };
 
     registerSocket();
+    const remaining = socket.data.expiresAt ? socket.data.expiresAt - Date.now() : null;
+    const expiryTimer = remaining !== null ? setTimeout(() => socket.disconnect(true), Math.max(0, Math.min(remaining, 2147483647))) : null;
+    expiryTimer?.unref?.();
+    socket.use(async (_packet, next) => {
+      const recipient = socket.recipient;
+      try {
+        const account = await (recipient.type === 'veterinarian' ? db.Veterinarian : db.User).findByPk(recipient.id);
+        const allowed = account && (recipient.type === 'veterinarian'
+          ? account.is_active && account.verification_status === 'verified'
+          : account.is_verified && !(account.is_blocked && (!account.blocked_until || new Date(account.blocked_until) > new Date())));
+        if (!allowed) return socket.disconnect(true);
+        next();
+      } catch { socket.disconnect(true); }
+    });
     socket.on('register', registerSocket);
 
     socket.on('disconnect', () => {
+      if (expiryTimer) clearTimeout(expiryTimer);
       for (const [recipientKey, socketIds] of connectedUsers.entries()) {
         if (socketIds instanceof Set) {
           socketIds.delete(socket.id);

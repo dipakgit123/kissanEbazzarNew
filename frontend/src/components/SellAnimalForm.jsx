@@ -149,8 +149,8 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
       onClick={onClick}
       className={`px-6 py-3 rounded-xl border-2 text-sm font-semibold transition-all duration-300 ${
         active 
-          ? 'bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white border-[#15BB73] shadow-lg' 
-          : 'text-gray-700 border-gray-200 hover:border-[#15BB73] hover:bg-[#15BB73]/5'
+          ? 'bg-primary text-white border-primary shadow-lg' 
+          : 'text-gray-700 border-gray-200 hover:border-primary hover:bg-primary/5'
       }`}
     >
       {children}
@@ -176,7 +176,7 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
           value={value}
           onChange={e => onChange(e.target.value)}
           placeholder={placeholder}
-          className="w-full px-4 py-3 text-base border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all"
+          className="w-full px-4 py-3 text-base border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
           required={required}
         />
         {unit && (
@@ -189,7 +189,7 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-6">
+    <div className="site-background min-h-screen py-6">
       <div className="max-w-4xl mx-auto px-4">
         {/* Header */}
         <div className="text-center mb-6">
@@ -280,8 +280,8 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
                   key={key}
                   className={`relative border-2 border-dashed rounded-xl flex flex-col items-center justify-center h-48 cursor-pointer transition-all ${
                     form.photos[key] 
-                      ? 'border-[#15BB73] bg-[#15BB73]/5' 
-                      : 'border-gray-300 hover:border-[#15BB73] hover:bg-gray-50'
+                      ? 'border-primary bg-primary/5' 
+                      : 'border-gray-300 hover:border-primary hover:bg-gray-50'
                   }`}
                 >
                   {form.photos[key] ? (
@@ -303,7 +303,7 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
                     </>
                   ) : (
                     <div className="text-center p-4">
-                      <div className="mx-auto bg-[#15BB73] rounded-full p-3 w-12 h-12 flex items-center justify-center mb-3">
+                      <div className="mx-auto bg-primary rounded-full p-3 w-12 h-12 flex items-center justify-center mb-3">
                         <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                         </svg>
@@ -331,8 +331,8 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
             <label
               className={`relative border-2 border-dashed rounded-xl flex flex-col items-center justify-center h-48 cursor-pointer transition-all ${
                 form.photos.video 
-                  ? 'border-[#15BB73] bg-[#15BB73]/5' 
-                  : 'border-gray-300 hover:border-[#15BB73] hover:bg-gray-50'
+                  ? 'border-primary bg-primary/5' 
+                  : 'border-gray-300 hover:border-primary hover:bg-gray-50'
               }`}
             >
               {form.photos.video ? (
@@ -377,7 +377,7 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
             <button
               type="button"
               onClick={() => handleChange('addInfoOpen', !form.addInfoOpen)}
-              className="w-full flex justify-between items-center text-left font-semibold text-gray-800 hover:text-[#15BB73] transition-all p-3 rounded-lg hover:bg-gray-50"
+              className="w-full flex justify-between items-center text-left font-semibold text-gray-800 hover:text-primary transition-all p-3 rounded-lg hover:bg-gray-50"
             >
               <div className="flex items-center gap-2">
                 <svg 
@@ -452,7 +452,7 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
                       checked={form.negotiation}
                       onChange={e => handleChange('negotiation', e.target.checked)}
                     />
-                    <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#15BB73]" />
+                    <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
                   </label>
                 </div>
 
@@ -462,7 +462,7 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
                     rows="3"
                     value={form.details}
                     onChange={e => handleChange('details', e.target.value)}
-                    className="w-full px-4 py-3 text-base border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all"
+                    className="w-full px-4 py-3 text-base border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                     placeholder="More details about the animal.."
                   />
                 </div>
@@ -485,7 +485,7 @@ const SellAnimalForm = ({ onCancel, onSubmit }) => {
             <button 
               type="submit"
               disabled={loading}
-              className="flex-1 px-6 py-3 rounded-lg bg-gradient-to-r from-[#15BB73] to-[#0FA568] font-semibold text-white hover:from-[#0FA568] hover:to-[#15BB73] transition-all shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 px-6 py-3 rounded-lg bg-primary font-semibold text-white hover:bg-primary-hover transition-all shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>

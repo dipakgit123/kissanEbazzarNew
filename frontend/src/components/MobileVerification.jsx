@@ -172,7 +172,7 @@ const MobileVerification = ({ onBack, onSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#E9F0F8] to-[#F0F8FF] p-4">
+    <div className="site-background min-h-screen flex items-center justify-center p-4">
       <Toaster position="top-right" />
       
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
@@ -212,8 +212,8 @@ const MobileVerification = ({ onBack, onSuccess }) => {
                   onKeyDown={(e) => handleKeyDown(index, e)}
                   onPaste={index === 0 ? handleOtpPaste : undefined}
                   className={`w-12 h-14 text-center text-xl font-bold border-2 ${
-                    otpError ? 'border-red-400' : digit ? 'border-[#15BB73]' : 'border-gray-300'
-                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all`}
+                    otpError ? 'border-red-400' : digit ? 'border-primary' : 'border-gray-300'
+                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all`}
                   maxLength="1"
                   autoComplete="off"
                   autoFocus={index === 0}
@@ -235,7 +235,7 @@ const MobileVerification = ({ onBack, onSuccess }) => {
               <button
                 onClick={handleResendOtp}
                 disabled={isLoading}
-                className="text-[#15BB73] font-semibold text-sm hover:underline disabled:opacity-50"
+                className="text-primary font-semibold text-sm hover:underline disabled:opacity-50"
               >
                 {t('auth.resendOTP')}
               </button>
@@ -249,7 +249,7 @@ const MobileVerification = ({ onBack, onSuccess }) => {
             className={`w-full py-3 px-4 rounded-lg font-semibold text-white transition-all duration-300 ${
               isLoading || otp.join('').length !== otpLength
                 ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-gradient-to-r from-[#15BB73] to-[#0FA568] hover:shadow-lg transform hover:-translate-y-0.5'
+                : 'bg-primary hover:shadow-lg transform hover:-translate-y-0.5'
             }`}
           >
             {isLoading ? t('auth.verifying') : t('auth.verifyAndContinue')}
@@ -258,7 +258,7 @@ const MobileVerification = ({ onBack, onSuccess }) => {
           {/* Back Button */}
           <button
             onClick={onBack}
-            className="w-full text-center text-sm text-gray-600 hover:text-[#15BB73] transition-colors"
+            className="w-full text-center text-sm text-gray-600 hover:text-primary transition-colors"
           >
             {t('auth.changePhoneNumber')}
           </button>

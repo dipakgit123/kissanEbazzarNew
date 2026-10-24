@@ -1,4 +1,4 @@
-﻿{
+{
   "expo": {
     "name": "Animal E Bazar",
     "slug": "kissan-ebazzar",
@@ -65,7 +65,6 @@
       "./plugins/withAndroidNetworkSecurity"
     ],
     "extra": {
-      "apiUrl": "https://api.kissanebazzar.example",
       "pushProvider": "firebase",
       "eas": {
         "projectId": "96a399a4-5977-446b-83ae-d746b0bfea7d"

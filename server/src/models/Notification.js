@@ -2,6 +2,8 @@ const { DataTypes } = require('sequelize');
 
 module.exports = (sequelize) => {
   const Notification = sequelize.define('Notification', {
+    push_status: { type: DataTypes.STRING(24), allowNull: false, defaultValue: 'not_requested' },
+    push_delivered_at: { type: DataTypes.DATE, allowNull: true },
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,

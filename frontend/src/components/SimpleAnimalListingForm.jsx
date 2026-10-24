@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { API_BASE_URL } from '../config/api';
 import { FormAlert } from './common';
 import { localizeApiMessage } from '../utils/localizeApiMessage';
+import { listingMediaAccept, listingMediaError } from '../utils/listingMedia';
 import './AnimalListingPage.css';
 
 const API_URL = API_BASE_URL;
@@ -66,6 +67,15 @@ const SimpleAnimalListingForm = ({
 
   const handleFileChange = (name, event) => {
     const selectedFile = event.target.files?.[0] || null;
+    if (!selectedFile) return;
+    const fileError = listingMediaError(selectedFile, name);
+    if (fileError) {
+      event.target.value = '';
+      setError(t(fileError));
+      toast.error(t(fileError));
+      return;
+    }
+    setError(null);
     setFiles((prev) => ({ ...prev, [name]: selectedFile }));
   };
 
@@ -73,6 +83,11 @@ const SimpleAnimalListingForm = ({
     if (!files.photo) return t('listing.photoRequired', 'Please upload at least one photo');
     if (!formData.breedName) return t('animal.breedNameRequired', 'Breed name is required');
     if (!formData.expectedPrice) return t('animal.priceRequired', 'Expected price is required');
+    if (!Number.isFinite(Number(formData.expectedPrice)) || Number(formData.expectedPrice) <= 0) return t('listing.positivePrice');
+    for (const [kind, file] of Object.entries(files)) {
+      const fileError = listingMediaError(file, kind);
+      if (fileError) return t(fileError);
+    }
     if (shouldAskPregnancy && isPregnant && !formData.pregnancyMonths) {
       return t('pregnancy.monthsRequired', 'Please enter pregnancy months');
     }
@@ -81,6 +96,7 @@ const SimpleAnimalListingForm = ({
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (loading) return;
 
     const validationMessage = validateForm();
     if (validationMessage) {
@@ -130,6 +146,7 @@ const SimpleAnimalListingForm = ({
         }
       });
 
+      if (!response.data?.success) throw new Error(response.data?.message || t('listing.createError'));
       if (response.data.success) {
         setSuccess(true);
         toast.success(t('listing.createSuccess', 'Listing created successfully'));
@@ -151,7 +168,8 @@ const SimpleAnimalListingForm = ({
   };
 
   return (
-    <form className="simple-listing-form" onSubmit={handleSubmit}>
+    <form className="simple-listing-form" onSubmit={handleSubmit} aria-busy={loading}>
+      <fieldset disabled={loading} className="m-0 min-w-0 border-0 p-0">
       <FormAlert type="success" message={success ? t('listing.createSuccess', 'Listing created successfully') : null} />
       <FormAlert type="error" message={error} />
 
@@ -160,18 +178,22 @@ const SimpleAnimalListingForm = ({
           <CompactFileInput
             id="animalPhoto"
             label={t('listing.photoRequiredLabel', 'Animal photo')}
-            accept="image/*"
+            accept={listingMediaAccept('photo')}
             file={files.photo}
             onChange={(event) => handleFileChange('photo', event)}
+            onRemove={() => setFiles(previous => ({ ...previous, photo: null }))}
+            removeLabel={t('common.remove')}
             required
             emptyText={t('formLabels.chooseFile', 'Choose file')}
           />
           <CompactFileInput
             id="animalVideo"
             label={t('listing.videoOptionalLabel', 'Video optional')}
-            accept="video/*"
+            accept={listingMediaAccept('video')}
             file={files.video}
             onChange={(event) => handleFileChange('video', event)}
+            onRemove={() => setFiles(previous => ({ ...previous, video: null }))}
+            removeLabel={t('common.remove')}
             icon="video"
             emptyText={t('formLabels.chooseFile', 'Choose file')}
           />
@@ -200,7 +222,8 @@ const SimpleAnimalListingForm = ({
             value={formData.expectedPrice}
             onChange={handleChange}
             placeholder={t('sellAnimal.price', 'Price')}
-            min="0"
+            min="0.01"
+            step="0.01"
             required
           />
         </CompactSection>
@@ -246,9 +269,10 @@ const SimpleAnimalListingForm = ({
 
       {canShowExtra && (
         <button type="submit" className="simple-submit-button" disabled={loading}>
-          {loading ? t('common.submitting', 'Submitting...') : t('listing.createListing', 'Create Listing')}
+          {loading ? t('listing.submitting') : t('listing.createListing', 'Create Listing')}
         </button>
       )}
+      </fieldset>
     </form>
   );
 };
@@ -266,9 +290,11 @@ const CompactSection = ({ number, title, helper, children }) => (
   </section>
 );
 
-const CompactFileInput = ({ id, label, accept, file, onChange, required, icon = 'image', emptyText = 'Choose file' }) => (
+const CompactFileInput = ({ id, label, accept, file, onChange, onRemove, removeLabel, required, icon = 'image', emptyText = 'Choose file' }) => {
+  const inputRef = useRef(null);
+  return (
   <div className={`simple-file-tile ${file ? 'is-selected' : ''}`}>
-    <input id={id} type="file" accept={accept} onChange={onChange} className="simple-file-input" />
+    <input ref={inputRef} id={id} type="file" accept={accept} onChange={onChange} className="simple-file-input" />
     <label htmlFor={id}>
       <span className="simple-file-icon" aria-hidden="true">
         {file ? (
@@ -290,8 +316,10 @@ const CompactFileInput = ({ id, label, accept, file, onChange, required, icon = 
       </span>
       <span className="simple-file-name">{file ? file.name : emptyText}</span>
     </label>
+    {file && <button type="button" className="mt-2 rounded px-2 py-1 text-sm font-semibold text-red-700" aria-label={`${removeLabel}: ${label}`} onClick={() => { inputRef.current.value = ''; onRemove(); }}>{removeLabel}</button>}
   </div>
-);
+  );
+};
 
 const CompactSelect = ({ label, name, value, onChange, options, required }) => (
   <label className="simple-field">

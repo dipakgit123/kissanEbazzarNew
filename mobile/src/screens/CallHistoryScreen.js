@@ -29,13 +29,7 @@ const CallHistoryScreen = ({ navigation }) => {
   const [filter, setFilter] = useState('all'); // all, made, received
 
   // Show loading while translations are loading
-  if (!ready) {
-    return (
-      <View style={styles.loadingContainer}>
-        <SkeletonLoader variant="list" count={5} />
-      </View>
-    );
-  }
+  
 
   useFocusEffect(
     useCallback(() => {
@@ -314,6 +308,14 @@ const CallHistoryScreen = ({ navigation }) => {
   );
 
   if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <SkeletonLoader variant="list" count={5} />
+      </View>
+    );
+  }
+
+  if (!ready) {
     return (
       <View style={styles.loadingContainer}>
         <SkeletonLoader variant="list" count={5} />

@@ -1,72 +1,94 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { experienceAnswer, petAssistantCopy, assistantExperienceCopy } from '../utils/experienceAssistant';
+import { getAnimalGroup } from '../utils/animalExperience';
+import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FiX, FiArrowRight, FiArrowLeft, FiGlobe, FiMessageCircle, FiGrid, FiSend, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 import aiAssistantImage from '../assets/images/ai_assistant.png';
+import petAssistantImage from '../assets/images/pet-features/assistant.jpg';
+import { assistantCopy, assistantLanguages } from '../utils/assistantCopy';
+import './AIAssistant.css';
+
+function AssistantDialog({ children, onClose, title, chat }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const dialog = ref.current;
+    const trigger = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    dialog.showModal();
+    document.body.style.overflow = 'hidden';
+    const resize = () => {
+      dialog.style.setProperty('--assistant-viewport', `${window.visualViewport?.height || window.innerHeight}px`);
+      dialog.style.setProperty('--assistant-offset', `${window.visualViewport?.offsetTop || 0}px`);
+    };
+    resize();
+    window.visualViewport?.addEventListener('resize', resize);
+    window.visualViewport?.addEventListener('scroll', resize);
+    return () => {
+      window.visualViewport?.removeEventListener('resize', resize);
+      window.visualViewport?.removeEventListener('scroll', resize);
+      dialog.close();
+      document.body.style.overflow = previousOverflow;
+      queueMicrotask(() => { if (trigger?.isConnected) trigger.focus({ preventScroll: true }); });
+    };
+  }, []);
+  return <dialog ref={ref} className={`assistant-dialog${chat ? ' assistant-dialog-chat' : ''}`} aria-labelledby="assistant-title" aria-label={title}
+    onCancel={event => { event.preventDefault(); onClose(); }}
+    onKeyDown={event => {
+      if (event.key !== 'Tab') return;
+      const controls = [...event.currentTarget.querySelectorAll('button:not(:disabled), textarea:not(:disabled), a[href], [tabindex="0"]')].filter(element => element.getClientRects().length > 0);
+      const first = controls[0], last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    }}>
+    {children}
+  </dialog>;
+}
+
+function AssistantText({ text }) {
+  // Render the existing lightweight emphasis as text nodes; never insert response HTML.
+  return <p className="assistant-message-text">{String(text || '').split(/(\*\*[^*]+\*\*)/g).map((part, index) => part.startsWith('**') && part.endsWith('**') ? <strong key={index}>{part.slice(2, -2)}</strong> : part)}</p>;
+}
 
 const AIAssistant = () => {
-  // Add custom CSS for animations
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes fade-in {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      @keyframes slide-up {
-        from { opacity: 0; transform: translateY(20px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      @keyframes spin-slow {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
-      }
-      .animate-fade-in {
-        animation: fade-in 0.3s ease-out;
-      }
-      .animate-slide-up {
-        animation: slide-up 0.4s ease-out;
-      }
-      .animate-spin-slow {
-        animation: spin-slow 3s linear infinite;
-      }
-    `;
-    document.head.appendChild(style);
-    return () => document.head.removeChild(style);
-  }, []);
   const { i18n } = useTranslation();
+  const siteLanguage = (i18n.resolvedLanguage || i18n.language || 'en').split('-')[0];
   const [isOpen, setIsOpen] = useState(false);
   const [languageSelected, setLanguageSelected] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState(i18n.language || 'en');
+  const [selectedLanguage, setSelectedLanguage] = useState(assistantCopy[siteLanguage] ? siteLanguage : 'en');
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const [showBackToMenu, setShowBackToMenu] = useState(false);
-  const messagesEndRef = useRef(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const [showTopics, setShowTopics] = useState(true);
+  const [topicGroup, setTopicGroup] = useState('animals');
+  const [expandedTopics, setExpandedTopics] = useState(false);
+  const messageId = useRef(0);
+  const conversationRef = useRef(null);
+  const inputRef = useRef(null);
+  const group = getAnimalGroup() || 'farm';
+  const activeLanguage = languageSelected || messages.length ? selectedLanguage : siteLanguage;
+  const originalCopy = assistantCopy[activeLanguage] || assistantCopy.en;
+  const copy = { ...originalCopy, ...assistantExperienceCopy(activeLanguage, group) };
+  const assistantImage = group === 'pet' ? petAssistantImage : aiAssistantImage;
+  const currentLanguage = assistantLanguages.find(language => language.code === selectedLanguage);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    const conversation = conversationRef.current;
+    if (conversation) conversation.scrollTop = conversation.scrollHeight;
+  }, [messages, showTopics, topicGroup, expandedTopics, isOpen, languageSelected]);
 
-  const handleLanguageSelection = (langCode) => {
-    setSelectedLanguage(langCode);
+  useEffect(() => {
+    if (isOpen && languageSelected && window.matchMedia('(min-width: 601px)').matches) inputRef.current?.focus({ preventScroll: true });
+  }, [isOpen, languageSelected]);
+
+  const handleLanguageSelection = code => {
+    setSelectedLanguage(code);
     setLanguageSelected(true);
-    
-    // Add welcome message in selected language
-    const welcomeMessages = {
-      en: 'Hello! I\'m your AI Farming Assistant. How can I help you today?',
-      hi: 'नमस्ते! मैं आपका AI कृषि सहायक हूं। आज मैं आपकी कैसे मदद कर सकता हूं?',
-      mr: 'नमस्कार! मी तुमचा AI शेती सहाय्यक आहे. आज मी तुम्हाला कशी मदत करू शकतो?'
-    };
-    
-    setMessages([{
-      id: Date.now(),
-      text: welcomeMessages[langCode] || welcomeMessages.en,
-      sender: 'ai',
-      timestamp: new Date()
-    }]);
+    if (!messages.length || code !== selectedLanguage) {
+      setMessages([{ id: ++messageId.current, text: group === 'pet' ? petAssistantCopy(code).greeting : assistantExperienceCopy(code, 'farm').greeting, sender: 'ai', timestamp: new Date() }]);
+      setInputMessage('');
+      setShowTopics(true);
+      setTopicGroup('animals');
+      setExpandedTopics(false);
+    }
   };
 
   const quickReplies = {
@@ -229,10 +251,13 @@ const AIAssistant = () => {
   );
 
   const getAIResponse = (message) => {
+    const scopedAnswer = experienceAnswer(message, selectedLanguage);
+    if (scopedAnswer) return scopedAnswer;
     const lowerMessage = message.toLowerCase();
     const lang = selectedLanguage || 'en';
     const responses = {
-      ...(aiResponses[lang] || aiResponses.en),
+      ...aiResponses.en,
+      ...(aiResponses[lang] || {}),
       ...(projectResponses[lang] || projectResponses.en)
     };
     
@@ -320,398 +345,72 @@ const AIAssistant = () => {
   };
 
   const handleSendMessage = (message = inputMessage) => {
-    if (!message.trim()) return;
-
-    const userMessage = {
-      id: messages.length + 1,
-      text: message,
-      sender: 'user',
-      timestamp: new Date()
-    };
-
-    setMessages(prev => [...prev, userMessage]);
+    const text = message.trim();
+    if (!text) return;
+    // Responses are local: show them immediately rather than simulate a network request.
+    const response = getAIResponse(text);
+    const userMessage = { id: ++messageId.current, text, sender: 'user', timestamp: new Date() };
+    const answer = { id: ++messageId.current, text: response, sender: 'ai', timestamp: new Date() };
+    setMessages(previous => [...previous, userMessage, answer]);
     setInputMessage('');
-    setIsTyping(true);
-    setShowBackToMenu(false);
-
-    // Simulate AI thinking time
-    setTimeout(() => {
-      const aiResponse = {
-        id: messages.length + 2,
-        text: getAIResponse(message),
-        sender: 'ai',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, aiResponse]);
-      setIsTyping(false);
-      setShowBackToMenu(true);
-    }, 1500);
+    setShowTopics(false);
+    setExpandedTopics(false);
   };
+  const formatTime = date => date.toLocaleTimeString(selectedLanguage === 'en' ? 'en-IN' : `${selectedLanguage}-IN`, { hour: '2-digit', minute: '2-digit' });
+  const replies = group === 'pet' ? petAssistantCopy(selectedLanguage)[topicGroup === 'animals' ? 'questions' : 'websiteQuestions'] : topicGroup === 'animals'
+    ? [...(quickReplies[selectedLanguage] || quickReplies.en), getMilkReportQuickReply(selectedLanguage)]
+    : projectQuickReplies[selectedLanguage] || projectQuickReplies.en;
 
-  const handleBackToMenu = () => {
-    const lang = selectedLanguage || 'en';
-    const welcomeMessages = {
-      en: 'Hello! I\'m your AI Farming Assistant. How can I help you today?',
-      hi: 'नमस्ते! मैं आपका AI कृषि सहायक हूं। आज मैं आपकी कैसे मदद कर सकता हूं?',
-      mr: 'नमस्कार! मी तुमचा AI शेती सहाय्यक आहे. आज मी तुम्हाला कशी मदत करू शकतो?'
-    };
-    
-    setMessages([{
-      id: Date.now(),
-      text: welcomeMessages[lang] || welcomeMessages.en,
-      sender: 'ai',
-      timestamp: new Date()
-    }]);
-    setShowBackToMenu(false);
-  };
-
-  const handleQuickReply = (reply) => {
-    handleSendMessage(reply);
-  };
-
-  const getQuickReplyIcon = (reply) => {
-    if (reply.includes('listing') || reply.includes('लिस्टिंग')) return '📝';
-    if (reply.includes('veterinarian') || reply.includes('पशु चिकित्सक') || reply.includes('पशुवैद्य')) return '🏥';
-    if (reply.includes('filter') || reply.includes('फ़िल्टर') || reply.includes('फिल्टर')) return '🔎';
-    if (reply.includes('wishlist') || reply.includes('विशलिस्ट')) return '❤️';
-    if (reply.includes('blog') || reply.includes('ब्लॉग')) return '📰';
-    if (reply.includes('location') || reply.includes('लोकेशन')) return '📍';
-    return '';
-  };
-
-  const formatTime = (date) => {
-    if (!date || !(date instanceof Date)) return '';
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  return (
-    <>
-      {/* Floating AI Assistant Button */}
-      <div className="group fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-50">
-        {/* Main Button */}
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          aria-label={isOpen ? 'Close AI Assistant' : 'Open AI Assistant'}
-          className={`group relative flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full border-4 border-white shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 sm:h-[5rem] sm:w-[5rem] ${
-            isOpen 
-              ? 'bg-gradient-to-br from-red-500 via-red-600 to-red-700 hover:from-red-600 hover:to-red-800 rotate-90' 
-              : 'bg-gradient-to-br from-[#15BB73] via-[#12A665] to-[#0FA568] hover:shadow-green-500/30'
-          }`}
-        >
-          {/* Button Content */}
-          <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-full">
-            {isOpen ? (
-              <svg className="h-7 w-7 rotate-90 text-white transition-transform duration-300 sm:h-8 sm:w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            ) : (
-              <img
-                src={aiAssistantImage}
-                alt="AI Assistant"
-                className="h-[4rem] w-[4rem] rounded-full object-cover sm:h-[4.5rem] sm:w-[4.5rem]"
-              />
-            )}
-          </div>
-          
-          {/* Badge */}
-          {!isOpen && (
-            <div className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-gradient-to-br from-yellow-400 to-orange-500 text-[10px] font-bold text-white shadow-md">
-              AI
-            </div>
-          )}
-        </button>
-
-        {/* Helper Text */}
-        {!isOpen && (
-          <div className="pointer-events-none absolute right-[5.5rem] top-1/2 hidden -translate-y-1/2 opacity-0 transition-opacity duration-200 group-hover:opacity-100 sm:block">
-            <div className="bg-gray-900 text-white text-sm px-4 py-2 rounded-lg shadow-xl whitespace-nowrap">
-              Ask AI Assistant
-              <div className="absolute right-0 top-1/2 transform translate-x-2 -translate-y-1/2 rotate-45 w-2 h-2 bg-gray-900"></div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Chat Modal */}
-      {isOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 flex items-end sm:items-center justify-center p-4 pt-20 animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[calc(100vh-100px)] h-[600px] flex flex-col transform transition-all duration-300 animate-slide-up border border-gray-200">
-            {/* Header */}
-            <div className="bg-gradient-to-br from-[#15BB73] via-[#12A665] to-[#0FA568] text-white p-5 rounded-t-3xl relative overflow-hidden">
-              {/* Animated Background Pattern */}
-              <div className="absolute inset-0 opacity-10">
-                <div className="absolute top-0 left-0 w-40 h-40 bg-white rounded-full -translate-x-20 -translate-y-20"></div>
-                <div className="absolute bottom-0 right-0 w-32 h-32 bg-white rounded-full translate-x-16 translate-y-16"></div>
-              </div>
-              
-              <div className="flex items-center justify-between relative z-10">
-                <div className="flex items-center space-x-3">
-                  {/* Avatar with Animation */}
-                  <div className="relative">
-                    <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border-2 border-white/30 shadow-lg">
-                      <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                    {/* Online Status Indicator */}
-                    <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-400 rounded-full border-2 border-white animate-pulse"></span>
-                  </div>
-                  
-                  <div>
-                    <h3 className="font-bold text-lg tracking-wide flex items-center gap-2">
-                      AI Farming Assistant
-                      <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full font-medium">BETA</span>
-                    </h3>
-                    <p className="text-xs text-white/90 flex items-center gap-1">
-                      <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                      Active now • Ready to help
-                    </p>
-                  </div>
-                </div>
-                
-                <button
-                  onClick={() => {
-                    setIsOpen(false);
-                    setLanguageSelected(false);
-                    setMessages([]);
-                  }}
-                  className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md transition-all duration-200 hover:rotate-90 border border-white/20"
-                >
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-gray-50 to-white">
-              {!languageSelected ? (
-                // Language Selection Screen
-                <div className="flex flex-col items-center justify-center h-full py-8">
-                  <div className="text-center mb-8">
-                    <h3 className="text-2xl font-bold text-gray-800 mb-3">Choose Your Language</h3>
-                    <p className="text-gray-600 text-sm">अपनी भाषा चुनें | तुमची भाषा निवडा</p>
-                  </div>
-
-                  <div className="w-full max-w-sm space-y-3">
-                    <button
-                      onClick={() => handleLanguageSelection('en')}
-                      className="w-full flex items-center justify-between p-5 bg-white border-2 border-gray-200 rounded-2xl hover:border-[#15BB73] hover:bg-gradient-to-r hover:from-green-50 hover:to-white transition-all duration-300 group shadow-sm hover:shadow-md"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center text-2xl shadow-md">
-                          🇬🇧
-                        </div>
-                        <div className="text-left">
-                          <div className="font-bold text-gray-800 group-hover:text-[#15BB73] text-lg">English</div>
-                          <div className="text-xs text-gray-500">Continue in English</div>
-                        </div>
-                      </div>
-                      <svg className="w-6 h-6 text-gray-400 group-hover:text-[#15BB73] transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
-
-                    <button
-                      onClick={() => handleLanguageSelection('hi')}
-                      className="w-full flex items-center justify-between p-5 bg-white border-2 border-gray-200 rounded-2xl hover:border-[#15BB73] hover:bg-gradient-to-r hover:from-green-50 hover:to-white transition-all duration-300 group shadow-sm hover:shadow-md"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center text-2xl shadow-md">
-                          🇮🇳
-                        </div>
-                        <div className="text-left">
-                          <div className="font-bold text-gray-800 group-hover:text-[#15BB73] text-lg">हिन्दी</div>
-                          <div className="text-xs text-gray-500">हिन्दी में जारी रखें</div>
-                        </div>
-                      </div>
-                      <svg className="w-6 h-6 text-gray-400 group-hover:text-[#15BB73] transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
-
-                    <button
-                      onClick={() => handleLanguageSelection('mr')}
-                      className="w-full flex items-center justify-between p-5 bg-white border-2 border-gray-200 rounded-2xl hover:border-[#15BB73] hover:bg-gradient-to-r hover:from-green-50 hover:to-white transition-all duration-300 group shadow-sm hover:shadow-md"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center text-2xl shadow-md">
-                          🇮🇳
-                        </div>
-                        <div className="text-left">
-                          <div className="font-bold text-gray-800 group-hover:text-[#15BB73] text-lg">मराठी</div>
-                          <div className="text-xs text-gray-500">मराठीत सुरू ठेवा</div>
-                        </div>
-                      </div>
-                      <svg className="w-6 h-6 text-gray-400 group-hover:text-[#15BB73] transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                // Chat Messages
-                <>
-              {messages.map((message, index) => (
-                <div
-                  key={message.id}
-                  className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}
-                  style={{ animationDelay: `${index * 0.1}s` }}
-                >
-                  {message.sender === 'ai' && (
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#15BB73] to-[#0FA568] flex items-center justify-center mr-2 flex-shrink-0 shadow-md">
-                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                  )}
-                  <div
-                    className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-md ${
-                      message.sender === 'user'
-                        ? 'bg-gradient-to-br from-[#15BB73] to-[#0FA568] text-white rounded-br-md'
-                        : 'bg-white text-gray-800 border border-gray-200 rounded-bl-md'
-                    }`}
-                  >
-                    <p className="text-sm whitespace-pre-line leading-relaxed">{message.text}</p>
-                    <p className={`text-xs mt-2 flex items-center gap-1 ${
-                      message.sender === 'user' ? 'text-white/70 justify-end' : 'text-gray-500'
-                    }`}>
-                      {formatTime(message.timestamp)}
-                      {message.sender === 'user' && (
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </p>
-                  </div>
-                  {message.sender === 'user' && (
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center ml-2 flex-shrink-0 shadow-md">
-                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-              ))}
-              
-              {isTyping && (
-                <div className="flex justify-start items-end animate-fade-in">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#15BB73] to-[#0FA568] flex items-center justify-center mr-2 flex-shrink-0 shadow-md">
-                    <svg className="w-5 h-5 text-white animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <div className="bg-white text-gray-800 px-6 py-4 rounded-2xl rounded-bl-md shadow-md border border-gray-200">
-                    <div className="flex space-x-1.5">
-                      <div className="w-2.5 h-2.5 bg-[#15BB73] rounded-full animate-bounce"></div>
-                      <div className="w-2.5 h-2.5 bg-[#12A665] rounded-full animate-bounce" style={{ animationDelay: '0.15s' }}></div>
-                      <div className="w-2.5 h-2.5 bg-[#0FA568] rounded-full animate-bounce" style={{ animationDelay: '0.3s' }}></div>
-                    </div>
-                  </div>
-                </div>
-              )}
-              <div ref={messagesEndRef} />
-                </>
-              )}
-            </div>
-
-            {/* Quick Replies */}
-            {languageSelected && messages.length === 1 && (
-              <div className="p-4 border-t border-gray-100 bg-gradient-to-b from-white to-gray-50">
-                <p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                  <svg className="w-4 h-4 text-[#15BB73]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  {selectedLanguage === 'hi' ? 'त्वरित प्रश्न:' : selectedLanguage === 'mr' ? 'जलद प्रश्न:' : 'Quick questions:'}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    ...(quickReplies[selectedLanguage] || quickReplies.en),
-                    getMilkReportQuickReply(selectedLanguage),
-                    ...(projectQuickReplies[selectedLanguage] || projectQuickReplies.en)
-                  ].map((reply, index) => (
-                    <button
-                      key={index}
-                      onClick={() => handleQuickReply(reply)}
-                      className="text-xs bg-white hover:bg-gradient-to-r hover:from-[#15BB73] hover:to-[#0FA568] text-gray-700 hover:text-white px-4 py-2 rounded-full transition-all duration-300 border border-gray-200 hover:border-transparent shadow-sm hover:shadow-md transform hover:scale-105"
-                    >
-                      {getQuickReplyIcon(reply) ? `${getQuickReplyIcon(reply)} ${reply}` : reply}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Back to Menu Button */}
-            {languageSelected && showBackToMenu && messages.length > 1 && (
-              <div className="px-4 pb-2 border-t border-gray-100 pt-3 bg-gradient-to-b from-white to-gray-50">
-                <button
-                  onClick={handleBackToMenu}
-                  className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-white to-gray-50 hover:from-[#15BB73] hover:to-[#0FA568] text-gray-700 hover:text-white px-5 py-3 rounded-2xl transition-all duration-300 font-semibold border-2 border-gray-200 hover:border-transparent shadow-sm hover:shadow-lg transform hover:scale-[1.02] group"
-                >
-                  <svg className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                  </svg>
-                  <span className="text-sm">
-                    {selectedLanguage === 'hi' ? 'मुख्य मेनू पर वापस जाएं' : 
-                     selectedLanguage === 'mr' ? 'मुख्य मेनूवर परत या' : 
-                     'Back to Main Menu'}
-                  </span>
-                  <svg className="w-4 h-4 opacity-0 group-hover:opacity-100 transform translate-x-[-10px] group-hover:translate-x-0 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
-            )}
-
-            {/* Input */}
-            {languageSelected && (
-            <div className="p-4 border-t border-gray-200 bg-white">
-              <div className="flex space-x-3 items-center">
-                <div className="flex-1 relative">
-                  <input
-                    type="text"
-                    value={inputMessage}
-                    onChange={(e) => setInputMessage(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                    placeholder={
-                      selectedLanguage === 'hi' ? 'खेती, पशु, कीमत के बारे में पूछें...' :
-                      selectedLanguage === 'mr' ? 'शेती, प्राणी, किंमत बद्दल विचारा...' :
-                      'Ask about farming, animals, pricing...'
-                    }
-                    className="w-full px-5 py-3 border-2 border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#15BB73] focus:border-[#15BB73] transition-all duration-300 bg-gray-50 focus:bg-white text-sm"
-                  />
-                  {/* Emoji/Attachment Button (Optional) */}
-                  <button className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </button>
-                </div>
-                <button
-                  onClick={() => handleSendMessage()}
-                  disabled={!inputMessage.trim()}
-                  className="bg-gradient-to-br from-[#15BB73] via-[#12A665] to-[#0FA568] text-white p-3 rounded-2xl hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none transform hover:scale-105 active:scale-95 flex items-center justify-center min-w-[48px]"
-                >
-                  <svg className="w-6 h-6 transform rotate-45" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                  </svg>
-                </button>
-              </div>
-              {/* Typing indicator text */}
-              <p className="text-xs text-gray-500 mt-2 text-center">
-                {selectedLanguage === 'hi' ? 'AI द्वारा संचालित • तुरंत उत्तर प्राप्त करें' :
-                 selectedLanguage === 'mr' ? 'AI द्वारा चालित • त्वरित उत्तरे मिळवा' :
-                 'Powered by AI • Get instant answers'}
-              </p>
-            </div>
-            )}
-          </div>
+  return <>
+    <button type="button" className="assistant-launcher" aria-label={assistantExperienceCopy(siteLanguage, group).title} aria-haspopup="dialog" aria-expanded={isOpen} onClick={() => setIsOpen(true)}>
+      <img src={assistantImage} alt="" /><span aria-hidden="true">AI</span>
+    </button>
+    {isOpen && <AssistantDialog title={copy.title} chat={languageSelected} onClose={() => setIsOpen(false)}>
+      <header className="assistant-header">
+        <img src={assistantImage} alt="" />
+        <div><h2 id="assistant-title">{copy.title}</h2><p>{copy.subtitle}</p></div>
+        <button type="button" className="assistant-close" onClick={() => setIsOpen(false)} aria-label={copy.close}><FiX aria-hidden="true" /></button>
+      </header>
+      {!languageSelected ? <section className="assistant-language-screen">
+        <div className="assistant-intro"><span className="assistant-intro-icon"><FiMessageCircle aria-hidden="true" /></span><h3>{copy.choose}</h3><p>{copy.chooseHint}</p><small>{copy.chooseNote}</small></div>
+        <div className="assistant-language-options" role="group" aria-label={copy.language}>
+          {assistantLanguages.map(language => <button type="button" key={language.code} lang={language.code} data-language={language.code} onClick={() => handleLanguageSelection(language.code)}>
+            <span className="assistant-language-glyph" aria-hidden="true">{language.glyph}</span><span><strong>{language.name}</strong><small>{language.hint}</small></span><FiArrowRight aria-hidden="true" />
+          </button>)}
+          {messages.length > 0 && <button type="button" className="assistant-return" onClick={() => setLanguageSelected(true)}><FiArrowLeft aria-hidden="true" />{copy.back}</button>}
         </div>
-      )}
-    </>
-  );
+      </section> : <>
+        <nav className="assistant-chat-toolbar" aria-label={copy.conversation}>
+          <button type="button" onClick={() => setLanguageSelected(false)} aria-label={`${copy.change}: ${currentLanguage.name}`}><FiGlobe aria-hidden="true" /><span>{currentLanguage.name}</span><FiChevronDown aria-hidden="true" /></button>
+          <button type="button" aria-expanded={showTopics} aria-controls="assistant-topics" onClick={() => { setShowTopics(value => !value); setExpandedTopics(false); }}><FiGrid aria-hidden="true" /><span>{copy.topics}</span></button>
+        </nav>
+        <div className="assistant-conversation" ref={conversationRef}>
+          <div className="assistant-message-log" role="log" aria-label={copy.conversation} aria-live="polite" aria-relevant="additions">
+            {messages.map(message => <article key={message.id} className={`assistant-message assistant-message-${message.sender}`}>
+              <div className="assistant-message-meta"><strong>{message.sender === 'user' ? copy.you : copy.assistant}</strong><time dateTime={message.timestamp.toISOString()}>{formatTime(message.timestamp)}</time></div>
+              <AssistantText text={message.text} />
+            </article>)}
+          </div>
+          <section className="assistant-topics" id="assistant-topics" hidden={!showTopics} aria-label={copy.topics}>
+            <div className="assistant-topic-groups" role="group" aria-label={copy.group}>
+              {['animals', 'website'].map(group => <button type="button" key={group} aria-pressed={topicGroup === group} onClick={() => { setTopicGroup(group); setExpandedTopics(false); }}>{copy[group]}</button>)}
+            </div>
+            <div className="assistant-question-grid">{(expandedTopics ? replies : replies.slice(0, 4)).map(reply => <button type="button" key={reply} onClick={() => handleSendMessage(reply)}><span>{reply}</span><FiArrowRight aria-hidden="true" /></button>)}</div>
+            <button type="button" className="assistant-more" aria-expanded={expandedTopics} onClick={() => setExpandedTopics(value => !value)}>{expandedTopics ? copy.less : copy.more}{expandedTopics ? <FiChevronUp aria-hidden="true" /> : <FiChevronDown aria-hidden="true" />}</button>
+          </section>
+        </div>
+        <footer className="assistant-composer">
+          <form onSubmit={event => { event.preventDefault(); handleSendMessage(); }}>
+            <label className="sr-only" htmlFor="assistant-question">{copy.message}</label>
+            <textarea ref={inputRef} id="assistant-question" rows={1} maxLength={2000} value={inputMessage} onChange={event => setInputMessage(event.target.value)} placeholder={copy.placeholder}
+              onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); handleSendMessage(); } }} />
+            <button type="submit" disabled={!inputMessage.trim()} aria-label={copy.send}><FiSend aria-hidden="true" /></button>
+          </form>
+          <p>{copy.footer}</p>
+        </footer>
+      </>}
+    </AssistantDialog>}
+  </>;
 };
 
 export default AIAssistant;

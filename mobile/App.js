@@ -1,3 +1,4 @@
+import { AnimalExperienceProvider, useAnimalExperience } from './src/context/AnimalExperienceContext';
 import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -17,6 +18,8 @@ applyGlobalTypography();
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
+
+function ScopedWishlist({ children }) { const { group } = useAnimalExperience(); return <WishlistProvider key={group || 'none'}>{children}</WishlistProvider>; }
 
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
@@ -55,15 +58,15 @@ export default function App() {
     <SafeAreaProvider>
       <AuthProvider>
         <VetAuthProvider>
-          <NotificationProvider>
-            <WishlistProvider>
+          <AnimalExperienceProvider><NotificationProvider>
+            <ScopedWishlist>
               <BeautifulFeedbackProvider>
                 <StatusBar style="light" backgroundColor="#15BB73" />
                 <AppNavigator />
                 <Toast config={beautifulToastConfig} />
               </BeautifulFeedbackProvider>
-            </WishlistProvider>
-          </NotificationProvider>
+            </ScopedWishlist>
+          </NotificationProvider></AnimalExperienceProvider>
         </VetAuthProvider>
       </AuthProvider>
     </SafeAreaProvider>

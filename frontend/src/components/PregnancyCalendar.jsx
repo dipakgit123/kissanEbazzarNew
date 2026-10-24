@@ -1,1027 +1,326 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
-import { pregnancyService } from '../services/api';
+import SavedAnimalPicker from './SavedAnimalPicker';
+import { getAnimalGroup, allowedSpecies } from '../utils/animalExperience';
+import { cloneElement, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
-import {
-  FaBaby,
-  FaCalendarDays,
-  FaCalendarXmark,
-  FaCat,
-  FaChartBar,
-  FaChevronLeft,
-  FaChevronRight,
-  FaCircleInfo,
-  FaClock,
-  FaCow,
-  FaDog,
-  FaHorseHead,
-  FaPaw,
-  FaPlus,
-  FaTriangleExclamation,
-  FaXmark
-} from 'react-icons/fa6';
-import { GiAlarmClock, GiBuffaloHead, GiGoat, GiSheep } from 'react-icons/gi';
+import { FaBaby, FaCalendarDays, FaChevronLeft, FaChevronRight, FaPlus, FaXmark, FaPaw, FaCow, FaCat, FaDog, FaHorseHead, FaPen, FaTrashCan, FaListUl, FaBookOpen } from 'react-icons/fa6';
+import { GiBuffaloHead, GiGoat, GiSheep, GiPig } from 'react-icons/gi';
+import { pregnancyService } from '../services/api';
 import { FullPageLoader } from './AppLoader';
+import { DEFAULT_DURATIONS, businessToday, daysSinceBreeding, addDays, dateKey, dayNumber, daysRemaining, moveMonth, pregnancyProgress, recordOnDate, calendarDayRecords, recordsInMonth } from '../utils/pregnancyCalendar';
+import './PregnancyCalendar.css';
 
-// Pregnancy duration in days for different animal types
-const PREGNANCY_DURATIONS = {
-  cow: { days: 280, monthCount: 9, Icon: FaCow, iconClass: 'text-emerald-300' },
-  buffalo: { days: 310, monthCount: 10, Icon: GiBuffaloHead, iconClass: 'text-slate-300' },
-  goat: { days: 150, monthCount: 5, Icon: GiGoat, iconClass: 'text-amber-300' },
-  sheep: { days: 150, monthCount: 5, Icon: GiSheep, iconClass: 'text-zinc-200' },
-  horse: { days: 340, monthCount: 11, Icon: FaHorseHead, iconClass: 'text-violet-300' },
-  dog: { days: 63, monthCount: 2, Icon: FaDog, iconClass: 'text-orange-300' },
-  cat: { days: 65, monthCount: 2, Icon: FaCat, iconClass: 'text-rose-300' },
-  other: { days: 150, monthCount: 5, Icon: FaPaw, iconClass: 'text-sky-300' }
-};
+const ICONS = { cow: FaCow, buffalo: GiBuffaloHead, goat: GiGoat, sheep: GiSheep, horse: FaHorseHead, dog: FaDog, cat: FaCat, pig: GiPig, other: FaPaw };
+const STATUS_KEYS = { pregnant: 'statusActive', delivered: 'delivered', miscarriage: 'statusMiscarriage', false_pregnancy: 'statusFalsePregnancy', cancelled: 'statusCancelled' };
+const emptyRecord = () => ({ animal_type: getAnimalGroup() === 'pet' ? 'dog' : 'cow', animal_name: '', ear_badge_number: '', pregnancy_duration_days: '', mating_date: businessToday(), mating_type: 'natural', notes: '' });
+const emptyCheck = () => ({ checked_on: businessToday(), result: '', estimated_age_value: '', estimated_age_unit: 'months', next_check_date: '', doctor_name: '', notes: '', request_id: crypto.randomUUID() });
+const emptyDelivery = () => ({ delivery_date: businessToday(), offspring_count: 1, offspring_gender: 'male', offspring_details: '' });
 
-const getAnimalMeta = (type) => {
-  return PREGNANCY_DURATIONS[type?.toLowerCase()] || PREGNANCY_DURATIONS.cow;
-};
+function AnimalIcon({ type }) {
+  const Icon = ICONS[type] || FaPaw;
+  return <Icon aria-hidden="true" />;
+}
 
-const DEFAULT_OTHER_PREGNANCY_DAYS = 150;
+function Field({ label, children, wide = false }) {
+  const id = useId();
+  return <div className={`pregnancy-field${wide ? ' pregnancy-field-wide' : ''}`}><label htmlFor={id}>{label}</label>{cloneElement(children, { id })}</div>;
+}
 
-const formatPregnancyDurationText = (days, t) => {
-  if (!days || Number.isNaN(Number(days))) return '';
+function RecordDialog({ title, busy, onClose, children, closeLabel }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const dialog = ref.current;
+    const previous = document.activeElement;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    dialog.showModal();
+    return () => { dialog.close(); document.body.style.overflow = overflow; previous?.focus(); };
+  }, []);
+  return <dialog ref={ref} className="pregnancy-dialog" aria-labelledby="pregnancy-dialog-title" onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}>
+    <header><h2 id="pregnancy-dialog-title">{title}</h2><button type="button" className="pc-icon-button" aria-label={closeLabel} disabled={busy} onClick={onClose}><FaXmark /></button></header>
+    {children}
+  </dialog>;
+}
 
-  const totalDays = Math.round(Number(days));
-  const months = Math.floor(totalDays / 30);
-  const remainingDays = totalDays % 30;
-
-  if (months > 0 && remainingDays > 0) {
-    return `${months} ${t('pregnancy.monthsLabel')} ${remainingDays} ${t('pregnancy.days')}`;
-  }
-
-  if (months > 0) {
-    return `${months} ${t('pregnancy.monthsLabel')}`;
-  }
-
-  return `${remainingDays} ${t('pregnancy.days')}`;
-};
-
-const AnimalTypeIcon = ({ type, className = 'text-xl', containerClassName = '' }) => {
-  const { Icon, iconClass } = getAnimalMeta(type);
-  return (
-    <span className={`inline-flex items-center justify-center ${containerClassName}`}>
-      <Icon className={`${iconClass} ${className}`} />
-    </span>
-  );
-};
-
-// Format date for display
-const formatDate = (dateString) => {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric'
-  });
-};
-
-// Get status badge styling
-const getStatusBadge = (status, t) => {
-  const badges = {
-    pregnant: { bg: 'bg-green-100', text: 'text-green-700', label: t('pregnancy.statusActive') },
-    delivered: { bg: 'bg-gray-100', text: 'text-gray-700', label: t('pregnancy.delivered') },
-    miscarriage: { bg: 'bg-red-100', text: 'text-red-700', label: t('pregnancy.statusMiscarriage') },
-    false_pregnancy: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: t('pregnancy.statusFalsePregnancy') },
-    cancelled: { bg: 'bg-gray-100', text: 'text-gray-500', label: t('pregnancy.statusCancelled') }
-  };
-  return badges[status] || badges.pregnant;
-};
-
-// Get progress color based on days remaining
-const getProgressColor = (daysRemaining, totalDays) => {
-  const progress = ((totalDays - daysRemaining) / totalDays) * 100;
-  if (progress < 30) return 'bg-blue-500';
-  if (progress < 60) return 'bg-green-500';
-  if (progress < 85) return 'bg-orange-500';
-  return 'bg-red-500';
-};
-
-const getRecordDurationDays = (record) => {
-  if (record?.animal_type === 'other' && record?.pregnancy_duration_days) {
-    return Number(record.pregnancy_duration_days) || DEFAULT_OTHER_PREGNANCY_DAYS;
-  }
-
-  return PREGNANCY_DURATIONS[record?.animal_type]?.days || DEFAULT_OTHER_PREGNANCY_DAYS;
-};
-
-const PregnancyCalendar = () => {
-  const { t } = useTranslation();
-  const [pregnancyRecords, setPregnancyRecords] = useState([]);
-  const [stats, setStats] = useState(null);
+export default function PregnancyCalendar() {
+  const { t, i18n } = useTranslation();
+  const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [showDeliverModal, setShowDeliverModal] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState(null);
-  const [activeTab, setActiveTab] = useState('active');
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(null);
-  const [isSubmittingAddRecord, setIsSubmittingAddRecord] = useState(false);
-
-  // Form state
-  const [formData, setFormData] = useState({
-    listing_id: '',
-    listing_type: '',
-    animal_type: 'cow',
-    animal_name: '',
-    ear_badge_number: '',
-    pregnancy_duration_days: '',
-    mating_date: new Date().toISOString().split('T')[0],
-    notes: ''
-  });
-
-  // Delivery form state
-  const [deliveryData, setDeliveryData] = useState({
-    delivery_date: new Date().toISOString().split('T')[0],
-    offspring_count: 1,
-    offspring_gender: 'male',
-    offspring_details: ''
-  });
-
-  // Fetch data
-  const fetchData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const [recordsRes, , statsRes] = await Promise.all([
-        pregnancyService.getRecords(),
-        pregnancyService.getMyAnimals(),
-        pregnancyService.getStats()
-      ]);
-
-      if (recordsRes.success) setPregnancyRecords(recordsRes.data || []);
-      if (statsRes.success) setStats(statsRes.data);
-    } catch (err) {
-      console.error('Error fetching pregnancy data:', err);
-      setError(t('pregnancy.loadFailed'));
-    } finally {
-      setLoading(false);
-    }
-  }, [t]);
-
+  const [error, setError] = useState(false);
+  const [tab, setTab] = useState('active');
+  const [mobileView, setMobileView] = useState('records');
+  const [month, setMonth] = useState(() => moveMonth(new Date(), 0));
+  const [selectedDate, setSelectedDate] = useState('');
+  const [search, setSearch] = useState('');
+  const [animalFilter, setAnimalFilter] = useState('');
+  const [timezone, setTimezone] = useState('Asia/Kolkata');
+  const [today, setToday] = useState(businessToday);
+  const [visibleCount, setVisibleCount] = useState(6);
+  const [modal, setModal] = useState(null);
+  const [form, setForm] = useState(emptyRecord);
+  const [check, setCheck] = useState(null);
+  const [durations, setDurations] = useState(DEFAULT_DURATIONS);
+  const [delivery, setDelivery] = useState(emptyDelivery);
+  const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState('');
+  const operation = useRef(false);
+  const requestVersion = useRef(0);
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    const updateDay = () => setToday(businessToday(timezone));
+    updateDay();
+    const timer = window.setInterval(updateDay, 60000);
+    document.addEventListener('visibilitychange', updateDay);
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', updateDay); };
+  }, [timezone]);
+  const locale = ({ mr: 'mr-IN', hi: 'hi-IN' })[i18n.resolvedLanguage?.split('-')[0]] || 'en-IN';
+  const checkText = (key, options) => t(`pregnancyCheck.${key}`, options);
+  const checkStatus = record => record.status === 'pending_confirmation' ? checkText('pending') : record.status === 'not_pregnant' ? checkText('notPregnant') : record.status === 'pregnant' ? checkText(record.confirmed_on ? 'confirmed' : 'legacy') : STATUS_KEYS[record.status] ? text(STATUS_KEYS[record.status]) : checkText('unknown');
+  const text = key => t(`pregnancy.${key}`);
+  const ui = (key, options) => t(`pregnancyUi.${key}`, options);
+  const animalName = type => text(`animal${type.charAt(0).toUpperCase() + type.slice(1)}`);
+  const formatDate = value => Number.isFinite(dayNumber(value)) ? new Date(`${value}T12:00:00Z`).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) : '—';
 
-  // Handle form submission
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsSubmittingAddRecord(true);
-
+  const fetchRecords = useCallback(async () => {
+    const version = ++requestVersion.current;
+    setLoading(true); setError(false);
     try {
-      const response = await pregnancyService.createRecord(formData);
-      if (response.success) {
-        setPregnancyRecords([...pregnancyRecords, response.data]);
-        setShowAddForm(false);
-        setFormData({
-          listing_id: '',
-          listing_type: '',
-          animal_type: 'cow',
-          animal_name: '',
-          ear_badge_number: '',
-          pregnancy_duration_days: '',
-          mating_date: new Date().toISOString().split('T')[0],
-          notes: ''
-        });
-        fetchData();
-      }
-    } catch (err) {
-      console.error('Error creating pregnancy record:', err);
-      toast.error(t('pregnancy.createFailed'));
+      const [result, durationResult] = await Promise.all([pregnancyService.getRecords(), pregnancyService.getDurations()]);
+      if (version === requestVersion.current && durationResult.success) setDurations(previous => ({ ...previous, ...Object.fromEntries(durationResult.data.map(item => [item.animal_type, item.duration_days])) }));
+      if (!result.success || !Array.isArray(result.data)) throw new Error('Invalid records response');
+      if (version === requestVersion.current) { setRecords(result.data); if (result.data[0]?.calculation_timezone) setTimezone(result.data[0].calculation_timezone); }
+    } catch {
+      if (version === requestVersion.current) setError(true);
     } finally {
-      setIsSubmittingAddRecord(false);
+      if (version === requestVersion.current) setLoading(false);
     }
-  };
+  }, []);
+  useEffect(() => { fetchRecords(); return () => { requestVersion.current += 1; }; }, [fetchRecords]);
 
-  // Handle delivery
-  const handleDeliver = async () => {
-    if (!selectedRecord) return;
+  const openForm = (mode, record = null) => {
+    setFormError('');
+    setForm(record ? { ...emptyRecord(), ...record, notes: record.notes || '', ear_badge_number: record.ear_badge_number || '' } : { ...emptyRecord(), mating_date: today });
+    setDelivery({ ...emptyDelivery(), delivery_date: today });
+    setCheck({ ...emptyCheck(), checked_on: today });
+    setModal({ mode, record });
+  };
+  const closeForm = () => { if (!operation.current) setModal(null); };
+
+  const save = async event => {
+    event.preventDefault();
+    if (operation.current) return;
+    setFormError('');
+    if (!['delivery', 'check'].includes(modal.mode) && (!form.animal_name.trim() || !Number.isFinite(dayNumber(form.mating_date)) || form.mating_date > today)) {
+      setFormError(ui('invalidRecord')); return;
+    }
+    if (modal.mode === 'delivery' && (!Number.isFinite(dayNumber(delivery.delivery_date)) || delivery.delivery_date < modal.record.mating_date || delivery.delivery_date > today || !Number.isInteger(Number(delivery.offspring_count)) || Number(delivery.offspring_count) < 1)) {
+      setFormError(ui('invalidDelivery')); return;
+    }
+    if (modal.mode === 'check' && (!check.result || !Number.isFinite(dayNumber(check.checked_on)) || check.checked_on < modal.record.mating_date || check.checked_on > today)) { setFormError(checkText('invalidCheck')); return; }
+    operation.current = true; setBusy(true);
     try {
-      const response = await pregnancyService.markDelivered(selectedRecord.id, deliveryData);
-      if (response.success) {
-        setShowDeliverModal(false);
-        setSelectedRecord(null);
-        fetchData();
+      let response;
+      if (modal.mode === 'check') {
+        response = await pregnancyService.recordCheckup(modal.record.id, check);
+      } else if (modal.mode === 'delivery') {
+        response = await pregnancyService.markDelivered(modal.record.id, { ...delivery, offspring_count: Number(delivery.offspring_count) });
+      } else {
+        const payload = { animal_profile_id: form.animal_profile_id || null, animal_type: form.animal_type, animal_name: form.animal_name.trim(), ear_badge_number: form.ear_badge_number.trim(), mating_date: form.mating_date, mating_type: form.mating_type, notes: form.notes, ...(form.animal_type === 'other' ? { pregnancy_duration_days: Number(form.pregnancy_duration_days) } : {}) };
+        response = modal.mode === 'edit' ? await pregnancyService.updateRecord(modal.record.id, payload) : await pregnancyService.createRecord(payload);
       }
+      if (!response.success || !response.data) throw new Error(response.message);
+      setRecords(previous => modal.mode === 'add' ? [response.data, ...previous] : previous.map(record => record.id === response.data.id ? response.data : record));
+      if (['delivery', 'check'].includes(modal.mode) && animalFilter === String(modal.record.id)) setAnimalFilter('');
+      if (modal.mode === 'add') { setTab('active'); setAnimalFilter(''); setSelectedDate(''); setSearch(''); setVisibleCount(6); setMobileView('records'); }
+      toast.success(modal.mode === 'check' ? checkText('saved') : modal.mode === 'delivery' ? text('deliveryRecorded') : modal.mode === 'edit' ? ui('recordUpdated') : text('recordAdded'));
+      setModal(null);
     } catch (err) {
-      console.error('Error marking as delivered:', err);
-      toast.error(t('pregnancy.markDeliveredFailed'));
-    }
+      setFormError(err.message || (modal.mode === 'delivery' ? text('markDeliveredFailed') : text('createFailed')));
+    } finally { operation.current = false; setBusy(false); }
   };
 
-  // Handle delete
-  const handleDelete = async (id) => {
-    if (!confirm(t('pregnancy.deleteConfirm'))) return;
+  const deleteRecord = async record => {
+    if (operation.current || !window.confirm(text('deleteConfirm'))) return;
+    operation.current = true; setBusy(true);
     try {
-      const response = await pregnancyService.deleteRecord(id);
-      if (response.success) {
-        setPregnancyRecords(pregnancyRecords.filter(r => r.id !== id));
-        fetchData();
-      }
-    } catch (err) {
-      console.error('Error deleting record:', err);
-      toast.error(t('pregnancy.deleteFailed'));
+      const response = await pregnancyService.deleteRecord(record.id);
+      if (!response.success) throw new Error(response.message);
+      setRecords(previous => previous.filter(item => item.id !== record.id));
+      if (String(record.id) === animalFilter) setAnimalFilter('');
+      toast.success(ui('recordDeleted'));
+    } catch (err) { toast.error(err.message || text('deleteFailed')); }
+    finally { operation.current = false; setBusy(false); }
+  };
+
+  const activeRecords = records.filter(record => record.status === 'pregnant');
+  const pendingRecords = records.filter(record => record.status === 'pending_confirmation');
+  const dueSoon = activeRecords.filter(record => daysRemaining(record, today) >= 0 && daysRemaining(record, today) <= 30);
+  const overdue = activeRecords.filter(record => daysRemaining(record, today) < 0);
+  const tabRecords = records.filter(record => tab === 'all' || (tab === 'active' ? ['pregnant', 'pending_confirmation'].includes(record.status) : record.status === 'delivered'));
+  const calendarRecords = tabRecords.filter(record => !animalFilter || String(record.id) === animalFilter);
+  const monthRecords = recordsInMonth(tabRecords, month, today);
+  const filtered = calendarRecords.filter(record => (!selectedDate || recordOnDate(record, selectedDate, today)) && `${record.animal_name} ${record.ear_badge_number || ''}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
+    .sort((a, b) => tab === 'delivered' ? (b.actual_delivery_date || '').localeCompare(a.actual_delivery_date || '') : a.expected_delivery_date.localeCompare(b.expected_delivery_date));
+  const duration = form.animal_type === 'other' ? Number(form.pregnancy_duration_days) : modal?.mode === 'edit' ? Number(form.pregnancy_duration_days) : durations[form.animal_type];
+  const expectedDate = addDays(form.mating_date, duration);
+  const firstDay = month.getDay();
+  const monthDays = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+  const clearFilters = () => { setSelectedDate(''); setSearch(''); setAnimalFilter(''); setVisibleCount(6); };
+  const chooseAnimal = value => { setAnimalFilter(value); setSelectedDate(''); setVisibleCount(6); };
+  const selectDate = date => {
+    setSelectedDate(value => value === date ? '' : date);
+    setVisibleCount(6);
+    setMobileView('records');
+    if (window.matchMedia('(max-width: 899px)').matches) {
+      requestAnimationFrame(() => document.getElementById('pc-records-title')?.focus({ preventScroll: true }));
     }
   };
 
-  // Calculate expected delivery date when mating date or animal type changes
-  useEffect(() => {
-    if (formData.mating_date && formData.animal_type) {
-      const duration = formData.animal_type === 'other'
-        ? Number(formData.pregnancy_duration_days) || DEFAULT_OTHER_PREGNANCY_DAYS
-        : (PREGNANCY_DURATIONS[formData.animal_type]?.days || DEFAULT_OTHER_PREGNANCY_DAYS);
-      const matingDate = new Date(formData.mating_date);
-      matingDate.setDate(matingDate.getDate() + duration);
-    }
-  }, [formData.mating_date, formData.animal_type, formData.pregnancy_duration_days]);
+  const durationReference = <details className="pc-reference pc-panel">
+    <summary><FaBookOpen aria-hidden="true" />{text('pregnancyDurationReference')}<FaChevronRight className="pc-reference-chevron" aria-hidden="true" /></summary>
+    <p>{ui('estimateHint')}</p>
+    <div>{Object.entries(durations).filter(([type]) => allowedSpecies(type)).map(([type, days]) => <span key={type}><AnimalIcon type={type} /><strong>{animalName(type)}</strong>{type === 'other' ? text('customDurationRequired') : `${days} ${text('days')}`}</span>)}</div>
+  </details>;
 
-  // Calendar functions
-  const getDaysInMonth = (date) => {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-  };
+  if (loading) return <FullPageLoader message={text('loadingCalendar')} />;
 
-  const getFirstDayOfMonth = (date) => {
-    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
-  };
-
-  const navigateMonth = (direction) => {
-    const newMonth = new Date(currentMonth);
-    newMonth.setMonth(newMonth.getMonth() + direction);
-    setCurrentMonth(newMonth);
-  };
-
-  // Get animals for specific date
-  const getRecordsForDate = (date) => {
-    return pregnancyRecords.filter(record => {
-      if (record.status !== 'pregnant') return false;
-      const matingDate = new Date(record.mating_date);
-      const expDate = new Date(record.expected_delivery_date);
-      return date >= matingDate && date <= expDate;
-    });
-  };
-
-  // Check if date is due date
-  const isDueDate = (date) => {
-    return pregnancyRecords.some(r => 
-      r.status === 'pregnant' && 
-      r.expected_delivery_date === date.toISOString().split('T')[0]
-    );
-  };
-
-  // Generate calendar days
-  const generateCalendarDays = () => {
-    const daysInMonth = getDaysInMonth(currentMonth);
-    const firstDay = getFirstDayOfMonth(currentMonth);
-    const days = [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    for (let i = 0; i < firstDay; i++) {
-      days.push(<div key={`empty-${i}`} className="h-14 w-full min-w-0 sm:h-20"></div>);
-    }
-
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-      date.setHours(0, 0, 0, 0);
-      const recordsForDate = getRecordsForDate(date);
-      const tooltipRecords = recordsForDate.slice(0, 4);
-      const isToday = date.getTime() === today.getTime();
-      const isSelected = selectedDate && date.getTime() === selectedDate.getTime();
-      const hasDueDate = isDueDate(date);
-
-      days.push(
-        <div
-          key={day}
-          onClick={() => setSelectedDate(date)}
-          className={`group relative h-14 w-full min-w-0 cursor-pointer rounded-md border-2 p-1 transition-all duration-200 sm:h-20 sm:rounded-lg sm:p-2 ${
-            isToday
-              ? 'bg-green-900/50 border-green-500 shadow-md'
-              : isSelected
-              ? 'bg-blue-900/50 border-blue-500'
-              : hasDueDate
-              ? 'bg-red-900/50 border-red-500 hover:border-red-400'
-              : recordsForDate.length > 0
-              ? 'bg-orange-900/50 border-orange-500 hover:border-orange-400'
-              : 'bg-gray-800 border-gray-700 hover:border-gray-600'
-          }`}
-        >
-          <div className="mb-0.5 flex items-start justify-between sm:mb-1">
-            <span className={`text-sm font-semibold ${
-              isToday ? 'text-green-300' : 'text-gray-300'
-            }`}>
-              <span className="text-xs sm:text-sm">{day}</span>
-            </span>
-            {recordsForDate.length > 0 && (
-              <span className="mt-0.5 h-2.5 w-2.5 rounded-full bg-green-400 shadow-[0_0_0_2px_rgba(22,163,74,0.18)] sm:h-3 sm:w-3"></span>
-            )}
-          </div>
-          {hasDueDate && (
-            <div className="flex items-center gap-1 text-[10px] font-semibold text-red-400 sm:text-xs">
-              <FaClock className="text-[9px] sm:text-[10px]" />
-              <span className="hidden sm:inline">{t("pregnancy.due")}</span>
-            </div>
-          )}
-          {recordsForDate.length > 0 && (
-            <div className="pointer-events-none absolute left-1/2 top-full z-30 mt-2 hidden w-44 -translate-x-1/2 rounded-lg border border-gray-700 bg-gray-950/95 p-2 text-left opacity-0 shadow-xl transition-all duration-150 group-hover:translate-y-0 group-hover:opacity-100 md:block">
-              <p className="mb-1 text-[11px] font-semibold text-white">
-                {recordsForDate.length} {recordsForDate.length === 1 ? t("pregnancy.recordSingular") : t("pregnancy.recordsLabel")}
-              </p>
-              <div className="space-y-1">
-                {tooltipRecords.map((record) => (
-                  <div key={`${day}-${record.id}`} className="truncate text-[11px] text-gray-300">
-                    {record.ear_badge_number
-                      ? `${t("pregnancy.earBadgeNumberShort")}: ${record.ear_badge_number}`
-                      : record.animal_name}
-                  </div>
-                ))}
-                {recordsForDate.length > tooltipRecords.length && (
-                  <div className="text-[11px] font-medium text-green-400">
-                    +{recordsForDate.length - tooltipRecords.length} {t("pregnancy.moreLabel")}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    return days;
-  };
-
-  // Filter records by tab
-  const filteredRecords = pregnancyRecords.filter(record => {
-    if (activeTab === 'active') return record.status === 'pregnant';
-    if (activeTab === 'delivered') return record.status === 'delivered';
-    return true;
-  });
-
-  const selectedDateRecords = selectedDate
-    ? getRecordsForDate(selectedDate).filter(record => {
-        if (activeTab === 'active') return record.status === 'pregnant';
-        if (activeTab === 'delivered') return record.status === 'delivered';
-        return true;
-      })
-    : [];
-
-  const renderRecordCard = (record, { showActions = true } = {}) => {
-    const statusBadge = getStatusBadge(record.status, t);
-    const totalDays = getRecordDurationDays(record);
-    const durationText = formatPregnancyDurationText(totalDays, t);
-
-    return (
-      <div
-        key={record.id}
-        className="rounded-lg border border-gray-700 bg-gray-800 p-4 transition-all hover:border-green-600 hover:shadow-md"
-      >
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <AnimalTypeIcon type={record.animal_type} className="text-2xl" />
-            <div>
-              <h4 className="text-sm font-bold text-white">{record.animal_name}</h4>
-              <p className="text-xs text-gray-400 capitalize">
-                {record.ear_badge_number
-                  ? `${t("pregnancy.earBadgeNumberShort")}: ${record.ear_badge_number}`
-                  : (record.breed_name || record.animal_type)}
-              </p>
-            </div>
-          </div>
-          <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusBadge.bg} ${statusBadge.text}`}>
-            {statusBadge.label}
-          </span>
-        </div>
-
-        <div className="mb-3 grid grid-cols-2 gap-2 text-xs">
-          <div className="rounded-lg border border-gray-700 bg-gray-900 p-2.5">
-            <p className="mb-1 text-gray-400">{t("pregnancy.matingDateLabel")}</p>
-            <p className="font-semibold text-gray-200">{formatDate(record.mating_date)}</p>
-          </div>
-          <div className="rounded-lg border border-gray-700 bg-gray-900 p-2.5">
-            <p className="mb-1 text-gray-400">{t("pregnancy.expectedDateLabel")}</p>
-            <p className="font-semibold text-green-400">{formatDate(record.expected_delivery_date)}</p>
-          </div>
-        </div>
-
-        <div className="mb-3 grid grid-cols-2 gap-2 text-xs">
-          <div className="rounded-lg border border-gray-700 bg-gray-900 p-2.5">
-            <p className="mb-1 text-gray-400">{t("pregnancy.animalType")}</p>
-            <p className="font-semibold text-gray-200">
-              {t(`pregnancy.animal${record.animal_type.charAt(0).toUpperCase() + record.animal_type.slice(1)}`)}
-            </p>
-          </div>
-          <div className="rounded-lg border border-gray-700 bg-gray-900 p-2.5">
-            <p className="mb-1 text-gray-400">{t("pregnancy.customPregnancyDurationDays")}</p>
-            <p className="font-semibold text-gray-200">{durationText || `${totalDays} ${t("pregnancy.days")}`}</p>
-          </div>
-        </div>
-
-        {record.status === 'pregnant' && (
-          <>
-            <div className="mb-3">
-              <div className="mb-1.5 flex justify-between text-xs text-gray-400">
-                <span>{t("pregnancy.progress")}</span>
-                <span className="font-bold text-green-400">{record.progress_percentage || 0}%</span>
-              </div>
-              <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-700">
-                <div
-                  className={`h-2.5 rounded-full ${getProgressColor(record.days_remaining, totalDays)} transition-all duration-500`}
-                  style={{ width: `${record.progress_percentage || 0}%` }}
-                ></div>
-              </div>
-            </div>
-
-            <div className="mb-3 flex justify-between rounded-lg border border-orange-700 bg-orange-900/30 px-3 py-2 text-xs">
-              <span className="font-medium text-gray-300">{t("pregnancy.daysRemainingLabel")}</span>
-              <span className="font-bold text-orange-400">{record.days_remaining || 0} {t("pregnancy.days")}</span>
-            </div>
-          </>
-        )}
-
-        {record.notes && (
-          <div className="mb-3 rounded-lg border border-gray-700 bg-gray-900 p-2.5 text-xs">
-            <p className="mb-1 text-gray-400">{t("pregnancy.notes")}</p>
-            <p className="leading-relaxed text-gray-200">{record.notes}</p>
-          </div>
-        )}
-
-        {record.status === 'delivered' && record.actual_delivery_date && (
-          <div className="mb-3 rounded-lg border border-blue-700 bg-blue-900/30 p-2.5">
-            <p className="text-xs font-medium text-blue-300">
-              {t("pregnancy.statusDelivered")} {formatDate(record.actual_delivery_date)}
-              {record.offspring_count ? ` - ${record.offspring_count} ${t("pregnancy.count")}` : ''}
-            </p>
-          </div>
-        )}
-
-        {showActions && record.status === 'pregnant' && (
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                setSelectedRecord(record);
-                setShowDeliverModal(true);
-              }}
-              className="flex-1 rounded-lg bg-green-600 px-3 py-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-green-700"
-            >
-              {t("pregnancy.markDelivered")}
-            </button>
-            <button
-              onClick={() => handleDelete(record.id)}
-              className="rounded-lg border border-red-700 bg-red-900/30 px-3 py-2.5 text-xs font-semibold text-red-400 transition-colors hover:bg-red-900/50"
-            >
-              {t("pregnancy.delete")}
-            </button>
-          </div>
-        )}
+  return <section className="pregnancy-page" aria-labelledby="pregnancy-title">
+    <header className="pc-page-header">
+      <div className="pc-heading-content">
+        <span className="pc-heading-icon"><FaCalendarDays aria-hidden="true" /></span>
+        <div><h1 id="pregnancy-title">{text('pageTitle')}</h1><p>{text('pageDescription')}</p></div>
       </div>
-    );
-  };
-
-  if (loading) {
-    return <FullPageLoader message={t("pregnancy.loadingCalendar")} dark />;
-  }
-
-  return (
-    <div className="min-h-screen bg-black py-6">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header Section */}
-        <div className="mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-white mb-2">{t("pregnancy.pageTitle")}</h1>
-              <p className="text-gray-400">{t("pregnancy.pageDescription")}</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Link
-                to="/"
-                className="px-4 py-2 border border-gray-700 text-gray-300 rounded-lg hover:bg-gray-900 hover:border-gray-600 transition-colors font-medium"
-              >{t("pregnancy.back")}</Link>
-              <button
-                onClick={() => setShowAddForm(true)}
-                className="px-5 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-all shadow-sm hover:shadow-md flex items-center gap-2"
-              >
-                <FaPlus className="w-4 h-4" />
-                {t("pregnancy.addPregnancy")}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {error && (
-          <div className="mb-6 p-4 bg-red-900/50 border border-red-700 rounded-lg text-red-300">
-            {error}
-          </div>
-        )}
-
-        {/* KPI Summary Cards */}
-        {stats && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 shadow-sm hover:shadow-md hover:border-green-700 transition-all">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-400 mb-1">{t("pregnancy.activePregnancies")}</p>
-                  <p className="text-3xl font-bold text-white">{stats.active_pregnancies || 0}</p>
-                </div>
-                <div className="w-12 h-12 bg-green-900/50 rounded-lg flex items-center justify-center border border-green-700">
-                  <FaCow className="text-2xl text-green-300" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 shadow-sm hover:shadow-md hover:border-blue-700 transition-all">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-400 mb-1">{t("pregnancy.delivered")}</p>
-                  <p className="text-3xl font-bold text-white">{stats.successful_deliveries || 0}</p>
-                </div>
-                <div className="w-12 h-12 bg-blue-900/50 rounded-lg flex items-center justify-center border border-blue-700">
-                  <FaBaby className="text-2xl text-blue-300" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 shadow-sm hover:shadow-md hover:border-orange-700 transition-all">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-400 mb-1">{t("pregnancy.dueSoon")}</p>
-                  <p className="text-3xl font-bold text-white">{stats.upcoming_deliveries?.length || 0}</p>
-                </div>
-                <div className="w-12 h-12 bg-orange-900/50 rounded-lg flex items-center justify-center border border-orange-700">
-                  <GiAlarmClock className="text-2xl text-orange-300" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 shadow-sm hover:shadow-md hover:border-purple-700 transition-all">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-400 mb-1">{t("pregnancy.totalRecords")}</p>
-                  <p className="text-3xl font-bold text-white">{stats.total_records || 0}</p>
-                </div>
-                <div className="w-12 h-12 bg-purple-900/50 rounded-lg flex items-center justify-center border border-purple-700">
-                  <FaChartBar className="text-2xl text-purple-300" />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* {t("pregnancy.pregnancyDurationReference")} */}
-        <div className="mb-8 bg-gray-900 rounded-xl p-6 border border-gray-800 shadow-sm">
-          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <FaCalendarDays className="text-sky-300" />
-            {t("pregnancy.pregnancyDurationReference")}
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(PREGNANCY_DURATIONS).map(([type, info]) => (
-              <div key={type} className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-lg border border-gray-700 hover:border-green-600 transition-colors">
-                <AnimalTypeIcon type={type} className="text-lg" />
-                <span className="text-sm text-gray-300 font-medium">{t(`pregnancy.animal${type.charAt(0).toUpperCase() + type.slice(1)}`)}:</span>
-                <span className="text-sm text-green-400 font-semibold">
-                  {type === 'other'
-                    ? t('pregnancy.customDurationRequired')
-                    : t(`pregnancy.months${info.monthCount}`)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Calendar Section */}
-          <div className="lg:col-span-2">
-            <div className="bg-gray-900 rounded-xl border border-gray-800 p-4 shadow-sm sm:p-6">
-              {/* Calendar Header */}
-              <div className="mb-4 flex items-center justify-between sm:mb-6">
-                <button
-                  onClick={() => navigateMonth(-1)}
-                  className="rounded-lg border border-gray-700 p-1.5 transition-colors hover:border-gray-600 hover:bg-gray-800 sm:p-2"
-                >
-                  <FaChevronLeft className="h-4 w-4 text-gray-300 sm:h-5 sm:w-5" />
-                </button>
-
-                <h2 className="text-base font-bold text-white sm:text-xl">
-                  {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                </h2>
-
-                <button
-                  onClick={() => navigateMonth(1)}
-                  className="rounded-lg border border-gray-700 p-1.5 transition-colors hover:border-gray-600 hover:bg-gray-800 sm:p-2"
-                >
-                  <FaChevronRight className="h-4 w-4 text-gray-300 sm:h-5 sm:w-5" />
-                </button>
-              </div>
-
-              {/* Calendar Grid */}
-              <div className="mb-1 grid grid-cols-7 gap-1 sm:mb-2 sm:gap-2">
-                {[t('pregnancy.sun'), t('pregnancy.mon'), t('pregnancy.tue'), t('pregnancy.wed'), t('pregnancy.thu'), t('pregnancy.fri'), t('pregnancy.sat')].map((day) => (
-                  <div key={day} className="py-1 text-center text-[11px] font-semibold text-gray-400 sm:py-2 sm:text-sm">
-                    {day}
-                  </div>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-7 gap-1 sm:gap-2">
-                {generateCalendarDays()}
-              </div>
-
-              {/* Legend */}
-              <div className="mt-5 flex flex-wrap gap-3 text-xs sm:mt-6 sm:gap-4 sm:text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="h-3.5 w-3.5 rounded bg-green-500 sm:h-4 sm:w-4"></div>
-                  <span className="text-gray-300">{t("pregnancy.today")}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-3.5 w-3.5 rounded border-2 border-orange-500 bg-orange-900/50 sm:h-4 sm:w-4"></div>
-                  <span className="text-gray-300">{t("pregnancy.pregnant")}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-3.5 w-3.5 rounded border-2 border-red-500 bg-red-900/50 sm:h-4 sm:w-4"></div>
-                  <span className="text-gray-300">{t("pregnancy.dueDate")}</span>
-                </div>
-              </div>
-
-              <div className="mt-5 rounded-xl border border-gray-800 bg-gray-950/50 p-1.5 shadow-sm sm:mt-6">
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => setActiveTab('active')}
-                    className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-all ${
-                      activeTab === 'active'
-                        ? 'bg-green-600 text-white shadow-sm'
-                        : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
-                    }`}
-                  >
-                    {t("pregnancy.active")}
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('delivered')}
-                    className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-all ${
-                      activeTab === 'delivered'
-                        ? 'bg-green-600 text-white shadow-sm'
-                        : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
-                    }`}
-                  >
-                    {t("pregnancy.delivered")}
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('all')}
-                    className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-all ${
-                      activeTab === 'all'
-                        ? 'bg-green-600 text-white shadow-sm'
-                        : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
-                    }`}
-                  >
-                    {t("pregnancy.all")}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Sidebar */}
-          <div className="space-y-6">
-            {/* Selected Date Details */}
-            <div className="rounded-xl border border-gray-800 bg-gray-900 p-4 shadow-sm">
-              <div className="mb-4 flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-bold text-white">{t("pregnancy.selectedDateDetails")}</h3>
-                  <p className="mt-1 text-xs text-gray-400">
-                    {selectedDate
-                      ? formatDate(selectedDate)
-                      : t("pregnancy.selectDateForDetails")}
-                  </p>
-                </div>
-                {selectedDate && (
-                  <span className="rounded-full bg-gray-800 px-2.5 py-1 text-xs font-semibold text-green-400">
-                    {selectedDateRecords.length} {selectedDateRecords.length === 1 ? t("pregnancy.recordSingular") : t("pregnancy.recordsLabel")}
-                  </span>
-                )}
-              </div>
-
-              {selectedDate ? (
-                selectedDateRecords.length > 0 ? (
-                  <div className="space-y-4">
-                    {selectedDateRecords.map((record) => renderRecordCard(record))}
-                  </div>
-                ) : (
-                  <div className="rounded-lg border border-dashed border-gray-700 bg-gray-800 p-4 text-center">
-                    <p className="text-sm font-medium text-gray-300">{t("pregnancy.noRecordsForSelectedDate")}</p>
-                    <p className="mt-1 text-xs text-gray-500">{t("pregnancy.selectAnotherDateHint")}</p>
-                  </div>
-                )
-              ) : (
-                <div className="rounded-lg border border-dashed border-gray-700 bg-gray-800 p-4 text-center">
-                  <p className="text-sm font-medium text-gray-300">{t("pregnancy.selectDateForDetails")}</p>
-                  <p className="mt-1 text-xs text-gray-500">{t("pregnancy.tapCalendarDateHint")}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Records List */}
-            <div className="bg-gray-900 rounded-xl p-4 border border-gray-800 shadow-sm max-h-[600px] overflow-y-auto">
-              {filteredRecords.length > 0 ? (
-                <div className="space-y-4">
-                  {filteredRecords.map((record) => renderRecordCard(record))}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-700">
-                    <FaCalendarXmark className="text-3xl text-gray-400" />
-                  </div>
-                  <p className="text-gray-400 text-sm mb-3">{t("pregnancy.noRecords")}</p>
-                  <button
-                    onClick={() => setShowAddForm(true)}
-                    className="text-green-400 font-semibold text-sm hover:text-green-300"
-                  >{t("pregnancy.addPregnancy")}</button>
-                </div>
-              )}
-            </div>
-
-            {/* Upcoming Deliveries Alert */}
-            {stats?.upcoming_deliveries?.length > 0 && (
-              <div className="bg-orange-900/30 rounded-xl p-4 border border-orange-700">
-                <h3 className="text-sm font-bold text-orange-300 mb-3 flex items-center gap-2">
-                  <FaTriangleExclamation className="text-orange-300" />
-                  {t("pregnancy.dueWithin30Days")}
-                </h3>
-                <div className="space-y-2">
-                  {stats.upcoming_deliveries.slice(0, 3).map((item) => (
-                    <div key={item.id} className="flex items-center justify-between p-2.5 bg-gray-800 rounded-lg border border-orange-700/50">
-                      <div className="flex items-center gap-2">
-                        <AnimalTypeIcon type={item.animal_type} className="text-lg" />
-                        <span className="text-sm text-gray-200 font-semibold">{item.animal_name}</span>
-                      </div>
-                      <span className="text-xs text-orange-400 font-bold">{item.days_remaining} {t("pregnancy.days")}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+      <div className="pc-header-actions"><span className="pc-current-date">{text('today')}<strong>{formatDate(today)}</strong></span><button className="pc-button pc-primary" onClick={() => openForm('add')} disabled={error}><FaPlus aria-hidden="true" />{checkText('recordBreeding')}</button></div>
+    </header>
+    {error ? <div className="pc-empty pc-panel" role="alert"><FaCalendarDays /><h2>{text('loadFailed')}</h2><button className="pc-button pc-primary" onClick={fetchRecords}>{ui('retry')}</button></div> : <>
+      <div className="pc-stats">
+        {[[text('activePregnancies'), activeRecords.length, 'active'], [text('dueWithin30Days'), dueSoon.length, 'soon'], [ui('overdue'), overdue.length, 'overdue'], [text('delivered'), records.filter(record => record.status === 'delivered').length, 'delivered']].map(([label, count, variant]) => <div className={`pc-stat pc-stat-${variant}`} key={variant}><span>{label}</span><strong>{count.toLocaleString(locale)}</strong></div>)}
       </div>
-
-      {/* Add Pregnancy Modal */}
-      {showAddForm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <AnimalTypeIcon type={formData.animal_type} className="text-xl" />
-                {t("pregnancy.addPregnancyRecord")}
-              </h3>
-              <button
-                onClick={() => !isSubmittingAddRecord && setShowAddForm(false)}
-                className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                disabled={isSubmittingAddRecord}
-              >
-                <FaXmark className="w-6 h-6" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="overflow-y-auto flex-1 p-6">
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.animalType")}</label>
-                    <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-green-50 px-3 py-1.5 text-sm font-medium text-green-700">
-                      <AnimalTypeIcon type={formData.animal_type} className="text-base" />
-                      <span>{t(`pregnancy.animal${formData.animal_type.charAt(0).toUpperCase() + formData.animal_type.slice(1)}`)}</span>
-                    </div>
-                    <select
-                      value={formData.animal_type}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        animal_type: e.target.value,
-                        pregnancy_duration_days: e.target.value === 'other' ? formData.pregnancy_duration_days : ''
-                      })}
-                      className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      required
-                    >
-                      {Object.keys(PREGNANCY_DURATIONS).map(type => (
-                        <option key={type} value={type}>
-                          {t(`pregnancy.animal${type.charAt(0).toUpperCase() + type.slice(1)}`)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {formData.animal_type === 'other' && (
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      {t("pregnancy.customPregnancyDurationDays")}
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={formData.pregnancy_duration_days}
-                      onChange={(e) => setFormData({ ...formData, pregnancy_duration_days: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      placeholder={t("pregnancy.placeholderCustomPregnancyDurationDays")}
-                      required
-                    />
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.animalName")}</label>
-                    <input
-                      type="text"
-                      value={formData.animal_name}
-                      onChange={(e) => setFormData({ ...formData, animal_name: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      placeholder={t("pregnancy.placeholderAnimalName")}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.earBadgeNumber")}</label>
-                    <input
-                      type="text"
-                      value={formData.ear_badge_number}
-                      onChange={(e) => setFormData({ ...formData, ear_badge_number: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      placeholder={t("pregnancy.placeholderEarBadge")}
-                    />
-                  </div>
-                </div>
-
-                {/* Mating Date */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.matingDate")}</label>
-                  <input
-                    type="date"
-                    value={formData.mating_date}
-                    onChange={(e) => setFormData({ ...formData, mating_date: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    required
-                  />
-                  <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
-                    <FaCircleInfo className="w-4 h-4" />
-                    {t("pregnancy.expectedDelivery")}: ~
-                    {formData.animal_type === 'other'
-                      ? formatPregnancyDurationText(formData.pregnancy_duration_days, t) || t("pregnancy.enterCustomDurationHint")
-                      : t(`pregnancy.months${PREGNANCY_DURATIONS[formData.animal_type]?.monthCount}`)} {t("pregnancy.fromMatingDate")}
-                  </p>
-                </div>
-
-                {/* Notes */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.notes")}</label>
-                  <textarea
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
-                    rows="3"
-                    placeholder={t("pregnancy.placeholderNotes")}
-                  />
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddForm(false)}
-                    disabled={isSubmittingAddRecord}
-                    className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-                  >{t("pregnancy.cancel")}</button>
-                  <button
-                    type="submit"
-                    disabled={isSubmittingAddRecord}
-                    className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors shadow-sm disabled:cursor-not-allowed disabled:bg-green-400"
-                  >
-                    {isSubmittingAddRecord ? t("pregnancy.addingRecord") : t("pregnancy.addRecord")}
-                  </button></div></form>
-            </div>
+      {pendingRecords.length > 0 && <p className="pc-muted">{checkText('waitingCount', { count: pendingRecords.length })}</p>}
+      <div className="pc-mobile-switch" role="group" aria-label={ui('viewLabel')}>
+        <button aria-pressed={mobileView === 'records'} onClick={() => setMobileView('records')}><FaListUl aria-hidden="true" />{ui('yourRecords')}</button>
+        <button aria-pressed={mobileView === 'calendar'} onClick={() => setMobileView('calendar')}><FaCalendarDays aria-hidden="true" />{text('calendar')}</button>
+      </div>
+      <div className="pc-workspace" data-mobile-view={mobileView}>
+        <aside className="pc-calendar-column">
+        <section className="pc-panel pc-calendar" aria-labelledby="pc-month-title">
+          <div className="pc-section-heading"><span className="pc-eyebrow"><FaCalendarDays />{text('calendar')}</span><button className="pc-text-button" onClick={() => { setMonth(moveMonth(new Date(), 0)); setSelectedDate(today); setVisibleCount(6); setMobileView('records'); }}>{text('today')}</button></div>
+          <div className="pc-month-nav"><button className="pc-icon-button" aria-label={ui('previousMonth')} onClick={() => setMonth(value => moveMonth(value, -1))}><FaChevronLeft /></button><h2 id="pc-month-title" aria-live="polite">{month.toLocaleDateString(locale, { month: 'long', year: 'numeric' })}</h2><button className="pc-icon-button" aria-label={ui('nextMonth')} onClick={() => setMonth(value => moveMonth(value, 1))}><FaChevronRight /></button></div>
+          <div className="pc-animal-filter"><label htmlFor="pregnancy-animal-filter">{ui('showAnimal')}</label><select id="pregnancy-animal-filter" value={animalFilter} onChange={event => chooseAnimal(event.target.value)}><option value="">{ui('allAnimals')}</option>{tabRecords.map(record => <option key={record.id} value={record.id}>{record.animal_name}{record.ear_badge_number ? ` · ${record.ear_badge_number}` : ` · #${record.id}`}</option>)}</select></div>
+          <div className="pc-calendar-grid">
+            {['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map(day => <span className="pc-weekday" key={day}>{text(day)}</span>)}
+            {Array.from({ length: firstDay }, (_, i) => <span key={`blank-${i}`} aria-hidden="true" />)}
+            {Array.from({ length: monthDays }, (_, i) => {
+              const date = dateKey(new Date(month.getFullYear(), month.getMonth(), i + 1));
+              const { active, due, delivered, pending } = calendarDayRecords(calendarRecords, date, today);
+              const label = [formatDate(date), pending.length ? checkText('waitingCount', { count: pending.length }) : '', active.length ? ui('activeOnDay', { count: active.length }) : '', ...active.map(record => record.animal_name), due.length ? `${text('expectedDelivery')}: ${due.map(record => record.animal_name).join(', ')}` : '', delivered.length ? `${text('delivered')}: ${delivered.map(record => record.animal_name).join(', ')}` : ''].filter(Boolean).join(', ');
+              return <button type="button" data-date={date} data-active-count={active.length} data-due-count={due.length} data-delivered-count={delivered.length} key={date} className={`pc-day${date === today ? ' is-today' : ''}${active.length ? ' has-active' : ''}${due.length ? ' has-due' : ''}`} aria-pressed={selectedDate === date} aria-current={date === today ? 'date' : undefined} aria-label={label} title={label} onClick={() => selectDate(date)}>
+                <span className="pc-day-number">{(i + 1).toLocaleString(locale)}</span>
+                {active.length > 0 && <span className="pc-animal-count">{ui('animalCount', { count: active.length, number: active.length.toLocaleString(locale) })}</span>}
+                {due.length > 0 && <span className="pc-day-event pc-event-due">{ui('calendarDueShort', { number: due.length.toLocaleString(locale) })}</span>}
+                {pending.length > 0 && <span className="pc-day-event">{ui('calendarCheckShort', { number: pending.length.toLocaleString(locale) })}</span>}
+                {delivered.length > 0 && <span className="pc-day-event pc-event-delivered">{ui('deliveredCount', { number: delivered.length.toLocaleString(locale) })}</span>}
+              </button>;
+            })}
           </div>
-        </div>
-      )}
+          <details className="pc-calendar-help"><summary>{ui('calendarHelp')}</summary><p><strong>{ui('countExample', { number: (3).toLocaleString(locale) })}</strong> {ui('countExplanation')}</p><p>{ui('tapDayHint')}</p><p className="pc-delivery-help">{ui('dueExplanation')}</p></details>
+          {monthRecords.length > 0 && <details className="pc-month-animals"><summary>{ui('animalsThisMonth', { count: monthRecords.length })}</summary><div>{monthRecords.map(record => <button type="button" key={record.id} className="pc-month-animal" aria-pressed={animalFilter === String(record.id)} onClick={() => chooseAnimal(animalFilter === String(record.id) ? '' : String(record.id))}><span className="pc-month-animal-icon"><AnimalIcon type={record.animal_type} /></span><span><strong>{record.animal_name}{record.ear_badge_number && ` · ${record.ear_badge_number}`}</strong><small>{!record.confirmed_on && record.status !== 'delivered' && checkText(record.status === 'pending_confirmation' ? 'pending' : 'legacy')}</small><small>{checkText('breedingDate')}: {formatDate(record.mating_date)}</small><small>{record.status === 'delivered' ? text('deliveryDate') : text('expectedDelivery')}: {formatDate(record.actual_delivery_date || record.expected_delivery_date)}</small></span></button>)}</div></details>}
+        </section>
+        {durationReference}
+        </aside>
 
-      {/* Deliver Modal */}
-      {showDeliverModal && selectedRecord && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <FaBaby className="text-blue-500" />
-                {t("pregnancy.recordDelivery")}
-              </h3>
-              <button
-                onClick={() => {
-                  setShowDeliverModal(false);
-                  setSelectedRecord(null);
-                }}
-                className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <FaXmark className="w-6 h-6" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-6">
-              {/* Animal Info Card */}
-              <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200 flex items-center gap-3">
-                <AnimalTypeIcon type={selectedRecord.animal_type} className="text-3xl" />
-                <div>
-                  <p className="text-gray-900 font-bold">{selectedRecord.animal_name}</p>
-                  <p className="text-gray-600 text-sm">
-                    {selectedRecord.ear_badge_number
-                      ? `${t("pregnancy.earBadgeNumberShort")}: ${selectedRecord.ear_badge_number}`
-                      : (selectedRecord.breed_name || selectedRecord.animal_type)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                {/* Delivery Date & Offspring Count */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.deliveryDateLabel")}</label>
-                    <input
-                      type="date"
-                      value={deliveryData.delivery_date}
-                      onChange={(e) => setDeliveryData({ ...deliveryData, delivery_date: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.count")}</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={deliveryData.offspring_count}
-                      onChange={(e) => setDeliveryData({ ...deliveryData, offspring_count: parseInt(e.target.value) })}
-                      className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-
-                {/* Gender Selection */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.gender")}</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {['male', 'female', 'mixed'].map((gender) => (
-                      <button
-                        key={gender}
-                        type="button"
-                        onClick={() => setDeliveryData({ ...deliveryData, offspring_gender: gender })}
-                        className={`py-2.5 px-3 rounded-lg text-sm font-semibold transition-all ${
-                          deliveryData.offspring_gender === gender
-                            ? 'bg-green-600 text-white shadow-sm'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
-                        }`}
-                      >
-                        {gender === 'male' ? t('pregnancy.genderMale') : gender === 'female' ? t('pregnancy.genderFemale') : t('pregnancy.genderMixed')}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Offspring Details */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">{t("pregnancy.detailsOptional")}</label>
-                  <textarea
-                    value={deliveryData.offspring_details}
-                    onChange={(e) => setDeliveryData({ ...deliveryData, offspring_details: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
-                    rows="3"
-                    placeholder={t("pregnancy.placeholderOffspringDetails")}
-                  />
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowDeliverModal(false);
-                      setSelectedRecord(null);
-                    }}
-                    className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold transition-colors"
-                  >{t("pregnancy.cancel")}</button>
-                  <button
-                    onClick={handleDeliver}
-                    className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors shadow-sm"
-                  >{t("pregnancy.confirmDelivery")}</button>
-                </div>
-              </div>
-            </div>
+        <section className="pc-records" aria-labelledby="pc-records-title">
+          <div className="pc-record-toolbar pc-panel">
+          <div className="pc-section-heading"><div><h2 id="pc-records-title" tabIndex={-1}>{ui('yourRecords')}</h2><p className="pc-records-caption">{ui('recordsHint')}</p></div></div>
+          <div className="pc-tabs" role="group" aria-label={ui('filterStatus')}>{['active', 'delivered', 'all'].map(value => <button key={value} aria-pressed={tab === value} onClick={() => { setTab(value); setAnimalFilter(''); setVisibleCount(6); }}>{text(value)}</button>)}</div>
+          <label className="pc-search"><span className="sr-only">{ui('searchRecords')}</span><input type="search" value={search} onChange={event => { setSearch(event.target.value); setVisibleCount(6); }} placeholder={ui('searchRecords')} /></label>
+          {selectedDate && <div className="pc-date-filter"><span>{formatDate(selectedDate)}</span><button className="pc-text-button" onClick={() => setSelectedDate('')}>{ui('clearDate')}</button></div>}
+          {animalFilter && <div className="pc-date-filter"><span>{records.find(record => String(record.id) === animalFilter)?.animal_name}</span><button className="pc-text-button" onClick={() => chooseAnimal('')}>{ui('allAnimals')}</button></div>}
           </div>
-        </div>
-      )}
-    </div>
-  );
-};
+          <div className="pc-record-list" aria-live="polite">
+            {filtered.slice(0, visibleCount).map(record => {
+              const remaining = daysRemaining(record, today);
+              const active = record.status === 'pregnant';
+              const open = active || record.status === 'pending_confirmation';
+              const history = [...(record.checkups || [])].sort((a, b) => b.checked_on.localeCompare(a.checked_on) || b.id - a.id);
+              return <article className="pc-record pc-panel" key={record.id}>
+                <header><span className="pc-animal-icon"><AnimalIcon type={record.animal_type} /></span><div className="pc-animal-name"><h3>{record.animal_name}</h3><p>{animalName(record.animal_type)}{record.ear_badge_number && ` · ${record.ear_badge_number}`}</p></div><span className={`pc-status${active && remaining < 0 ? ' pc-status-overdue' : ''}`}>{checkStatus(record)}</span></header>
+                <dl className="pc-record-dates"><div><dt>{checkText('breedingDate')}</dt><dd>{formatDate(record.mating_date)}</dd></div><div><dt>{record.status === 'delivered' ? text('deliveryDate') : text('expectedDelivery')}</dt><dd>{formatDate(record.status === 'delivered' ? record.actual_delivery_date : record.expected_delivery_date)}</dd></div></dl>
+                {open && <div className="pc-progress"><div><span>{remaining < 0 ? checkText('passed', { count: Math.abs(remaining) }) : remaining === 0 ? text('expectedDelivery') + ': ' + text('today') : checkText('remaining', { count: remaining })}</span><span>{pregnancyProgress(record, today)}%</span></div><progress max="100" value={pregnancyProgress(record, today)} aria-label={`${record.animal_name}: ${text('progress')}`} /></div>}
+                {open && record.last_check_result === 'recheck' && <p className="pc-muted">{checkText('recheck')}</p>}
+                {open && record.next_check_date && <p className="pc-muted">{checkText('nextCheck')}: {formatDate(record.next_check_date)}</p>}
+                {(open || record.status === 'delivered' || record.notes || record.offspring_details || history.length > 0 || record.date_corrections?.length > 0) && <details className="pc-record-details">
+                  <summary>{ui('recordDetails')}</summary>
+                  <div>
+                {open && <p className="pc-muted">{checkText('elapsed', { count: Math.max(0, daysSinceBreeding(record, today)) })}{record.confirmed_on && <> · {checkText('lastChecked')}: {formatDate(history.find(item => item.result === 'pregnant')?.checked_on || record.confirmed_on)}</>}</p>}
+                {open && !record.confirmed_on && <p className="pc-muted">{checkText('provisional')}</p>}
+                {record.status === 'delivered' && <p className="pc-offspring"><FaBaby />{text('offspringCount')}: {record.offspring_count ?? '—'}{record.offspring_gender && ` · ${text(`gender${record.offspring_gender.charAt(0).toUpperCase() + record.offspring_gender.slice(1)}`)}`}</p>}
+                {(record.notes || record.offspring_details) && <details className="pc-record-notes"><summary>{text('notes')}</summary>{record.notes && <p>{record.notes}</p>}{record.offspring_details && <p>{text('offspringDetails')}: {record.offspring_details}</p>}</details>}
+                {history.length > 0 && <details className="pc-record-notes"><summary>{checkText('history')} ({history.length})</summary>{history.map(item => <p key={item.id}><strong>{formatDate(item.checked_on)} · {checkText(item.result === 'not_pregnant' ? 'notPregnant' : item.result === 'recheck' ? 'checkAgain' : 'pregnant')}</strong>{item.estimated_age_value && <> · {item.estimated_age_value} {checkText(item.estimated_age_unit)}</>}{item.doctor_name && <> · {item.doctor_name}</>}{item.next_check_date && <><br />{checkText('nextCheck')}: {formatDate(item.next_check_date)}</>}{item.notes && <><br />{item.notes}</>}</p>)}</details>}
+                {record.date_corrections?.length > 0 && <details className="pc-record-notes"><summary>{checkText('corrections')}</summary>{record.date_corrections.map((item, index) => <p key={index}>{formatDate(item.previous_mating_date)} → {formatDate(item.mating_date)} · {item.previous_duration} → {item.duration} {checkText('days')}</p>)}</details>}
+                  </div>
+                </details>}
+                <footer>
+                  {open && <div className="pc-record-primary-actions">
+                    <button className="pc-button pc-secondary" aria-label={checkText('recordCheck')} disabled={busy} onClick={() => openForm('check', record)}>{ui('doctorCheck')}</button>
+                    {active && <button className="pc-button pc-primary pc-deliver-button" aria-label={text('markDelivered')} disabled={busy} onClick={() => openForm('delivery', record)}><FaBaby aria-hidden="true" />{ui('recordDeliveryShort')}</button>}
+                  </div>}
+                  <div className="pc-record-utilities">
+                    {open && <button className="pc-icon-button pc-edit-button" aria-label={`${ui('editRecord')}: ${record.animal_name}`} title={ui('editRecord')} disabled={busy} onClick={() => openForm('edit', record)}><FaPen aria-hidden="true" /></button>}
+                    <button className="pc-icon-button pc-delete" aria-label={`${text('delete')}: ${record.animal_name}`} title={text('delete')} disabled={busy} onClick={() => deleteRecord(record)}><FaTrashCan aria-hidden="true" /></button>
+                  </div>
+                </footer>
+              </article>;
+            })}
+            {filtered.length === 0 && <div className="pc-empty pc-panel"><FaCalendarDays /><h3>{records.length ? ui('noMatches') : text('noRecords')}</h3><p>{ui('emptyHint')}</p>{(selectedDate || search || animalFilter) ? <button className="pc-button pc-secondary" onClick={clearFilters}>{ui('clearFilters')}</button> : <button className="pc-button pc-secondary" onClick={() => openForm('add')}>{checkText('recordBreeding')}</button>}</div>}
+          </div>
+          {filtered.length > visibleCount && <button className="pc-button pc-secondary pc-load-more" onClick={() => setVisibleCount(value => value + 6)}>{ui('showMore')}</button>}
+        </section>
+      </div>
+    </>}
 
-export default PregnancyCalendar;
+    {modal && <RecordDialog title={modal.mode === 'check' ? checkText('recordCheck') : modal.mode === 'delivery' ? text('recordDelivery') : modal.mode === 'edit' ? ui('editRecord') : checkText('recordBreeding')} busy={busy} onClose={closeForm} closeLabel={ui('close')}>
+      <form onSubmit={save} className="pc-form">{modal.mode === 'add' && <SavedAnimalPicker onSelect={animal => setForm(previous => ({ ...previous, animal_profile_id: animal.id, animal_type: animal.species, animal_name: animal.name, ear_badge_number: animal.tag || '' }))} />}
+        <fieldset disabled={busy}>
+          {modal.mode === 'check' ? <>
+            <p className="pc-form-animal"><AnimalIcon type={modal.record.animal_type} />{modal.record.animal_name}</p>
+            <p className="pc-muted">{checkText('breedingDate')}: {formatDate(modal.record.mating_date)}</p>
+            <p className="pc-muted">{checkText('anchorHelp')}</p>
+            <div className="pc-form-grid">
+              <Field label={checkText('checkedOn')}><input type="date" required min={modal.record.mating_date} max={today} value={check.checked_on} onChange={event => setCheck({ ...check, checked_on: event.target.value })} /></Field>
+              <Field label={checkText('result')}><select required value={check.result} onChange={event => setCheck({ ...check, result: event.target.value, next_check_date: event.target.value === 'not_pregnant' ? '' : check.next_check_date })}><option value="">{checkText('chooseResult')}</option>{[['pregnant', 'pregnant'], ['not_pregnant', 'notPregnant'], ['recheck', 'checkAgain']].map(([value, key]) => <option key={value} value={value}>{checkText(key)}</option>)}</select></Field>
+            </div>
+            <details className="pc-record-notes"><summary>{checkText('details')}</summary><div className="pc-form-grid">
+              <Field label={checkText('age')}><input type="number" min="0.01" max="1000" step="0.01" value={check.estimated_age_value} onChange={event => setCheck({ ...check, estimated_age_value: event.target.value })} /></Field>
+              <Field label={checkText('ageUnit')}><select value={check.estimated_age_unit} onChange={event => setCheck({ ...check, estimated_age_unit: event.target.value })}>{['days', 'weeks', 'months'].map(unit => <option key={unit} value={unit}>{checkText(unit)}</option>)}</select></Field>
+              {check.result !== 'not_pregnant' && <Field label={checkText('nextCheck')}><input type="date" min={addDays(check.checked_on, 1)} value={check.next_check_date} onChange={event => setCheck({ ...check, next_check_date: event.target.value })} /></Field>}
+              <Field label={checkText('doctor')}><input maxLength="100" value={check.doctor_name} onChange={event => setCheck({ ...check, doctor_name: event.target.value })} /></Field>
+              <Field label={text('notes')} wide><textarea rows="2" maxLength="5000" value={check.notes} onChange={event => setCheck({ ...check, notes: event.target.value })} /></Field>
+            </div></details>
+          </> : modal.mode === 'delivery' ? <>
+            <p className="pc-form-animal"><AnimalIcon type={modal.record.animal_type} />{modal.record.animal_name}</p>
+            <div className="pc-form-grid">
+              <Field label={text('deliveryDate')}><input type="date" required min={modal.record.mating_date} max={today} value={delivery.delivery_date} onChange={event => setDelivery({ ...delivery, delivery_date: event.target.value })} /></Field>
+              <Field label={text('offspringCount')}><input type="number" required min="1" max="100" step="1" value={delivery.offspring_count} onChange={event => setDelivery({ ...delivery, offspring_count: event.target.value })} /></Field>
+              <Field label={text('offspringGender')} wide><select value={delivery.offspring_gender} onChange={event => setDelivery({ ...delivery, offspring_gender: event.target.value })}>{['male', 'female', 'mixed'].map(gender => <option key={gender} value={gender}>{text(`gender${gender.charAt(0).toUpperCase() + gender.slice(1)}`)}</option>)}</select></Field>
+              <Field label={text('detailsOptional')} wide><textarea rows="3" maxLength="5000" placeholder={text('placeholderOffspringDetails')} value={delivery.offspring_details} onChange={event => setDelivery({ ...delivery, offspring_details: event.target.value })} /></Field>
+            </div>
+          </> : <>
+            <div className="pc-form-grid">
+              <Field label={text('animalType')}><select disabled={modal.mode === 'edit'} value={form.animal_type} onChange={event => setForm({ ...form, animal_profile_id: null, animal_type: event.target.value, pregnancy_duration_days: '' })}>{Object.keys(DEFAULT_DURATIONS).map(type => <option key={type} value={type}>{animalName(type)}</option>)}</select></Field>
+              <Field label={text('animalName')}><input required maxLength="100" value={form.animal_name} placeholder={text('placeholderAnimalName')} onChange={event => setForm({ ...form, animal_name: event.target.value })} /></Field>
+              <Field label={text('earBadgeNumber')}><input maxLength="100" value={form.ear_badge_number} placeholder={text('placeholderEarBadge')} onChange={event => setForm({ ...form, ear_badge_number: event.target.value })} /></Field>
+              <Field label={checkText('breedingDate')}><input type="date" required max={today} value={form.mating_date} onChange={event => setForm({ ...form, mating_date: event.target.value })} /></Field>
+              <Field label={checkText('breedingMethod')} wide><select value={form.mating_type} onChange={event => setForm({ ...form, mating_type: event.target.value })}>{['natural', 'artificial_insemination'].map(method => <option key={method} value={method}>{checkText(method)}</option>)}</select></Field>
+              <p className="pc-muted pregnancy-field-wide">{checkText('breedingHelp')}</p>
+              {form.animal_type === 'other' && <Field label={text('customPregnancyDurationDays')} wide><input type="number" min="1" max="1000" step="1" required value={form.pregnancy_duration_days} placeholder={text('placeholderCustomPregnancyDurationDays')} onChange={event => setForm({ ...form, pregnancy_duration_days: event.target.value })} /></Field>}
+              <div className="pc-date-preview pregnancy-field-wide"><span>{text('expectedDelivery')}</span><strong>{expectedDate ? formatDate(expectedDate) : text('enterCustomDurationHint')}</strong><p>{ui('estimateHint')}</p></div>
+              <Field label={text('notes')} wide><textarea rows="3" maxLength="5000" value={form.notes} placeholder={text('placeholderNotes')} onChange={event => setForm({ ...form, notes: event.target.value })} /></Field>
+            </div>
+          </>}
+          {formError && <p className="pc-form-error" role="alert">{formError}</p>}
+          <footer className="pc-form-actions"><button type="button" className="pc-button pc-secondary" onClick={closeForm}>{text('cancel')}</button><button type="submit" className="pc-button pc-primary">{busy ? ui('saving') : modal.mode === 'check' ? checkText('save') : modal.mode === 'delivery' ? text('confirmDelivery') : modal.mode === 'edit' ? ui('saveChanges') : text('addRecord')}</button></footer>
+        </fieldset>
+      </form>
+    </RecordDialog>}
+  </section>;
+}

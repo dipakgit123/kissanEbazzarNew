@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { Toaster } from 'react-hot-toast';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
+import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
 import './i18n/config'; // Initialize i18n
 
@@ -19,7 +20,7 @@ createRoot(document.getElementById('root')).render(
           },
           success: {
             style: {
-              background: '#15BB73',
+              background: '#11744e',
             },
           },
           error: {
@@ -29,7 +30,7 @@ createRoot(document.getElementById('root')).render(
           },
         }}
       />
-      <App />
+      <ErrorBoundary><App /></ErrorBoundary>
     </BrowserRouter>
   </StrictMode>,
 )

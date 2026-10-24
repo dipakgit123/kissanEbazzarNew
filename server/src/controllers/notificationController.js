@@ -2,7 +2,7 @@ const db = require('../models');
 const { Notification, DeviceToken, NotificationPreference } = db;
 const { Op } = require('sequelize');
 const logger = require('../utils/logger');
-const { sendRealtimeNotification } = require('../services/notificationService');
+const { deliverNotification } = require('../services/notificationService');
 
 const getRequestRecipient = (req) => {
   if (req.vet) {
@@ -48,9 +48,15 @@ const buildRecipientPayload = ({ id, type, legacyUserId }) => ({
   recipient_id: id,
 });
 
+const notifyChanged = recipient => global.io?.to(`recipient:${recipient.type}:${recipient.id}`).emit('notifications_changed');
+
 const DEFAULT_PREFERENCES = {
   push_enabled: true,
-  appointments_enabled: true,
+  health_enabled: true,
+  pet_mating_enabled: true,
+  farm_enabled: true, pet_enabled: true,
+  content_enabled: false,
+  milk_reminders_enabled: false,
   marketplace_enabled: true,
   reminders_enabled: true,
   communication_enabled: true,
@@ -117,6 +123,8 @@ const registerToken = async (req, res) => {
       });
     }
 
+    if (device_id) await DeviceToken.update({ is_active: false }, { where: buildRecipientWhere(recipient, { device_id: String(device_id).slice(0, 120), token: { [Op.ne]: token } }) });
+
     res.json({
       success: true,
       message: 'Device token registered successfully',
@@ -160,6 +168,11 @@ const updatePreferences = async (req, res) => {
         }
         updates[field] = req.body[field];
       }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'language')) {
+      if (!['en', 'mr', 'hi'].includes(req.body.language)) return res.status(400).json({ success: false, message: 'Invalid language' });
+      updates.language = req.body.language;
     }
 
     if (Object.keys(updates).length === 0) {
@@ -247,22 +260,16 @@ const sendTestNotification = async (req, res) => {
       where: buildRecipientWhere(recipient, { is_active: true }),
     });
 
-    const sent = await sendRealtimeNotification(
-      recipient.id,
-      title,
-      body,
-      {
-        type: 'test_notification',
-        source: 'local_test',
-        sentAt: new Date().toISOString(),
-      },
-      db,
-      recipient.type
-    );
+    const result = await deliverNotification({
+      db, recipientId: recipient.id, recipientType: recipient.type, title, body,
+      type: 'test_notification', data: { type: 'test_notification', source: 'local_test', sentAt: new Date().toISOString() },
+    });
 
     res.json({
-      success: sent,
-      message: sent ? 'Test notification sent' : 'Test notification could not be sent',
+      success: Boolean(result.stored),
+      queued: Boolean(result.queued),
+      suppressed: Boolean(result.suppressed),
+      message: result.queued ? 'Saved and queued; device delivery is pending' : result.stored ? 'Saved in inbox; push is disabled' : 'Notifications are disabled for this account or category',
       active_token_count: activeTokenCount,
     });
   } catch (error) {
@@ -290,7 +297,7 @@ const getNotifications = async (req, res) => {
 
     const notifications = await Notification.findAndCountAll({
       where: buildRecipientWhere(recipient),
-      order: [['created_at', 'DESC']],
+      order: [['created_at', 'DESC'], ['id', 'DESC']],
       limit,
       offset,
     });
@@ -358,6 +365,7 @@ const markAsRead = async (req, res) => {
     }
 
     await notification.update({ is_read: true });
+    notifyChanged(recipient);
 
     res.json({
       success: true,
@@ -384,6 +392,7 @@ const markAllAsRead = async (req, res) => {
       { where: buildRecipientWhere(recipient, { is_read: false }) }
     );
 
+    notifyChanged(recipient);
     res.json({
       success: true,
       message: 'All notifications marked as read',
@@ -417,6 +426,7 @@ const deleteNotification = async (req, res) => {
     }
 
     await notification.destroy();
+    notifyChanged(recipient);
 
     res.json({
       success: true,
@@ -442,6 +452,7 @@ const clearAllNotifications = async (req, res) => {
       where: buildRecipientWhere(recipient),
     });
 
+    notifyChanged(recipient);
     res.json({
       success: true,
       message: 'All notifications cleared',

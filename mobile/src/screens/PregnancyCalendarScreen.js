@@ -1,3 +1,6 @@
+import SavedAnimalPicker from '../components/SavedAnimalPicker';
+import { allowedSpecies, getAnimalGroup } from '../utils/animalExperience';
+import { notificationText } from '../utils/notificationUi';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -20,6 +23,8 @@ import AppHeader from '../components/AppHeader';
 import FeatureHelpModal from '../components/FeatureHelpModal';
 import { getLocalizedFeatureHelp } from '../constants/featureHelp';
 import { pregnancyService } from '../services/api';
+import PregnancyCheckDialog from '../components/PregnancyCheckDialog';
+import { dateOnly, dayDifference, openBreeding, businessToday, remainingDays, elapsedDays } from '../utils/pregnancyDates';
 import { COLORS } from '../utils/constants';
 
 const DURATION_META = {
@@ -40,17 +45,12 @@ const DEFAULT_STATS = {
   total_records: 0,
 };
 
-const getDateOnlyValue = (date) => {
-  if (!date) return '';
-  const normalizedDate = new Date(date);
-  normalizedDate.setHours(0, 0, 0, 0);
-  return normalizedDate.toISOString().split('T')[0];
-};
+const getDateOnlyValue = (date) => date ? dateOnly(new Date(date)) : '';
 
 const formatDisplayDate = (dateString, localeCode = 'en-IN') => {
   if (!dateString) return '';
 
-  const parsedDate = new Date(dateString);
+  const parsedDate = new Date(typeof dateString === 'string' && dateString.length === 10 ? `${dateString}T12:00:00` : dateString);
 
   if (Number.isNaN(parsedDate.getTime())) {
     return '';
@@ -69,7 +69,7 @@ const getMonthTitle = (date, localeCode = 'en-IN') =>
     year: 'numeric',
   });
 
-const PregnancyCalendarScreen = ({ navigation }) => {
+const PregnancyCalendarScreen = ({ navigation, route }) => {
   const { t, ready, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
   const localeCode = i18n.language?.startsWith('hi')
@@ -88,6 +88,10 @@ const PregnancyCalendarScreen = ({ navigation }) => {
   const [error, setError] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  const [checkRecord, setCheckRecord] = useState(null);
+  const [historyRecord, setHistoryRecord] = useState(null);
+  const [today, setToday] = useState(businessToday);
+  useEffect(() => { const timer = setInterval(() => setToday(businessToday(pregnancyRecords[0]?.calculation_timezone)), 60000); return () => clearInterval(timer); }, [pregnancyRecords]);
   const [helpVisible, setHelpVisible] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
@@ -95,16 +99,17 @@ const PregnancyCalendarScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('active');
 
   const [formData, setFormData] = useState({
-    animal_type: 'cow',
+    animal_type: getAnimalGroup() === 'pet' ? 'dog' : 'cow',
     animal_name: '',
     ear_badge_number: '',
     pregnancy_duration_days: '',
-    mating_date: getDateOnlyValue(new Date()),
+    mating_date: businessToday(),
+    mating_type: 'natural',
     notes: '',
   });
 
   const [deliveryData, setDeliveryData] = useState({
-    delivery_date: getDateOnlyValue(new Date()),
+    delivery_date: businessToday(),
     offspring_count: '1',
     offspring_gender: 'male',
     offspring_details: '',
@@ -157,7 +162,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+  }, [loadData, route?.params?.recordId]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -167,18 +172,18 @@ const PregnancyCalendarScreen = ({ navigation }) => {
 
   const resetAddForm = useCallback(() => {
     setFormData({
-      animal_type: 'cow',
+      animal_type: getAnimalGroup() === 'pet' ? 'dog' : 'cow',
       animal_name: '',
       ear_badge_number: '',
       pregnancy_duration_days: '',
-      mating_date: getDateOnlyValue(new Date()),
+      mating_date: businessToday(),
       notes: '',
     });
   }, []);
 
   const resetDeliveryForm = useCallback(() => {
     setDeliveryData({
-      delivery_date: getDateOnlyValue(new Date()),
+      delivery_date: businessToday(),
       offspring_count: '1',
       offspring_gender: 'male',
       offspring_details: '',
@@ -280,7 +285,9 @@ const PregnancyCalendarScreen = ({ navigation }) => {
         },
       };
 
-      return config[status] || config.pregnant;
+      if (status === 'pending_confirmation') return { backgroundColor: '#FEF3C7', textColor: '#92400E', label: t('pregnancyCheck.pending') };
+      if (status === 'not_pregnant') return { backgroundColor: '#E5E7EB', textColor: '#4B5563', label: t('pregnancyCheck.notPregnant') };
+      return config[status] || { backgroundColor: '#E5E7EB', textColor: '#4B5563', label: t('pregnancyCheck.unknown') };
     },
     [t]
   );
@@ -301,48 +308,8 @@ const PregnancyCalendarScreen = ({ navigation }) => {
     [getDurationDays]
   );
 
-  const getRecordProgress = useCallback(
-    (record) => {
-      if (record?.status !== 'pregnant') {
-        return 100;
-      }
-
-      const progressPercentage = Number(record?.progress_percentage);
-
-      if (Number.isFinite(progressPercentage)) {
-        return Math.min(100, Math.max(0, Math.round(progressPercentage)));
-      }
-
-      const totalDays = getRecordDurationDays(record);
-      const matingDate = new Date(record.mating_date);
-      const today = new Date();
-      const daysPassed = Math.floor(
-        (today - matingDate) / (1000 * 60 * 60 * 24)
-      );
-
-      return Math.min(100, Math.max(0, Math.round((daysPassed / totalDays) * 100)));
-    },
-    [getRecordDurationDays]
-  );
-
-  const getDaysRemaining = useCallback((record) => {
-    if (record?.status !== 'pregnant') {
-      return 0;
-    }
-
-    const providedDaysRemaining = Number(record?.days_remaining);
-
-    if (Number.isFinite(providedDaysRemaining)) {
-      return Math.max(0, providedDaysRemaining);
-    }
-
-    const expectedDate = new Date(record.expected_delivery_date);
-    const today = new Date();
-    return Math.max(
-      0,
-      Math.ceil((expectedDate - today) / (1000 * 60 * 60 * 24))
-    );
-  }, []);
+  const getRecordProgress = (record) => openBreeding(record) ? Math.min(100, Math.max(0, Math.round(elapsedDays(record, today) / getRecordDurationDays(record) * 100))) : 100;
+  const getDaysRemaining = (record) => openBreeding(record) ? remainingDays(record, today) : 0;
 
   const getDaysInMonth = (date) =>
     new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -351,8 +318,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
     new Date(date.getFullYear(), date.getMonth(), 1).getDay();
 
   const navigateMonth = (direction) => {
-    const nextMonth = new Date(currentMonth);
-    nextMonth.setMonth(nextMonth.getMonth() + direction);
+    const nextMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + direction, 1);
     setCurrentMonth(nextMonth);
   };
 
@@ -363,10 +329,11 @@ const PregnancyCalendarScreen = ({ navigation }) => {
       const dateValue = getDateOnlyValue(date);
 
       return pregnancyRecords.filter((record) => {
+        if (record.status === 'pending_confirmation') return record.mating_date === dateValue || record.next_check_date === dateValue;
         if (record.status === 'pregnant') {
           return (
             dateValue >= record.mating_date &&
-            dateValue <= record.expected_delivery_date
+            dateValue <= (record.expected_delivery_date < today ? today : record.expected_delivery_date)
           );
         }
 
@@ -377,7 +344,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
         return false;
       });
     },
-    [pregnancyRecords]
+    [pregnancyRecords, today]
   );
 
   const isDueDate = useCallback(
@@ -394,7 +361,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
 
   const getFilteredRecords = useCallback(() => {
     if (activeTab === 'active') {
-      return pregnancyRecords.filter((record) => record.status === 'pregnant');
+      return pregnancyRecords.filter(openBreeding);
     }
 
     if (activeTab === 'delivered') {
@@ -408,7 +375,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
     const records = getRecordsForDate(selectedDate);
 
     if (activeTab === 'active') {
-      return records.filter((record) => record.status === 'pregnant');
+      return records.filter(openBreeding);
     }
 
     if (activeTab === 'delivered') {
@@ -446,7 +413,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
 
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
 
-    if (!dateRegex.test(formData.mating_date)) {
+    if (!dateRegex.test(formData.mating_date) || !Number.isFinite(dayDifference(formData.mating_date, today)) || formData.mating_date > today) {
       Alert.alert(t('common.error'), t('pregnancy.invalidDateFormat'));
       return;
     }
@@ -469,6 +436,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
 
     try {
       const payload = {
+        animal_profile_id: formData.animal_profile_id || null,
         animal_type: formData.animal_type,
         animal_name: formData.animal_name.trim(),
         ear_badge_number: formData.ear_badge_number.trim() || null,
@@ -477,6 +445,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
             ? Number(formData.pregnancy_duration_days)
             : null,
         mating_date: formData.mating_date,
+        mating_type: formData.mating_type,
         notes: formData.notes.trim() || null,
       };
 
@@ -485,6 +454,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
       if (response?.success) {
         Alert.alert(t('common.success'), t('pregnancy.recordCreated'));
         setShowAddModal(false);
+        setActiveTab('active');
         resetAddForm();
         await loadData();
       } else {
@@ -576,7 +546,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
     setSelectedRecord(record);
     setDeliveryData((current) => ({
       ...current,
-      delivery_date: getDateOnlyValue(new Date()),
+      delivery_date: businessToday(),
     }));
     setShowDeliveryModal(true);
   };
@@ -628,6 +598,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
     const progress = getRecordProgress(record);
     const progressColor = getProgressColor(daysRemaining, totalDays);
     const statusConfig = getStatusConfig(record.status);
+    if (record.status === 'pregnant') statusConfig.label = t(record.confirmed_on ? 'pregnancyCheck.confirmed' : 'pregnancyCheck.legacy');
 
     return (
       <View key={record.id} style={styles.recordCard}>
@@ -673,7 +644,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
 
         <View style={styles.detailGrid}>
           <View style={styles.detailTile}>
-            <Text style={styles.detailTileLabel}>{t('pregnancy.matingDate')}</Text>
+            <Text style={styles.detailTileLabel}>{t('pregnancyCheck.breedingDate')}</Text>
               <Text style={styles.detailTileValue}>
               {formatDisplayDate(record.mating_date, localeCode)}
             </Text>
@@ -707,7 +678,11 @@ const PregnancyCalendarScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {record.status === 'pregnant' ? (
+        {openBreeding(record) && <Text style={styles.sectionSubtitle}>{t('pregnancyCheck.elapsed', { count: Math.max(0, elapsedDays(record, today)) })}</Text>}
+        {openBreeding(record) && !record.confirmed_on && <Text style={styles.sectionSubtitle}>{t('pregnancyCheck.provisional')}</Text>}
+        {openBreeding(record) && record.last_check_result === 'recheck' && <Text style={styles.sectionSubtitle}>{t('pregnancyCheck.recheck')}</Text>}
+        {openBreeding(record) && record.next_check_date && <Text style={styles.sectionSubtitle}>{t('pregnancyCheck.nextCheck')}: {formatDisplayDate(record.next_check_date, localeCode)}</Text>}
+        {openBreeding(record) ? (
           <>
             <View style={styles.progressHeader}>
               <Text style={styles.progressLabel}>{t('pregnancy.progress')}</Text>
@@ -730,10 +705,10 @@ const PregnancyCalendarScreen = ({ navigation }) => {
 
             <View style={styles.remainingBanner}>
               <Text style={styles.remainingBannerLabel}>
-                {t('pregnancy.daysRemaining')}
+                {t(daysRemaining < 0 ? 'pregnancyCheck.passed' : 'pregnancyCheck.remaining', { count: Math.abs(daysRemaining) })}
               </Text>
               <Text style={styles.remainingBannerValue}>
-                {daysRemaining} {t('pregnancy.days')}
+                {Math.abs(daysRemaining)} {t('pregnancy.days')}
               </Text>
             </View>
           </>
@@ -762,6 +737,9 @@ const PregnancyCalendarScreen = ({ navigation }) => {
           </View>
         ) : null}
 
+        {(record.checkups || []).length > 0 && <TouchableOpacity onPress={() => setHistoryRecord(historyRecord === record.id ? null : record.id)}><Text style={styles.inputLabel}>{t('pregnancyCheck.history')} ({record.checkups.length})</Text></TouchableOpacity>}
+        {historyRecord === record.id && [...(record.checkups || [])].sort((a, b) => b.checked_on.localeCompare(a.checked_on) || b.id - a.id).map(check => <View key={check.id} style={styles.notesBox}><Text style={styles.notesLabel}>{formatDisplayDate(check.checked_on, localeCode)} · {t('pregnancyCheck.' + (check.result === 'not_pregnant' ? 'notPregnant' : check.result === 'recheck' ? 'checkAgain' : 'pregnant'))}</Text>{check.estimated_age_value && <Text style={styles.notesText}>{check.estimated_age_value} {t('pregnancyCheck.' + check.estimated_age_unit)}</Text>}{check.doctor_name && <Text style={styles.notesText}>{check.doctor_name}</Text>}{check.notes && <Text style={styles.notesText}>{check.notes}</Text>}</View>)}
+        {showActions && openBreeding(record) && <TouchableOpacity style={styles.secondaryModalButton} onPress={() => setCheckRecord(record)}><Text style={styles.secondaryModalButtonText}>{t('pregnancyCheck.recordCheck')}</Text></TouchableOpacity>}
         {showActions && record.status === 'pregnant' ? (
           <View style={styles.recordActions}>
             <TouchableOpacity
@@ -926,6 +904,12 @@ const PregnancyCalendarScreen = ({ navigation }) => {
           />
         }
       >
+        {route?.params?.recordId && <View style={styles.sectionCard}>
+          <TouchableOpacity onPress={() => navigation.setParams({ recordId: undefined })}><Text style={styles.inputLabel}>{t('common.close', { defaultValue: 'Close' })}</Text></TouchableOpacity>
+          {pregnancyRecords.find(record => String(record.id) === String(route.params.recordId))
+            ? renderRecordCard(pregnancyRecords.find(record => String(record.id) === String(route.params.recordId)))
+            : <Text>{notificationText(i18n.language)('unavailable')}</Text>}
+        </View>}
         {error ? (
           <View style={styles.errorBanner}>
             <Ionicons name="alert-circle-outline" size={18} color="#B91C1C" />
@@ -982,7 +966,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.referenceChipRow}
           >
-            {animalTypes.map((animal) => {
+            {animalTypes.filter(animal => allowedSpecies(animal.key)).map((animal) => {
               const durationDays = getDurationDays(animal.key);
               const monthMeta = DURATION_META[animal.key]?.months;
               const durationText =
@@ -1215,6 +1199,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
             </View>
           </View>
 
+          {(stats.pending_confirmation > 0 || stats.confirmation_unrecorded > 0) && <Text style={styles.sectionSubtitle}>{t('pregnancyCheck.waitingCount', { count: stats.pending_confirmation || 0 })}{stats.confirmation_unrecorded > 0 ? ' · ' + t('pregnancyCheck.legacyCount', { count: stats.confirmation_unrecorded }) : ''}</Text>}
           {filteredRecords.length > 0 ? (
             <View style={styles.recordList}>
               {filteredRecords.map((record) => renderRecordCard(record))}
@@ -1276,6 +1261,8 @@ const PregnancyCalendarScreen = ({ navigation }) => {
         ) : null}
       </ScrollView>
 
+      {checkRecord && <PregnancyCheckDialog record={checkRecord} styles={styles} onClose={() => setCheckRecord(null)} onSaved={() => { setCheckRecord(null); loadData(); }} />}
+
       <FeatureHelpModal
         visible={helpVisible}
         onClose={() => setHelpVisible(false)}
@@ -1299,9 +1286,10 @@ const PregnancyCalendarScreen = ({ navigation }) => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
-              <View>
+              
+<View>
                 <Text style={styles.modalTitle}>
-                  {t('pregnancy.addPregnancyRecord')}
+                  {t('pregnancyCheck.recordBreeding')}
                 </Text>
                 <Text style={styles.modalSubtitle}>
                   {t('pregnancy.pageDescription', {
@@ -1329,13 +1317,14 @@ const PregnancyCalendarScreen = ({ navigation }) => {
               contentContainerStyle={styles.modalContent}
               showsVerticalScrollIndicator={false}
             >
+<SavedAnimalPicker onSelect={animal => setFormData(previous => ({ ...previous, animal_profile_id: animal.id, animal_type: animal.species, animal_name: animal.name, ear_badge_number: animal.tag || '' }))} />
               <Text style={styles.inputLabel}>{t('pregnancy.animalType')}</Text>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.typeChipRow}
               >
-                {animalTypes.map((animal) => (
+                {animalTypes.filter(animal => allowedSpecies(animal.key)).map((animal) => (
                   <TouchableOpacity
                     key={animal.key}
                     style={[
@@ -1345,7 +1334,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
                     onPress={() =>
                       setFormData((current) => ({
                         ...current,
-                        animal_type: animal.key,
+                        animal_profile_id: null, animal_type: animal.key,
                         pregnancy_duration_days:
                           animal.key === 'other'
                             ? current.pregnancy_duration_days
@@ -1432,7 +1421,7 @@ const PregnancyCalendarScreen = ({ navigation }) => {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>{t('pregnancy.matingDate')}</Text>
+                <Text style={styles.inputLabel}>{t('pregnancyCheck.breedingDate')}</Text>
                 <TextInput
                   style={styles.input}
                   value={formData.mating_date}
@@ -1447,6 +1436,9 @@ const PregnancyCalendarScreen = ({ navigation }) => {
                 />
               </View>
 
+              <Text style={styles.inputLabel}>{t('pregnancyCheck.breedingMethod')}</Text>
+              <View style={styles.typeChipRow}>{['natural', 'artificial_insemination'].map(method => <TouchableOpacity key={method} style={[styles.typeChip, formData.mating_type === method && styles.typeChipActive]} onPress={() => setFormData(current => ({ ...current, mating_type: method }))}><Text style={styles.typeChipText}>{t('pregnancyCheck.' + method)}</Text></TouchableOpacity>)}</View>
+              <Text style={styles.sectionSubtitle}>{t('pregnancyCheck.breedingHelp')}</Text>
               <View style={styles.infoBanner}>
                 <Ionicons
                   name="information-circle-outline"

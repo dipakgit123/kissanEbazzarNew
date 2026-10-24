@@ -1,3 +1,4 @@
+import VetAnimalGroupPicker from '../components/VetAnimalGroupPicker';
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, Image, Dimensions, Platform, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,7 +21,7 @@ const VetRegistrationScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
   const [formData, setFormData] = useState({
-    full_name: '', phone_number: '', email: '', specialization: 'general', experience_years: '',
+    full_name: '', phone_number: '', email: '', specialization: 'general', animal_groups: [], experience_years: '',
     qualification: 'BVSc', services: [], consultation_fee: '', emergency_available: false,
     license_number: '', clinic_name: '', clinic_address: '', latitude: '', longitude: '',
     city: '', state: '', pincode: ''
@@ -29,13 +30,7 @@ const VetRegistrationScreen = ({ navigation }) => {
   const [errors, setErrors] = useState({});
 
   // Show loading while translations are loading
-  if (!ready) {
-    return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <SkeletonLoader variant="detail" />
-      </View>
-    );
-  }
+  
 
   const specializations = [
     { value: 'general', label: t('vetRegistration.specializations.general') || 'General Practice' },
@@ -230,6 +225,14 @@ const VetRegistrationScreen = ({ navigation }) => {
     }
   };
 
+  if (!ready) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <SkeletonLoader variant="detail" />
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
@@ -264,7 +267,8 @@ const VetRegistrationScreen = ({ navigation }) => {
         ))}
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}><VetAnimalGroupPicker value={formData.animal_groups} onChange={value => setFormData(previous => ({ ...previous, animal_groups: value }))} />
+
         <View style={styles.stepContainer}>
           {step === 1 && (
             <>

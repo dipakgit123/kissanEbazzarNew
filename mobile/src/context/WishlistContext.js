@@ -1,204 +1,98 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import { getAnimalGroup } from '../utils/animalExperience';
+import React, { createContext, useState, useContext, useEffect, useRef, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { wishlistService } from '../services/api';
+import { useAuth } from './AuthContext';
 
 const WishlistContext = createContext();
-
-const isUnauthorizedError = (error) => (
-    error?.response?.status === 401 ||
-    error?.status === 401 ||
-    error?.message === 'Invalid token' ||
-    error?.message?.toLowerCase?.().includes('unauthorized')
-);
+const typeOf = item => String(item.animal_type || item.animalType || 'cow').toLowerCase();
+const matches = (item, id, type) => Number(item.animal_id ?? item.id) === Number(id) && typeOf(item) === String(type || '').toLowerCase();
 
 export const WishlistProvider = ({ children }) => {
-    const [wishlist, setWishlist] = useState([]);
-    const [loading, setLoading] = useState(true);
+  const { user, token, loading: authLoading } = useAuth();
+  const [wishlist, setWishlist] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const generation = useRef(0);
+  const account = useRef(token);
+  account.current = token;
+  const cacheKey = (token && user?.id ? 'wishlist:user:' + user.id : 'wishlist:guest') + ':' + (getAnimalGroup() || 'farm');
 
-    // Load wishlist from backend on mount
-    useEffect(() => {
-        loadWishlist();
-    }, []);
-
-    const loadWishlist = async () => {
+  const loadWishlist = useCallback(async () => {
+    const request = ++generation.current;
+    setLoading(true);
+    try {
+      let items;
+      if (token) {
+        const response = await wishlistService.getWishlist();
+        items = response.wishlist || [];
+      } else {
+        const saved = await AsyncStorage.getItem(cacheKey);
+        items = saved ? JSON.parse(saved) : [];
+      }
+      if (request === generation.current && account.current === token) {
+        setWishlist(Array.isArray(items) ? items : []);
+        await AsyncStorage.setItem(cacheKey, JSON.stringify(Array.isArray(items) ? items : []));
+      }
+    } catch (error) {
+      if (request === generation.current && account.current === token) {
         try {
-            setLoading(true);
-            const token = await AsyncStorage.getItem('token');
-            
-            if (!token) {
-                // User not logged in, load from local storage
-                const savedWishlist = await AsyncStorage.getItem('wishlist');
-                if (savedWishlist) {
-                    setWishlist(JSON.parse(savedWishlist));
-                }
-            } else {
-                // User logged in, fetch from backend
-                const response = await wishlistService.getWishlist();
-                if (response.success) {
-                    setWishlist(response.wishlist || []);
-                }
-            }
-        } catch (error) {
-            if (!isUnauthorizedError(error)) {
-                console.error('Error loading wishlist:', error);
-            }
-            // Fallback to local storage on error
-            try {
-                const savedWishlist = await AsyncStorage.getItem('wishlist');
-                if (savedWishlist) {
-                    setWishlist(JSON.parse(savedWishlist));
-                }
-            } catch (e) {
-                console.error('Error loading local wishlist:', e);
-            }
-        } finally {
-            setLoading(false);
+          const saved = await AsyncStorage.getItem(cacheKey);
+          const items = saved ? JSON.parse(saved) : [];
+          if (request === generation.current && account.current === token) setWishlist(Array.isArray(items) ? items : []);
+        } catch {
+          if (request === generation.current && account.current === token) setWishlist([]);
         }
-    };
-
-    const addToWishlist = async (animal) => {
-        try {
-            const token = await AsyncStorage.getItem('token');
-            
-            // Determine animal type from the object
-            let animalType = animal.animal_type || animal.animalType;
-            
-            // If not present, try to infer from category or default to 'cow'
-            if (!animalType) {
-                if (animal.category) {
-                    animalType = animal.category.toLowerCase();
-                } else {
-                    // Map from breed or other fields
-                    animalType = 'cow'; // default
-                }
-            }
-            
-            const animalId = animal.id;
-
-            if (!token) {
-                // User not logged in, save to local storage
-                const exists = wishlist.find(item => item.id === animalId);
-                if (exists) {
-                    console.log('Animal already in wishlist');
-                    return { success: false, message: 'Already in wishlist' };
-                }
-
-                const newWishlist = [...wishlist, { ...animal, addedAt: new Date().toISOString() }];
-                setWishlist(newWishlist);
-                await AsyncStorage.setItem('wishlist', JSON.stringify(newWishlist));
-                console.log('Added to wishlist (local):', animal.breed_name || animal.title);
-                return { success: true, message: 'Added to wishlist' };
-            }
-
-            // User logged in, save to backend
-            const response = await wishlistService.addToWishlist(animalType, animalId);
-            
-            if (response.success) {
-                // Reload wishlist from backend
-                await loadWishlist();
-                console.log('Added to wishlist (backend):', animal.breed_name || animal.title);
-            }
-            
-            return response;
-        } catch (error) {
-            if (!isUnauthorizedError(error)) {
-                console.error('Error adding to wishlist:', error);
-            }
-            return { success: false, message: error.message };
-        }
-    };
-
-    const removeFromWishlist = async (animalId, animalType = null) => {
-        try {
-            const token = await AsyncStorage.getItem('token');
-
-            if (!token) {
-                // User not logged in, remove from local storage
-                const newWishlist = wishlist.filter(item => item.id !== animalId);
-                setWishlist(newWishlist);
-                await AsyncStorage.setItem('wishlist', JSON.stringify(newWishlist));
-                console.log('Removed from wishlist (local)');
-                return { success: true };
-            }
-
-            // User logged in, remove from backend
-            // Find animal type from wishlist if not provided
-            if (!animalType) {
-                const item = wishlist.find(w => w.animal_id === animalId || w.id === animalId);
-                animalType = item?.animal_type || item?.animalType || 'cow';
-                console.log('🔍 Animal type lookup:', { animalId, found: !!item, animalType });
-                console.log('🔍 Wishlist item:', JSON.stringify(item));
-            }
-
-            console.log('📤 Removing from wishlist:', { animalType, animalId });
-            const response = await wishlistService.removeFromWishlist(animalType, animalId);
-            
-            if (response.success) {
-                // Reload wishlist from backend
-                await loadWishlist();
-                console.log('Removed from wishlist (backend)');
-            }
-            
-            return response;
-        } catch (error) {
-            if (!isUnauthorizedError(error)) {
-                console.error('Error removing from wishlist:', error);
-            }
-            return { success: false, message: error.message };
-        }
-    };
-
-    const isInWishlist = (animalId) => {
-        return wishlist.some(item => item.id === animalId || item.animal_id === animalId);
-    };
-
-    const clearWishlist = async () => {
-        try {
-            const token = await AsyncStorage.getItem('token');
-
-            if (!token) {
-                // User not logged in, clear local storage
-                setWishlist([]);
-                await AsyncStorage.removeItem('wishlist');
-                return { success: true };
-            }
-
-            // User logged in, clear from backend
-            const response = await wishlistService.clearWishlist();
-            
-            if (response.success) {
-                setWishlist([]);
-            }
-            
-            return response;
-        } catch (error) {
-            if (!isUnauthorizedError(error)) {
-                console.error('Error clearing wishlist:', error);
-            }
-            return { success: false, message: error.message };
-        }
-    };
-
-    return (
-        <WishlistContext.Provider
-            value={{
-                wishlist,
-                addToWishlist,
-                removeFromWishlist,
-                isInWishlist,
-                clearWishlist,
-                loading,
-            }}
-        >
-            {children}
-        </WishlistContext.Provider>
-    );
-};
-
-export const useWishlist = () => {
-    const context = useContext(WishlistContext);
-    if (!context) {
-        throw new Error('useWishlist must be used within a WishlistProvider');
+      }
+    } finally {
+      if (request === generation.current) setLoading(false);
     }
-    return context;
+  }, [token, cacheKey]);
+
+  useEffect(() => {
+    setWishlist([]);
+    if (!authLoading) loadWishlist();
+    return () => { generation.current += 1; };
+  }, [token, user?.id, authLoading, loadWishlist]);
+
+  const saveLocal = async items => {
+    setWishlist(items);
+    await AsyncStorage.setItem(cacheKey, JSON.stringify(items));
+    return { success: true };
+  };
+  const addToWishlist = async animal => {
+    const type = typeOf(animal);
+    const id = animal.animal_id ?? animal.id;
+    try {
+      if (!token) {
+        if (wishlist.some(item => matches(item, id, type))) return { success: true };
+        return saveLocal([...wishlist, { ...animal, animal_type: type, addedAt: new Date().toISOString() }]);
+      }
+      const result = await wishlistService.addToWishlist(type, id);
+      if (result.success && account.current === token) await loadWishlist();
+      return result;
+    } catch (error) { return { success: false, message: error.message }; }
+  };
+  const removeFromWishlist = async (id, type) => {
+    if (!type) return { success: false, message: 'Animal type is required' };
+    try {
+      if (!token) return saveLocal(wishlist.filter(item => !matches(item, id, type)));
+      const result = await wishlistService.removeFromWishlist(String(type).toLowerCase(), id);
+      if (result.success && account.current === token) await loadWishlist();
+      return result;
+    } catch (error) { return { success: false, message: error.message }; }
+  };
+  const clearWishlist = async () => {
+    try {
+      if (token) await wishlistService.clearWishlist();
+      if (account.current === token) return saveLocal([]);
+      return { success: true };
+    } catch (error) { return { success: false, message: error.message }; }
+  };
+  const isInWishlist = (id, type) => wishlist.some(item => matches(item, id, type));
+  return <WishlistContext.Provider value={{ wishlist, loading, addToWishlist, removeFromWishlist, clearWishlist, isInWishlist }}>{children}</WishlistContext.Provider>;
+};
+export const useWishlist = () => {
+  const value = useContext(WishlistContext);
+  if (!value) throw new Error('useWishlist must be used within WishlistProvider');
+  return value;
 };

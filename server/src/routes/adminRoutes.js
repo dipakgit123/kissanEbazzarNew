@@ -102,6 +102,23 @@ router.patch('/pet-mating/:id/status', petMatingController.adminUpdateStatus.bin
 
 // Veterinarian Management
 const veterinarianController = require('../controllers/veterinarianController');
+router.get('/veterinarians/:id/documents/:type', async (req, res) => {
+  try {
+    if (!['license_document', 'degree_certificate', 'aadhar_document'].includes(req.params.type)) return res.status(400).json({ success: false, message: 'Invalid document type' });
+    const vet = await require('../models').Veterinarian.findByPk(req.params.id);
+    const key = vet?.[req.params.type + '_public_id'];
+    if (!key) return res.status(404).json({ success: false, message: 'Document not found' });
+    const object = await require('../config/cloudinary').readStoredDocument(key);
+    res.set('Cache-Control', 'private, no-store');
+    res.set('Content-Type', object.ContentType || 'application/octet-stream');
+    res.set('Content-Disposition', 'inline');
+    object.Body.on('error', () => res.destroy());
+    object.Body.pipe(res);
+  } catch (error) {
+    res.status(503).json({ success: false, message: 'Document is temporarily unavailable' });
+  }
+});
+
 router.get('/veterinarians/stats', veterinarianController.getStats);
 router.get('/veterinarians/pending', veterinarianController.getPendingVerifications);
 router.get('/veterinarians', veterinarianController.getAllForAdmin);

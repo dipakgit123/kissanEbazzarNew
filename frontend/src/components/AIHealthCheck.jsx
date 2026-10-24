@@ -1,9 +1,11 @@
-import React, { useMemo, useRef, useState } from 'react';
+import { allowedSpecies } from '../utils/animalExperience';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { API_BASE_URL } from '../config/api';
+import HealthReportTools from './HealthReportTools';
+import { healthRequest } from '../services/healthReports';
+import { checkedHealthResult, healthError, healthText, urgencyCode } from '../utils/healthReport';
 
-const API_URL = API_BASE_URL;
-const MAX_AI_HEALTH_IMAGE_SIZE_BYTES = 25 * 1024 * 1024;
+const MAX_AI_HEALTH_IMAGE_SIZE_BYTES = 8 * 1024 * 1024;
 const TARGET_AI_HEALTH_UPLOAD_BYTES = 800 * 1024;
 const MAX_AI_HEALTH_IMAGE_DIMENSION = 1600;
 
@@ -175,7 +177,8 @@ const AIHealthCheck = () => {
     { id: 'other', name: t('animalTypes.other') }
   ]), [t]);
 
-  const [selectedAnimal, setSelectedAnimal] = useState(null);
+  const linkedAnimal = new URLSearchParams(window.location.search);
+  const [selectedAnimal, setSelectedAnimal] = useState(() => allowedSpecies(linkedAnimal.get('species')) ? linkedAnimal.get('species') : null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [symptoms, setSymptoms] = useState('');
@@ -186,6 +189,15 @@ const AIHealthCheck = () => {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [customPrompt, setCustomPrompt] = useState('');
+  const [report, setReport] = useState(null);
+  const c = healthText(i18n.language);
+  const imageVersion = useRef(0);
+  const requestVersion = useRef(0);
+  const uploadKey = useRef(null);
+  useEffect(() => () => { imageVersion.current++; requestVersion.current++; }, []);
+  useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
+  const openReport = next => { setResult(checkedHealthResult(next.analysis)); setReport(next.id && next.context ? next : null); };
+  const changeSpecies = species => setSelectedAnimal(species);
   const fileInputRef = useRef(null);
 
   const selectedAnimalMeta = animalTypes.find((animal) => animal.id === selectedAnimal);
@@ -207,15 +219,16 @@ const AIHealthCheck = () => {
   }, [result?.questionError, result?.questionErrorCode, t]);
 
   const setImageForAnalysis = async (file) => {
-    if (!file) return;
+    if (!file || loading || preparingImage) return;
+    const version = ++imageVersion.current;
 
-    if (!file.type.startsWith('image/')) {
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
       setError(t('healthCheck.errorImageFile'));
       return;
     }
 
     if (file.size > MAX_AI_HEALTH_IMAGE_SIZE_BYTES) {
-      setError(t('healthCheck.errorFileSize'));
+      setError(c('photo'));
       return;
     }
 
@@ -224,6 +237,7 @@ const AIHealthCheck = () => {
 
     try {
       const optimizedFile = await optimizeImageForUpload(file);
+      if (version !== imageVersion.current) return;
       setSelectedFile(optimizedFile);
       setPreviewUrl((currentUrl) => {
         if (currentUrl) {
@@ -250,6 +264,7 @@ const AIHealthCheck = () => {
   };
 
   const removeImage = () => {
+    imageVersion.current++;
     setSelectedFile(null);
     setPreviewUrl((currentUrl) => {
       if (currentUrl) {
@@ -270,50 +285,25 @@ const AIHealthCheck = () => {
     setError(null);
     setResult(null);
 
+    const version = ++requestVersion.current;
     try {
       const formData = new FormData();
       formData.append('image', selectedFile);
-      formData.append('animalType', selectedAnimal);
-      formData.append('symptoms', symptoms);
-      formData.append('age', age);
-      formData.append('additionalInfo', additionalInfo);
-      formData.append('customQuestion', customPrompt);
-      formData.append('languageHint', i18n.language);
-
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/api/health-check/upload-and-analyze`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData
-      });
-
-      const contentType = response.headers.get('content-type') || '';
-      const data = contentType.includes('application/json')
-        ? await response.json()
-        : { success: false, message: await response.text() };
-
-      if (data.success) {
-        setResult(data.data);
-      } else {
-        const isNginx413 = !contentType.includes('application/json') &&
-          response.status === 413 &&
-          typeof data.message === 'string' &&
-          data.message.includes('413 Request Entity Too Large');
-
-        setError(
-          isNginx413
-            ? t('healthCheck.errorRequestTooLarge')
-            : (data.message || t('healthCheck.errorAnalysisFailed'))
-        );
-      }
-    } catch {
-      setError(t('healthCheck.errorConnectionFailed'));
-    } finally {
-      setLoading(false);
-    }
+      const payload = { animalId: selectedAnimal === linkedAnimal.get('species') ? linkedAnimal.get('animalId') : null, animalType: selectedAnimal, symptoms, age, additionalInfo, customQuestion: customPrompt, languageHint: i18n.language };
+      const fingerprint = JSON.stringify(payload) + selectedFile.name + selectedFile.size + selectedFile.lastModified;
+      if (uploadKey.current?.fingerprint !== fingerprint) uploadKey.current = { fingerprint, id: crypto.randomUUID() };
+      Object.entries({ ...payload, requestId: uploadKey.current.id }).forEach(([key, value]) => formData.append(key, value ?? ''));
+      const data = await healthRequest('/upload-and-analyze', { method: 'POST', body: formData });
+      if (version === requestVersion.current) { openReport(data.report || { analysis: data.data }); uploadKey.current = null; }
+    } catch (err) { if (version === requestVersion.current) setError(healthError(err, c)); }
+    finally { if (version === requestVersion.current) setLoading(false); }
   };
 
   const resetForm = () => {
+    requestVersion.current++;
+    imageVersion.current++;
+    uploadKey.current = null;
+    setReport(null);
     setSelectedAnimal(null);
     setSelectedFile(null);
     setPreviewUrl((currentUrl) => {
@@ -331,6 +321,7 @@ const AIHealthCheck = () => {
   };
 
   const getBodyConditionText = (score) => {
+    if (score == null) return c('uncertain');
     const numericScore = Number(score);
     if (numericScore <= 2) return t('healthCheck.underweight');
     if (numericScore >= 4) return t('healthCheck.overweight');
@@ -338,10 +329,11 @@ const AIHealthCheck = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-8">
+    <div className="site-background min-h-screen px-4 py-8">
       <div className="mx-auto max-w-5xl">
+        <HealthReportTools report={report} onOpen={openReport} onDelete={resetForm} language={i18n.language} disabled={loading || preparingImage} />
         {!result ? (
-          <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
+          <fieldset disabled={loading || preparingImage} className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
             <div className="mb-6 flex items-center justify-center">
               <div className="flex items-center space-x-3">
                 {[1, 2, 3].map((step) => (
@@ -374,10 +366,10 @@ const AIHealthCheck = () => {
                 {t('healthCheck.step1')}
               </label>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {animalTypes.map((animal) => (
+                {animalTypes.filter(animal => allowedSpecies(animal.id)).map((animal) => (
                   <button
                     key={animal.id}
-                    onClick={() => setSelectedAnimal(animal.id)}
+                    onClick={() => changeSpecies(animal.id)}
                     className={`rounded-xl border px-4 py-3 text-sm font-semibold transition ${
                       selectedAnimal === animal.id
                         ? 'border-slate-900 bg-slate-900 text-white'
@@ -390,6 +382,7 @@ const AIHealthCheck = () => {
               </div>
             </div>
 
+            <p className="mb-3 text-sm">{c('privacy')}</p>
             <div className="mb-6 border-t border-slate-200 pt-6">
               <label className="mb-3 flex items-center text-sm font-bold text-slate-800">
                 <span className="mr-2 flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">2</span>
@@ -409,7 +402,7 @@ const AIHealthCheck = () => {
                     </svg>
                   </div>
                   <p className="text-sm font-semibold text-slate-800">{t('healthCheck.clickOrDrag')}</p>
-                  <p className="mt-1 text-xs text-slate-500">{t('healthCheck.fileFormats')}</p>
+                  <p className="mt-1 text-xs text-slate-500">{c('photo')}</p>
                   <p className="mt-2 text-[11px] text-slate-400">{t('healthCheck.autoOptimizeHint')}</p>
                 </div>
               ) : (
@@ -426,7 +419,7 @@ const AIHealthCheck = () => {
                 </div>
               )}
 
-              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+              <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={handleFileSelect} className="hidden" />
             </div>
 
             <div className="mb-6 border-t border-slate-200 pt-6">
@@ -436,13 +429,7 @@ const AIHealthCheck = () => {
               </label>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <input
-                  type="text"
-                  value={age}
-                  onChange={(e) => setAge(e.target.value)}
-                  placeholder={t('healthCheck.agePlaceholder')}
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-500 focus:bg-white"
-                />
+
                 <input
                   type="text"
                   value={symptoms}
@@ -526,9 +513,11 @@ const AIHealthCheck = () => {
             <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
               <p className="text-xs leading-6 text-slate-600">{t('healthCheck.disclaimer')}</p>
             </div>
-          </div>
+          </fieldset>
         ) : (
           <div className="space-y-5">
+            {result.assessmentLimitations?.length > 0 && <SectionCard title={c('photoLimits')} icon={Icons.alert}><BulletList items={result.assessmentLimitations} /></SectionCard>}
+            <p className="rounded-xl border bg-white p-4 text-sm">{c('limitations')}</p>
             <SectionCard title={t('healthCheck.results')} icon={Icons.report}>
               <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div className="max-w-3xl">
@@ -540,13 +529,13 @@ const AIHealthCheck = () => {
                   </p>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
-                      {result.urgencyLevel || t('healthCheck.normal')}
+                      {c(urgencyCode(result) === 'unknown' ? 'uncertain' : urgencyCode(result))}
                     </span>
                     <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
                       {result.animalType || selectedAnimalMeta?.name || t('healthCheck.animal')}
                     </span>
                     <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
-                      {t('healthCheck.bodyCondition')}: {result.bodyConditionScore || '3'}/5
+                      {t('healthCheck.bodyCondition')}: {result.bodyConditionScore ?? '—'}/5
                     </span>
                   </div>
                 </div>
@@ -554,13 +543,13 @@ const AIHealthCheck = () => {
                 <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[360px]">
                   <SummaryItem
                     label={t('healthCheck.healthScore')}
-                    value={result.healthScore || '?'}
+                    value={result.healthScore ?? '—'}
                     icon={Icons.score}
                   />
                   <SummaryItem
                     label={t('healthCheck.bodyCondition')}
                     value={getBodyConditionText(result.bodyConditionScore)}
-                    subvalue={`${result.bodyConditionScore || '3'} (${t('healthCheck.average')})/5`}
+                    subvalue={`${result.bodyConditionScore ?? '—'}/5`}
                     icon={Icons.report}
                   />
                   <SummaryItem
@@ -572,6 +561,8 @@ const AIHealthCheck = () => {
               </div>
             </SectionCard>
 
+            {result.firstAid?.length > 0 && <SectionCard title={c('firstAid')} icon={Icons.alert}><BulletList items={result.firstAid} /></SectionCard>}
+            {result.preventiveCare?.length > 0 && <SectionCard title={c('preventive')} icon={Icons.report}><BulletList items={result.preventiveCare} /></SectionCard>}
             {(result.questionAnswer || result.questionError) && (
               <SectionCard title={t('healthCheck.askQuestionResponseTitle')} icon={Icons.question}>
                 <div className="grid gap-4 lg:grid-cols-[0.95fr,1.35fr]">

@@ -24,13 +24,7 @@ const VetAppointmentsScreen = ({ navigation }) => {
   const [filter, setFilter] = useState('pending'); // pending, confirmed, completed, cancelled, all
 
   // Show loading while translations are loading
-  if (!ready) {
-    return (
-      <View style={styles.loadingContainer}>
-        <SkeletonLoader variant="list" count={5} />
-      </View>
-    );
-  }
+  
 
   useEffect(() => {
     fetchAppointments();
@@ -260,6 +254,14 @@ const VetAppointmentsScreen = ({ navigation }) => {
     if (key === 'all') return appointments.length;
     return appointments.filter((apt) => apt.status === key).length;
   };
+
+  if (!ready) {
+    return (
+      <View style={styles.loadingContainer}>
+        <SkeletonLoader variant="list" count={5} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>

@@ -107,15 +107,15 @@ const CallHistory = ({ initialTab = 'all' }) => {
       {/* Statistics Cards */}
       {stats && (
         <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-4 rounded-xl shadow-lg">
+          <div className="bg-blue-600 text-white p-4 rounded-xl shadow-lg">
             <div className="text-3xl font-bold">{stats.callsMade}</div>
             <div className="text-sm opacity-90">Calls Made</div>
           </div>
-          <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-4 rounded-xl shadow-lg">
+          <div className="bg-primary text-white p-4 rounded-xl shadow-lg">
             <div className="text-3xl font-bold">{stats.callsReceived}</div>
             <div className="text-sm opacity-90">Calls Received</div>
           </div>
-          <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white p-4 rounded-xl shadow-lg">
+          <div className="bg-purple-600 text-white p-4 rounded-xl shadow-lg">
             <div className="text-3xl font-bold">{stats.totalCalls}</div>
             <div className="text-sm opacity-90">Total Calls</div>
           </div>

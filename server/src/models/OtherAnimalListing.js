@@ -25,8 +25,7 @@ module.exports = (sequelize) => {
 
     // Instance method to increment views
     async incrementViews() {
-      this.views += 1;
-      await this.save();
+      await this.increment('views');
       return this;
     }
 
@@ -46,6 +45,7 @@ module.exports = (sequelize) => {
   }
 
   OtherAnimalListing.init({
+  animal_group: { type: DataTypes.STRING(8), allowNull: true },
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
@@ -350,8 +350,8 @@ module.exports = (sequelize) => {
   // Search with filters
   OtherAnimalListing.search = async function(filters = {}) {
     const where = buildSearchWhere(filters);
-    const validSortFields = ['createdAt', 'updatedAt', 'expectedPrice', 'views'];
-    const sortBy = validSortFields.includes(filters.sortBy) ? filters.sortBy : 'createdAt';
+    const validSortFields = ['created_at', 'updated_at', 'expectedPrice', 'views'];
+    const sortBy = validSortFields.includes(filters.sortBy) ? filters.sortBy : 'created_at';
     const sortOrder = String(filters.sortOrder).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
     return await this.findAll({

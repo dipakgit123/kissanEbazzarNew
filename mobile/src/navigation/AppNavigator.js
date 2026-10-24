@@ -1,3 +1,8 @@
+import MyAnimalsScreen from '../screens/MyAnimalsScreen';
+import BlogsScreen from '../screens/BlogsScreen';
+import { useAnimalExperience } from '../context/AnimalExperienceContext';
+import AnimalExperienceScreen from '../screens/AnimalExperienceScreen';
+import NotificationArticleScreen from '../screens/NotificationArticleScreen';
 import React from 'react';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -325,9 +330,14 @@ const VetStack = () => {
 
 // Main Stack Navigator (after login)
 const MainStack = () => {
+  const { group } = useAnimalExperience();
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator initialRouteName="MainTabs" screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="ChooseExperience" component={AnimalExperienceScreen} />
+      <Stack.Screen name="MyAnimals" component={MyAnimalsScreen} />
+      <Stack.Screen name="Blogs" component={BlogsScreen} />
       <Stack.Screen name="MainTabs" component={MainTabs} />
+      <Stack.Screen name="NotificationArticle" component={NotificationArticleScreen} />
       <Stack.Screen
         name="AnimalDetail"
         component={AnimalDetailScreen}
@@ -384,13 +394,13 @@ const MainStack = () => {
           animation: 'slide_from_right',
         }}
       />
-      <Stack.Screen
+      {group === 'farm' && (      <Stack.Screen
         name="MilkReports"
         component={MilkReportsScreen}
         options={{
           animation: 'slide_from_right',
         }}
-      />
+      />)}
       <Stack.Screen
         name="Wishlist"
         component={WishlistScreen}
@@ -438,27 +448,27 @@ const MainStack = () => {
           animation: 'slide_from_right',
         }}
       />
-      <Stack.Screen
+      {group === 'farm' && (      <Stack.Screen
         name="GovernmentSchemes"
         component={GovernmentSchemesScreen}
         options={{
           animation: 'slide_from_right',
         }}
-      />
-      <Stack.Screen
+      />)}
+      {group === 'farm' && (      <Stack.Screen
         name="GovernmentSchemeDetail"
         component={GovernmentSchemeDetailScreen}
         options={{
           animation: 'slide_from_right',
         }}
-      />
-      <Stack.Screen
+      />)}
+      {group === 'pet' && (      <Stack.Screen
         name="PetMating"
         component={PetMatingScreen}
         options={{
           animation: 'slide_from_right',
         }}
-      />
+      />)}
       <Stack.Screen
         name="CallHistory"
         component={CallHistoryScreen}
@@ -500,10 +510,11 @@ const MainStack = () => {
 
 // App Navigator
 const AppNavigator = () => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user, requiresAnimalSelection } = useAuth();
+  const { group, loading: experienceLoading } = useAnimalExperience();
   const { isVetAuthenticated, loading: vetLoading } = useVetAuth();
 
-  if (loading || vetLoading) {
+  if (loading || vetLoading || (isAuthenticated && experienceLoading)) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background }}>
         <CowLoader message="" size="large" />
@@ -517,7 +528,9 @@ const AppNavigator = () => {
       return <VetStack />;
     }
     if (isAuthenticated) {
-      return <MainStack />;
+      if (requiresAnimalSelection || !group) return <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="ChooseExperience" component={AnimalExperienceScreen} /></Stack.Navigator>;
+      if (!user?.full_name || !user?.postal_code) return <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="ProfileCompletion" component={ProfileCompletionScreen} /></Stack.Navigator>;
+      return <MainStack key={group} />;
     }
     return <AuthStack />;
   };
@@ -527,6 +540,7 @@ const AppNavigator = () => {
       ref={navigationRef}
       theme={navigationTheme}
       onReady={flushPendingNotificationNavigation}
+      onStateChange={flushPendingNotificationNavigation}
     >
       {getActiveStack()}
     </NavigationContainer>

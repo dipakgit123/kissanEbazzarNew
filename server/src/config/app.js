@@ -1,3 +1,4 @@
+const { mediaLifecycle } = require('../utils/mediaLifecycle');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -53,8 +54,36 @@ const setupMiddleware = (app) => {
 
   app.use(morgan('combined'));
 
+  app.use('/api/', (req, res, next) => {
+    for (const [key, maximum] of [['limit', 100], ['page', 10000], ['radius', 500], ['radiusKm', 500]]) {
+      if (req.query[key] === undefined) continue;
+      const value = Number(req.query[key]);
+      if (typeof req.query[key] !== 'string' || !Number.isFinite(value) || value <= 0 || (['page', 'limit'].includes(key) && !Number.isInteger(value))) {
+        return res.status(400).json({ success: false, message: 'Invalid pagination or radius parameter' });
+      }
+      req.query[key] = String(Math.min(value, maximum));
+    }
+    next();
+  });
+
   // Rate limiting
   app.use('/api/', generalLimiter);
+
+  app.use(mediaLifecycle);
+  app.use((req, res, next) => {
+    const json = res.json;
+    res.json = function (body) {
+      if (process.env.NODE_ENV === 'production' && this.statusCode >= 500 && !this.locals.healthPublicError) {
+        // Preserve documented public codes, never provider messages or payloads.
+        const publicCodes = { AI_NOT_CONFIGURED: 503, AI_UNAVAILABLE: 503, AI_INVALID_RESPONSE: 502, MILK_ADVICE_ERROR: 500 };
+        const code = body?.code;
+        body = { success: false, message: 'Unable to complete request. Please try again later.',
+          ...(Object.hasOwn(publicCodes, code) && publicCodes[code] === this.statusCode ? { code } : {}) };
+      }
+      return json.call(this, body);
+    };
+    next();
+  });
 
   // Body parsing middleware
   app.use(express.json({ limit: jsonBodyLimit }));

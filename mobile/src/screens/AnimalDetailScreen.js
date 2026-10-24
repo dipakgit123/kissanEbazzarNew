@@ -49,7 +49,7 @@ const AnimalDetailScreen = ({ route, navigation }) => {
   const videoRef = useRef(null);
   
   const { addToWishlist, removeFromWishlist, isInWishlist: checkIsInWishlist } = useWishlist();
-  const isInWishlist = checkIsInWishlist(id);
+  const isInWishlist = checkIsInWishlist(id, animalType);
 
   useEffect(() => {
     fetchListing();

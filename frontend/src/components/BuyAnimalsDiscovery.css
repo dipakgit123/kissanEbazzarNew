@@ -1,0 +1,65 @@
+.buy-discovery { margin-bottom: 32px; padding: 28px; border: 1px solid rgb(var(--palette-line)); border-radius: 20px; background: rgb(var(--palette-surface)); color: rgb(var(--palette-ink)); }
+.buy-discovery-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px; }
+.buy-discovery-heading > div { min-width: 0; }
+.buy-discovery h1 { margin: 0; font-size: clamp(24px, 2.5vw, 30px); line-height: 1.4; font-weight: 750; letter-spacing: -.02em; }
+.buy-discovery-heading p { margin: 6px 0 0; font-size: 14px; line-height: 1.7; color: rgb(var(--palette-muted)); }
+.buy-discovery-location { display: flex; align-items: center; gap: 10px; max-width: 360px; }
+.buy-discovery-location p { margin: 0; overflow-wrap: anywhere; font-size: 13px; }
+.buy-discovery-location-icon { display: grid; place-items: center; width: 38px; height: 38px; flex: none; background: rgb(var(--palette-canvas)); color: rgb(var(--palette-primary)); border-radius: 50%; }
+.buy-discovery-location-icon svg { width: 20px; height: 20px; }
+.buy-discovery-controls { display: flex; align-items: stretch; gap: 12px; margin: 24px 0; }
+.buy-animal-search { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; min-height: 50px; padding: 0 14px; border: 1px solid rgb(var(--palette-line)); border-radius: 10px; background: rgb(var(--palette-surface)); color: rgb(var(--palette-muted)); }
+.buy-animal-search > svg { flex: none; width: 20px; height: 20px; }
+.buy-animal-search input { flex: 1; min-width: 0; width: 100%; height: 48px; padding: 0; border: 0; outline: none; background: transparent; color: rgb(var(--palette-ink)); font-size: 14px; }
+.buy-animal-search input::placeholder { color: rgb(var(--palette-muted)); opacity: 1; }
+.buy-animal-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.buy-animal-search:focus-within { border-color: rgb(var(--palette-primary)); outline: 2px solid rgb(var(--palette-primary) / .18); outline-offset: 2px; }
+.buy-animal-search button { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 8px; }
+.buy-animal-search button:hover { background: rgb(var(--palette-canvas)); }
+.buy-animal-search button svg { width: 18px; height: 18px; }
+.buy-nearby-switch { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 50px; padding: 10px 14px; border: 1px solid rgb(var(--palette-line)); border-radius: 10px; background: rgb(var(--palette-cream)); color: rgb(var(--palette-ink)); font-size: 13px; font-weight: 600; text-align: left; }
+.buy-nearby-track { position: relative; width: 44px; height: 24px; flex: none; border-radius: 999px; background: #879e8e; transition: background-color .15s; }
+.buy-nearby-track > span { position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; background: white; border-radius: 50%; transition: transform .15s; }
+.buy-nearby-switch[aria-checked="true"] .buy-nearby-track { background: rgb(var(--palette-primary)); }
+.buy-nearby-switch[aria-checked="true"] .buy-nearby-track > span { transform: translateX(20px); }
+.buy-category-grid { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 12px; padding-top: 24px; border-top: 1px solid rgb(var(--palette-line)); }
+.buy-category-choice { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 10px; min-width: 0; padding: 16px 8px; border: 1px solid rgb(var(--palette-line)); border-radius: 12px; background: white; color: rgb(var(--palette-ink)); transition: border-color .15s, background-color .15s; }
+.buy-category-choice:hover { border-color: rgb(var(--palette-primary)); background: rgb(var(--palette-cream)); }
+.buy-category-choice[aria-pressed="true"] { border-color: rgb(var(--palette-primary)); background: rgb(var(--palette-canvas)); color: rgb(var(--palette-primary)); }
+.buy-category-image { display: grid; place-items: center; width: 56px; height: 56px; overflow: hidden; border-radius: 12px; background: rgb(var(--palette-canvas)); color: rgb(var(--palette-muted)); }
+.buy-category-image img { width: 100%; height: 100%; object-fit: cover; }
+.buy-category-image svg { width: 26px; height: 26px; }
+.buy-category-label { width: 100%; font-size: 14px; font-weight: 650; line-height: 1.5; text-align: center; overflow-wrap: anywhere; }
+.buy-category-check { position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: rgb(var(--palette-primary)); color: white; font-size: 11px; }
+.buy-category-clear { display: flex; align-items: center; gap: 10px; min-height: 44px; margin-top: 12px; color: rgb(var(--palette-primary)); font-size: 13px; font-weight: 650; }
+.buy-category-clear:hover { text-decoration: underline; text-underline-offset: 4px; }
+.buy-discovery button:focus-visible, .buy-animal-search button:focus-visible { outline: 3px solid rgb(var(--palette-primary)); outline-offset: 3px; }
+
+@media (max-width: 1023px) {
+  .buy-category-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@media (max-width: 639px) {
+  .buy-discovery { margin-bottom: 20px; padding: 14px; border-radius: 14px; }
+  .buy-discovery-heading { gap: 8px; }
+  .buy-discovery h1 { font-size: 22px; }
+  .buy-discovery-heading > div:first-child > p { display: none; }
+  .buy-discovery-location { gap: 8px; }
+  .buy-discovery-location p { font-size: 12px; line-height: 1.5; }
+  .buy-discovery-location-icon { width: 28px; height: 28px; }
+  .buy-discovery-location-icon svg { width: 16px; height: 16px; }
+  .buy-discovery-controls { flex-direction: column; gap: 6px; margin: 12px 0; }
+  .buy-animal-search { min-height: 46px; padding: 0 10px; gap: 8px; }
+  .buy-animal-search input { height: 44px; font-size: 16px; }
+  .buy-nearby-switch { min-height: 44px; padding: 6px 10px; }
+  .buy-category-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding-top: 12px; }
+  .buy-category-choice { min-height: 76px; padding: 8px 3px; gap: 6px; border-radius: 9px; }
+  .buy-category-image { width: 36px; height: 36px; border-radius: 8px; }
+  .buy-category-label { font-size: 11px; line-height: 1.45; }
+  .buy-category-check { top: 3px; right: 3px; width: 15px; height: 15px; font-size: 10px; }
+  .buy-category-clear { margin-top: 4px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .buy-nearby-track, .buy-nearby-track > span, .buy-category-choice { transition: none; }
+}

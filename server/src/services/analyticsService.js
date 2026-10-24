@@ -81,10 +81,13 @@ class AnalyticsService {
     }
 
     // Get pregnancy stats
-    let pregnancyStats = { total: 0, active: 0, delivered: 0 };
+    let pregnancyStats = { total: 0, active: 0, delivered: 0, pending_confirmation: 0, confirmed: 0, confirmation_unrecorded: 0 };
     if (PregnancyRecord) {
       pregnancyStats.total = await PregnancyRecord.count();
       pregnancyStats.active = await PregnancyRecord.count({ where: { status: 'pregnant' } });
+      pregnancyStats.pending_confirmation = await PregnancyRecord.count({ where: { status: 'pending_confirmation' } });
+      pregnancyStats.confirmation_unrecorded = await PregnancyRecord.count({ where: { status: 'pregnant', confirmed_on: null } });
+      pregnancyStats.confirmed = pregnancyStats.active - pregnancyStats.confirmation_unrecorded;
       pregnancyStats.delivered = await PregnancyRecord.count({ where: { status: 'delivered' } });
     }
 

@@ -1,3 +1,7 @@
+import { featureAllowed, getAnimalGroup } from '../utils/animalExperience';
+import { petFeatureImages } from '../utils/petFeatureImages';
+import { assistantExperienceCopy } from '../utils/experienceAssistant';
+import { useExperienceText } from '../context/AnimalExperienceContext';
 import React from 'react';
 import {
   View,
@@ -18,7 +22,8 @@ import AppHeader from '../components/AppHeader';
 const { width } = Dimensions.get('window');
 
 const ServicesScreen = ({ navigation }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const experienceText = useExperienceText();
 
   const services = [
     {
@@ -33,7 +38,7 @@ const ServicesScreen = ({ navigation }) => {
     {
       id: 2,
       icon: 'chatbubbles',
-      title: t('services.aiAssistant'),
+      title: assistantExperienceCopy(i18n.language).title,
       subtitle: t('services.aiAssistantDesc'),
       color: COLORS.info,
       screen: 'AIAssistant',
@@ -81,18 +86,18 @@ const ServicesScreen = ({ navigation }) => {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <View style={styles.servicesGrid}>
-          {services.map((service) => (
+          {[...services, { id: 6, screen: 'Blogs', title: experienceText.blogs, icon: 'book', color: COLORS.primary }, { id: 7, screen: 'PetMating', title: t('petMating.title', 'Pet mating'), icon: 'heart', color: COLORS.primary }].filter(service => featureAllowed(service.screen)).map((service) => (
             <TouchableOpacity
               key={service.id}
               style={styles.serviceCard}
               onPress={() => navigation.navigate(service.screen)}
               activeOpacity={0.9}
             >
-              <Image
-                source={service.image}
+{(getAnimalGroup() === 'pet' ? petFeatureImages[service.screen] : service.image) ? (              <Image
+                source={getAnimalGroup() === 'pet' ? petFeatureImages[service.screen] : service.image}
                 style={styles.serviceImage}
                 resizeMode="contain"
-              />
+              />) : <View style={[styles.serviceImage, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#edf5ef' }]}><Ionicons name={service.icon} size={54} color={COLORS.primary} /></View>}
               <View style={styles.serviceContent}>
                 <Text style={styles.serviceTitle}>{service.title}</Text>
                 <Text style={styles.serviceSubtitle}>{service.subtitle}</Text>

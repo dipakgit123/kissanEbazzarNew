@@ -1,3 +1,4 @@
+import { getAnimalGroup } from '../../utils/animalExperience';
 import React, { useState } from 'react';
 import {
   View,
@@ -21,14 +22,14 @@ import api from '../../services/api';
 import OptionSelectField from '../OptionSelectField';
 import { getOtherAnimalBreedOptions } from '../../constants/otherAnimalBreeds';
 
-const OtherAnimalListingForm = ({ navigation, onSuccess }) => {
+const OtherAnimalListingForm = ({ navigation, onSuccess, initialSpecies }) => {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showAnimalTypePicker, setShowAnimalTypePicker] = useState(false);
 
   const [formData, setFormData] = useState({
-    animalType: 'sheep',
+    animalType: initialSpecies || (getAnimalGroup() === 'pet' ? 'rabbit' : 'sheep'),
     breedName: '',
     age: '',
     gender: 'male',
@@ -309,7 +310,7 @@ const OtherAnimalListingForm = ({ navigation, onSuccess }) => {
                 </TouchableOpacity>
               </View>
               <ScrollView style={styles.modalList}>
-                {animalTypeOptions.map((option) => (
+                {animalTypeOptions.filter(option => getAnimalGroup() !== 'pet' || ['rabbit', 'exotic', 'other'].includes(option.value)).map((option) => (
                   <TouchableOpacity
                     key={option.value}
                     style={[

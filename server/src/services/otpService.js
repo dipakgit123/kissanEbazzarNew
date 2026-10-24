@@ -77,11 +77,9 @@ class OTPService {
   }
 
   shouldExposeDebugOtp() {
-    if ((process.env.OTP_EXPOSE_IN_RESPONSE || '').toLowerCase() === 'true') {
-      return true;
-    }
-
-    return process.env.NODE_ENV !== 'production' && this.isTwilioDirectProvider();
+    return process.env.NODE_ENV === 'development'
+      && process.env.OTP_EXPOSE_IN_RESPONSE === 'true'
+      && this.isTwilioDirectProvider();
   }
 
   getProviderMetadata(user) {
@@ -308,10 +306,11 @@ class OTPService {
         user = await User.findOne({
           where: { phone_number: phoneNumber },
           transaction,
+          lock: transaction.LOCK.UPDATE,
         });
 
         if (user && user.is_blocked) {
-          if (user.blocked_until && new Date() < new Date(user.blocked_until)) {
+          if (!user.blocked_until || new Date() < new Date(user.blocked_until)) {
             await transaction.rollback();
             throw new Error(`Account is blocked until ${user.blocked_until}`);
           }
@@ -441,11 +440,16 @@ class OTPService {
       const user = await User.findOne({
         where: { phone_number: phoneNumber },
         transaction,
+        lock: transaction.LOCK.UPDATE,
       });
 
       if (!user) {
         await transaction.rollback();
         throw new Error('User not found. Please request OTP first');
+      }
+
+      if (user.is_blocked && (!user.blocked_until || new Date(user.blocked_until) > new Date())) {
+        throw new Error('Account is blocked');
       }
 
       if (user.otp_attempts >= 3) {
@@ -461,7 +465,7 @@ class OTPService {
         );
 
         if (transaction && !transaction.finished) {
-          await transaction.rollback();
+          await transaction.commit();
         }
         throw new Error('Maximum OTP attempts exceeded. Account blocked for 30 minutes');
       }
@@ -608,10 +612,8 @@ class OTPService {
       throw new Error('User not found. Please request OTP first');
     }
 
-    if (user.is_verified) {
-      throw new Error('Phone number is already verified');
-    }
-
+    // Verification records account history, not whether a new login needs a code.
+    // Use the same delivery, cooldown, rate limits and block checks as initial send.
     return this.sendOTP(phoneNumber, ipAddress, userAgent);
   }
 

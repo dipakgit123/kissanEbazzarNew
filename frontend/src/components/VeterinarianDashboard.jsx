@@ -1,3 +1,4 @@
+import VetAnimalGroups from './VetAnimalGroups';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -365,7 +366,7 @@ const VeterinarianDashboard = () => {
   }
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-slate-950' : 'bg-slate-100'}`}>
+    <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-slate-950' : 'site-background'}`}>
       <Toaster position="top-right" />
 
       {sidebarOpen && (
@@ -756,7 +757,8 @@ const VeterinarianDashboard = () => {
                       <label className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{t('vetDashboard.licenseNumber', 'License Number')}</label>
                       <p className="mt-1 font-medium">{veterinarian?.license_number || t('vetDashboard.notAvailable', 'N/A')}</p>
                     </div>
-                    <div>
+                    <VetAnimalGroups />
+<div>
                       <label className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{t('vetDashboard.specialization', 'Specialization')}</label>
                       <p className="mt-1 font-medium">{formatSpecialization(t, veterinarian?.specialization) || t('vetDashboard.notAvailable', 'N/A')}</p>
                     </div>

@@ -247,7 +247,7 @@ class GovernmentSchemeController {
       const validSortFields = ['published_at', 'created_at', 'updated_at', 'deadline', 'views', 'title'];
       const sanitizedSortBy = validSortFields.includes(sortBy) ? sortBy : 'published_at';
       const sanitizedOrder = String(order).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
-      const effectiveStatus = status ?? (req.admin ? 'all' : SCHEME_STATUS.PUBLISHED);
+      const effectiveStatus = req.admin ? (status ?? 'all') : SCHEME_STATUS.PUBLISHED;
 
       if (!VALID_STATUSES.includes(effectiveStatus)) {
         return res.status(400).json({

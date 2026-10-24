@@ -1,9 +1,10 @@
+const { recordListingView } = require('../services/listingViewService');
+const { pickListingUpdates } = require('../utils/editableFields');
 'use strict';
 
 const db = require('../models');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudinary');
 const { Op } = require('sequelize');
-const notificationService = require('../services/notificationService');
 const listingLocationService = require('../services/listingLocationService');
 
 class AnimalListingController {
@@ -54,6 +55,7 @@ class AnimalListingController {
               uploadedFiles[`${field}PublicId`] = result.public_id;
             } catch (error) {
               console.error(`Error uploading ${field}:`, error);
+              throw error;
             }
           }
         }
@@ -66,6 +68,7 @@ class AnimalListingController {
             uploadedFiles.videoPublicId = result.public_id;
           } catch (error) {
             console.error('Error uploading video:', error);
+            throw error;
           }
         }
       }
@@ -87,52 +90,6 @@ class AnimalListingController {
         ...uploadedFiles,
         ...locationData
       });      
-      // ðŸ”” SEND NOTIFICATIONS TO NEARBY USERS
-      try {
-        // Get users within 50km radius (excluding the listing creator)
-        const nearbyUsers = await db.User.findAll({
-          where: {
-            id: { [Op.ne]: userIdInt },
-            latitude: { [Op.ne]: null },
-            longitude: { [Op.ne]: null }
-          }
-        });
-
-        // Calculate distance and send notifications to nearby users
-        const notificationPromises = [];
-        for (const nearbyUser of nearbyUsers) {
-          // Calculate distance using Haversine formula
-          const distance = calculateDistance(
-            user.latitude, user.longitude,
-            nearbyUser.latitude, nearbyUser.longitude
-          );
-
-          // Send notification if within 50km
-          if (distance <= 50) {
-            notificationPromises.push(
-              notificationService.sendRealtimeNotification(
-                nearbyUser.id,
-                'New Animal Available!',
-                `${breedName} posted just ${distance.toFixed(1)}km from you - Rs.${expectedPrice}`,
-                {
-                  type: 'new_listing',
-                  listingId: listing.id.toString(),
-                  animalType: 'cow',
-                  distance: distance.toFixed(1)
-                },
-                db
-              )
-            );
-          }
-        }
-
-        // Send all notifications in parallel
-        await Promise.allSettled(notificationPromises);
-        console.log('Real-time notifications sent to nearby users for new listing');
-      } catch (notifError) {
-        console.error('Error sending notifications:', notifError);
-        // Don't fail the listing creation if notifications fail
-      }
 
       res.status(201).json({
         success: true,
@@ -256,7 +213,7 @@ class AnimalListingController {
       }
 
       // Increment views
-      await listing.increment('views');
+      await recordListingView(req, listing, 'cow');
 
       res.json({ 
         success: true, 
@@ -295,7 +252,7 @@ class AnimalListingController {
       }
 
       // Process updates
-      const updates = { ...req.body };
+      const updates = pickListingUpdates(req.body, 'animal');
       
       // Convert string booleans
       if (updates.hasHorns !== undefined) {

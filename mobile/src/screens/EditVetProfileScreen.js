@@ -1,3 +1,5 @@
+import VetAnimalGroupPicker from '../components/VetAnimalGroupPicker';
+import { vetText } from '../utils/vetUi';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -21,16 +23,19 @@ import SkeletonLoader from '../components/SkeletonLoader';
 import AppHeader from '../components/AppHeader';
 
 const EditVetProfileScreen = ({ navigation }) => {
-  const { t, ready } = useTranslation();
+  const { t, ready, i18n } = useTranslation();
+  const c = vetText(i18n.language);
   const { veterinarian, updateVeterinarian } = useVetAuth();
   
   const [loading, setLoading] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [imageUri, setImageUri] = useState(veterinarian?.profile_photo || null);
   
   const [formData, setFormData] = useState({
     full_name: veterinarian?.full_name || '',
     email: veterinarian?.email || '',
     specialization: veterinarian?.specialization || 'general',
+    animal_groups: veterinarian?.animal_groups || [],
     experience_years: veterinarian?.experience_years?.toString() || '',
     qualification: veterinarian?.qualification || '',
     license_number: veterinarian?.license_number || '',
@@ -93,6 +98,7 @@ const EditVetProfileScreen = ({ navigation }) => {
 
     if (!result.canceled) {
       setImageUri(result.assets[0].uri);
+      setSelectedPhoto(result.assets[0]);
     }
   };
 
@@ -128,7 +134,15 @@ const EditVetProfileScreen = ({ navigation }) => {
         consultation_fee: parseFloat(formData.consultation_fee) || 0,
       };
 
-      const response = await veterinarianService.updateProfile(updateData);
+      delete updateData.qualification;
+      delete updateData.license_number;
+      let payload = updateData;
+      if (selectedPhoto) {
+        payload = new FormData();
+        for (const [key, value] of Object.entries(updateData)) payload.append(key, typeof value === 'object' ? JSON.stringify(value) : String(value));
+        payload.append('profile_photo', { uri: selectedPhoto.uri, type: selectedPhoto.mimeType || 'image/jpeg', name: selectedPhoto.fileName || 'profile.jpg' });
+      }
+      const response = await veterinarianService.updateProfile(payload);
 
       if (response.success) {
         // Update context
@@ -172,6 +186,7 @@ const EditVetProfileScreen = ({ navigation }) => {
           <Text style={styles.photoLabel}>Tap to change photo</Text>
         </View>
 
+        <Text style={{ margin: 16 }}>{c('credentials')}</Text>
         {/* Basic Information */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Basic Information</Text>
@@ -202,7 +217,7 @@ const EditVetProfileScreen = ({ navigation }) => {
             placeholder="VET12345"
             placeholderTextColor={COLORS.gray}
             value={formData.license_number}
-            onChangeText={(text) => setFormData({ ...formData, license_number: text })}
+            editable={false}
             editable={false}
           />
         </View>
@@ -212,7 +227,8 @@ const EditVetProfileScreen = ({ navigation }) => {
           <Text style={styles.sectionTitle}>Professional Information</Text>
           
           <Text style={styles.label}>Specialization *</Text>
-          <View style={styles.specializationGrid}>
+          <VetAnimalGroupPicker value={formData.animal_groups} onChange={value => setFormData(previous => ({ ...previous, animal_groups: value }))} />
+<View style={styles.specializationGrid}>
             {specializationOptions.map((option) => (
               <TouchableOpacity
                 key={option.value}
@@ -250,7 +266,7 @@ const EditVetProfileScreen = ({ navigation }) => {
             placeholder="BVSc & AH, MVSc"
             placeholderTextColor={COLORS.gray}
             value={formData.qualification}
-            onChangeText={(text) => setFormData({ ...formData, qualification: text })}
+            editable={false}
           />
 
           <Text style={styles.label}>Consultation Fee (₹) *</Text>

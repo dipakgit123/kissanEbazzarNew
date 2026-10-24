@@ -20,6 +20,13 @@ module.exports = (sequelize) => {
       allowNull: false,
       defaultValue: true,
     },
+    farm_enabled: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
+    pet_enabled: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
+    language: { type: DataTypes.STRING(8), allowNull: false, defaultValue: 'en' },
+    health_enabled: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
+    pet_mating_enabled: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
+    content_enabled: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+    milk_reminders_enabled: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     appointments_enabled: {
       type: DataTypes.BOOLEAN,
       allowNull: false,

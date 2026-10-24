@@ -3,6 +3,10 @@ const bcrypt = require('bcryptjs');
 
 module.exports = (sequelize, DataTypes) => {
   const Veterinarian = sequelize.define('Veterinarian', {
+    otp_attempts: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+    last_otp_sent_at: { type: DataTypes.DATE, allowNull: true },
+    otp_blocked_until: { type: DataTypes.DATE, allowNull: true },
+    animal_groups: { type: DataTypes.ARRAY(DataTypes.STRING(8)), allowNull: false, defaultValue: [], set(value) { this.setDataValue('animal_groups', typeof value === 'string' ? (value.startsWith('[') ? JSON.parse(value) : value.split(',')) : value); }, validate: { groups(value) { if (!Array.isArray(value) || value.some(g => !['farm', 'pet'].includes(g))) throw new Error('Invalid animal groups'); } } },
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
@@ -358,7 +362,7 @@ module.exports = (sequelize, DataTypes) => {
           )
         )) AS distance
       FROM veterinarians
-      WHERE verification_status = 'verified'
+      WHERE (:animalGroup IS NULL OR :animalGroup = ANY(animal_groups)) AND verification_status = 'verified'
         AND is_active = true
         AND latitude IS NOT NULL
         AND longitude IS NOT NULL
@@ -375,6 +379,7 @@ module.exports = (sequelize, DataTypes) => {
 
     return await sequelize.query(query, {
       replacements: {
+        animalGroup: require('../services/animalGroupScope').currentGroup() || null,
         lat: parseFloat(latitude),
         lon: parseFloat(longitude),
         radius: radiusKm

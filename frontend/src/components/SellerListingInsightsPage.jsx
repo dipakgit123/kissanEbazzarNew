@@ -95,25 +95,25 @@ const buildSmoothPath = (points) => {
 
 const StatCard = ({ label, value, tone = 'green', helper }) => {
   const toneClass = {
-    green: 'text-[#0F6E56] bg-[#E1F5EE]',
+    green: 'text-forest bg-[#E1F5EE]',
     orange: 'text-[#D85A30] bg-[#FAECE7]',
     dark: 'text-[#085041] bg-[#E8F1ED]',
-    neutral: 'text-[#2C2C2A] bg-[#F5F4EF]',
-  }[tone] || 'text-[#0F6E56] bg-[#E1F5EE]';
+    neutral: 'text-ink bg-cream',
+  }[tone] || 'text-forest bg-[#E1F5EE]';
 
   return (
-    <div className="rounded-2xl border border-[#E5E4DC] bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-line bg-white p-5 shadow-sm">
       <div className={`mb-4 inline-flex rounded-full px-3 py-1 text-xs font-black ${toneClass}`}>
         {label}
       </div>
-      <p className="text-3xl font-black leading-none text-[#2C2C2A]">{value}</p>
-      {helper ? <p className="mt-2 text-sm font-semibold text-[#5F5E5A]">{helper}</p> : null}
+      <p className="text-3xl font-black leading-none text-ink">{value}</p>
+      {helper ? <p className="mt-2 text-sm font-semibold text-muted">{helper}</p> : null}
     </div>
   );
 };
 
 const MetricTrendChart = ({ data = [], metric, onMetricChange, language, t }) => {
-  const color = metric === 'calls' ? '#D85A30' : '#1D9E75';
+  const color = metric === 'calls' ? '#D85A30' : '#11744e';
   const softColor = metric === 'calls' ? '#FAECE7' : '#E1F5EE';
   const label = metric === 'calls'
     ? t('profile.callsTrend', { defaultValue: 'Calls trend' })
@@ -158,25 +158,25 @@ const MetricTrendChart = ({ data = [], metric, onMetricChange, language, t }) =>
   }, [data]);
 
   return (
-    <section className="rounded-3xl border border-[#E5E4DC] bg-white p-5 shadow-sm sm:p-6">
+    <section className="rounded-3xl border border-line bg-white p-5 shadow-sm sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-sm font-black uppercase tracking-[0.14em] text-[#0F6E56]">
+          <p className="text-sm font-black uppercase tracking-[0.14em] text-forest">
             {t('profile.performance', { defaultValue: 'Performance' })}
           </p>
-          <h2 className="mt-1 text-2xl font-black text-[#2C2C2A]">{label}</h2>
-          <p className="mt-1 text-sm font-semibold text-[#5F5E5A]">
+          <h2 className="mt-1 text-2xl font-black text-ink">{label}</h2>
+          <p className="mt-1 text-sm font-semibold text-muted">
             {t('profile.chartRangeFromListing', { defaultValue: 'From listing date' })}
           </p>
         </div>
-        <div className="inline-flex rounded-2xl bg-[#F5F4EF] p-1">
+        <div className="inline-flex rounded-2xl bg-cream p-1">
           {['views', 'calls'].map((item) => (
             <button
               key={item}
               type="button"
               onClick={() => onMetricChange(item)}
               className={`rounded-xl px-4 py-2 text-sm font-black transition ${
-                metric === item ? 'bg-white text-[#0F6E56] shadow-sm' : 'text-[#5F5E5A] hover:text-[#2C2C2A]'
+                metric === item ? 'bg-white text-forest shadow-sm' : 'text-muted hover:text-ink'
               }`}
             >
               {item === 'views'
@@ -187,9 +187,9 @@ const MetricTrendChart = ({ data = [], metric, onMetricChange, language, t }) =>
         </div>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-[#E5E4DC] bg-[#FBFAF6] p-4">
+      <div className="mt-6 rounded-2xl border border-line bg-cream p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <p className="text-sm font-black text-[#2C2C2A]">
+          <p className="text-sm font-black text-ink">
             {metric === 'calls'
               ? t('profile.calledByBuyers', { count: total, defaultValue: `${total} buyer calls` })
               : t('profile.seenByBuyers', { count: total, defaultValue: `${total} buyer views` })}
@@ -201,7 +201,7 @@ const MetricTrendChart = ({ data = [], metric, onMetricChange, language, t }) =>
 
         {chart.points.length === 0 ? (
           <div className="flex min-h-[16rem] items-center justify-center rounded-xl bg-white text-center">
-            <p className="max-w-sm text-sm font-semibold text-[#5F5E5A]">
+            <p className="max-w-sm text-sm font-semibold text-muted">
               {t('profile.noMetricDataYet', { defaultValue: 'Activity will appear here after buyers view or call this listing.' })}
             </p>
           </div>
@@ -229,7 +229,7 @@ const MetricTrendChart = ({ data = [], metric, onMetricChange, language, t }) =>
                     x2={chart.width - chart.right}
                     y1={y}
                     y2={y}
-                    stroke="#E5E4DC"
+                    stroke="#d6e2d8"
                     strokeDasharray="5 7"
                   />
                 );
@@ -296,8 +296,8 @@ const MetricTrendChart = ({ data = [], metric, onMetricChange, language, t }) =>
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {data.map((item) => (
-          <div key={item.day} className="flex items-center justify-between rounded-xl border border-[#E5E4DC] bg-[#FBFAF6] px-3 py-2">
-            <span className="text-xs font-black text-[#5F5E5A]">{formatDayLabel(item.day, language)}</span>
+          <div key={item.day} className="flex items-center justify-between rounded-xl border border-line bg-cream px-3 py-2">
+            <span className="text-xs font-black text-muted">{formatDayLabel(item.day, language)}</span>
             <span className="text-sm font-black" style={{ color }}>{Number(item.count || 0)}</span>
           </div>
         ))}
@@ -372,7 +372,7 @@ const SellerListingInsightsPage = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-[70vh] items-center justify-center bg-[#F5F4EF]">
+      <div className="flex min-h-[70vh] items-center justify-center bg-cream">
         <AppLoader message={t('profile.loadingInsights', { defaultValue: 'Loading listing analytics...' })} />
       </div>
     );
@@ -380,9 +380,9 @@ const SellerListingInsightsPage = () => {
 
   if (!listing) {
     return (
-      <div className="min-h-[70vh] bg-[#F5F4EF] p-8 text-center">
-        <h1 className="text-2xl font-black text-[#2C2C2A]">{t('profile.insightsNotFound', { defaultValue: 'Listing insights not found' })}</h1>
-        <button onClick={() => navigate(-1)} className="mt-5 rounded-xl bg-[#1D9E75] px-5 py-3 font-bold text-white">
+      <div className="min-h-[70vh] bg-cream p-8 text-center">
+        <h1 className="text-2xl font-black text-ink">{t('profile.insightsNotFound', { defaultValue: 'Listing insights not found' })}</h1>
+        <button onClick={() => navigate(-1)} className="mt-5 rounded-xl bg-primary px-5 py-3 font-bold text-white">
           {t('common.back', { defaultValue: 'Back' })}
         </button>
       </div>
@@ -390,45 +390,45 @@ const SellerListingInsightsPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F4EF] pb-16">
+    <div className="site-background min-h-screen pb-16">
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
         <button
           type="button"
           onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-2 rounded-full border border-[#E5E4DC] bg-white px-4 py-2 text-sm font-black text-[#0F6E56] shadow-sm transition hover:border-[#1D9E75]"
+          className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2 text-sm font-black text-forest shadow-sm transition hover:border-primary"
         >
           <span aria-hidden="true">&lsaquo;</span>
           {t('profile.backToListings', { defaultValue: 'Back to listings' })}
         </button>
 
-        <section className="overflow-hidden rounded-3xl border border-[#E5E4DC] bg-white shadow-sm">
+        <section className="overflow-hidden rounded-3xl border border-line bg-white shadow-sm">
           <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_22rem]">
             <div className="p-5 sm:p-8">
               <div className="flex flex-wrap gap-2">
-                <span className="rounded-full bg-[#E1F5EE] px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-[#0F6E56]">
+                <span className="rounded-full bg-[#E1F5EE] px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-forest">
                   {getAnimalTypeLabel(listing.animal_type, t)}
                 </span>
-                <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.12em] ${isSold ? 'bg-[#F5F4EF] text-[#5F5E5A]' : 'bg-[#FAECE7] text-[#D85A30]'}`}>
+                <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.12em] ${isSold ? 'bg-cream text-muted' : 'bg-[#FAECE7] text-[#D85A30]'}`}>
                   {isSold ? t('profile.sold', { defaultValue: 'Sold' }) : t('profile.active', { defaultValue: 'Active' })}
                 </span>
               </div>
 
-              <h1 className="mt-5 max-w-3xl text-3xl font-black leading-tight text-[#2C2C2A] sm:text-5xl">
+              <h1 className="mt-5 max-w-3xl text-3xl font-black leading-tight text-ink sm:text-5xl">
                 {listingTitle}
               </h1>
               <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2">
-                <p className="text-2xl font-black text-[#0F6E56]">{formatCurrency(listing.price || listing.expected_price)}</p>
-                <p className="text-base font-bold text-[#5F5E5A]">{locationLabel}</p>
+                <p className="text-2xl font-black text-forest">{formatCurrency(listing.price || listing.expected_price)}</p>
+                <p className="text-base font-bold text-muted">{locationLabel}</p>
               </div>
-              <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-[#5F5E5A]">
+              <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-muted">
                 {isSold
                   ? t('profile.animalSoldVisible', { defaultValue: 'Animal is marked as sold' })
                   : t('profile.animalVisibleToBuyers', { defaultValue: 'Animal is visible to buyers' })}
               </p>
             </div>
 
-            <div className="border-t border-[#E5E4DC] bg-[#FBFAF6] p-5 lg:border-l lg:border-t-0">
-              <div className="aspect-[4/3] overflow-hidden rounded-2xl border border-[#E5E4DC] bg-white">
+            <div className="border-t border-line bg-cream p-5 lg:border-l lg:border-t-0">
+              <div className="aspect-[4/3] overflow-hidden rounded-2xl border border-line bg-white">
                 <img
                   src={listing.photo1 || listing.photos?.[0] || FALLBACK_IMAGE}
                   alt={listingTitle}
@@ -475,54 +475,54 @@ const SellerListingInsightsPage = () => {
             t={t}
           />
 
-          <section className="rounded-3xl border border-[#E5E4DC] bg-white p-5 shadow-sm sm:p-6">
-            <p className="text-sm font-black uppercase tracking-[0.14em] text-[#0F6E56]">
+          <section className="rounded-3xl border border-line bg-white p-5 shadow-sm sm:p-6">
+            <p className="text-sm font-black uppercase tracking-[0.14em] text-forest">
               {t('profile.saleStatus', { defaultValue: 'Sale status' })}
             </p>
-            <h2 className="mt-1 text-2xl font-black text-[#2C2C2A]">
+            <h2 className="mt-1 text-2xl font-black text-ink">
               {t('profile.soldQuestion', { defaultValue: 'Is your animal sold?' })}
             </h2>
-            <p className="mt-2 text-sm font-semibold leading-6 text-[#5F5E5A]">
+            <p className="mt-2 text-sm font-semibold leading-6 text-muted">
               {t('profile.soldQuestionHelp', { defaultValue: 'Update the status when the animal is sold so buyers see accurate availability.' })}
             </p>
             <div className="mt-6 grid gap-3">
               <button
                 disabled={isSold || markingSold}
                 onClick={handleMarkSold}
-                className="rounded-2xl bg-[#0F6E56] px-5 py-4 text-base font-black text-white shadow-sm transition hover:bg-[#085041] disabled:cursor-not-allowed disabled:bg-[#C9C8C0]"
+                className="rounded-2xl bg-forest px-5 py-4 text-base font-black text-white shadow-sm transition hover:bg-[#085041] disabled:cursor-not-allowed disabled:bg-[#C9C8C0]"
               >
                 {isSold ? t('profile.alreadySold', { defaultValue: 'Already sold' }) : t('profile.markAsSold', { defaultValue: 'Mark as sold' })}
               </button>
-              <Link to={`/animal/${listing.animal_type}/${listing.id}`} className="rounded-2xl border border-[#E5E4DC] px-5 py-4 text-center text-base font-black text-[#2C2C2A] transition hover:border-[#1D9E75] hover:text-[#0F6E56]">
+              <Link to={`/animal/${listing.animal_type}/${listing.id}`} className="rounded-2xl border border-line px-5 py-4 text-center text-base font-black text-ink transition hover:border-primary hover:text-forest">
                 {t('profile.viewPublicListing', { defaultValue: 'View public listing' })}
               </Link>
             </div>
           </section>
         </div>
 
-        <section className="rounded-3xl border border-[#E5E4DC] bg-white p-5 shadow-sm sm:p-6">
+        <section className="rounded-3xl border border-line bg-white p-5 shadow-sm sm:p-6">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-black uppercase tracking-[0.14em] text-[#0F6E56]">
+              <p className="text-sm font-black uppercase tracking-[0.14em] text-forest">
                 {t('profile.callHistory', { defaultValue: 'Call History' })}
               </p>
-              <h2 className="mt-1 text-2xl font-black text-[#2C2C2A]">
+              <h2 className="mt-1 text-2xl font-black text-ink">
                 {t('profile.recentBuyerCalls', { defaultValue: 'Recent buyer calls' })}
               </h2>
             </div>
           </div>
           <div className="mt-5 space-y-3">
             {(insights?.recentCalls || []).length === 0 ? (
-              <p className="rounded-2xl bg-[#FBFAF6] p-4 text-sm font-semibold text-[#5F5E5A]">
+              <p className="rounded-2xl bg-cream p-4 text-sm font-semibold text-muted">
                 {t('profile.noBuyerCallsYet', { defaultValue: 'No buyer calls yet.' })}
               </p>
             ) : insights.recentCalls.map((call) => (
-              <div key={call.id} className="flex flex-col gap-3 rounded-2xl border border-[#E5E4DC] bg-[#FBFAF6] p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div key={call.id} className="flex flex-col gap-3 rounded-2xl border border-line bg-cream p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="font-black text-[#2C2C2A]">{call.buyerName || t('profile.buyerShort', { defaultValue: 'Buyer' })}</p>
-                  <p className="text-sm font-semibold text-[#5F5E5A]">{call.buyerPhone || t('profile.na', { defaultValue: 'N/A' })}</p>
+                  <p className="font-black text-ink">{call.buyerName || t('profile.buyerShort', { defaultValue: 'Buyer' })}</p>
+                  <p className="text-sm font-semibold text-muted">{call.buyerPhone || t('profile.na', { defaultValue: 'N/A' })}</p>
                 </div>
-                <span className="inline-flex w-fit rounded-full bg-[#E1F5EE] px-3 py-1 text-xs font-black text-[#0F6E56]">
+                <span className="inline-flex w-fit rounded-full bg-[#E1F5EE] px-3 py-1 text-xs font-black text-forest">
                   {getCallStatusLabel(call.status, t)}
                 </span>
               </div>

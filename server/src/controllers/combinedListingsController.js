@@ -1,3 +1,4 @@
+const { scopeListingSql } = require('../services/animalGroupScope');
 'use strict';
 
 const db = require('../models');
@@ -24,6 +25,7 @@ const normalizeOwnListing = (listing, type) => {
     id: data.id,
     type,
     animal_type: type,
+    species: type === 'other' ? data.animalType : type,
     breed: data.breed_name || data.breedName,
     breed_name: data.breed_name || data.breedName,
     age: data.age,
@@ -94,61 +96,7 @@ const getIndiaDateString = (dateValue = new Date()) => new Intl.DateTimeFormat('
   day: '2-digit'
 }).format(new Date(dateValue));
 
-const getRequestIp = (req) => {
-  const forwardedFor = req.headers['x-forwarded-for'];
-  if (forwardedFor) {
-    return String(forwardedFor).split(',')[0].trim();
-  }
-
-  return req.ip || req.connection?.remoteAddress || null;
-};
-
-const recordListingView = async (req, listing, listingType) => {
-  if (!db.ListingViewLog || !listing?.user_id) {
-    return false;
-  }
-
-  const viewerId = getAuthUserIdFromRequest(req);
-  if (viewerId && Number(viewerId) === Number(listing.user_id)) {
-    return false;
-  }
-
-  const viewerIp = getRequestIp(req);
-  const viewerKey = viewerId ? `user:${viewerId}` : viewerIp ? `ip:${viewerIp}` : null;
-  if (!viewerKey) {
-    return false;
-  }
-
-  const viewDate = getIndiaDateString();
-
-  try {
-    const [, created] = await db.ListingViewLog.findOrCreate({
-      where: {
-        listing_id: listing.id,
-        listing_type: listingType,
-        view_date: viewDate,
-        viewer_key: viewerKey
-      },
-      defaults: {
-        listing_id: listing.id,
-        listing_type: listingType,
-        seller_id: listing.user_id,
-        viewer_id: viewerId || null,
-        viewer_ip: viewerIp,
-        view_date: viewDate,
-        viewer_key: viewerKey,
-        user_agent: req.headers['user-agent'] || null
-      }
-    });
-    return created;
-  } catch (error) {
-    if (error.name === 'SequelizeUniqueConstraintError') {
-      return false;
-    }
-    console.error('Failed to log listing view:', error.message);
-    return false;
-  }
-};
+const { recordListingView } = require('../services/listingViewService');
 
 const parsePositiveInt = (value, fallback, max = 100) => {
   const parsed = Number.parseInt(value, 10);
@@ -812,7 +760,7 @@ class CombinedListingsController {
         LIMIT $4;
       `;
 
-      const listings = await db.sequelize.query(query, {
+      const listings = await db.sequelize.query(scopeListingSql(query), {
         bind: [lat, lng, rad, lim],
         type: db.sequelize.QueryTypes.SELECT
       });
@@ -1041,7 +989,7 @@ class CombinedListingsController {
         LIMIT $1;
       `;
 
-      const listings = await db.sequelize.query(query, {
+      const listings = await db.sequelize.query(scopeListingSql(query), {
         bind: [lim],
         type: db.sequelize.QueryTypes.SELECT
       });
@@ -1106,7 +1054,7 @@ class CombinedListingsController {
       }
 
       // Fetch the listing
-      const listing = await Model.findByPk(id);
+      const listing = await Model.findOne({ where: { id, status: ['active', 'sold'] } });
 
       if (!listing) {
         return res.status(404).json({
@@ -1124,9 +1072,8 @@ class CombinedListingsController {
       });
 
       // Count one view per unique viewer per listing per India calendar day.
-      const countedView = await recordListingView(req, listingData, animalType.toLowerCase());
+      const countedView = await recordListingView(req, listing, animalType.toLowerCase());
       if (countedView) {
-        await listing.incrementViews();
         listingData.views = Number(listingData.views || 0) + 1;
       }
 
@@ -1363,7 +1310,7 @@ class CombinedListingsController {
         `;
         bindings.push(lim);
 
-        const listings = await db.sequelize.query(singleQuery, {
+        const listings = await db.sequelize.query(scopeListingSql(singleQuery), {
           bind: bindings,
           type: db.sequelize.QueryTypes.SELECT
         });
@@ -1432,7 +1379,7 @@ class CombinedListingsController {
       `;
       bindings.push(lim);
 
-      const listings = await db.sequelize.query(searchAllQuery, {
+      const listings = await db.sequelize.query(scopeListingSql(searchAllQuery), {
         bind: bindings,
         type: db.sequelize.QueryTypes.SELECT
       });

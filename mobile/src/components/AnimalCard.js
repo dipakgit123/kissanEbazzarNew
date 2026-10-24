@@ -32,10 +32,6 @@ const REPORT_REASONS = [
 ];
 
 const AnimalCard = ({ listing, onPress }) => {
-  if (!listing) {
-    return null;
-  }
-
   const { t } = useTranslation();
   const navigation = useNavigation();
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
@@ -44,7 +40,9 @@ const AnimalCard = ({ listing, onPress }) => {
   const [reportReason, setReportReason] = useState('wrong_information');
   const [reportDescription, setReportDescription] = useState('');
   const [isReportSubmitting, setIsReportSubmitting] = useState(false);
-  const inWishlist = isInWishlist(listing.id);
+  const inWishlist = isInWishlist(listing?.id, listing?.animal_type || listing?.animalType);
+
+  if (!listing) return null;
 
   const {
     animal_type,

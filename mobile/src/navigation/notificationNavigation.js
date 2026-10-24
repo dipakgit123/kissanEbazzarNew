@@ -1,3 +1,4 @@
+import { getAnimalGroup, switchForNotification } from '../utils/animalExperience';
 import { createNavigationContainerRef } from '@react-navigation/native';
 import logger from '../utils/logger';
 
@@ -13,23 +14,25 @@ const getTarget = (data = {}, isVeterinarian = false) => {
   const listingId = firstValue(data.listing_id, data.listingId);
   const animalType = firstValue(data.animal_type, data.animalType, data.listing_type);
 
-  if (type.includes('appointment')) {
-    return {
-      name: isVeterinarian ? 'VetAppointments' : 'MyAppointments',
-      params: appointmentId ? { focusAppointmentId: appointmentId } : undefined,
-    };
-  }
-
+  if (type.includes('appointment')) return { name: 'Notifications' };
+  if (type === 'vet_contact' || type === 'vet_status') return { name: isVeterinarian ? 'VetDashboard' : 'Notifications' };
+  if (type === 'health_report' && !isVeterinarian) return { name: 'AIHealthCheck', params: { reportId: data.report_id } };
+  if (type === 'milk_reminder' && !isVeterinarian) return { name: 'MilkReports' };
+  if (type === 'pet_status' && !isVeterinarian) return { name: 'PetMating', params: { profileId: data.profile_id } };
+  if (type === 'scheme_published' && !isVeterinarian) return { name: 'GovernmentSchemeDetail', params: { slug: data.slug } };
+  if (type === 'blog_published' && !isVeterinarian) return { name: 'NotificationArticle', params: { slug: data.slug } };
   if (type.includes('call')) {
     return { name: 'CallHistory' };
   }
 
-  if (['new_listing', 'price_drop', 'contact', 'listing_sold'].includes(type) && listingId && animalType) {
+  if (['new_listing', 'price_drop', 'contact'].includes(type) && listingId && animalType) {
     return {
       name: 'AnimalDetail',
       params: { id: listingId, animalType },
     };
   }
+
+  if (type === 'listing_sold' && !isVeterinarian) return { name: 'Wishlist' };
 
   if (type.includes('pregnancy') && !isVeterinarian) {
     return {
@@ -42,9 +45,23 @@ const getTarget = (data = {}, isVeterinarian = false) => {
 };
 
 export const navigateFromNotification = (data, isVeterinarian = false) => {
+  const species = data?.animal_type || data?.animalType;
+  const group = ['farm', 'pet'].includes(data?.animal_group) ? data.animal_group
+    : ['dog', 'cat'].includes(species) || data?.type === 'pet_status' ? 'pet'
+    : ['cow', 'buffalo', 'goat', 'horse', 'sheep', 'pig'].includes(species) || ['milk_reminder', 'scheme_published'].includes(data?.type) ? 'farm' : null;
+  if (!isVeterinarian && group && group !== getAnimalGroup()) {
+    const target = getTarget(data, false);
+    switchForNotification(group).then(switched => {
+      if (!switched) return;
+      pendingNavigation = target;
+      setTimeout(flushPendingNotificationNavigation, 100);
+    }).catch(() => { pendingNavigation = { name: 'Notifications' }; flushPendingNotificationNavigation(); });
+    return false;
+  }
+
   const target = getTarget(data, isVeterinarian);
 
-  if (!navigationRef.isReady()) {
+  if (!navigationRef.isReady() || !hasRoute(navigationRef.getRootState(), target.name)) {
     pendingNavigation = target;
     return false;
   }
@@ -60,8 +77,11 @@ export const navigateFromNotification = (data, isVeterinarian = false) => {
 };
 
 export const flushPendingNotificationNavigation = () => {
-  if (!pendingNavigation || !navigationRef.isReady()) return;
+  if (!pendingNavigation || !navigationRef.isReady() || !hasRoute(navigationRef.getRootState(), pendingNavigation.name)) return;
   const target = pendingNavigation;
   pendingNavigation = null;
   navigationRef.navigate(target.name, target.params);
 };
+
+const hasRoute = (state, name) => Boolean(state?.routeNames?.includes(name) || state?.routes?.some(route => hasRoute(route.state, name)));
+export const clearPendingNotificationNavigation = () => { pendingNavigation = null; };

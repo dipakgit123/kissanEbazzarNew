@@ -1,3 +1,4 @@
+import { getAnimalGroup } from '../utils/animalExperience';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
@@ -70,42 +71,46 @@ const api = axios.create({
   timeout: 60000, // 60 seconds timeout for large file uploads
 });
 
-// Add token to requests
-api.interceptors.request.use(
-  async (config) => {
-    // Check for both user token and vet token
-    let token = await AsyncStorage.getItem('token');
-    
-    // If no user token, check for vet token
-    if (!token) {
-      token = await AsyncStorage.getItem('vetToken');
-    }
-    
-    if (token && !config.headers.Authorization) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
+const requestRole = (config) => {
+  if (config.authRole) return config.authRole;
+  const url = config.url || '';
+  return new RegExp('/veterinarians/(profile|dashboard)').test(url)
+    || new RegExp('/appointments/(vet-appointments|vet/stats|stats)').test(url)
+    || (config.method === 'patch' && new RegExp('/appointments/[^/]+/status').test(url))
+    || new RegExp('/vet-reviews/[^/]+/respond').test(url)
+    ? 'veterinarian' : 'user';
+};
+api.interceptors.request.use(async config => {
+  config.headers['X-Animal-Group'] = getAnimalGroup() || 'farm';
+  config.authRole = requestRole(config);
+  if (config.headers.Authorization) {
+    const vetToken = await AsyncStorage.getItem('vetToken');
+    if (vetToken && config.headers.Authorization === 'Bearer ' + vetToken) config.authRole = 'veterinarian';
   }
-);
-
-// Response interceptor
-api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    if (error.response?.status === 401) {
-      // Clear both user and vet tokens on 401
-      await AsyncStorage.removeItem('token');
-      await AsyncStorage.removeItem('userData');
-      await AsyncStorage.removeItem('vetToken');
-      await AsyncStorage.removeItem('veterinarianData');
-      DeviceEventEmitter.emit('auth:unauthorized');
-    }
-    return Promise.reject(error);
+  const isLogin = new RegExp('/(login|send-otp|verify-otp|resend-otp|forgot-password|reset-password)$').test(config.url || '');
+  const key = config.authRole === 'veterinarian' ? 'vetToken' : 'token';
+  if (!isLogin && !config.headers.Authorization) {
+    const token = await AsyncStorage.getItem(key);
+    if (token) config.headers.Authorization = 'Bearer ' + token;
   }
-);
+  return config;
+});
+api.interceptors.response.use(response => response, async error => {
+  if (error.response?.data?.message) error.message = error.response.data.message;
+  error.status = error.response?.status;
+  const sent = error.config?.headers?.Authorization;
+  if (error.status === 401 && sent) {
+    const role = error.config.authRole || 'user';
+    const key = role === 'veterinarian' ? 'vetToken' : 'token';
+    const current = await AsyncStorage.getItem(key);
+    if (current && sent === 'Bearer ' + current) {
+      await AsyncStorage.removeItem(key);
+      await AsyncStorage.removeItem(role === 'veterinarian' ? 'veterinarianData' : 'userData');
+      DeviceEventEmitter.emit('auth:unauthorized', { role });
+    }
+  }
+  return Promise.reject(error);
+});
 
 // OTP Services
 export const otpService = {
@@ -114,7 +119,7 @@ export const otpService = {
       const response = await api.post('/api/auth/send-otp', { phoneNumber });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -123,7 +128,7 @@ export const otpService = {
       const response = await api.post('/api/auth/verify-otp', { phoneNumber, otp });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -132,7 +137,7 @@ export const otpService = {
       const response = await api.post('/api/auth/resend-otp', { phoneNumber });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 };
@@ -146,7 +151,7 @@ export const listingsService = {
       });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -157,7 +162,7 @@ export const listingsService = {
       });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -166,7 +171,7 @@ export const listingsService = {
       const response = await api.get(`/api/listings/${animalType}/${id}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -177,7 +182,7 @@ export const listingsService = {
       });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -188,7 +193,7 @@ export const listingsService = {
       });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -197,7 +202,7 @@ export const listingsService = {
       const response = await api.patch(`/api/listings/${animalType}/${id}/sold`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -206,7 +211,7 @@ export const listingsService = {
       const response = await api.get(`/api/listings/${animalType}/${id}/insights`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   }
 };
@@ -217,7 +222,7 @@ export const listingReportService = {
       const response = await api.post('/api/listing-reports', reportData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -228,18 +233,23 @@ export const listingReportService = {
       });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   }
 };
 
 export const petMatingService = {
+  updateStatus: async (id, status) => {
+    try { const response = await api.patch(`/api/pet-mating/${id}/status`, {status}); return response.data; }
+    catch (error) { throw error.response?.data || error; }
+  },
+
   getProfiles: async (params = {}) => {
     try {
       const response = await api.get('/api/pet-mating', { params });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -248,7 +258,7 @@ export const petMatingService = {
       const response = await api.get(`/api/pet-mating/${id}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -257,7 +267,7 @@ export const petMatingService = {
       const response = await api.get('/api/pet-mating/my-profiles');
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -270,7 +280,7 @@ export const petMatingService = {
       });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -283,7 +293,7 @@ export const petMatingService = {
       });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -292,7 +302,7 @@ export const petMatingService = {
       const response = await api.patch(`/api/pet-mating/${id}/matched`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -301,7 +311,7 @@ export const petMatingService = {
       const response = await api.delete(`/api/pet-mating/${id}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -310,7 +320,7 @@ export const petMatingService = {
       const response = await api.post(`/api/pet-mating/${id}/contact`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -319,7 +329,7 @@ export const petMatingService = {
       const response = await api.post(`/api/pet-mating/${id}/report`, reportData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 };
@@ -331,7 +341,7 @@ export const userService = {
       const response = await api.get('/api/auth/profile');
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -340,7 +350,7 @@ export const userService = {
       const response = await api.get('/api/listings/my-listings');
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -349,7 +359,7 @@ export const userService = {
       const response = await api.put('/api/auth/update-profile', profileData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -358,7 +368,7 @@ export const userService = {
       const response = await api.post('/api/auth/complete-profile', profileData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -391,7 +401,7 @@ export const userService = {
       
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -400,7 +410,7 @@ export const userService = {
       const response = await api.delete('/api/auth/delete-photo');
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   }
 };
@@ -417,7 +427,7 @@ export const healthCheckService = {
       });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -427,10 +437,10 @@ export const healthCheckService = {
         imageUrl,
         animalType,
         ...options,
-      });
+      }, { timeout: 55000 });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -439,7 +449,7 @@ export const healthCheckService = {
       const response = await api.get(`/api/health-check/common-issues/${animalType}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -448,7 +458,7 @@ export const healthCheckService = {
       const response = await api.get('/api/health-check/emergency-symptoms');
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -457,7 +467,7 @@ export const healthCheckService = {
       const response = await api.get(`/api/health-check/vaccination/${animalType}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -466,13 +476,21 @@ export const healthCheckService = {
       const response = await api.get(`/api/health-check/deworming/${animalType}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 };
 
 // Pregnancy Calendar Service
 export const pregnancyService = {
+  recordCheckup: async (id, data) => {
+    try {
+      const response = await api.post(`/api/pregnancy/records/${id}/checkups`, data);
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || error.message);
+    }
+  },
   getRecords: async (status = null, animalType = null) => {
     try {
       const params = {};
@@ -481,7 +499,7 @@ export const pregnancyService = {
       const response = await api.get('/api/pregnancy/records', { params });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -490,7 +508,7 @@ export const pregnancyService = {
       const response = await api.get(`/api/pregnancy/records/${id}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -499,7 +517,7 @@ export const pregnancyService = {
       const response = await api.post('/api/pregnancy/records', data);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -508,7 +526,7 @@ export const pregnancyService = {
       const response = await api.put(`/api/pregnancy/records/${id}`, data);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -517,7 +535,7 @@ export const pregnancyService = {
       const response = await api.delete(`/api/pregnancy/records/${id}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -526,7 +544,7 @@ export const pregnancyService = {
       const response = await api.patch(`/api/pregnancy/records/${id}/deliver`, deliveryData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -535,7 +553,7 @@ export const pregnancyService = {
       const response = await api.patch(`/api/pregnancy/records/${id}/status`, { status, notes });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -547,7 +565,7 @@ export const pregnancyService = {
       const response = await api.get('/api/pregnancy/calendar', { params });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -556,7 +574,7 @@ export const pregnancyService = {
       const response = await api.get('/api/pregnancy/stats');
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -565,7 +583,7 @@ export const pregnancyService = {
       const response = await api.get('/api/pregnancy/my-animals');
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -574,19 +592,26 @@ export const pregnancyService = {
       const response = await api.get('/api/pregnancy/durations');
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   }
 };
 
 // Milk Report Service
 export const milkReportService = {
+  getAdvice: async (id, language = 'en') => (await api.get(`/api/milk-reports/cows/${id}/advice`, { params: { language }, timeout: 20000 })).data,
+  saveFeeding: async (id, data) => (await api.put(`/api/milk-reports/cows/${id}/feeding`, data, { timeout: 20000 })).data,
+  generateAdvice: async (id, language = 'en') => (await api.post(`/api/milk-reports/cows/${id}/advice`, { language }, { timeout: 45000 })).data,
+  getExpenses: async (params = {}) => (await api.get('/api/milk-reports/expenses', { params })).data,
+  createExpenses: async data => (await api.post('/api/milk-reports/expenses', data)).data,
+  updateExpense: async (id, data) => (await api.put(`/api/milk-reports/expenses/${id}`, data)).data,
+  deleteExpense: async id => (await api.delete(`/api/milk-reports/expenses/${id}`)).data,
   getCows: async (params = {}) => {
     try {
       const response = await api.get('/api/milk-reports/cows', { params });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -595,7 +620,7 @@ export const milkReportService = {
       const response = await api.post('/api/milk-reports/cows', data);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -604,7 +629,7 @@ export const milkReportService = {
       const response = await api.put(`/api/milk-reports/cows/${id}`, data);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -613,7 +638,7 @@ export const milkReportService = {
       const response = await api.delete(`/api/milk-reports/cows/${id}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -622,7 +647,7 @@ export const milkReportService = {
       const response = await api.get('/api/milk-reports/reports', { params });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -631,7 +656,7 @@ export const milkReportService = {
       const response = await api.post('/api/milk-reports/reports', data);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -640,7 +665,7 @@ export const milkReportService = {
       const response = await api.put(`/api/milk-reports/reports/${id}`, data);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -649,7 +674,7 @@ export const milkReportService = {
       const response = await api.delete(`/api/milk-reports/reports/${id}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -658,7 +683,7 @@ export const milkReportService = {
       const response = await api.get('/api/milk-reports/stats', { params });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 };
@@ -670,7 +695,7 @@ export const governmentSchemeService = {
       const response = await api.get('/api/government-schemes', { params });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -681,7 +706,7 @@ export const governmentSchemeService = {
       });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -692,7 +717,7 @@ export const governmentSchemeService = {
       });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 };
@@ -705,7 +730,7 @@ export const animalListingService = {
       const response = await api.get('/api/listings/featured', { params });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -719,30 +744,23 @@ export const animalListingService = {
       });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
   uploadListingPhotos: async (endpoint, listingId, photos) => {
-    try {
-      const formData = new FormData();
-      photos.forEach((photo, index) => {
-        formData.append(`photo${index + 1}`, {
-          uri: photo.uri,
-          type: 'image/jpeg',
-          name: `photo_${index + 1}.jpg`,
-        });
-      });
-
-      const response = await api.post(`/api/${endpoint}/listings/${listingId}/photos`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
+    const fields = ['cats', 'dogs', 'goats'].includes(endpoint)
+      ? ['photo1', 'photo2', 'photo3', 'photo4', 'photo5']
+      : ['frontPhoto', 'sidePhoto', endpoint === 'horses' ? 'fullBodyPhoto' : endpoint === 'other-animals' ? 'additionalPhoto' : 'milkScenePhoto'];
+    if (photos.length > fields.length) throw new Error('Too many listing photos');
+    const formData = new FormData();
+    photos.forEach((photo, index) => formData.append(fields[index], {
+      uri: photo.uri, type: photo.type || 'image/jpeg', name: photo.fileName || 'photo_' + index + '.jpg',
+    }));
+    const response = await api.put('/api/' + endpoint + '/listings/' + listingId, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
   },
 
   getMyListings: async () => {
@@ -750,7 +768,7 @@ export const animalListingService = {
       const response = await api.get('/api/animals/my-listings');
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   }
 };
@@ -768,7 +786,7 @@ export const veterinarianService = {
       });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -778,7 +796,7 @@ export const veterinarianService = {
       const response = await api.post('/api/veterinarians/send-otp', { phone_number: phoneNumber });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -788,7 +806,7 @@ export const veterinarianService = {
       const response = await api.post('/api/veterinarians/verify-otp', { phone_number: phoneNumber, otp });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -797,7 +815,7 @@ export const veterinarianService = {
       const response = await api.post('/api/veterinarians/send-otp', { phone_number: phoneNumber });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -807,7 +825,7 @@ export const veterinarianService = {
       const response = await api.post('/api/veterinarians/login', credentials);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -817,17 +835,17 @@ export const veterinarianService = {
       const response = await api.get('/api/veterinarians/profile/me');
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
   // Update profile
   updateProfile: async (profileData) => {
     try {
-      const response = await api.put('/api/veterinarians/profile/me', profileData);
+      const response = await api.put('/api/veterinarians/profile/me', profileData, profileData instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -839,7 +857,7 @@ export const veterinarianService = {
       const response = await api.get('/api/veterinarians/nearby', { params });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -851,7 +869,7 @@ export const veterinarianService = {
       });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -861,7 +879,7 @@ export const veterinarianService = {
       const response = await api.get(`/api/veterinarians/${id}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -871,7 +889,7 @@ export const veterinarianService = {
       const response = await api.get('/api/veterinarians/dashboard');
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 };
@@ -886,7 +904,7 @@ export const vetReviewService = {
       });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -896,7 +914,7 @@ export const vetReviewService = {
       const response = await api.post('/api/vet-reviews', reviewData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -906,7 +924,7 @@ export const vetReviewService = {
       const response = await api.get(`/api/vet-reviews/my-review/${veterinarianId}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -916,7 +934,7 @@ export const vetReviewService = {
       const response = await api.put(`/api/vet-reviews/${reviewId}`, reviewData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -926,7 +944,7 @@ export const vetReviewService = {
       const response = await api.delete(`/api/vet-reviews/${reviewId}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -936,7 +954,7 @@ export const vetReviewService = {
       const response = await api.post(`/api/vet-reviews/${reviewId}/helpful`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 };
@@ -949,7 +967,7 @@ export const vetReportService = {
       const response = await api.post('/api/vet-reports', reportData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -961,7 +979,7 @@ export const vetReportService = {
       });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 };
@@ -980,7 +998,7 @@ export const callLogService = {
       const response = await api.get(endpoint);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
   
@@ -991,7 +1009,7 @@ export const callLogService = {
       DeviceEventEmitter.emit('callHistory:updated');
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
   
@@ -1002,7 +1020,7 @@ export const callLogService = {
       DeviceEventEmitter.emit('callHistory:updated');
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
   
@@ -1012,7 +1030,7 @@ export const callLogService = {
       const response = await api.get('/api/call-logs/stats');
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
   
@@ -1022,7 +1040,7 @@ export const callLogService = {
       const response = await api.get(`/api/call-logs/listing/${listingType}/${listingId}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 };
@@ -1106,7 +1124,7 @@ export const appointmentService = {
       const response = await api.post('/api/appointments', appointmentData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -1118,7 +1136,7 @@ export const appointmentService = {
       });
       return normalizeAppointmentListResponse(response.data);
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -1130,7 +1148,7 @@ export const appointmentService = {
       });
       return normalizeAppointmentListResponse(response.data);
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -1140,7 +1158,7 @@ export const appointmentService = {
       const response = await api.get(`/api/appointments/${appointmentId}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -1153,7 +1171,7 @@ export const appointmentService = {
       });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -1163,7 +1181,7 @@ export const appointmentService = {
       const response = await api.patch(`/api/appointments/${appointmentId}/cancel`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -1176,7 +1194,7 @@ export const appointmentService = {
       });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -1186,7 +1204,7 @@ export const appointmentService = {
       const response = await api.get('/api/appointments/stats');
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 
@@ -1198,7 +1216,7 @@ export const appointmentService = {
       });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error;
+      throw error;
     }
   },
 };

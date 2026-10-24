@@ -2,7 +2,7 @@ import React from 'react';
 
 const SubmitButton = ({ loading, loadingText, submitText }) => {
   return (
-    <button type="submit" className="submit-button" disabled={loading}>
+    <button type="submit" className="simple-submit-button" disabled={loading}>
       {loading ? loadingText : submitText}
     </button>
   );

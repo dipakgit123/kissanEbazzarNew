@@ -1,6 +1,7 @@
 'use strict';
 
 const { DataTypes } = require('sequelize');
+const { calendarDate, addCalendarDays } = require('../utils/businessTime');
 
 // Pregnancy duration in days for different animal types
 const PREGNANCY_DURATION = {
@@ -17,6 +18,8 @@ const PREGNANCY_DURATION = {
 
 module.exports = (sequelize) => {
   const PregnancyRecord = sequelize.define('PregnancyRecord', {
+  animal_group: { type: DataTypes.STRING(8), allowNull: true },
+  animal_profile_id: DataTypes.INTEGER,
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
@@ -94,9 +97,14 @@ module.exports = (sequelize) => {
       field: 'mating_type'
     },
     status: {
-      type: DataTypes.ENUM('pregnant', 'delivered', 'miscarriage', 'false_pregnancy', 'cancelled'),
-      defaultValue: 'pregnant'
+      type: DataTypes.ENUM('pregnant', 'delivered', 'miscarriage', 'false_pregnancy', 'cancelled', 'pending_confirmation', 'not_pregnant'),
+      defaultValue: 'pending_confirmation'
     },
+    confirmation_source: { type: DataTypes.STRING(30), allowNull: false, defaultValue: 'breeding_recorded' },
+    confirmed_on: DataTypes.DATEONLY,
+    last_check_result: DataTypes.STRING(20),
+    next_check_date: DataTypes.DATEONLY,
+    date_corrections: { type: DataTypes.JSONB, allowNull: false, defaultValue: [] },
     health_status: {
       type: DataTypes.ENUM('healthy', 'needs_attention', 'critical'),
       defaultValue: 'healthy',
@@ -165,6 +173,7 @@ module.exports = (sequelize) => {
 
   // Associations
   PregnancyRecord.associate = (models) => {
+    if (models.PregnancyCheckup) PregnancyRecord.hasMany(models.PregnancyCheckup, { foreignKey: 'pregnancy_record_id', as: 'checkups' });
     if (models.User) {
       PregnancyRecord.belongsTo(models.User, {
         foreignKey: 'user_id',
@@ -188,9 +197,7 @@ module.exports = (sequelize) => {
   // Static method to calculate expected delivery date
   PregnancyRecord.calculateExpectedDeliveryDate = function(matingDate, animalType, customDurationDays) {
     const duration = this.getPregnancyDuration(animalType, customDurationDays);
-    const date = new Date(matingDate);
-    date.setDate(date.getDate() + duration);
-    return date.toISOString().split('T')[0];
+    return addCalendarDays(matingDate, duration);
   };
 
   // Static method to get all pregnancy durations
@@ -200,19 +207,19 @@ module.exports = (sequelize) => {
 
   // Instance method to calculate days remaining
   PregnancyRecord.prototype.getDaysRemaining = function() {
-    if (this.status !== 'pregnant') return 0;
-    const today = new Date();
-    const expectedDate = new Date(this.expected_delivery_date);
+    if (!['pregnant', 'pending_confirmation'].includes(this.status)) return 0;
+    const today = new Date(`${calendarDate()}T00:00:00Z`);
+    const expectedDate = new Date(`${this.expected_delivery_date}T00:00:00Z`);
     const diffTime = expectedDate - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return Math.max(0, diffDays);
+    return diffDays;
   };
 
   // Instance method to calculate pregnancy progress percentage
   PregnancyRecord.prototype.getProgressPercentage = function() {
-    if (this.status !== 'pregnant') return 100;
+    if (!['pregnant', 'pending_confirmation'].includes(this.status)) return 100;
     const matingDate = new Date(this.mating_date);
-    const today = new Date();
+    const today = new Date(`${calendarDate()}T00:00:00Z`);
     const daysPassed = Math.floor((today - matingDate) / (1000 * 60 * 60 * 24));
     const percentage = Math.min(100, Math.max(0, (daysPassed / this.pregnancy_duration_days) * 100));
     return Math.round(percentage);
@@ -227,13 +234,14 @@ module.exports = (sequelize) => {
   };
 
   // Instance method to mark as delivered
-  PregnancyRecord.prototype.markAsDelivered = async function(deliveryData) {
+  PregnancyRecord.prototype.markAsDelivered = async function(deliveryData, options = {}) {
     this.status = 'delivered';
-    this.actual_delivery_date = deliveryData.deliveryDate || new Date().toISOString().split('T')[0];
+    this.next_check_date = null;
+    this.actual_delivery_date = deliveryData.deliveryDate || calendarDate();
     if (deliveryData.offspringCount) this.offspring_count = deliveryData.offspringCount;
     if (deliveryData.offspringGender) this.offspring_gender = deliveryData.offspringGender;
     if (deliveryData.offspringDetails) this.offspring_details = deliveryData.offspringDetails;
-    await this.save();
+    await this.save(options);
   };
 
   // Instance method to get pregnancy milestones
@@ -254,12 +262,12 @@ module.exports = (sequelize) => {
     milestones.forEach(milestone => {
       if (!milestone.date) {
         const date = new Date(matingDate);
-        date.setDate(date.getDate() + milestone.day);
+        date.setUTCDate(date.getUTCDate() + milestone.day);
         milestone.date = date.toISOString().split('T')[0];
       }
 
       // Check if milestone is passed
-      milestone.passed = new Date(milestone.date) <= new Date();
+      milestone.passed = milestone.date <= calendarDate();
     });
 
     return milestones;

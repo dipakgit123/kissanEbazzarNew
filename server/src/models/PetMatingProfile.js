@@ -2,6 +2,7 @@
 
 module.exports = (sequelize, DataTypes) => {
   const PetMatingProfile = sequelize.define('PetMatingProfile', {
+  animal_profile_id: DataTypes.INTEGER,
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,

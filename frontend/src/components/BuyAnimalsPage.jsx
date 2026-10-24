@@ -1,8 +1,8 @@
+import { allowedSpecies } from '../utils/animalExperience';
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import CircleBar from './CircleBar';
+import BuyAnimalsDiscovery, { AnimalSearchInput } from './BuyAnimalsDiscovery';
 import AnimalCard from './AnimalCard';
-import DistanceToggle from './DistanceToggle';
 import AppLoader from './AppLoader';
 import { listingsService, userService } from '../services/api';
 import { useWishlist } from '../contexts/useWishlist';
@@ -68,27 +68,35 @@ const BuyAnimalsPage = () => {
     return () => window.clearTimeout(timer);
   }, [shouldScrollToListings, selectedCategory, distanceMode, selectedBreed, minPrice, maxPrice, searchQuery]);
 
-  // Scroll effect for sticky search bar
+  // Show the sticky copy only after the original search is behind the header.
   useEffect(() => {
     const handleScroll = () => {
-      if (searchBarRef.current) {
-        const rect = searchBarRef.current.getBoundingClientRect();
-        // Make sticky when search bar reaches the top (after header)
-        setIsSearchSticky(rect.top <= 80); // 80px is approximately header height
+      const searchInput = searchBarRef.current?.querySelector('.buy-animal-search');
+      if (searchInput) {
+        const headerHeight = window.matchMedia('(min-width: 640px)').matches ? 80 : 64;
+        setIsSearchSticky(searchInput.getBoundingClientRect().bottom <= headerHeight);
       }
     };
 
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', handleScroll);
+    const observer = new ResizeObserver(handleScroll);
+    if (searchBarRef.current) observer.observe(searchBarRef.current);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleScroll);
+      observer.disconnect();
+    };
   }, []);
 
   // Toggle wishlist function
   const handleToggleWishlist = (animalId) => {
     const animal = animalData.find(a => a.id === animalId);
     if (isInWishlist(animalId)) {
-      removeFromWishlist(animalId);
+      return removeFromWishlist(animalId);
     } else {
-      addToWishlist(animal);
+      return addToWishlist(animal);
     }
   };
 
@@ -137,7 +145,7 @@ const BuyAnimalsPage = () => {
   const matchesSelectedCategory = useCallback((animal, category) => {
     if (!category) return true;
 
-    const animalType = animal.animalType?.toLowerCase();
+    const animalType = (animal.species || animal.animalType)?.toLowerCase();
     const normalizedCategory = category.toLowerCase();
 
     if (normalizedCategory === 'cow' || normalizedCategory === 'bull') {
@@ -181,6 +189,7 @@ const BuyAnimalsPage = () => {
 
   const categoryItems = useMemo(
     () => [
+      { key: 'sheep', label: t('animalTypes.sheep'), helper: t('buyPage.browseAll'), image: null },
       {
         key: 'cow',
         label: t('buyPage.cows'),
@@ -229,7 +238,7 @@ const BuyAnimalsPage = () => {
         helper: t('buyPage.browseAll'),
         image: null,
       },
-    ],
+    ].filter(item => allowedSpecies(item.key)),
     [t]
   );
 
@@ -345,6 +354,7 @@ const BuyAnimalsPage = () => {
         const transformedListings = listings.map(listing => ({
           id: `${listing.animal_type}-${listing.id}`,
           listingId: listing.id,
+          species: listing.species,
           title: `${listing.breed_name || 'Unknown Breed'} | ${listing.animal_type.charAt(0).toUpperCase() + listing.animal_type.slice(1)}`,
           price: listing.expected_price ? Number(listing.expected_price).toLocaleString('en-IN') : '0',
           priceValue: Number(listing.expected_price) || 0,
@@ -457,169 +467,35 @@ const BuyAnimalsPage = () => {
   };
 
   return (
-    <div className="bg-gradient-to-br from-[#E9F0F8] to-[#F0F8FF] min-h-screen">
+    <div className="site-background min-h-screen">
       {/* Sticky Search Bar Container - Integrates into navbar */}
       {isSearchSticky && (
         <div className="fixed top-16 sm:top-20 left-0 right-0 z-40 bg-white/95 backdrop-blur-md shadow-lg border-b border-gray-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-            <div className="flex items-center justify-center gap-4">
-              {/* Centered Search Input */}
-              <div className="flex-1 max-w-2xl relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-                <input
-                  type="text"
-                  placeholder={t('buyPage.searchPlaceholder')}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#15BB73] focus:border-transparent transition-all duration-200 text-sm"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-                  >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-              {/* Results count on the right */}
-              <span className="hidden sm:block text-sm text-gray-600 whitespace-nowrap">
-                {filteredAnimals.length} {filteredAnimals.length === 1 ? t('buyPage.result') : t('buyPage.results')}
-              </span>
+            <div className="mx-auto max-w-2xl">
+              <AnimalSearchInput value={searchQuery} onChange={setSearchQuery} />
             </div>
           </div>
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <section ref={searchBarRef} className="mb-8 overflow-hidden rounded-[2rem] border border-cyan-100 bg-white/75 shadow-[0_24px_70px_rgba(15,23,42,0.07)] backdrop-blur-sm">
-          <div className="border-b border-cyan-100/80 px-4 py-4 sm:px-6">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-              <div className="flex min-w-0 items-center gap-3 text-sm text-slate-600">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#e8fff5] text-[#15BB73] shadow-sm">
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-slate-700">{locationLabel}</p>
-                  <p className="text-xs text-slate-500">{t('buyPage.pageSubtitle')}</p>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center xl:justify-end">
-                <div className="flex items-center justify-between gap-3 rounded-full bg-slate-50 px-4 py-2 text-sm text-slate-600 shadow-inner">
-                  <span className="font-medium">{t('buyPage.nearby')}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleDistanceModeChange(distanceMode === 'nearby' ? 'all' : 'nearby')}
-                    className={`relative h-7 w-14 rounded-full transition-colors duration-300 ${
-                      distanceMode === 'nearby' ? 'bg-[#15BB73]' : 'bg-slate-300'
-                    }`}
-                    aria-pressed={distanceMode === 'nearby'}
-                  >
-                    <span
-                      className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-300 ${
-                        distanceMode === 'nearby' ? 'translate-x-8' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                <div className="relative min-w-0 sm:w-72">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
-                  <input
-                    type="text"
-                    placeholder={t('buyPage.searchPlaceholder')}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full rounded-full border border-slate-200 bg-white px-10 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-[#15BB73] focus:ring-2 focus:ring-[#15BB73]/20"
-                  />
-                  {searchQuery && (
-                    <button
-                      onClick={() => setSearchQuery('')}
-                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 transition hover:text-slate-600"
-                    >
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="px-4 py-4 sm:px-6">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <h1 className="text-2xl font-bold text-[#000600] sm:text-3xl">{t('buyPage.browseByCategory')}</h1>
-                <p className="mt-1 text-sm text-slate-500">{t('buyPage.browseCategorySubtitle')}</p>
-              </div>
-              <span className="hidden rounded-full bg-[#eefcf5] px-4 py-2 text-sm font-medium text-[#0f8b54] sm:inline-flex">
-                {filteredAnimals.length} {filteredAnimals.length === 1 ? t('buyPage.result') : t('buyPage.results')}
-              </span>
-            </div>
-
-            <div className="hide-scrollbar -mx-1 overflow-x-auto pb-1">
-              <div className="flex min-w-max gap-2 px-1 sm:gap-3">
-                {categoryItems.map((category) => {
-                  const isSelected = selectedCategory === category.key;
-
-                  return (
-                    <button
-                      key={category.key}
-                      type="button"
-                      onClick={() => handleCategoryClick(category.key)}
-                      className={`group flex h-[84px] w-[96px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-[1rem] border px-2 py-2.5 text-center transition-all duration-300 sm:h-[96px] sm:w-[112px] ${
-                        isSelected
-                          ? 'border-[#15BB73] bg-[#e9fff5] shadow-[0_14px_30px_rgba(21,187,115,0.18)]'
-                          : 'border-cyan-100 bg-[linear-gradient(135deg,#ecffff_0%,#f9fffd_100%)] shadow-sm hover:-translate-y-0.5 hover:shadow-md'
-                      }`}
-                    >
-                      <div className={`relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[0.8rem] sm:h-12 sm:w-12 ${
-                        category.image ? 'bg-white/80 shadow-sm' : 'bg-slate-100'
-                      }`}>
-                        {category.image ? (
-                          <img
-                            src={category.image}
-                            alt={category.label}
-                            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                          />
-                        ) : (
-                          <svg className="h-5 w-5 text-slate-400 sm:h-6 sm:w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 5v14m7-7H5" />
-                          </svg>
-                        )}
-                      </div>
-
-                      <div className="w-full min-w-0">
-                        <p className={`truncate text-xs font-bold leading-tight sm:text-sm ${isSelected ? 'text-[#0f8b54]' : 'text-[#125f66]'}`}>
-                          {category.label}
-                        </p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </section>
+      <div className="max-w-7xl mx-auto px-0 sm:px-6 lg:px-8 py-4 sm:py-8">
+        <BuyAnimalsDiscovery
+          sectionRef={searchBarRef}
+          locationLabel={locationLabel}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          distanceMode={distanceMode}
+          onDistanceChange={handleDistanceModeChange}
+          categories={categoryItems}
+          selectedCategory={selectedCategory}
+          onCategoryChange={handleCategoryClick}
+          onClearCategory={clearCategoryFilter}
+        />
 
         {selectedCategory && (
           <section className="mb-8 overflow-hidden rounded-[1.75rem] border border-emerald-100 bg-white shadow-[0_18px_50px_rgba(21,187,115,0.08)]">
-            <div className="border-b border-emerald-100 bg-gradient-to-r from-emerald-50 via-white to-cyan-50 px-5 py-5 sm:px-7">
+            <div className="border-b border-emerald-100 bg-emerald-50 px-5 py-5 sm:px-7">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700/80">
@@ -632,10 +508,7 @@ const BuyAnimalsPage = () => {
                     {t('buyPage.refineSelectionSubtitle')}
                   </p>
                 </div>
-                <div className="rounded-2xl bg-white/90 px-4 py-3 text-sm text-gray-600 shadow-sm ring-1 ring-emerald-100">
-                  <span className="font-semibold text-[#0f2f23]">{animalsForSelectedCategory.length}</span>{' '}
-                  {animalsForSelectedCategory.length === 1 ? t('buyPage.result') : t('buyPage.results')}
-                </div>
+
               </div>
             </div>
 
@@ -647,7 +520,7 @@ const BuyAnimalsPage = () => {
                 <select
                   value={selectedBreed}
                   onChange={(e) => setSelectedBreed(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm transition-all duration-200 hover:border-emerald-200 hover:shadow-md focus:border-[#15BB73] focus:ring-2 focus:ring-[#15BB73]"
+                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm transition-all duration-200 hover:border-emerald-200 hover:shadow-md focus:border-primary focus:ring-2 focus:ring-primary"
                 >
                   <option value="">{t('buyPage.selectBreed')}</option>
                   {availableBreeds.map((breed) => (
@@ -669,7 +542,7 @@ const BuyAnimalsPage = () => {
                   placeholder={t('buyPage.minPrice')}
                   value={minPrice}
                   onChange={(e) => setMinPrice(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm transition-all duration-200 hover:border-emerald-200 hover:shadow-md focus:border-[#15BB73] focus:ring-2 focus:ring-[#15BB73]"
+                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm transition-all duration-200 hover:border-emerald-200 hover:shadow-md focus:border-primary focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -684,7 +557,7 @@ const BuyAnimalsPage = () => {
                   placeholder={t('buyPage.maxPrice')}
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm transition-all duration-200 hover:border-emerald-200 hover:shadow-md focus:border-[#15BB73] focus:ring-2 focus:ring-[#15BB73]"
+                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm transition-all duration-200 hover:border-emerald-200 hover:shadow-md focus:border-primary focus:ring-2 focus:ring-primary"
                 />
               </div>
             </div>
@@ -700,7 +573,7 @@ const BuyAnimalsPage = () => {
               {selectedCategory && (
                 <button
                   onClick={clearCategoryFilter}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#15BB73]/10 text-[#15BB73] rounded-lg text-sm font-medium hover:bg-[#15BB73]/20 transition-colors"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-sm font-medium hover:bg-primary/20 transition-colors"
                 >
                   <span>{getCategoryLabel(selectedCategory)}</span>
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -750,7 +623,7 @@ const BuyAnimalsPage = () => {
 
               <button
                 onClick={clearAllFilters}
-                className="ml-auto text-sm text-gray-600 hover:text-[#15BB73] font-medium transition-colors"
+                className="ml-auto text-sm text-gray-600 hover:text-primary font-medium transition-colors"
               >
                 {t('buyPage.clearAll')}
               </button>
@@ -768,7 +641,7 @@ const BuyAnimalsPage = () => {
         <div id="animal-listings" ref={listingsSectionRef} className="mb-8 scroll-mt-28">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-3">
             <div>
-              <h3 className="text-2xl font-bold text-[#000600]">
+              <h3 className="text-2xl font-bold text-ink">
                 {selectedCategory
                   ? getCategoryLabel(selectedCategory)
                   : searchQuery
@@ -785,7 +658,7 @@ const BuyAnimalsPage = () => {
             </div>
             {userLocation && distanceMode === 'nearby' && (
               <span className="text-sm text-gray-500 flex items-center">
-                <svg className="w-4 h-4 mr-1 text-[#15BB73]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 mr-1 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
@@ -846,7 +719,7 @@ const BuyAnimalsPage = () => {
                 {(selectedCategory || searchQuery || selectedBreed || minPrice || maxPrice) && (
                   <button
                     onClick={clearAllFilters}
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />

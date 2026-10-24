@@ -1,0 +1,1034 @@
+{
+  "generatedAt": "2026-10-19T19:00:36.234Z",
+  "scope": "Local isolated runtime fixes",
+  "summary": {
+    "checks": 119,
+    "passed": 119,
+    "failed": 0,
+    "parsedSourceFiles": 358,
+    "syntaxErrors": 0,
+    "frontendLintErrors": 0,
+    "browserRoutes": 27,
+    "browserPageErrors": 0,
+    "httpRouteRequests": 585,
+    "migrations": 43,
+    "frontendBuild": "PASS",
+    "androidBundle": "PASS",
+    "iosBundle": "PASS",
+    "shutdown": "PASS",
+    "runtimeUtilities": "PASS",
+    "notificationUnitTests": "PASS"
+  },
+  "areas": [
+    [
+      "Account and listing integrity",
+      "Explicit editable-field lists for six listing controllers and veterinarian profiles; stronger generated vet passwords; moderation state and featured flags protected."
+    ],
+    [
+      "OTP authentication",
+      "Cryptographic code generation; direct-provider debug output restricted to explicitly enabled development; persistent attempt blocks; existing blocks preserved; row locks prevent code reuse; veterinarian OTPs hashed with cooldown and attempt limits."
+    ],
+    [
+      "Public data and privacy",
+      "Published-only blog/scheme feeds; removed listings hidden; moderation notes and internal media keys removed from public pet responses; nearby-user phone exposure removed; sensitive veterinarian documents stored separately and served through admin authentication."
+    ],
+    [
+      "Database consistency",
+      "One shared Sequelize configuration; explicit TLS settings and certificate validation; transactional milk/cow updates; unique active appointment slots, daily milk reports, and animal identities; idempotent review helpful votes."
+    ],
+    [
+      "Appointment and date handling",
+      "Invalid UUIDs return client errors; terminal status transitions restricted; India business dates used for booking validation and reminders; web booking URLs fetch veterinarian details and survive reload."
+    ],
+    [
+      "Media and AI requests",
+      "Original media retained until request succeeds; new uploads cleaned after failure including late parallel completions; failed cow uploads cannot silently succeed; AI image requests restricted to approved HTTPS storage hosts and public DNS addresses with pinned resolution, bounded size, timeout and no redirects."
+    ],
+    [
+      "Notifications and sockets",
+      "Failed push sends remain retryable; actual outcomes propagate to callers; blocked recipients are checked before delivery; existing sockets revoked when account access is denied and tokens expire; nearby notification candidates filtered and paginated in PostgreSQL."
+    ],
+    [
+      "Calls, views and API bounds",
+      "Recipient/listing ownership checked before recording calls; per-participant history deletion implemented; atomic daily view counting shared across listing routes; pagination/radius bounded; invalid wishlist checks return client errors; production server errors sanitized."
+    ],
+    [
+      "Mobile stability and sessions",
+      "Translation-readiness hook order fixed in three screens; conditional hook order corrected in AnimalCard; farmer/vet tokens selected independently; role-specific 401 cleanup; Axios error metadata preserved; account-scoped wishlist cache and species-aware identity; photo upload helper uses supported routes and field names."
+    ],
+    [
+      "Web wishlist and configuration",
+      "Server-backed wishlist persistence, seller contacts and per-account cache; async mutation errors propagated to UI; cross-tab session refresh; missing map coordinates distinguished from zero; maps key read from environment; Netlify SPA fallback added."
+    ],
+    [
+      "Release and process lifecycle",
+      "Placeholder mobile API URLs removed; preview/production require a real HTTPS endpoint and reject cleartext opt-in; share package corrected and placeholder App Store link removed; SIGTERM/SIGINT close sockets, HTTP, scheduled jobs, timers and database."
+    ]
+  ],
+  "deployment": [
+    "Run npm run runtime:preflight from server against the intended deployment database. This is read-only and reports duplicate IDs plus legacy public document owners. The audit ran it only against isolated local data.",
+    "Reconcile any reported duplicate active appointments, daily milk reports or animal identities before running npm run db:migrate. The new migration fails transactionally on duplicates rather than deleting or guessing which business record to keep. Apply migrations before starting the new server.",
+    "Configure AWS_S3_PRIVATE_BUCKET as a separate bucket with all S3 public-access blocking enabled and no public bucket policy; grant the backend read/write permissions. New identity-document uploads intentionally fail if separate private storage is missing.",
+    "Move existing license, degree and Aadhaar objects out of public storage, update their document and *_public_id columns to private:<bucket>:<key>, verify admin downloads, and remove old public objects and cached CDN copies. The preflight lists affected veterinarian IDs; live object migration was not authorized or performed.",
+    "Set the actual HTTPS API URL in preview/production EAS environments and leave EXPO_PUBLIC_ALLOW_CLEARTEXT false. Configure DB_SSL and the trusted CA as needed. Review existing RATE_LIMIT_MAX_REQUESTS overrides against the new 1000-per-15-minute default.",
+    "Set VITE_GOOGLE_MAPS_API_KEY with appropriate origin/API restrictions and rotate or restrict the formerly embedded key. Set EXPO_PUBLIC_IOS_STORE_URL only when the actual App Store URL is available. Real .env files were not modified."
+  ],
+  "limits": [
+    "No configured remote database or live SMS, email, push, AI, geocoding or object-storage service was contacted by the application tests. External delivery and provider behavior were simulated locally where needed.",
+    "Android and iOS JavaScript/Hermes bundles were exported successfully. Physical-device camera, GPS, permissions, push delivery, native compilation/signing and App Store installation were not tested; no emulator or device was available.",
+    "The HTTP route sweep includes four postal-code 500 responses because external geocoding was blocked. These are recorded as provider coverage limitations, not counted as successful provider tests.",
+    "The initial public pet-detail check failed before a follow-up fix. Its passing replacement is explicitly recorded in extended-results.json. The booking deep-link problem found by browser follow-up was fixed and retested.",
+    "This report covers the inspected code and reproduced cases. Passing tests do not prove that no undiscovered defects remain. No deployment or live-data migration was performed."
+  ],
+  "checks": [
+    {
+      "source": "api-results.json",
+      "name": "health connects to migrated PostgreSQL",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "all registered models can query migrated tables",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "cow public list/detail",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "cow rejects another owner update",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "buffalo public list/detail",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "buffalo rejects another owner update",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "horse public list/detail",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "horse rejects another owner update",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "goat public list/detail",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "goat rejects another owner update",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "cat public list/detail",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "cat rejects another owner update",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "dog public list/detail",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "dog rejects another owner update",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "other public list/detail",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "other rejects another owner update",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "veterinarian password login",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "farmer profile and role isolation",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "invalid and expired tokens rejected",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "cow update protects owner and counters",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "buffalo update protects owner and counters",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "horse update protects owner and counters",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "goat update protects owner and counters",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "cat update protects owner and counters",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "dog update protects owner and counters",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "other update protects owner and counters",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "deleted listing is hidden publicly",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "pet moderation cannot be overridden by owner",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "public pet detail excludes admin notes",
+      "result": "PASS",
+      "originalResult": "FAIL",
+      "recheckedIn": "extended-results.json"
+    },
+    {
+      "source": "api-results.json",
+      "name": "vet profile prevents password and verification overwrite",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "nearby user API excludes non-listing account phones",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "location setup returns validation error when already set",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "wishlist add/list/remove across species",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "pregnancy create/read/update and ownership",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "milk report calculations and duplicate rejection",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "appointment create/detail/cancel and ownership",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "concurrent appointment booking allows one reservation",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "cancelled appointment cannot reclaim a booked slot",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "call logging rejects mismatched receiver and listing",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "mobile call delete API exists",
+      "result": "PASS"
+    },
+    {
+      "source": "api-results.json",
+      "name": "AI image URL cannot fetch loopback service",
+      "result": "PASS"
+    },
+    {
+      "source": "focused-results.json",
+      "name": "cow protected-field mutation reaches controller",
+      "result": "PASS"
+    },
+    {
+      "source": "focused-results.json",
+      "name": "buffalo protected-field mutation reaches controller",
+      "result": "PASS"
+    },
+    {
+      "source": "focused-results.json",
+      "name": "horse protected-field mutation reaches controller",
+      "result": "PASS"
+    },
+    {
+      "source": "focused-results.json",
+      "name": "goat protected-field mutation reaches controller",
+      "result": "PASS"
+    },
+    {
+      "source": "focused-results.json",
+      "name": "cat protected-field mutation reaches controller",
+      "result": "PASS"
+    },
+    {
+      "source": "focused-results.json",
+      "name": "dog protected-field mutation reaches controller",
+      "result": "PASS"
+    },
+    {
+      "source": "focused-results.json",
+      "name": "other protected-field mutation reaches controller",
+      "result": "PASS"
+    },
+    {
+      "source": "focused-results.json",
+      "name": "pet moderation bypass with an available request quota",
+      "result": "PASS"
+    },
+    {
+      "source": "focused-results.json",
+      "name": "vet protected-field mutation with an available request quota",
+      "result": "PASS"
+    },
+    {
+      "source": "focused-results.json",
+      "name": "real multipart image upload to local S3 protocol emulator",
+      "result": "PASS"
+    },
+    {
+      "source": "focused-results.json",
+      "name": "image replacement failure preserves original stored object",
+      "result": "PASS"
+    },
+    {
+      "source": "focused-results.json",
+      "name": "invalid MIME upload rejected",
+      "result": "PASS"
+    },
+    {
+      "source": "focused-results.json",
+      "name": "oversized image rejected",
+      "result": "PASS"
+    },
+    {
+      "source": "focused-results.json",
+      "name": "upload quota enforces limit for one client",
+      "result": "PASS"
+    },
+    {
+      "source": "focused-results.json",
+      "name": "OTP send and verify with simulated SMS delivery",
+      "result": "PASS"
+    },
+    {
+      "source": "focused-results.json",
+      "name": "indefinite block remains after OTP request",
+      "result": "PASS"
+    },
+    {
+      "source": "focused-results.json",
+      "name": "OTP maximum-attempt block persists in PostgreSQL",
+      "result": "PASS"
+    },
+    {
+      "source": "focused-results.json",
+      "name": "OTP cannot be consumed concurrently more than once",
+      "result": "PASS"
+    },
+    {
+      "source": "focused-results.json",
+      "name": "concurrent milk reports reject duplicate days",
+      "result": "PASS"
+    },
+    {
+      "source": "focused-results.json",
+      "name": "malformed appointment UUID gives client error",
+      "result": "PASS"
+    },
+    {
+      "source": "focused-results.json",
+      "name": "missing wishlist check parameters give client error",
+      "result": "PASS"
+    },
+    {
+      "source": "additional-results.json",
+      "name": "OTP send/verify service completes with real database and simulated delivery",
+      "result": "PASS"
+    },
+    {
+      "source": "additional-results.json",
+      "name": "OTP request cannot remove indefinite account block",
+      "result": "PASS"
+    },
+    {
+      "source": "additional-results.json",
+      "name": "failed FCM sends are not reported delivered or permanently deduplicated",
+      "result": "PASS"
+    },
+    {
+      "source": "additional-results.json",
+      "name": "Socket.IO rejects missing authentication",
+      "result": "PASS"
+    },
+    {
+      "source": "additional-results.json",
+      "name": "Socket.IO authenticates farmer and veterinarian",
+      "result": "PASS"
+    },
+    {
+      "source": "additional-results.json",
+      "name": "Socket.IO emits listing notification to intended farmer",
+      "result": "PASS"
+    },
+    {
+      "source": "content-socket-results.json",
+      "name": "admin password login succeeds",
+      "result": "PASS"
+    },
+    {
+      "source": "content-socket-results.json",
+      "name": "admin creates draft blog and public slug hides it",
+      "result": "PASS"
+    },
+    {
+      "source": "content-socket-results.json",
+      "name": "anonymous blog status filter cannot reveal drafts",
+      "result": "PASS"
+    },
+    {
+      "source": "content-socket-results.json",
+      "name": "blog publish and public read succeed",
+      "result": "PASS"
+    },
+    {
+      "source": "content-socket-results.json",
+      "name": "admin creates draft government scheme",
+      "result": "PASS"
+    },
+    {
+      "source": "content-socket-results.json",
+      "name": "anonymous scheme status filter cannot reveal drafts",
+      "result": "PASS"
+    },
+    {
+      "source": "content-socket-results.json",
+      "name": "scheme publish and public read succeed",
+      "result": "PASS"
+    },
+    {
+      "source": "content-socket-results.json",
+      "name": "review create, rating aggregation and owner isolation",
+      "result": "PASS"
+    },
+    {
+      "source": "content-socket-results.json",
+      "name": "review helpful vote is idempotent per user",
+      "result": "PASS"
+    },
+    {
+      "source": "content-socket-results.json",
+      "name": "listing report can be created and resolved by admin",
+      "result": "PASS"
+    },
+    {
+      "source": "content-socket-results.json",
+      "name": "notification preferences save independently per recipient",
+      "result": "PASS"
+    },
+    {
+      "source": "content-socket-results.json",
+      "name": "real Socket.IO notification delivery",
+      "result": "PASS"
+    },
+    {
+      "source": "content-socket-results.json",
+      "name": "blocking account revokes existing Socket.IO delivery",
+      "result": "PASS"
+    },
+    {
+      "source": "extended-results.json",
+      "name": "public pet detail omits moderation and storage fields after increment/reload",
+      "result": "PASS"
+    },
+    {
+      "source": "extended-results.json",
+      "name": "rejected pet cannot use matched endpoint to regain owner activation",
+      "result": "PASS"
+    },
+    {
+      "source": "extended-results.json",
+      "name": "view counter and daily uniqueness agree across legacy and combined routes",
+      "result": "PASS"
+    },
+    {
+      "source": "extended-results.json",
+      "name": "nearby user query excludes blocked users and bounds database results",
+      "result": "PASS"
+    },
+    {
+      "source": "extended-results.json",
+      "name": "private identity document upload has no public URL and uses encryption",
+      "result": "PASS"
+    },
+    {
+      "source": "extended-results.json",
+      "name": "private document download requires admin and streams exact stored bytes",
+      "result": "PASS"
+    },
+    {
+      "source": "extended-results.json",
+      "name": "veterinarian OTP cooldown, hashing and concurrent single use",
+      "result": "PASS"
+    },
+    {
+      "source": "extended-results.json",
+      "name": "veterinarian OTP attempt block persists",
+      "result": "PASS"
+    },
+    {
+      "source": "extended-results.json",
+      "name": "business dates and appointment instants are correct under UTC server timezone",
+      "result": "PASS"
+    },
+    {
+      "source": "extended-results.json",
+      "name": "media lifecycle preserves old object and cleans delayed uploads after failure",
+      "result": "PASS"
+    },
+    {
+      "source": "extended-results.json",
+      "name": "API pagination rejects non-numeric or unbounded values",
+      "result": "PASS"
+    },
+    {
+      "source": "final-api-results.json",
+      "name": "call deletion hides only the requesting participant history",
+      "result": "PASS"
+    },
+    {
+      "source": "final-api-results.json",
+      "name": "listing creation still delivers nearby notifications after SQL filtering",
+      "result": "PASS"
+    },
+    {
+      "source": "final-api-results.json",
+      "name": "rejected AI image URL produces client error without network access",
+      "result": "PASS"
+    },
+    {
+      "source": "final-api-results.json",
+      "name": "failed image upload cannot silently create an incomplete cow listing",
+      "result": "PASS"
+    },
+    {
+      "source": "mobile-component-results.json",
+      "name": "CallHistoryScreen.js renders through translation readiness transition",
+      "result": "PASS"
+    },
+    {
+      "source": "mobile-component-results.json",
+      "name": "VetAppointmentsScreen.js renders through translation readiness transition",
+      "result": "PASS"
+    },
+    {
+      "source": "mobile-component-results.json",
+      "name": "VetRegistrationScreen.js renders through translation readiness transition",
+      "result": "PASS"
+    },
+    {
+      "source": "mobile-component-results.json",
+      "name": "mobile wishlist distinguishes same ID across species",
+      "result": "PASS"
+    },
+    {
+      "source": "mobile-component-results.json",
+      "name": "mobile wishlist reloads when login changes",
+      "result": "PASS"
+    },
+    {
+      "source": "mobile-api-results.json",
+      "name": "farmer and vet requests select their own token when both sessions exist",
+      "result": "PASS"
+    },
+    {
+      "source": "mobile-api-results.json",
+      "name": "login failures do not attach an unrelated authenticated session",
+      "result": "PASS"
+    },
+    {
+      "source": "mobile-api-results.json",
+      "name": "401 clears only the matching role and preserves the original Axios error",
+      "result": "PASS"
+    },
+    {
+      "source": "mobile-api-results.json",
+      "name": "late 401 from an old session cannot remove a newly signed-in session",
+      "result": "PASS"
+    },
+    {
+      "source": "browser-flow-results.json",
+      "name": "milk reports page finishes rendering",
+      "result": "PASS"
+    },
+    {
+      "source": "browser-flow-results.json",
+      "name": "create animal through milk-report web form",
+      "result": "PASS"
+    },
+    {
+      "source": "browser-flow-results.json",
+      "name": "create milk report through web form",
+      "result": "PASS"
+    },
+    {
+      "source": "browser-flow-results.json",
+      "name": "buy page renders at mobile viewport without horizontal overflow",
+      "result": "PASS"
+    },
+    {
+      "source": "browser-wishlist-results.json",
+      "name": "web wishlist button persists to API and survives reload",
+      "result": "PASS"
+    },
+    {
+      "source": "browser-wishlist-results.json",
+      "name": "server-backed wishlist retains seller contact and survives removal",
+      "result": "PASS"
+    },
+    {
+      "source": "browser-wishlist-results.json",
+      "name": "switching accounts cannot expose another account wishlist",
+      "result": "PASS"
+    },
+    {
+      "source": "browser-wishlist-results.json",
+      "name": "booking page resolves beyond loading state",
+      "result": "PASS"
+    },
+    {
+      "source": "release-config-results.json",
+      "name": "Release build rejects http://localhost:5000",
+      "result": "PASS"
+    },
+    {
+      "source": "release-config-results.json",
+      "name": "Release build rejects https://api.example.com",
+      "result": "PASS"
+    },
+    {
+      "source": "release-config-results.json",
+      "name": "Release build rejects https://127.0.0.1",
+      "result": "PASS"
+    },
+    {
+      "source": "release-config-results.json",
+      "name": "Release build rejects missing API URL",
+      "result": "PASS"
+    },
+    {
+      "source": "release-config-results.json",
+      "name": "Release config accepts a configured HTTPS host without contacting it",
+      "result": "PASS"
+    },
+    {
+      "source": "release-config-results.json",
+      "name": "Release config rejects cleartext opt-in",
+      "result": "PASS"
+    }
+  ],
+  "files": [
+    {
+      "file": ".gitignore",
+      "sha256": "2d94af1f8a4fa47609cf22a816ab2f192de5c79591f92b0285fb8d02506c07b6"
+    },
+    {
+      "file": "frontend/netlify.toml",
+      "sha256": "62ec4247c367696eee54548e0df14a8660d8af9415606d2dd9aad4440e5a6bc1"
+    },
+    {
+      "file": "frontend/src/components/AnimalCard.jsx",
+      "sha256": "8844d24e6461660dfd65df08c3042c339a87383fc6dd3910cf06b9dc61a2473d"
+    },
+    {
+      "file": "frontend/src/components/AppointmentBookingForm.jsx",
+      "sha256": "8aca6ce5a1bc8519fb57e0aecbf39640ae98c6131369999d5efdb7aabe412da6"
+    },
+    {
+      "file": "frontend/src/components/BuyAnimalsPage.jsx",
+      "sha256": "87a7e4a0da16ea246aced9110aca0cc7db5427b764e184fe20306f63358f7d0a"
+    },
+    {
+      "file": "frontend/src/components/HomePage.jsx",
+      "sha256": "1b7e490d6859d8ba958104531a50750917a2419e3b973062391969db45289363"
+    },
+    {
+      "file": "frontend/src/components/MapView.jsx",
+      "sha256": "0c822b8979ff3653b040e0767d8912c4d900a3c0b03123319cfe4dab42581113"
+    },
+    {
+      "file": "frontend/src/components/WishlistPage.jsx",
+      "sha256": "d2579f9ba8020d188b3f516649c9758358252d77fc08fd757f49c612531dda45"
+    },
+    {
+      "file": "frontend/src/components/admin/AdminDashboard.jsx",
+      "sha256": "2a578c7c9a444c36d91cd1630f39a284dc859c14c8c3639f737fcb3479d0065c"
+    },
+    {
+      "file": "frontend/src/contexts/WishlistContext.jsx",
+      "sha256": "caf87ddfcfd26694b0ebde560add2a33f57a0c216e3e1bb084efd391a5b0de27"
+    },
+    {
+      "file": "mobile/.env.example",
+      "sha256": "836f93c03eb1089cc49c84f3d375f782e5cbd57f4ab8c9f8e18d1608885d4415"
+    },
+    {
+      "file": "mobile/app.config.js",
+      "sha256": "5d02daab14d4bad1c645e2ea4490580cf1890dc4800c42efebbd89e4d76221c4"
+    },
+    {
+      "file": "mobile/app.json",
+      "sha256": "0ff19a5c704487385d7ac9ab3d087edefd3ffa812034c4dbb787e6bed1abfc11"
+    },
+    {
+      "file": "mobile/eas.json",
+      "sha256": "9e3f6fd1f7ffef6b59bc96ec6ad93110af0325249b6332e51c0929cca6010c84"
+    },
+    {
+      "file": "mobile/src/components/AnimalCard.js",
+      "sha256": "dce760a16fd723ea2c1d65198b62aadb36a2aae83f15b2f926a2dcae95801d84"
+    },
+    {
+      "file": "mobile/src/context/AuthContext.js",
+      "sha256": "12f62497e19af412156e1d0a98a451f718774d99307757c95af8ea0e1d6b3027"
+    },
+    {
+      "file": "mobile/src/context/VetAuthContext.js",
+      "sha256": "3e1570e5a413c5bea117cdce9460b54bdd188d5a86003793bd8e4885ee10a1ea"
+    },
+    {
+      "file": "mobile/src/context/WishlistContext.js",
+      "sha256": "3fcf194f9a9e5bb8db9d021f544af7c72bd2645aa3507f5f98880e574caf44f0"
+    },
+    {
+      "file": "mobile/src/screens/AnimalDetailScreen.js",
+      "sha256": "d00436e2562ac02ab9790fc9d803a1060febf660a0029075f2aebbd7c3b1f40f"
+    },
+    {
+      "file": "mobile/src/screens/CallHistoryScreen.js",
+      "sha256": "e5246c5cdc67fae1928823b8b18b3a8b5e2c2119709bda64f378ba917e5030a1"
+    },
+    {
+      "file": "mobile/src/screens/MapScreen.js",
+      "sha256": "304b2ce8eb0e7a462dc189071dbcecc4f52106194da35cf8adef81d00f7d6e0a"
+    },
+    {
+      "file": "mobile/src/screens/ProfileScreen.js",
+      "sha256": "6ced34357c66c327b34ac4e241f99e061705a5b38963946555c07a87c977ed61"
+    },
+    {
+      "file": "mobile/src/screens/VetAppointmentsScreen.js",
+      "sha256": "f90dd17e0f2a8d87f562803ed06f7628e7b65557dbb26d261a0b8222cb85889b"
+    },
+    {
+      "file": "mobile/src/screens/VetRegistrationScreen.js",
+      "sha256": "d3c84e26d46891a343ff98fe84ae4dcd06b3b3d7e652e4e67cf699f798ae5790"
+    },
+    {
+      "file": "mobile/src/services/api.js",
+      "sha256": "7d5579d72448ea0276153bc8d2556dc25b8cac4e3b13ead6662fcafa9a7c7db8"
+    },
+    {
+      "file": "server/.env.example",
+      "sha256": "a651988365c122dfb4e364efb7b1d572a5c860ecb1d97412278e22597a1730f9"
+    },
+    {
+      "file": "server/package.json",
+      "sha256": "88a5a2b48bd0b547b31998abf1b0ad7b76ab4b13d6c697597c0c2c2a109d9c07"
+    },
+    {
+      "file": "server/scripts/check-runtime-data.js",
+      "sha256": "4bd29e696cdfe144f1e7e7b12bdfce3c7cf3a76d343ae969e13f8b2585434e0b"
+    },
+    {
+      "file": "server/scripts/test-notification-delivery.js",
+      "sha256": "1765578ed409cd5cf126988bd4fa0d0f364bd0247dbfd83d08f6161505cc33b8"
+    },
+    {
+      "file": "server/scripts/test-runtime-utilities.js",
+      "sha256": "ecbd889fc7c33d353ea2bd9e9a70364b2fab301b17808c826450046a4b0f5fb5"
+    },
+    {
+      "file": "server/server.js",
+      "sha256": "2122c2b866ed048593bba961b576196e3e6cb64200b2ac9a425723027a486b28"
+    },
+    {
+      "file": "server/src/config/app.js",
+      "sha256": "b5515db1c4ee5e58ca3535a2b0af64dcc7aa46b4d53f0af0f2d3f7c25bb3904f"
+    },
+    {
+      "file": "server/src/config/cloudinary.js",
+      "sha256": "e51a5d1211598caca4a64c428c1c4fc0a57450baa9b7946317abbadec78d8c6c"
+    },
+    {
+      "file": "server/src/config/config.js",
+      "sha256": "3178089c08d27e5a9c2bc92ea10bba1c9680bd6a24683dd0b3a334975477acc5"
+    },
+    {
+      "file": "server/src/config/database.js",
+      "sha256": "812530ff461e3f7a63afc1717567abb42274904f0cfcfb0584e4b38768d5354c"
+    },
+    {
+      "file": "server/src/config/rateLimiter.js",
+      "sha256": "b13d8210d3801fd957648973dd3ac2ab2c656f1306b22c86ab8f8a42db12e5b8"
+    },
+    {
+      "file": "server/src/config/socket.js",
+      "sha256": "6ca45206b8351f68572a3f8a740f633d5eccac1109860e0d396407d7ad6eadf2"
+    },
+    {
+      "file": "server/src/controllers/aiHealthController.js",
+      "sha256": "5bcb148ae18ff58c44da483d7275f87ca2155616ea18e1c55e3634d15e638e5f"
+    },
+    {
+      "file": "server/src/controllers/animalListingController.js",
+      "sha256": "76245793d569b4ceca173f8da1bd9233b3aa2078dea3b4272f7db2ded873e802"
+    },
+    {
+      "file": "server/src/controllers/appointmentController.js",
+      "sha256": "d7566ca558f7f5b7ccde62eb087f4df36e9651d678a798e4d70672994d8632d7"
+    },
+    {
+      "file": "server/src/controllers/blogController.js",
+      "sha256": "3bf5d207b2a93701160db3eff8936f19e5b26134b7afbf77ed70754d278d1284"
+    },
+    {
+      "file": "server/src/controllers/buffaloListingController.js",
+      "sha256": "f24e718b96f8b4231b2b8e024cd6ba8d3a60f4446ab747052aa6ece806d4f184"
+    },
+    {
+      "file": "server/src/controllers/callLogController.js",
+      "sha256": "dc8c2d1e27690ae6ffec75286978cf8ea8e502cee663838195e73d91a49cb399"
+    },
+    {
+      "file": "server/src/controllers/catListingController.js",
+      "sha256": "7755f2a8173e7bea85b4c68c1fd667dc8a6ffd97b00ff04b0a3248f33e48638b"
+    },
+    {
+      "file": "server/src/controllers/combinedListingsController.js",
+      "sha256": "1acb55c10feeb6800ede7f51166ea064ec24227e58b35e2947bb5ef670f5b14c"
+    },
+    {
+      "file": "server/src/controllers/dogListingController.js",
+      "sha256": "cad801299fa0fb758bde28804dd0cfd9e640007d4dfe295a65d22c7fe3bf869d"
+    },
+    {
+      "file": "server/src/controllers/goatListingController.js",
+      "sha256": "cd6f52b2984bc5778a282307aafb202ebf513df6dc99e3378b391b1e932ee67c"
+    },
+    {
+      "file": "server/src/controllers/governmentSchemeController.js",
+      "sha256": "2d01418f2050a5750029a3a11a43539eaacecb94d1e20a5403694c7b2d2b7175"
+    },
+    {
+      "file": "server/src/controllers/horseListingController.js",
+      "sha256": "1f31badda1f59e4cb2ceef5fcf769f9899859227c236c69798a6b0ea4f2129e6"
+    },
+    {
+      "file": "server/src/controllers/milkReportController.js",
+      "sha256": "c9f583651278e4eceae23f74340f1a8a50c41cdc91516b57deab4ba7ef32eb36"
+    },
+    {
+      "file": "server/src/controllers/otherAnimalListingController.js",
+      "sha256": "9a36c06642c3a414eb051b2ae6e3f4632d9d5b879134f46fd32854d637c0df8e"
+    },
+    {
+      "file": "server/src/controllers/petMatingController.js",
+      "sha256": "dc1925c2398b16b721ad9f6059b9d45db574819df8f89bfb69c063044b8eace9"
+    },
+    {
+      "file": "server/src/controllers/vetReviewController.js",
+      "sha256": "dd02c9e59b015e74fe30a8a31d35479991db9a841f7afe3f747ecf9c8fc4c008"
+    },
+    {
+      "file": "server/src/controllers/veterinarianController.js",
+      "sha256": "f0d5fcfff4251dfc57f5b7dec20cdab2d36361795aec584b52ee5a4c61b57e5d"
+    },
+    {
+      "file": "server/src/controllers/wishlistController.js",
+      "sha256": "2b5c0e1a5a1c81da95e38863bd412abc7fb4b9eebfefa3bf9ca567127a1d8216"
+    },
+    {
+      "file": "server/src/migrations/20261019000000-enforce-runtime-integrity.js",
+      "sha256": "4a575c94522ef1745cdd9bbbbd5ea0f94a50a1d3d48721f06a47cdf0f5631a84"
+    },
+    {
+      "file": "server/src/models/AnimalListing.js",
+      "sha256": "1a038b16a61baab56b63a8a1eec5a12bff673ed61c5f71415185a8f17a5e4784"
+    },
+    {
+      "file": "server/src/models/BuffaloListing.js",
+      "sha256": "41ab7025a52c5cddfe7273379d08448a6be084535b71644fd0c04ca7cdafffd6"
+    },
+    {
+      "file": "server/src/models/CallLog.js",
+      "sha256": "37c2b6433a46eb9a9fa07770913d92a1957b6ac866d9f908f291a7915fd15b38"
+    },
+    {
+      "file": "server/src/models/CatListing.js",
+      "sha256": "8018f873b77009d7b964fc3867708f5b2846e3ac6dc59cacff882344a9adad4a"
+    },
+    {
+      "file": "server/src/models/DogListing.js",
+      "sha256": "33c96dfb8057256e3adf4faf81b02e50b38e3d39da5e49f86f0c34cb44e962e4"
+    },
+    {
+      "file": "server/src/models/GoatListing.js",
+      "sha256": "0f174653e681ea35de19272713ba30e114d8533e679faddfe7e2fe1cbcd048c3"
+    },
+    {
+      "file": "server/src/models/HorseListing.js",
+      "sha256": "1cfdd30b5b592923f9a5b78aa4cb8d64746317698433a7883339d37b616650af"
+    },
+    {
+      "file": "server/src/models/Notification.js",
+      "sha256": "6a1fa46831aae24a3f6b759a1cd28cafa0754671fecdbd37bc93c742a0f9593a"
+    },
+    {
+      "file": "server/src/models/OtherAnimalListing.js",
+      "sha256": "d95b46d53fdee7cd7e3dd02d0590c41529515f4d2c81147e5f4f912affc1568e"
+    },
+    {
+      "file": "server/src/models/VetReviewHelpfulVote.js",
+      "sha256": "53e08e4ec18ba0e022a176a68f066c196b4fa70e8d09f2221a59a1b1a9b9c7c4"
+    },
+    {
+      "file": "server/src/models/Veterinarian.js",
+      "sha256": "0c7de227d161d82f4852db3ef4ff0e3e101b7dbd1bc45343e71e3fcd03b405d9"
+    },
+    {
+      "file": "server/src/models/index.js",
+      "sha256": "4a5cf812940fe39a1ee6065d26bf4541961aad60a1fcc15f9c6aa948410bc4db"
+    },
+    {
+      "file": "server/src/routes/adminRoutes.js",
+      "sha256": "19d4dd21eb5cff4f2fa7fa8be421eca339b5ea46c09e8a461692e2a163e13bc7"
+    },
+    {
+      "file": "server/src/routes/appointmentRoutes.js",
+      "sha256": "fd88b320a148afbcfa88cb985965d64e42b8b90d1728574e87ea41dfbdc9d0af"
+    },
+    {
+      "file": "server/src/routes/callLogRoutes.js",
+      "sha256": "179e31bdccc18766fb43f38d7f8cb3cdb6167a5da9c82341dc0f7698deb322c2"
+    },
+    {
+      "file": "server/src/services/aiHealthService.js",
+      "sha256": "04c916b463ceebedd563abcca7110a9b8db8d7a1530aa48e367533665bd7f3ca"
+    },
+    {
+      "file": "server/src/services/listingViewService.js",
+      "sha256": "86f2b2fd174a58a83115e136219b6f7fa70ef6aa32d4a9541e5cf7444ab96ad9"
+    },
+    {
+      "file": "server/src/services/locationService.js",
+      "sha256": "52fe2dda182b4dc015abd0d54ceb81188200c80066fb94bd40d488c17288324e"
+    },
+    {
+      "file": "server/src/services/nearbyUserService.js",
+      "sha256": "3107a8420f4327e3e4171a2bfa09e85c30816f9c9c60d8d7f4ab9d3df32dc1ce"
+    },
+    {
+      "file": "server/src/services/notificationService.js",
+      "sha256": "190408bbcbe825a6b4ee93eda3d6022a22db81ad7f7b4b0715a917c0772be70f"
+    },
+    {
+      "file": "server/src/services/otpService.js",
+      "sha256": "521dfc3e71af2c0e10ff1e7432a785aad9b2c9c83128580ebf074436aba5eddc"
+    },
+    {
+      "file": "server/src/services/scheduledNotifications.js",
+      "sha256": "849691aaa78026ce03010ae604ed5bd9169e7f51c7c93eadecea88ed68fbd9d1"
+    },
+    {
+      "file": "server/src/services/vetOtpService.js",
+      "sha256": "b078860822c895f7bcb16972cff1d073e0155ae83891309cddc77c8d90a103cb"
+    },
+    {
+      "file": "server/src/utils/businessTime.js",
+      "sha256": "ac25183e7b6ea30228115f54713a5323fa0de4d7c32b13785ba19e1719b2d6a8"
+    },
+    {
+      "file": "server/src/utils/editableFields.js",
+      "sha256": "73547e45f83cad094939fef39b5ab9aa6e786f217e2d3765633fe009b3c56778"
+    },
+    {
+      "file": "server/src/utils/mediaLifecycle.js",
+      "sha256": "9ceea6ab28e2f9af1982860b817084b12d53cb574c4fc621de84b44ddbe777ef"
+    },
+    {
+      "file": "server/src/utils/otpGenerator.js",
+      "sha256": "32549d2b2bc3a4bcc8c8800b5c1d201bed57442430683cd664e8bb1b64ff2f8b"
+    },
+    {
+      "file": "server/src/utils/safeImageFetch.js",
+      "sha256": "8333b3488773c229375b01ee242d14ba1546f1bc0dcb89da8a8ac3f0b830b077"
+    },
+    {
+      "file": "server/src/utils/whatsappReactivate.js",
+      "sha256": "2d1ff96ec95d080f8530ec7d891d6ed400b4b595dd744e4149451a1aecf1ce57"
+    }
+  ],
+  "followups": [
+    {
+      "date": "2026-10-21",
+      "issue": "Returning users cannot resend login OTP because their account is already verified",
+      "status": "Resend code fixed; initial SMS non-delivery remains unverified",
+      "tests": ".runtime-audit/otp-resend-results.json",
+      "passed": 7,
+      "delivery": "User reaches code-entry screen but receives no SMS. Configured provider is Twilio SMS; awaiting message delivery status/error code. No live services contacted."
+    }
+  ]
+}

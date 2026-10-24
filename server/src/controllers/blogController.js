@@ -68,6 +68,7 @@ class BlogController {
         content,
         excerpt: excerpt || content.substring(0, 200) + '...',
         category: category || 'general',
+        audience: req.body.audience || 'unassigned',
         tags: normalizeTags(tags, []),
         author_id: adminId,
         status: status || BLOG_STATUS.DRAFT,
@@ -122,7 +123,7 @@ class BlogController {
       const sanitizedSortBy = validSortFields.includes(sortBy) ? sortBy : 'published_at';
       const sanitizedOrder = String(order).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-      const effectiveStatus = status ?? (req.admin ? 'all' : 'published');
+      const effectiveStatus = req.admin ? (status ?? 'all') : 'published';
 
       if (!validStatuses.includes(effectiveStatus)) {
         return res.status(400).json({
@@ -336,6 +337,7 @@ class BlogController {
 
       if (excerpt !== undefined) updates.excerpt = excerpt;
       if (category !== undefined) updates.category = category;
+      if (req.body.audience !== undefined) updates.audience = req.body.audience;
       if (tags !== undefined) updates.tags = normalizeTags(tags, blog.tags);
       if (meta_description !== undefined) updates.meta_description = meta_description;
       if (meta_keywords !== undefined) updates.meta_keywords = meta_keywords;

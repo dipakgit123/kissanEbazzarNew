@@ -33,11 +33,13 @@ exports.getWishlist = async (req, res) => {
         }
 
         try {
-          const animal = await Model.findByPk(item.animal_id);
+          const animal = await Model.findByPk(item.animal_id, {
+            include: [{ association: 'seller', attributes: ['id', 'full_name', 'phone_number', 'city', 'state'] }]
+          });
           
-          if (!animal) {
+          if (!animal || !['active', 'sold'].includes(animal.status)) {
             // Animal no longer exists, remove from wishlist
-            await item.destroy();
+            // Keep historical entries; an unclassified or hidden listing is not a deleted record.
             return null;
           }
 
@@ -91,7 +93,7 @@ exports.addToWishlist = async (req, res) => {
     const Model = animalModels[animal_type];
     const animal = await Model.findByPk(animal_id);
 
-    if (!animal) {
+    if (!animal || animal.status !== 'active') {
       return res.status(404).json({
         success: false,
         message: 'Animal not found'
@@ -212,6 +214,9 @@ exports.checkWishlist = async (req, res) => {
   try {
     const userId = req.user.id;
     const { animal_type, animal_id } = req.query;
+    if (!animalModels[animal_type] || !Number.isInteger(Number(animal_id)) || Number(animal_id) <= 0) {
+      return res.status(400).json({ success: false, message: 'Valid animal_type and animal_id are required' });
+    }
 
     const exists = await Wishlist.findOne({
       where: {

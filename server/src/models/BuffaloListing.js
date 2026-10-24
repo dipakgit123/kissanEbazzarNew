@@ -207,8 +207,7 @@ module.exports = (sequelize) => {
 
   // Instance methods
   BuffaloListing.prototype.incrementViews = async function() {
-    this.views += 1;
-    await this.save();
+    await this.increment('views');
   };
 
   BuffaloListing.prototype.markAsSold = async function() {

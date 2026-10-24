@@ -1,9 +1,6 @@
 'use strict';
 
-const toNumber = (value) => {
-  const parsed = Number.parseFloat(value ?? 0);
-  return Number.isFinite(parsed) ? parsed : 0;
-};
+const { calculate } = require('../utils/milkReportMath');
 
 module.exports = (sequelize, DataTypes) => {
   const MilkReport = sequelize.define('MilkReport', {
@@ -91,10 +88,19 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: 0,
       field: 'other_cost'
     },
+    morning_sold_liters: { type: DataTypes.DECIMAL(10, 2), allowNull: true },
+    afternoon_sold_liters: { type: DataTypes.DECIMAL(10, 2), allowNull: true },
+    morning_price_per_liter: { type: DataTypes.DECIMAL(10, 2), allowNull: true },
+    afternoon_price_per_liter: { type: DataTypes.DECIMAL(10, 2), allowNull: true },
+    amount_received: { type: DataTypes.DECIMAL(10, 2), allowNull: true },
+    home_liters: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
+    calf_liters: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
+    discarded_liters: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
     notes: {
       type: DataTypes.TEXT,
       allowNull: true
-    }
+    },
+    expense_status: { type: DataTypes.STRING(16), allowNull: false, defaultValue: 'unknown' }
   }, {
     tableName: 'milk_reports',
     underscored: true,
@@ -119,40 +125,9 @@ module.exports = (sequelize, DataTypes) => {
     }
   };
 
-  MilkReport.prototype.getTotalLiters = function() {
-    return toNumber(this.morning_liters) + toNumber(this.afternoon_liters);
-  };
-
-  MilkReport.prototype.getTotalRevenue = function() {
-    return this.getTotalLiters() * toNumber(this.price_per_liter);
-  };
-
-  MilkReport.prototype.getTotalCost = function() {
-    return (
-      toNumber(this.feed_cost) +
-      toNumber(this.medicine_cost) +
-      toNumber(this.labor_cost) +
-      toNumber(this.other_cost)
-    );
-  };
-
-  MilkReport.prototype.getProfitOrLoss = function() {
-    return this.getTotalRevenue() - this.getTotalCost();
-  };
-
-  MilkReport.prototype.getProfitStatus = function() {
-    const difference = this.getProfitOrLoss();
-
-    if (difference > 0) {
-      return 'profit';
-    }
-
-    if (difference < 0) {
-      return 'loss';
-    }
-
-    return 'break_even';
-  };
+  for (const [method, field] of Object.entries({ getTotalLiters: 'total_liters', getTotalRevenue: 'total_revenue', getTotalCost: 'total_cost', getProfitOrLoss: 'profit_or_loss', getProfitStatus: 'profit_status' })) {
+    MilkReport.prototype[method] = function() { return calculate(this)[field]; };
+  }
 
   return MilkReport;
 };

@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { locationService, userService } from '../services/api';
 
 const getMapEmbedUrl = (latitude, longitude) => {
+  if (latitude === '' || longitude === '' || latitude == null || longitude == null) return '';
   const lat = Number(latitude);
   const lng = Number(longitude);
 
@@ -439,14 +440,16 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
     : t('profile.fetchingAddressFromLocation', { defaultValue: 'Your address is being fetched from your location...' });
 
   return (
-    <div className="bg-white rounded-2xl shadow-xl overflow-hidden max-h-[90vh] overflow-y-auto">
+    <div className="profile-editor bg-white rounded-2xl shadow-xl overflow-hidden max-h-[90vh] overflow-y-auto">
       {/* Header */}
-      <div className="bg-gradient-to-r from-[#15BB73] to-[#0FA568] px-6 py-4">
+      <div className="profile-editor-heading bg-primary px-6 py-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold text-white">{t('profile.editProfile')}</h2>
           <button
             type="button"
             onClick={onCancel}
+            aria-label={t('profile.close')}
+            disabled={loading || uploadingPhoto}
             className="text-white/80 hover:text-white transition-colors"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -465,7 +468,7 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
               onClick={!uploadingPhoto ? handlePhotoClick : undefined}
               className={`h-24 w-24 rounded-full overflow-hidden flex items-center justify-center shadow-lg cursor-pointer transition-all ${
                 uploadingPhoto ? 'opacity-50' : 'hover:opacity-90'
-              } ${photoPreview ? 'bg-gray-200' : 'bg-gradient-to-br from-[#15BB73] to-[#0FA568]'}`}
+              } ${photoPreview ? 'bg-gray-200' : 'bg-primary'}`}
             >
               {photoPreview ? (
                 <img
@@ -516,7 +519,7 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
               type="button"
               onClick={handlePhotoClick}
               disabled={uploadingPhoto}
-              className="text-sm text-[#15BB73] hover:text-[#0FA568] font-medium disabled:opacity-50"
+              className="text-sm text-primary hover:text-primary-hover font-medium disabled:opacity-50"
             >
               {photoPreview ? t('profile.changePhoto') || 'Change Photo' : t('profile.addPhoto') || 'Add Photo'}
             </button>
@@ -538,14 +541,16 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
 
         {/* Name Field */}
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1">
+          <label htmlFor="profile-edit-name" className="block text-sm font-semibold text-gray-700 mb-1">
             {t('profile.name')} <span className="text-red-500">*</span>
           </label>
           <input
+            id="profile-edit-name"
             name="name"
+            autoComplete="name"
             value={form.name}
             onChange={handleChange}
-            className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all ${
+            className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all ${
               errors.name ? 'border-red-400' : 'border-gray-200'
             }`}
             placeholder={t('profile.namePlaceholder') || 'Enter your full name'}
@@ -555,10 +560,11 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
 
         {/* Phone Field (readonly) */}
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1">
+          <label htmlFor="profile-edit-phone" className="block text-sm font-semibold text-gray-700 mb-1">
             {t('profile.phone')}
           </label>
           <input
+            id="profile-edit-phone"
             value={form.phone}
             readOnly
             className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-500 cursor-not-allowed"
@@ -568,15 +574,16 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
 
         {/* Address Field */}
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1">
+          <label htmlFor="profile-edit-address" className="block text-sm font-semibold text-gray-700 mb-1">
             {t('profile.address')} <span className="text-red-500">*</span>
           </label>
           <textarea
+            id="profile-edit-address"
             name="address"
             value={form.address}
             onChange={handleChange}
             rows={2}
-            className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all resize-none ${
+            className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none ${
               errors.address ? 'border-red-400' : 'border-gray-200'
             }`}
             placeholder={t('profile.addressPlaceholder') || 'Enter your complete address'}
@@ -585,14 +592,14 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
         </div>
 
         {isFetchingAddress && (
-          <div className="rounded-2xl border border-[#15BB73]/20 bg-[#15BB73]/8 px-4 py-3">
+          <div className="rounded-2xl border border-primary/20 bg-primary/8 px-4 py-3">
             <div className="flex items-center gap-3">
-              <svg className="h-5 w-5 animate-spin text-[#15BB73]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg className="h-5 w-5 animate-spin text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
               <div>
-                <p className="text-sm font-semibold text-[#0F8F5D]">
+                <p className="text-sm font-semibold text-primary">
                   {t('profile.fetchingAddressTitle', { defaultValue: 'Fetching location details' })}
                 </p>
                 <p className="text-xs text-[#3A6E57]">
@@ -603,13 +610,13 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
           </div>
         )}
 
-        <div className="rounded-2xl border border-[#15BB73]/20 bg-[#15BB73]/5 p-4 space-y-3">
+        <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 space-y-3">
           <div className="flex flex-col sm:flex-row gap-2">
             <button
               type="button"
               onClick={handleFindOnMap}
               disabled={resolvingLocation || uploadingPhoto}
-              className="flex-1 rounded-xl border border-[#15BB73]/20 bg-white px-4 py-2.5 text-sm font-semibold text-[#0F8F5D] hover:bg-[#F3FFF9] transition-colors disabled:opacity-50"
+              className="flex-1 rounded-xl border border-primary/20 bg-white px-4 py-2.5 text-sm font-semibold text-primary hover:bg-[#F3FFF9] transition-colors disabled:opacity-50"
             >
               {resolvingLocation ? t('common.loading', { defaultValue: 'Loading...' }) : t('profile.findOnMap', { defaultValue: 'Find real location on map' })}
             </button>
@@ -617,7 +624,7 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
               type="button"
               onClick={handleUseCurrentLocation}
               disabled={resolvingLocation || uploadingPhoto}
-              className="flex-1 rounded-xl border border-[#15BB73]/20 bg-white px-4 py-2.5 text-sm font-semibold text-[#0F8F5D] hover:bg-[#F3FFF9] transition-colors disabled:opacity-50"
+              className="flex-1 rounded-xl border border-primary/20 bg-white px-4 py-2.5 text-sm font-semibold text-primary hover:bg-[#F3FFF9] transition-colors disabled:opacity-50"
             >
               {t('profile.useCurrentLocation', { defaultValue: 'Use current location' })}
             </button>
@@ -641,21 +648,24 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
 
         {/* Pincode Field */}
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1">
+          <label htmlFor="profile-edit-pincode" className="block text-sm font-semibold text-gray-700 mb-1">
             {t('profile.pincode')} <span className="text-red-500">*</span>
           </label>
           <input
+            id="profile-edit-pincode"
             name="pincode"
+            inputMode="numeric"
+            autoComplete="postal-code"
             value={form.pincode}
             onChange={handleChange}
             maxLength={6}
-            className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all ${
+            className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all ${
               errors.pincode ? 'border-red-400' : 'border-gray-200'
             }`}
             placeholder={t('profile.pincodePlaceholder') || 'Enter 6-digit pincode'}
           />
           {lookingUpPincode && (
-            <p className="text-[#0F8F5D] text-xs mt-1">
+            <p className="text-primary text-xs mt-1">
               {t('profile.pincodeLookupLoading', { defaultValue: 'Looking up address from pincode...' })}
             </p>
           )}
@@ -664,41 +674,44 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
+            <label htmlFor="profile-edit-city" className="block text-sm font-semibold text-gray-700 mb-1">
               {t('profile.city', { defaultValue: 'City' })}
             </label>
             <input
-              name="city"
+              id="profile-edit-city"
+            name="city"
               value={form.city}
               onChange={handleChange}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all"
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
               placeholder={t('profile.cityPlaceholder') || 'City'}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
+            <label htmlFor="profile-edit-state" className="block text-sm font-semibold text-gray-700 mb-1">
               {t('profile.state', { defaultValue: 'State' })}
             </label>
             <input
-              name="state"
+              id="profile-edit-state"
+            name="state"
               value={form.state}
               onChange={handleChange}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all"
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
               placeholder={t('profile.statePlaceholder') || 'State'}
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1">
+          <label htmlFor="profile-edit-country" className="block text-sm font-semibold text-gray-700 mb-1">
             {t('profile.country', { defaultValue: 'Country' })}
           </label>
           <input
+            id="profile-edit-country"
             name="country"
             value={form.country}
             onChange={handleChange}
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all"
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
             placeholder={t('profile.country', { defaultValue: 'Country' })}
           />
         </div>
@@ -706,21 +719,23 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
         {(form.latitude || form.longitude) && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+              <label htmlFor="profile-edit-latitude" className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
                 {t('profile.latitude', { defaultValue: 'Latitude' })}
               </label>
               <input
-                value={form.latitude}
+                id="profile-edit-latitude"
+            value={form.latitude}
                 readOnly
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-500"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+              <label htmlFor="profile-edit-longitude" className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
                 {t('profile.longitude', { defaultValue: 'Longitude' })}
               </label>
               <input
-                value={form.longitude}
+                id="profile-edit-longitude"
+            value={form.longitude}
                 readOnly
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-500"
               />
@@ -741,7 +756,7 @@ const EditProfileForm = ({ onCancel, onSave, initialData = {}, loading = false, 
           <button
             type="submit"
             disabled={loading || uploadingPhoto || resolvingLocation}
-            className="flex-1 py-3 rounded-xl bg-gradient-to-r from-[#15BB73] to-[#0FA568] font-semibold text-white hover:from-[#0FA568] hover:to-[#15BB73] transition-all shadow-lg shadow-[#15BB73]/30 disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-1 py-3 rounded-xl bg-primary font-semibold text-white hover:bg-primary-hover transition-all shadow-lg shadow-primary/30 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {loading ? (
               <>

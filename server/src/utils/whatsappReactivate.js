@@ -127,7 +127,7 @@ function startAutoReactivation(checkIntervalMinutes = 60) {
   });
 
   // Schedule periodic reactivation checks
-  setInterval(async () => {
+  return setInterval(async () => {
     logger.log('🔍 Checking if WhatsApp reactivation needed...');
     const result = await autoReactivateWhatsApp();
 

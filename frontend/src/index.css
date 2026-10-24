@@ -2,6 +2,18 @@
 
 /* Font Family Configuration for Multi-language Support */
 :root {
+  /* RGB channels keep shared colors compatible with Tailwind opacity utilities. */
+  --palette-primary: 17 116 78;
+  --palette-primary-hover: 14 95 64;
+  --palette-forest: 22 78 59;
+  --palette-ink: 24 61 46;
+  --palette-muted: 95 112 101;
+  --palette-canvas: 231 239 233;
+  --palette-surface: 255 255 255;
+  --palette-cream: 255 253 246;
+  --palette-gold: 245 230 185;
+  --palette-line: 214 226 216;
+  --site-background: rgb(var(--palette-canvas));
   /* Noto Sans Devanagari is the best font for Hindi and Marathi
      - Excellent Devanagari script support
      - Clean and modern design
@@ -15,6 +27,8 @@
 
 body {
   margin: 0;
+  background-color: var(--site-background);
+  color: rgb(var(--palette-ink));
   font-family: var(--font-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -127,4 +141,102 @@ html[lang="mr"] {
 }
 
 @tailwind components;
+
+@layer components {
+  /* Clip off-screen page decoration without creating a second scroll container.
+     Nested horizontal lists retain their own scrolling; sticky headers still work. */
+  .site-layout {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: clip;
+  }
+
+  .site-brand-name {
+    color: #183d2e;
+  }
+
+  .site-background {
+    background-color: var(--site-background);
+  }
+
+  .action-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 12px 20px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.5;
+    text-align: center;
+    text-decoration: none;
+    background-image: none;
+    transition: background-color 160ms ease, border-color 160ms ease;
+  }
+
+  .action-button > svg { flex-shrink: 0; }
+
+  .action-button-primary {
+    background-color: rgb(var(--palette-primary));
+    border-color: rgb(var(--palette-primary));
+    color: rgb(var(--palette-surface));
+  }
+
+  .action-button-primary:hover {
+    background-color: rgb(var(--palette-primary-hover));
+    border-color: rgb(var(--palette-primary-hover));
+  }
+
+  .action-button-secondary {
+    background-color: rgb(var(--palette-surface));
+    border-color: rgb(var(--palette-primary));
+    color: rgb(var(--palette-primary));
+  }
+
+  .action-button-secondary:hover {
+    background-color: rgb(var(--palette-canvas));
+    border-color: rgb(var(--palette-primary-hover));
+    color: rgb(var(--palette-primary-hover));
+  }
+
+  .action-button:focus-visible {
+    outline: 3px solid rgb(var(--palette-primary));
+    outline-offset: 3px;
+  }
+
+  .action-button:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+  }
+}
+
 @tailwind utilities;
+
+/* Shared control styling: solid, readable actions without decorative glow or zoom. */
+:is(button, a, [role="button"], input[type="submit"], input[type="button"]) {
+  box-shadow: none !important;
+  text-shadow: none;
+}
+
+:is(button, a, [role="button"], input[type="submit"], input[type="button"]):focus-visible {
+  outline: 3px solid rgb(var(--palette-primary));
+  outline-offset: 3px;
+}
+
+/* Keep positioning transforms, open/close chevrons and loading spinners functional. */
+[class*="hover:scale-"], [class*="active:scale-"] {
+  --tw-scale-x: 1 !important;
+  --tw-scale-y: 1 !important;
+}
+
+[class*="hover:rotate-"] { --tw-rotate: 0deg !important; }
+[class*="hover:-translate-y-"] { --tw-translate-y: 0px !important; }
+
+.animate-shimmer, .animate-pulse-glow, .animate-float { animation: none; }
+.animate-pulse-glow { box-shadow: none; }
+
+.site-header-icon svg { stroke-width: 1.8; }

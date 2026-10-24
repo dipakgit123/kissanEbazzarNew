@@ -7,7 +7,7 @@ import { listingsService } from '../services/api';
 import { FullPageLoader, InlineLoader } from './AppLoader';
 import { safeJsonParse } from '../utils/stringUtils';
 
-const GOOGLE_MAPS_API_KEY = 'AIzaSyAXGS_YosP1JmJL1KaLbW4ibs-rblbnUNQ';
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
 const ANIMAL_EMOJIS = {
   cow: '\uD83D\uDC04',
@@ -53,7 +53,7 @@ const LoadingComponent = ({ t }) => (
 );
 
 const ErrorComponent = ({ t }) => (
-  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#E9F0F8] to-[#F0F8FF]">
+  <div className="flex h-full w-full items-center justify-center bg-canvas">
     <div className="p-8 text-center">
       <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
         <svg className="h-8 w-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -77,9 +77,9 @@ const getMarkerColor = (type) => {
     dog: '#14B8A6',
     cat: '#F97316',
     bull: '#F59E0B',
-    animal: '#15BB73'
+    animal: '#11744e'
   };
-  return colors[String(type || '').toLowerCase()] || '#15BB73';
+  return colors[String(type || '').toLowerCase()] || '#11744e';
 };
 
 const formatPrice = (price) => {
@@ -304,8 +304,8 @@ const MapView = ({ addToWishlist, removeFromWishlist, isInWishlist }) => {
   const mapInstanceRef = useRef(null);
   const hasAppliedQuerySelectionRef = useRef(false);
   const requestedListingId = searchParams.get('listingId');
-  const requestedLatitude = Number(searchParams.get('lat'));
-  const requestedLongitude = Number(searchParams.get('lng'));
+  const requestedLatitude = searchParams.has('lat') && searchParams.get('lat') !== '' ? Number(searchParams.get('lat')) : NaN;
+  const requestedLongitude = searchParams.has('lng') && searchParams.get('lng') !== '' ? Number(searchParams.get('lng')) : NaN;
   const currentUser = safeJsonParse(localStorage.getItem('userData'), null);
   const currentUserId = currentUser?.id ?? currentUser?.user_id ?? null;
 
@@ -436,13 +436,11 @@ const MapView = ({ addToWishlist, removeFromWishlist, isInWishlist }) => {
     }
   }, [fetchAnimals, userLocation]);
 
-  const handleToggleWishlist = useCallback((animal) => {
-    if (isInWishlist?.(animal.id)) {
-      removeFromWishlist?.(animal.id);
-      return;
-    }
-
-    addToWishlist?.(animal);
+  const handleToggleWishlist = useCallback(async (animal) => {
+    const result = isInWishlist?.(animal.id)
+      ? await removeFromWishlist?.(animal.id)
+      : await addToWishlist?.(animal);
+    if (result?.success === false) toast.error(result.message);
   }, [addToWishlist, isInWishlist, removeFromWishlist]);
 
   const filteredAnimals = filterType === 'all'
@@ -523,18 +521,18 @@ const MapView = ({ addToWishlist, removeFromWishlist, isInWishlist }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#E9F0F8] to-[#F0F8FF]">
+    <div className="site-background min-h-screen">
       <div className="border-b border-gray-200 bg-white shadow-lg">
         <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8 lg:py-4">
           <div className="flex items-center space-x-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#15BB73] to-[#0FA568] shadow-lg lg:h-12 lg:w-12">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary shadow-lg lg:h-12 lg:w-12">
               <svg className="h-6 w-6 text-white lg:h-7 lg:w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </div>
             <div>
-              <h1 className="text-xl font-bold text-[#000600] lg:text-2xl">{t('mapView.title')}</h1>
+              <h1 className="text-xl font-bold text-ink lg:text-2xl">{t('mapView.title')}</h1>
               <p className="text-xs text-gray-600 lg:text-sm">{t('mapView.subtitle')}</p>
             </div>
           </div>
@@ -546,7 +544,9 @@ const MapView = ({ addToWishlist, removeFromWishlist, isInWishlist }) => {
           {loading ? (
             <LoadingComponent t={t} />
           ) : (
-            <Wrapper apiKey={GOOGLE_MAPS_API_KEY} render={render} />
+            GOOGLE_MAPS_API_KEY
+              ? <Wrapper apiKey={GOOGLE_MAPS_API_KEY} render={render} />
+              : <ErrorComponent t={t} />
           )}
 
           <div className="absolute right-2 top-2 z-10 space-y-2 lg:right-4 lg:top-4">
@@ -592,9 +592,9 @@ const MapView = ({ addToWishlist, removeFromWishlist, isInWishlist }) => {
           <div className="p-4 lg:p-6">
             <div className="mb-4">
               <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-[#000600] lg:text-xl">{t('mapView.nearestAnimals')}</h2>
+                <h2 className="text-lg font-bold text-ink lg:text-xl">{t('mapView.nearestAnimals')}</h2>
                 {refreshing && (
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-[#15BB73] border-t-transparent"></div>
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
                 )}
               </div>
 
@@ -603,7 +603,7 @@ const MapView = ({ addToWishlist, removeFromWishlist, isInWishlist }) => {
                   onClick={() => setFilterType('all')}
                   className={`rounded-full px-3 py-1.5 text-sm font-medium transition-all ${
                     filterType === 'all'
-                      ? 'bg-[#15BB73] text-white'
+                      ? 'bg-primary text-white'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
@@ -615,7 +615,7 @@ const MapView = ({ addToWishlist, removeFromWishlist, isInWishlist }) => {
                     onClick={() => setFilterType(type)}
                     className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium transition-all ${
                       filterType === type
-                        ? 'bg-[#15BB73] text-white'
+                        ? 'bg-primary text-white'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
@@ -642,7 +642,7 @@ const MapView = ({ addToWishlist, removeFromWishlist, isInWishlist }) => {
                       key={`${animal.animal_type || animal.animalType}-${animal.id}`}
                       className={`cursor-pointer rounded-xl border-2 p-3 transition-all duration-300 hover:shadow-lg lg:p-4 ${
                         selectedAnimal?.id === animal.id
-                          ? 'border-[#15BB73] bg-green-50'
+                          ? 'border-primary bg-green-50'
                           : 'border-gray-200 bg-white hover:border-green-300'
                       }`}
                       onClick={() => setSelectedAnimal(animal)}
@@ -703,7 +703,7 @@ const MapView = ({ addToWishlist, removeFromWishlist, isInWishlist }) => {
                       )}
 
                       <div className="mb-2 flex items-center justify-between lg:mb-3">
-                        <span className="text-base font-bold text-[#15BB73] lg:text-lg">
+                        <span className="text-base font-bold text-primary lg:text-lg">
                           {'\u20B9'}{formatPrice(animal.expected_price || animal.price)}
                         </span>
                         <span className="truncate text-xs text-gray-600 lg:text-sm">
@@ -717,7 +717,7 @@ const MapView = ({ addToWishlist, removeFromWishlist, isInWishlist }) => {
                             event.stopPropagation();
                             window.open(`tel:${animal.seller?.phone || animal.phoneNumber}`, '_self');
                           }}
-                          className="flex-1 rounded-lg bg-gradient-to-r from-[#15BB73] to-[#0FA568] px-2 py-2 text-xs font-semibold text-white transition-all duration-300 hover:shadow-lg lg:px-3 lg:text-sm"
+                          className="flex-1 rounded-lg bg-primary px-2 py-2 text-xs font-semibold text-white transition-all duration-300 hover:shadow-lg lg:px-3 lg:text-sm"
                         >
                           {t('animalCard.call')}
                         </button>
@@ -732,7 +732,7 @@ const MapView = ({ addToWishlist, removeFromWishlist, isInWishlist }) => {
                             });
                             window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(message)}`, '_blank');
                           }}
-                          className="flex-1 rounded-lg bg-gradient-to-r from-green-500 to-green-600 px-2 py-2 text-xs font-semibold text-white transition-all duration-300 hover:shadow-lg lg:px-3 lg:text-sm"
+                          className="flex-1 rounded-lg bg-primary px-2 py-2 text-xs font-semibold text-white transition-all duration-300 hover:shadow-lg lg:px-3 lg:text-sm"
                         >
                           {t('animalCard.chat')}
                         </button>
@@ -755,7 +755,7 @@ const MapView = ({ addToWishlist, removeFromWishlist, isInWishlist }) => {
                 <p className="text-sm text-gray-500 lg:text-base">{t('mapView.noAnimalsFoundNearby')}</p>
                 <button
                   onClick={handleRefresh}
-                  className="mt-4 font-semibold text-[#15BB73] hover:underline"
+                  className="mt-4 font-semibold text-primary hover:underline"
                 >
                   {t('mapView.tryRefreshing')}
                 </button>

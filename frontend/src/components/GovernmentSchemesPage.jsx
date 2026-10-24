@@ -1,256 +1,93 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
+import { FiHome, FiSearch, FiX, FiArrowRight, FiChevronDown, FiMapPin } from 'react-icons/fi';
+import SchemeVisualIcon from './SchemeVisualIcon';
+import schemeHero from '../assets/images/government-scheme-assistance.webp';
 import { API_BASE_URL } from '../config/api';
-
-const CATEGORY_OPTIONS = ['all', 'loan', 'subsidy', 'insurance', 'training', 'health', 'general'];
-const ANIMAL_CATEGORY_OPTIONS = ['all', 'farm', 'pet', 'both'];
-
-const getLocalizedValue = (scheme, field, language) => {
-  const translations = scheme?.translations || {};
-  const languageValue = translations[language]?.[field];
-  const fallbackValue = translations.en?.[field];
-  return languageValue || fallbackValue || scheme?.[field] || '';
-};
+import { SCHEME_CATEGORIES, SCHEME_ANIMALS, schemeLanguage, schemeLocale, schemeText, schemeItems, schemeAmount, schemeDeadline } from '../utils/governmentSchemes';
+import './GovernmentSchemes.css';
 
 const GovernmentSchemesPage = () => {
   const { t, i18n } = useTranslation();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [params, setParams] = useSearchParams();
+  const category = params.get('category') || 'all';
+  const animalCategory = params.get('animalCategory') || 'all';
+  const search = params.get('search') || '';
+  const pageValue = Number(params.get('page'));
+  const currentPage = Number.isSafeInteger(pageValue) && pageValue > 0 ? pageValue : 1;
+  const language = schemeLanguage(i18n.resolvedLanguage || i18n.language);
+  const [draftSearch, setDraftSearch] = useState(search);
   const [schemes, setSchemes] = useState([]);
-  const [featuredSchemes, setFeaturedSchemes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [error, setError] = useState(false);
+  const [retry, setRetry] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const resultsRef = useRef(null);
+  const number = value => Number(value).toLocaleString(schemeLocale(language));
+  const categoryLabel = value => t(`governmentSchemes.categories.${value}`, { defaultValue: value });
+  const animalLabel = value => t(`governmentSchemes.animalCategories.${value}`, { defaultValue: value });
 
-  const category = searchParams.get('category') || 'all';
-  const animalCategory = searchParams.get('animalCategory') || 'all';
-  const search = searchParams.get('search') || '';
-  const language = i18n.resolvedLanguage || i18n.language || 'en';
-
-  const fetchSchemes = useCallback(async () => {
-    setLoading(true);
-    try {
-      const query = new URLSearchParams({
-        page: String(currentPage),
-        limit: '9',
-        sortBy: 'is_featured',
-        order: 'DESC'
-      });
-      if (category !== 'all') query.set('category', category);
-      if (animalCategory !== 'all') query.set('animalCategory', animalCategory);
-      if (search.trim()) query.set('search', search.trim());
-
-      const response = await fetch(`${API_BASE_URL}/api/government-schemes?${query.toString()}`);
-      const data = await response.json();
-      if (data.success) {
-        setSchemes(data.data.schemes || []);
-        setTotalPages(data.data.totalPages || 1);
-      }
-    } catch (error) {
-      console.error('Failed to fetch government schemes:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [animalCategory, category, currentPage, search]);
-
-  const fetchFeaturedSchemes = useCallback(async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/government-schemes/featured?limit=3`);
-      const data = await response.json();
-      if (data.success) {
-        setFeaturedSchemes(data.data.schemes || []);
-      }
-    } catch (error) {
-      console.error('Failed to fetch featured schemes:', error);
-    }
-  }, []);
-
+  useEffect(() => { setDraftSearch(search); }, [search]);
   useEffect(() => {
-    fetchSchemes();
-    fetchFeaturedSchemes();
-  }, [fetchFeaturedSchemes, fetchSchemes]);
+    const controller = new AbortController();
+    setLoading(true); setError(false);
+    const query = new URLSearchParams({ page: String(currentPage), limit: '9', sortBy: 'is_featured', order: 'DESC' });
+    if (category !== 'all') query.set('category', category);
+    if (animalCategory !== 'all') query.set('animalCategory', animalCategory);
+    if (search.trim()) query.set('search', search.trim());
+    (async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/government-schemes?${query}`, { signal: controller.signal });
+        const result = await response.json();
+        if (!response.ok || !result.success || !Array.isArray(result.data?.schemes)) throw new Error('Unable to load schemes');
+        if (controller.signal.aborted) return;
+        setSchemes(result.data.schemes);
+        setTotalPages(Math.max(1, Number(result.data.totalPages) || 1));
+      } catch {
+        if (!controller.signal.aborted) { setSchemes([]); setError(true); }
+      } finally { if (!controller.signal.aborted) setLoading(false); }
+    })();
+    return () => controller.abort();
+  }, [category, animalCategory, currentPage, search, retry]);
 
   const updateFilter = (key, value) => {
-    const nextParams = new URLSearchParams(searchParams);
-    if (value === 'all' || !value) {
-      nextParams.delete(key);
-    } else {
-      nextParams.set(key, value);
-    }
-    setCurrentPage(1);
-    setSearchParams(nextParams);
+    const next = new URLSearchParams(params); next.delete('page');
+    if (!value || value === 'all') next.delete(key); else next.set(key, value);
+    setParams(next);
   };
-
-  const handleSearch = (event) => {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    updateFilter('search', String(formData.get('search') || '').trim());
+  const clearFilters = () => { setDraftSearch(''); setParams({}); };
+  const changePage = page => {
+    const next = new URLSearchParams(params);
+    if (page === 1) next.delete('page'); else next.set('page', String(page));
+    setParams(next); resultsRef.current?.scrollIntoView({ block: 'start', behavior: 'instant' });
   };
+  const filtered = search || category !== 'all' || animalCategory !== 'all';
 
-  const heroScheme = featuredSchemes[0] || schemes[0];
-
-  return (
-    <main className="min-h-screen bg-[#f8f2e7]">
-      <section className="relative overflow-hidden bg-gradient-to-br from-[#87510a] via-[#b66f0d] to-[#d58a20] text-white">
-        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 20% 20%, #fff 0 2px, transparent 2px)', backgroundSize: '34px 34px' }} />
-        <div className="relative mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[1fr_24rem] lg:px-8 lg:py-20">
-          <div>
-            <p className="text-sm font-bold uppercase tracking-[0.28em] text-amber-100">{t('governmentSchemes.kicker')}</p>
-            <h1 className="mt-4 max-w-3xl text-4xl font-black leading-tight sm:text-6xl">
-              {t('governmentSchemes.heroTitle')}
-            </h1>
-            <p className="mt-5 max-w-2xl text-lg leading-8 text-amber-50">
-              {t('governmentSchemes.heroSubtitle')}
-            </p>
-            <form onSubmit={handleSearch} className="mt-8 flex max-w-2xl flex-col gap-3 rounded-2xl bg-white/12 p-2 backdrop-blur sm:flex-row">
-              <input
-                name="search"
-                defaultValue={search}
-                placeholder={t('governmentSchemes.searchPlaceholder')}
-                className="min-w-0 flex-1 rounded-xl border border-white/20 bg-white px-4 py-3 text-slate-900 outline-none"
-              />
-              <button className="rounded-xl bg-[#126b4f] px-6 py-3 font-bold text-white hover:bg-[#0f5a43]">
-                {t('common.search')}
-              </button>
-            </form>
-          </div>
-
-          {heroScheme && (
-            <Link to={`/government-schemes/${heroScheme.slug}`} className="group rounded-[2rem] bg-white p-5 text-slate-900 shadow-2xl shadow-black/20 transition hover:-translate-y-1">
-              <div className="h-48 overflow-hidden rounded-[1.4rem] bg-amber-100">
-                {heroScheme.image_url ? (
-                  <img src={heroScheme.image_url} alt={heroScheme.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
-                ) : (
-                  <div className="flex h-full items-center justify-center">
-                    <SchemeIcon className="h-20 w-20 text-[#b66f0d]" />
-                  </div>
-                )}
-              </div>
-              <div className="mt-5">
-                <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#126b4f]">{t('governmentSchemes.featuredScheme')}</p>
-                <h2 className="mt-2 text-2xl font-black leading-tight">{getLocalizedValue(heroScheme, 'title', language)}</h2>
-                <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">{getLocalizedValue(heroScheme, 'short_description', language)}</p>
-              </div>
-            </Link>
-          )}
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-        <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-sm font-bold uppercase tracking-[0.22em] text-[#b66f0d]">{t('governmentSchemes.browseKicker')}</p>
-            <h2 className="mt-2 text-3xl font-black text-slate-900">{t('governmentSchemes.browseTitle')}</h2>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {CATEGORY_OPTIONS.map((option) => (
-              <FilterButton key={option} active={category === option} onClick={() => updateFilter('category', option)}>
-                {option === 'all' ? t('governmentSchemes.all') : t(`governmentSchemes.categories.${option}`, { defaultValue: option })}
-              </FilterButton>
-            ))}
-          </div>
-        </div>
-
-        <div className="mb-8 flex flex-wrap gap-2">
-          {ANIMAL_CATEGORY_OPTIONS.map((option) => (
-            <FilterButton key={option} active={animalCategory === option} onClick={() => updateFilter('animalCategory', option)}>
-              {option === 'all' ? t('governmentSchemes.allAnimals') : t(`governmentSchemes.animalCategories.${option}`, { defaultValue: option })}
-            </FilterButton>
-          ))}
-        </div>
-
-        {loading ? (
-          <div className="rounded-[2rem] bg-white px-6 py-20 text-center text-slate-500 shadow-sm">{t('governmentSchemes.loading')}</div>
-        ) : schemes.length === 0 ? (
-          <div className="rounded-[2rem] bg-white px-6 py-20 text-center text-slate-500 shadow-sm">{t('governmentSchemes.empty')}</div>
-        ) : (
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {schemes.map((scheme) => (
-              <SchemeCard key={scheme.id} scheme={scheme} language={language} t={t} />
-            ))}
-          </div>
-        )}
-
-        {totalPages > 1 && (
-          <div className="mt-10 flex justify-center gap-3">
-            <button
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-              className="rounded-full border border-slate-200 bg-white px-5 py-2 font-semibold text-slate-700 disabled:opacity-40"
-            >
-              {t('common.back')}
-            </button>
-            <span className="rounded-full bg-white px-5 py-2 font-semibold text-slate-700">
-              {currentPage} / {totalPages}
-            </span>
-            <button
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-              className="rounded-full border border-slate-200 bg-white px-5 py-2 font-semibold text-slate-700 disabled:opacity-40"
-            >
-              {t('common.next')}
-            </button>
-          </div>
-        )}
-      </section>
-    </main>
-  );
+  return <main className="gs-page"><div className="gs-container">
+    <header className="gs-discovery-hero">
+      <div className="gs-hero-copy"><span className="gs-hero-eyebrow"><FiHome aria-hidden="true" />{t('governmentSchemes.kicker')}</span><h1>{t('schemeVisual.heroTitle')}</h1><p>{t('schemeUi.subtitle')}</p><a href="#scheme-results-title" className="gs-hero-explore">{t('schemeVisual.explore')}<FiArrowRight aria-hidden="true" /></a></div>
+      <div className="gs-hero-art"><img src={schemeHero} alt="" /><span className="gs-hero-caption"><SchemeVisualIcon kind="benefits" />{t('schemeVisual.heroCaption')}</span></div>
+    </header>
+    <section className="gs-filters" aria-label={t('schemeUi.filterSchemes')}>
+      <div className="gs-category-picker"><p>{t('schemeVisual.chooseSupport')}</p><div className="gs-category-options" role="group" aria-label={t('schemeUi.schemeType')}>{['all', ...SCHEME_CATEGORIES].map(value => <button type="button" data-category={value} key={value} aria-pressed={category === value} onClick={() => updateFilter('category', value)}><span><SchemeVisualIcon kind={value} /></span>{value === 'all' ? t('governmentSchemes.all') : categoryLabel(value)}</button>)}</div></div>
+      <form role="search" className="gs-search" onSubmit={event => { event.preventDefault(); updateFilter('search', draftSearch.trim()); }}><label htmlFor="scheme-search" className="sr-only">{t('governmentSchemes.searchPlaceholder')}</label><div><FiSearch aria-hidden="true" /><input id="scheme-search" type="search" name="search" value={draftSearch} onChange={event => setDraftSearch(event.target.value)} placeholder={t('governmentSchemes.searchPlaceholder')} /></div><button type="submit" className="action-button action-button-primary">{t('common.search')}</button></form>
+      <div className="gs-filter-fields"><label htmlFor="scheme-animal"><span>{t('governmentSchemes.for')}</span><select id="scheme-animal" value={animalCategory} onChange={event => updateFilter('animalCategory', event.target.value)}><option value="all">{t('governmentSchemes.allAnimals')}</option>{[...new Set([...SCHEME_ANIMALS, ...(animalCategory === 'all' ? [] : [animalCategory])])].map(value => <option key={value} value={value}>{animalLabel(value)}</option>)}</select></label></div>
+      {filtered && <div className="gs-applied-filters"><span>{[search && `“${search}”`, category !== 'all' && categoryLabel(category), animalCategory !== 'all' && animalLabel(animalCategory)].filter(Boolean).join(' · ')}</span><button type="button" onClick={clearFilters}><FiX aria-hidden="true" />{t('schemeUi.clearFilters')}</button></div>}
+    </section>
+    <section className="gs-results" ref={resultsRef} aria-labelledby="scheme-results-title" aria-busy={loading}>
+      <div className="gs-results-heading"><h2 id="scheme-results-title">{t('governmentSchemes.browseTitle')}</h2>{!loading && !error && totalPages > 1 && <span>{t('schemeUi.pageOf', { page: number(currentPage), total: number(totalPages) })}</span>}</div>
+      {loading ? <div className="gs-empty" role="status">{t('governmentSchemes.loading')}</div> : error ? <div className="gs-empty" role="alert"><p>{t('schemeUi.loadError')}</p><button type="button" className="action-button action-button-secondary" onClick={() => setRetry(value => value + 1)}>{t('schemeUi.retry')}</button></div> : schemes.length ? <div className="gs-card-grid">{schemes.map(scheme => <article key={scheme.id} className="gs-card" data-category={scheme.category}>
+        <Link to={`/government-schemes/${scheme.slug}`} className="gs-card-main"><div className="gs-card-heading"><div className="gs-card-image"><SchemeVisualIcon kind={scheme.category} />{scheme.image_url && <img src={scheme.image_url} alt="" loading="lazy" onError={event => { event.currentTarget.hidden = true; }} />}</div><div><div className="gs-card-labels"><span>{categoryLabel(scheme.category || 'general')}</span>{scheme.is_featured && <span className="gs-featured-label">{t('governmentSchemes.featuredScheme')}</span>}</div><h3>{schemeText(scheme, 'title', language)}</h3></div></div>
+        <p className="gs-card-description">{schemeText(scheme, 'short_description', language)}</p>
+        <dl className="gs-card-facts"><div><dt>{t('governmentSchemes.amount')}</dt><dd>{schemeAmount(scheme.amount_label, language) || t('schemeUi.notSpecified')}</dd></div>{scheme.interest_rate && <div><dt>{t('governmentSchemes.interest')}</dt><dd>{scheme.interest_rate}</dd></div>}<div><dt>{t('governmentSchemes.for')}</dt><dd>{animalLabel(scheme.animal_category || 'both')}</dd></div></dl>
+        <div className="gs-card-scope"><span>{scheme.department || t(`schemeUi.levels.${scheme.government_level || 'other'}`)}</span><span><FiMapPin aria-hidden="true" />{scheme.state || t('governmentSchemes.allIndia')}</span></div></Link>
+        <details className="gs-card-preview"><summary><SchemeVisualIcon kind="eligibility" /><span>{t('schemeVisual.checkEligibility')}</span><FiChevronDown aria-hidden="true" /></summary>{schemeItems(scheme, 'eligibility', language).length ? <ul>{schemeItems(scheme, 'eligibility', language).map((item, index) => <li key={index}>{item}</li>)}</ul> : <p>{t('governmentSchemes.noEligibility')}</p>}</details>
+        <div className="gs-card-footer">{scheme.deadline && <span>{t('governmentSchemes.deadline')}: {schemeDeadline(scheme.deadline, language)}</span>}<Link to={`/government-schemes/${scheme.slug}`} className="gs-card-open">{t('schemeUi.viewDetails')}<FiArrowRight aria-hidden="true" /></Link></div>
+      </article>)}</div> : <div className="gs-empty"><FiSearch aria-hidden="true" /><p>{t('governmentSchemes.empty')}</p>{(filtered || currentPage > 1) && <button type="button" className="action-button action-button-secondary" onClick={clearFilters}>{t('schemeUi.showAll')}</button>}</div>}
+      {!loading && !error && totalPages > 1 && <nav className="gs-pagination" aria-label={t('schemeUi.pagination')}><button type="button" onClick={() => changePage(currentPage - 1)} disabled={currentPage <= 1}>{t('common.back')}</button><span>{number(currentPage)} / {number(totalPages)}</span><button type="button" onClick={() => changePage(currentPage + 1)} disabled={currentPage >= totalPages}>{t('common.next')}</button></nav>}
+    </section>
+  </div></main>;
 };
-
-const SchemeCard = ({ scheme, language, t }) => {
-  const title = getLocalizedValue(scheme, 'title', language);
-  const description = getLocalizedValue(scheme, 'short_description', language);
-
-  return (
-    <Link to={`/government-schemes/${scheme.slug}`} className="group overflow-hidden rounded-[1.8rem] bg-white shadow-sm ring-1 ring-black/5 transition hover:-translate-y-1 hover:shadow-xl">
-      <div className="relative h-48 bg-gradient-to-br from-amber-100 to-emerald-100">
-        {scheme.image_url ? (
-          <img src={scheme.image_url} alt={title} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
-        ) : (
-          <div className="flex h-full items-center justify-center">
-            <SchemeIcon className="h-16 w-16 text-[#b66f0d]" />
-          </div>
-        )}
-        <div className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-bold capitalize text-[#126b4f]">
-          {scheme.category}
-        </div>
-      </div>
-      <div className="p-5">
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#b66f0d]">{scheme.department || scheme.government_level}</p>
-        <h3 className="mt-2 text-xl font-black leading-tight text-slate-900">{title}</h3>
-        <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">{description}</p>
-        <div className="mt-5 grid grid-cols-3 gap-2 text-center text-xs">
-          <InfoPill label={t('governmentSchemes.amount')} value={scheme.amount_label || '-'} />
-          <InfoPill label={t('governmentSchemes.rate')} value={scheme.interest_rate || '-'} />
-          <InfoPill label={t('governmentSchemes.for')} value={t(`governmentSchemes.animalCategories.${scheme.animal_category}`, { defaultValue: scheme.animal_category || 'both' })} />
-        </div>
-      </div>
-    </Link>
-  );
-};
-
-const FilterButton = ({ active, children, onClick }) => (
-  <button
-    onClick={onClick}
-    className={`rounded-full px-4 py-2 text-sm font-bold capitalize transition ${
-      active ? 'bg-[#126b4f] text-white shadow-lg shadow-emerald-900/10' : 'bg-white text-slate-600 ring-1 ring-black/5 hover:bg-emerald-50'
-    }`}
-  >
-    {children}
-  </button>
-);
-
-const InfoPill = ({ label, value }) => (
-  <div className="rounded-2xl bg-[#f8f2e7] px-2 py-3">
-    <p className="truncate font-black text-slate-900">{value}</p>
-    <p className="mt-1 text-slate-500">{label}</p>
-  </div>
-);
-
-const SchemeIcon = ({ className }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 21h18M5 21V9l7-4 7 4v12M9 21v-6h6v6M9 11h.01M12 11h.01M15 11h.01" />
-  </svg>
-);
 
 export default GovernmentSchemesPage;

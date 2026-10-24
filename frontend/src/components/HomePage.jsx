@@ -1,7 +1,11 @@
+import { getAnimalGroup, allowedSpecies } from '../utils/animalExperience';
+import { useExperienceText } from './AnimalExperience';
+import Link from './ExperienceLink';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import AnimalCard from './AnimalCard';
 import AppLoader from './AppLoader';
+import GovernmentSchemesBanner from './GovernmentSchemesBanner';
 import { listingsService, userService } from '../services/api';
 import { useWishlist } from '../contexts/useWishlist';
 import { safeJsonParse } from '../utils/stringUtils';
@@ -12,9 +16,14 @@ import veterinarianFeatureImage from '../assets/images/veternarian.png';
 import aiHealthFeatureImage from '../assets/images/AI health.png';
 import pregnancyCalendarFeatureImage from '../assets/images/pregnancy calender.png';
 import petMatingFeatureImage from '../assets/images/mating_feature.png';
+import petHomeHeroImage from '../assets/images/pet-features/home-hero.jpg';
+import petVeterinarianImage from '../assets/images/pet-features/veterinarian.jpg';
+import petAiHealthImage from '../assets/images/pet-features/ai-health.jpg';
+import petPregnancyImage from '../assets/images/pet-features/pregnancy.jpg';
 import playStoreBannerImage from '../assets/images/playstore.png';
+import './HomePage.css';
 
-import { Link } from 'react-router-dom';
+
 
 // Debounce hook for search
 const useDebounce = (value, delay) => {
@@ -33,10 +42,11 @@ const useDebounce = (value, delay) => {
 
 const HomePage = () => {
   const { t } = useTranslation();
+  const experienceText = useExperienceText();
+  const pet = getAnimalGroup() === 'pet';
   const { isInWishlist, toggleWishlist } = useWishlist();
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredAnimals, setFilteredAnimals] = useState([]);
-  const [isScrolled, setIsScrolled] = useState(false);
   const [animalData, setAnimalData] = useState([]);
   const [myListings, setMyListings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -80,7 +90,7 @@ const HomePage = () => {
     const animal = animalData.find(a => a.id === animalId) || filteredAnimals.find(a => a.id === animalId);
     if (!animal) return;
 
-    toggleWishlist(animal);
+    return toggleWishlist(animal);
   };
 
   // Helper function to format time ago - defined before useEffect
@@ -269,6 +279,7 @@ const HomePage = () => {
 
   useEffect(() => {
     const fetchFeaturedScheme = async () => {
+      if (pet) return;
       try {
         const featuredResponse = await fetch(`${API_BASE_URL}/api/government-schemes/featured?limit=1`);
         const featuredData = await featuredResponse.json();
@@ -435,37 +446,23 @@ const HomePage = () => {
   const displayAnimals = filteredAnimals.length > 0 || searchQuery.trim() ? filteredAnimals : categoryFilteredAnimals;
   const isShowingSearchResults = searchQuery.trim() && filteredAnimals.length > 0;
   const isShowingCategoryResults = selectedCategory && !searchQuery.trim();
-  const schemeTarget = '/government-schemes';
-  const schemeTitle = t('home.governmentSchemesBannerTitle');
-  const schemeDescription = t('home.governmentSchemesBannerDesc');
-
-  // Handle scroll effect
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollTop = window.scrollY;
-      setIsScrolled(scrollTop > 200);
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
 
   return (
-    <div className="bg-gradient-to-br from-[#E9F0F8] to-[#F0F8FF] min-h-screen flex flex-col">
+    <div className="home-page site-background min-h-screen flex flex-col">
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-white via-[#F0F8FF] to-[#E9F0F8] py-4 sm:py-6 lg:py-8">
+      <section className="home-overview py-4 sm:py-6 lg:py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Hero Content */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-center">
+          <div className="home-hero-card grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-center">
             {/* Left Side - Banner Image */}
             <div className="order-1 lg:order-1">
               <div className="relative">
                 {/* Main Banner Image */}
-                <div className="relative rounded-2xl overflow-hidden shadow-2xl">
+                <div className="home-hero-image relative rounded-2xl overflow-hidden">
                   <img
-                    src={farmerHeroImage}
-                    alt={t('home.heroTitle') + ' ' + t('home.heroTitleHighlight')}
+                    src={pet ? petHomeHeroImage : farmerHeroImage}
+                    alt={pet ? experienceText.petTitle : t('home.heroTitle') + ' ' + t('home.heroTitleHighlight')}
                     className="w-full h-auto object-contain"
                   />
                   {/* Overlay gradient for better text visibility if needed */}
@@ -478,49 +475,49 @@ const HomePage = () => {
             <div className="order-2 lg:order-2 space-y-4">
               {/* Heading */}
               <div className="space-y-2">
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[#000600] leading-tight">
-                  {t('home.heroTitle')}<br />
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#15BB73] to-[#0FA568]">{t('home.heroTitleHighlight')}</span>
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-ink leading-tight">
+                  {pet ? experienceText.petTitle : t('home.heroTitle')}<br />
+                  <span className="text-primary">{!pet && t('home.heroTitleHighlight')}</span>
                 </h1>
                 <p className="text-sm sm:text-base text-gray-600 max-w-xl">
-                  {t('home.heroDescription')}
+                  {pet ? experienceText.petHint : t('home.heroDescription')}
                 </p>
               </div>
 
               {/* Trust Indicators */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 py-3 px-3 bg-gradient-to-r from-[#15BB73]/5 to-[#0FA568]/5 rounded-xl border border-[#15BB73]/10">
+              <div className="home-trust grid grid-cols-1 sm:grid-cols-3 gap-3 py-3 px-3 rounded-xl border border-line">
                 <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 bg-gradient-to-br from-[#15BB73] to-[#0FA568] rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
+                  <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
                     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
                   </div>
                   <div>
-                    <div className="text-base font-bold text-[#000600]">{t('home.farmersCount')}</div>
-                    <div className="text-xs text-gray-600">{t('home.farmers')}</div>
+                    <div className="text-base font-bold text-ink">{pet ? experienceText.pet : t('home.farmersCount')}</div>
+                    <div className="text-xs text-gray-600">{pet ? t('animalTypes.dog') + ' / ' + t('animalTypes.cat') : t('home.farmers')}</div>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 bg-gradient-to-br from-[#15BB73] to-[#0FA568] rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
+                  <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
                     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                     </svg>
                   </div>
                   <div>
-                    <div className="text-base font-bold text-[#000600]">{t('home.verified')}</div>
+                    <div className="text-base font-bold text-ink">{t('home.verified')}</div>
                     <div className="text-xs text-gray-600">{t('home.sellers')}</div>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 bg-gradient-to-br from-[#15BB73] to-[#0FA568] rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
+                  <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
                     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
                   </div>
                   <div>
-                    <div className="text-base font-bold text-[#000600]">{t('home.secure')}</div>
+                    <div className="text-base font-bold text-ink">{t('home.secure')}</div>
                     <div className="text-xs text-gray-600">{t('home.chatAndDeals')}</div>
                   </div>
                 </div>
@@ -530,7 +527,7 @@ const HomePage = () => {
               <div className="flex flex-col sm:flex-row gap-2">
                 <Link
                   to="/sell-animal"
-                  className="flex-1 group relative overflow-hidden bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold text-sm shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5"
+                  className="action-button action-button-primary flex-1"
                 >
                   <div className="relative z-10 flex items-center justify-center gap-2">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -538,12 +535,11 @@ const HomePage = () => {
                     </svg>
                     <span>{t('header.sell')}</span>
                   </div>
-                  <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
                 </Link>
 
                 <Link
                   to="/buy-animals"
-                  className="flex-1 group relative overflow-hidden bg-white text-[#15BB73] border-2 border-[#15BB73] px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold text-sm shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 hover:bg-[#15BB73] hover:text-white"
+                  className="action-button action-button-secondary flex-1"
                 >
                   <div className="relative z-10 flex items-center justify-center gap-2">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -557,11 +553,11 @@ const HomePage = () => {
           </div>
 
           {/* Feature Cards Section */}
-          <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className={`home-feature-grid ${pet ? 'home-pet-feature-grid' : ''} mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4`}>
             {/* Milk Reports Card */}
             <Link
               to="/milk-reports"
-              className="group relative bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105"
+              className="group relative bg-primary rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105"
             >
               <div className="relative h-44 overflow-hidden">
                 <img
@@ -589,11 +585,11 @@ const HomePage = () => {
             {/* Veterinarian Card */}
             <Link
               to="/veterinarian"
-              className="group relative bg-gradient-to-br from-green-500 to-green-600 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105"
+              className="group relative bg-primary rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105"
             >
               <div className="relative h-44 overflow-hidden">
                 <img
-                  src={veterinarianFeatureImage}
+                  src={pet ? petVeterinarianImage : veterinarianFeatureImage}
                   alt="Veterinarian"
                   className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500"
                 />
@@ -617,11 +613,11 @@ const HomePage = () => {
             {/* AI Health Card */}
             <Link
               to="/ai-health-check"
-              className="group relative bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105"
+              className="group relative bg-purple-600 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105"
             >
               <div className="relative h-44 overflow-hidden">
                 <img
-                  src={aiHealthFeatureImage}
+                  src={pet ? petAiHealthImage : aiHealthFeatureImage}
                   alt="AI Health Check"
                   className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500"
                 />
@@ -645,7 +641,7 @@ const HomePage = () => {
             {/* Pet Mating Card */}
             <Link
               to="/pet-mating"
-              className="group relative bg-gradient-to-br from-[#0F6E56] to-[#D85A30] rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105"
+              className="group relative bg-forest rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105"
             >
               <div className="relative h-44 overflow-hidden">
                 <img
@@ -653,7 +649,7 @@ const HomePage = () => {
                   alt={t('petMating.title', { defaultValue: 'Pet Mating' })}
                   className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#082F25]/70 via-[#0F6E56]/30 to-transparent"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-[#082F25]/70 via-forest/30 to-transparent"></div>
               </div>
               <div className="absolute inset-0 p-4 flex flex-col justify-end">
                 <div className="flex items-center justify-between">
@@ -673,11 +669,11 @@ const HomePage = () => {
             {/* Pregnancy Calendar Card */}
             <Link
               to="/pregnancy-calendar"
-              className="group relative bg-gradient-to-br from-pink-500 to-pink-600 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105"
+              className="group relative bg-pink-600 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden transform hover:-translate-y-2 hover:scale-105"
             >
               <div className="relative h-44 overflow-hidden">
                 <img
-                  src={pregnancyCalendarFeatureImage}
+                  src={pet ? petPregnancyImage : pregnancyCalendarFeatureImage}
                   alt="Pregnancy Calendar"
                   className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500"
                 />
@@ -700,75 +696,21 @@ const HomePage = () => {
           </div>
 
           {/* Government Schemes Banner */}
-          <Link
-            to={schemeTarget}
-            className="group mt-8 block overflow-hidden rounded-[2rem] border border-amber-200/80 bg-gradient-to-br from-[#FFF7E8] via-[#F8FDF4] to-[#EAF7F0] shadow-xl shadow-amber-900/5 transition-all duration-500 hover:-translate-y-1 hover:shadow-2xl hover:shadow-amber-900/10"
-          >
-            <div className="relative grid gap-6 p-5 sm:p-6 lg:grid-cols-[1fr_18rem] lg:items-center lg:p-8">
-              <div className="absolute inset-0 opacity-50" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(180,111,13,0.18) 1px, transparent 0)', backgroundSize: '26px 26px' }} />
-              <div className="relative z-10">
-                <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-amber-100 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-[#9A5B08]">
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21h18M5 21V9l7-4 7 4v12M9 21v-6h6v6" />
-                  </svg>
-                  {t('home.governmentSchemesKicker')}
-                </div>
-                <h2 className="max-w-3xl text-2xl font-black leading-tight text-[#12251D] sm:text-4xl">
-                  {schemeTitle || t('home.governmentSchemesBannerTitle')}
-                </h2>
-                <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
-                  {schemeDescription || t('home.governmentSchemesBannerDesc')}
-                </p>
-                <div className="mt-5 flex flex-wrap gap-3">
-                  <span className="rounded-full bg-white px-4 py-2 text-sm font-bold text-[#126B4F] shadow-sm ring-1 ring-emerald-100">
-                    {t('home.governmentSchemesTagLoan')}
-                  </span>
-                  <span className="rounded-full bg-white px-4 py-2 text-sm font-bold text-[#126B4F] shadow-sm ring-1 ring-emerald-100">
-                    {t('home.governmentSchemesTagSubsidy')}
-                  </span>
-                  <span className="rounded-full bg-white px-4 py-2 text-sm font-bold text-[#126B4F] shadow-sm ring-1 ring-emerald-100">
-                    {t('home.governmentSchemesTagDocs')}
-                  </span>
-                </div>
-              </div>
-
-              <div className="relative z-10 rounded-[1.5rem] bg-white p-4 shadow-lg ring-1 ring-black/5">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-16 w-16 flex-none items-center justify-center rounded-2xl bg-[#126B4F] text-white">
-                    <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6M7 4h10a2 2 0 012 2v14l-4-2-3 2-3-2-4 2V6a2 2 0 012-2z" />
-                    </svg>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-slate-500">{t('home.governmentSchemesCardLabel')}</p>
-                    <p className="mt-1 truncate text-lg font-black text-slate-900">
-                      {featuredScheme?.amount_label || t('home.governmentSchemesCardValue')}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-5 flex items-center justify-between rounded-2xl bg-[#F5F7EF] px-4 py-3 text-sm font-black text-[#126B4F]">
-                  <span>{t('home.governmentSchemesOpen')}</span>
-                  <svg className="h-5 w-5 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-          </Link>
+          {!pet && <GovernmentSchemesBanner featuredScheme={featuredScheme} />}
 
           {/* Seller Listings Preview */}
           {myListings.length > 0 && (
             <div className="mt-8">
               <div className="mb-5 flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0F8F6A]">
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-primary">
                     {t('profile.sellerDashboard', { defaultValue: 'Seller dashboard' })}
                   </p>
-                  <h2 className="mt-1 text-2xl font-black text-[#12251D] sm:text-3xl">
+                  <h2 className="mt-1 text-2xl font-black text-ink sm:text-3xl">
                     {t('profile.myAnimals', { defaultValue: 'My animals' })}
                   </h2>
                 </div>
-                <Link to="/profile" className="text-sm font-black text-[#0F8F6A] hover:text-[#096B51]">
+                <Link to="/profile" className="text-sm font-black text-primary hover:text-primary-hover">
                   {t('profile.viewAll', { defaultValue: 'View all' })}
                 </Link>
               </div>
@@ -803,7 +745,7 @@ const HomePage = () => {
                               <p className="text-xl font-black text-slate-900 line-clamp-1">{listing.breed || listing.breed_name || t('animalTypes.animal')}</p>
                               <p className="mt-1 text-sm font-bold uppercase tracking-wide text-slate-500">{type}</p>
                             </div>
-                            <span className="text-2xl text-[#0F8F6A] transition-transform group-hover:translate-x-1">›</span>
+                            <span className="text-2xl text-primary transition-transform group-hover:translate-x-1">›</span>
                           </div>
                           <p className="mt-3 text-2xl font-black text-slate-900">
                             ₹{Number(listing.price || listing.expected_price || 0).toLocaleString('en-IN')}
@@ -824,13 +766,13 @@ const HomePage = () => {
           {/* Animal Listings Preview Section */}
           <div className="mt-8">
             {/* Section Header */}
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl sm:text-3xl font-bold text-[#000600]">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+              <h2 className="text-2xl sm:text-3xl font-bold text-ink">
                 {t('home.allAvailableAnimals')}
               </h2>
               <Link
                 to="/buy-animals"
-                className="flex items-center gap-2 bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold text-sm sm:text-base hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5"
+                className="action-button action-button-primary shrink-0"
               >
                 <span>{t('home.viewAll')}</span>
                 <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -887,22 +829,24 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* App Download Banner - Full Width with Padding */}
-      <section className="w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] my-8 bg-gradient-to-r from-[#F0F8FF] to-[#E9F0F8] px-4 sm:px-6 md:px-8 lg:px-12 py-4 sm:py-6">
+      {/* App banner follows the same centered width as the home content. */}
+      <section className="home-download">
         <a 
           href="#" 
-          className="block rounded-xl overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
+          className="home-download-link"
         >
           <img 
             src={playStoreBannerImage}
             alt={t('home.downloadApp')} 
-            className="w-full h-auto object-cover"
+            width={1920}
+            height={700}
+            className="home-download-image"
           />
         </a>
       </section>
 
       {/* Main Content */}
-      <main className={`flex-1 p-4 pb-20 transition-all duration-300 ${isScrolled ? 'pt-16 sm:pt-20' : ''}`}>
+      <section className="home-results w-full max-w-7xl mx-auto px-4 pb-6 sm:px-6 lg:px-8" hidden={!(isShowingSearchResults || isShowingCategoryResults)}>
 
         <div className="max-w-7xl mx-auto">
           {/* Search Results Header */}
@@ -911,23 +855,23 @@ const HomePage = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-xl font-bold text-[#000600]">
+                    <h3 className="text-xl font-bold text-ink">
                       {t('home.searchResultsFor')} "{searchQuery}"
                     </h3>
                     {searchMode === 'api' && (
-                      <span className="px-2 py-0.5 bg-[#15BB73]/10 text-[#15BB73] text-xs font-medium rounded-full">
+                      <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs font-medium rounded-full">
                         {t('home.databaseSearch')}
                       </span>
                     )}
                   </div>
                   <p className="text-gray-600 text-sm">
                     Found {filteredAnimals.length} animal{filteredAnimals.length !== 1 ? 's' : ''} matching your search
-                    {isSearching && <span className="ml-2 text-[#15BB73]">• {t('home.searchingMore')}</span>}
+                    {isSearching && <span className="ml-2 text-primary">• {t('home.searchingMore')}</span>}
                   </p>
                 </div>
                 <button
                   onClick={clearSearch}
-                  className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-[#15BB73] hover:bg-gray-50 rounded-lg transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -944,10 +888,10 @@ const HomePage = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-xl font-bold text-[#000600]">
+                    <h3 className="text-xl font-bold text-ink">
                       {selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}s
                     </h3>
-                    <span className="px-2 py-0.5 bg-[#15BB73]/10 text-[#15BB73] text-xs font-medium rounded-full">
+                    <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs font-medium rounded-full">
                       {t('home.categoryFilter')}
                     </span>
                   </div>
@@ -957,7 +901,7 @@ const HomePage = () => {
                 </div>
                 <button
                   onClick={clearCategoryFilter}
-                  className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-[#15BB73] hover:bg-gray-50 rounded-lg transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-primary hover:bg-gray-50 rounded-lg transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -972,7 +916,7 @@ const HomePage = () => {
           {(isShowingSearchResults || isShowingCategoryResults) && (
             <div id="animal-listings" className="mb-8 scroll-mt-20">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-2xl font-bold text-[#000600]">
+                <h3 className="text-2xl font-bold text-ink">
                   {isShowingSearchResults
                     ? t('home.searchResults')
                     : `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}s`}
@@ -1025,11 +969,11 @@ const HomePage = () => {
                     {t('home.clearSearch')}
                   </button>
                   <div className="flex flex-wrap justify-center gap-2">
-                    {quickSearchTags.slice(0, 4).map((tag) => (
+                    {quickSearchTags.filter(tag => allowedSpecies(tag.query)).slice(0, 4).map((tag) => (
                       <button
                         key={tag.query}
                         onClick={() => handleQuickSearch(tag.query)}
-                        className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white rounded-xl font-medium hover:shadow-lg transition-all"
+                        className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-xl font-medium hover:shadow-lg transition-all"
                       >
                         <span>{tag.icon}</span>
                         {tag.label}
@@ -1064,7 +1008,7 @@ const HomePage = () => {
                   </button>
                   <Link
                     to="/sell-animal"
-                    className="px-6 py-3 bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white rounded-xl font-semibold hover:shadow-lg transition-all"
+                    className="px-6 py-3 bg-primary text-white rounded-xl font-semibold hover:shadow-lg transition-all"
                   >
                     List Your {selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}
                   </Link>
@@ -1079,7 +1023,7 @@ const HomePage = () => {
                 </p>
                 <Link
                   to="/sell-animal"
-                  className="inline-block bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-300"
+                  className="inline-block bg-primary text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-300"
                 >
                   {t('home.listYourAnimal')}
                 </Link>
@@ -1088,7 +1032,7 @@ const HomePage = () => {
             </div>
           )}
         </div>
-      </main>
+      </section>
 
     </div>
   );

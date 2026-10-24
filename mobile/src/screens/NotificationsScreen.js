@@ -11,12 +11,18 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { notificationText } from '../utils/notificationUi';
+import notificationMessages from '../utils/notificationMessages.json';
 import { useNotifications } from '../context/NotificationContext';
 import { COLORS } from '../utils/constants';
 import SkeletonLoader from '../components/SkeletonLoader';
 import AppHeader from '../components/AppHeader';
 
 const NotificationItem = ({ notification, onPress, onDelete }) => {
+  const { i18n } = useTranslation();
+  const c = notificationText(i18n.language);
+  const pair = notificationMessages[notification.data?.message_key || notification.type]?.[{ en: 0, mr: 1, hi: 2 }[i18n.language?.split('-')[0]] || 0];
+  const render = text => text?.replace(/\{\{(\w+)\}\}/g, (_, key) => String(notification.data?.message_args?.[key] || ''));
   const getIcon = () => {
     switch (notification.type) {
       case 'new_listing':
@@ -45,7 +51,7 @@ const NotificationItem = ({ notification, onPress, onDelete }) => {
   };
 
   const icon = getIcon();
-  const timeAgo = getTimeAgo(notification.created_at);
+  const timeAgo = getTimeAgo(notification.created_at, i18n.language, c);
 
   return (
     <TouchableOpacity
@@ -61,10 +67,10 @@ const NotificationItem = ({ notification, onPress, onDelete }) => {
       </View>
       <View style={styles.contentContainer}>
         <Text style={styles.title} numberOfLines={1}>
-          {notification.title}
+          {render(pair?.[0]) || notification.title}
         </Text>
         <Text style={styles.message} numberOfLines={2}>
-          {notification.message}
+          {render(pair?.[1]) || notification.message}
         </Text>
         <Text style={styles.time}>{timeAgo}</Text>
       </View>
@@ -83,30 +89,29 @@ const NotificationItem = ({ notification, onPress, onDelete }) => {
   );
 };
 
-const getTimeAgo = (dateString) => {
-  if (!dateString) return 'Unknown';
+const getTimeAgo = (dateString, language, c) => {
+  if (!dateString) return ''; 
 
   const now = new Date();
   const date = new Date(dateString);
 
   // Check if date is valid
-  if (isNaN(date.getTime())) return 'Unknown';
+  if (isNaN(date.getTime())) return ''; 
 
   const seconds = Math.floor((now - date) / 1000);
 
   // Check for future dates
-  if (seconds < 0) return 'Just now';
+  if (seconds < 0) return c('now');
 
-  if (seconds < 60) return 'Just now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-  return date.toLocaleDateString();
+  if (seconds < 60) return c('now');
+  return date.toLocaleString(language === 'mr' ? 'mr-IN' : language === 'hi' ? 'hi-IN' : 'en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 };
 
 const NotificationsScreen = ({ navigation }) => {
-  const { t, ready } = useTranslation();
+  const { t, ready, i18n } = useTranslation();
+  const c = notificationText(i18n.language);
   const {
+    error,
     notifications,
     unreadCount,
     loading,
@@ -118,6 +123,10 @@ const NotificationsScreen = ({ navigation }) => {
     clearAll,
     openNotification,
   } = useNotifications();
+
+  const onRefresh = useCallback(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
 
   // Show loading while translations are loading
   if (!ready) {
@@ -134,12 +143,12 @@ const NotificationsScreen = ({ navigation }) => {
 
   const handleDelete = (notificationId) => {
     Alert.alert(
-      'Delete Notification',
-      'Are you sure you want to delete this notification?',
+      c('deleteTitle'),
+      c('deleteBody'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: c('cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: c('delete'),
           style: 'destructive',
           onPress: () => deleteNotification(notificationId),
         },
@@ -149,12 +158,12 @@ const NotificationsScreen = ({ navigation }) => {
 
   const handleClearAll = () => {
     Alert.alert(
-      'Clear All Notifications',
-      'Are you sure you want to delete all notifications?',
+      c('clearTitle'),
+      c('clearBody'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: c('cancel'), style: 'cancel' },
         {
-          text: 'Clear All',
+          text: c('delete'),
           style: 'destructive',
           onPress: clearAll,
         },
@@ -162,9 +171,7 @@ const NotificationsScreen = ({ navigation }) => {
     );
   };
 
-  const onRefresh = useCallback(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
+
 
   const renderHeader = () => (
     <AppHeader
@@ -172,10 +179,7 @@ const NotificationsScreen = ({ navigation }) => {
       title={t('notifications.title')}
       subtitle={
         unreadCount > 0
-          ? t('notifications.unreadCount', {
-              count: unreadCount,
-              defaultValue: `${unreadCount} unread`,
-            })
+          ? `${unreadCount} ${c('unread')}`
           : undefined
       }
       rightActions={[
@@ -183,7 +187,7 @@ const NotificationsScreen = ({ navigation }) => {
           icon: 'settings-outline',
           onPress: () => navigation.navigate('NotificationSettings'),
           color: COLORS.textMuted,
-          accessibilityLabel: 'Notification settings',
+          accessibilityLabel: c('settingsTitle'),
         },
         ...(unreadCount > 0
           ? [
@@ -191,7 +195,7 @@ const NotificationsScreen = ({ navigation }) => {
                 icon: 'checkmark-done',
                 onPress: markAllAsRead,
                 color: COLORS.primary,
-                accessibilityLabel: 'Mark all notifications as read',
+                accessibilityLabel: c('markAll'),
               },
             ]
           : []),
@@ -201,7 +205,7 @@ const NotificationsScreen = ({ navigation }) => {
                 icon: 'trash-outline',
                 onPress: handleClearAll,
                 color: COLORS.error,
-                accessibilityLabel: 'Clear all notifications',
+                accessibilityLabel: c('clearTitle'),
               },
             ]
           : []),
@@ -222,6 +226,10 @@ const NotificationsScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       {renderHeader()}
+      {error && <View accessibilityRole="alert" style={{ padding: 16, backgroundColor: '#fff3e0' }}>
+        <Text>{c(error)}</Text>
+        <TouchableOpacity onPress={() => fetchNotifications()} style={{ paddingVertical: 12 }}><Text>{c('retry')}</Text></TouchableOpacity>
+      </View>}
 
       {loading && notifications.length === 0 ? (
         <View style={styles.loadingContainer}>
@@ -238,7 +246,7 @@ const NotificationsScreen = ({ navigation }) => {
               onDelete={handleDelete}
             />
           )}
-          ListEmptyComponent={renderEmpty}
+          ListEmptyComponent={error ? null : renderEmpty}
           ListFooterComponent={loadingMore ? (
             <ActivityIndicator style={styles.footerLoader} color={COLORS.primary} />
           ) : null}

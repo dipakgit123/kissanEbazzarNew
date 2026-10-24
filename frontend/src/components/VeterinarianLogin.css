@@ -1,0 +1,51 @@
+.vet-login-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 20px 24px 36px;
+  color: #173f34;
+}
+.vet-login-page * { box-sizing: border-box; }
+.vet-login-toolbar { max-width: 1000px; margin: 0 auto 16px; display: flex; justify-content: flex-end; }
+.vet-login-toolbar button { min-height: 44px; }
+.vet-login-card { max-width: 1000px; margin: 0 auto; display: grid; grid-template-columns: 40% 60%; background: white; border: 1px solid #d2e0d7; border-radius: 20px; overflow: hidden; }
+.vet-login-art { position: relative; background: #edf4ef; }
+.vet-login-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: left center; }
+.vet-login-content { padding: 36px 44px; min-width: 0; }
+.vet-login-heading { margin-bottom: 26px; }
+.vet-login-heading h1 { font-size: clamp(24px, 2.6vw, 30px); line-height: 1.35; font-weight: 750; margin: 0 0 8px; }
+.vet-login-heading p { color: #607268; line-height: 1.6; margin: 0; }
+.vet-login-content form { display: flex; flex-direction: column; gap: 20px; }
+.vet-login-field label { font-size: 14px; font-weight: 650; display: block; }
+.vet-login-password-label { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 14px; }
+.vet-login-password-label a { font-size: 14px; padding: 4px 0; }
+.vet-login-input { position: relative; margin-top: 8px; }
+.vet-login-input > svg { position: absolute; width: 19px; height: 19px; left: 15px; top: 16px; color: #607268; pointer-events: none; }
+.vet-login-input input { display: block; width: 100%; height: 52px; border: 1px solid #bcd0c2; border-radius: 10px; padding: 12px 48px 12px 44px; background: white; color: #173f34; font-size: 16px; }
+.vet-login-input input:focus { border-color: #11744e; outline: 2px solid #11744e; outline-offset: 2px; }
+.vet-login-input input[aria-invalid="true"] { border-color: #b42318; }
+.vet-login-input input:disabled { background: #f3f6f4; }
+.vet-login-visibility { position: absolute; right: 4px; top: 4px; display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 8px; color: #426253; background: transparent; cursor: pointer; }
+.vet-login-visibility svg { width: 20px; height: 20px; }
+.vet-login-submit { min-height: 50px; padding: 12px 20px; border-radius: 10px; border: 1px solid #11744e; background: #11744e; color: white; font-size: 16px; font-weight: 700; cursor: pointer; }
+.vet-login-submit:hover { background: #0b6141; }
+.vet-login-submit:disabled { opacity: .65; cursor: wait; }
+.vet-login-page a { color: #11744e; font-weight: 600; text-underline-offset: 3px; }
+.vet-login-page a:hover { text-decoration: underline; }
+.vet-login-page button:focus-visible, .vet-login-page a:focus-visible { outline: 2px solid #11744e; outline-offset: 3px; }
+.vet-login-error { padding: 12px 14px; border: 1px solid #edc8c4; border-radius: 10px; color: #a32318; background: #fff4f2; font-size: 14px; line-height: 1.6; }
+.vet-login-field-error { margin-top: 8px; color: #a32318; font-size: 13px; line-height: 1.5; }
+.vet-login-registration { margin-top: 24px; padding-top: 20px; border-top: 1px solid #dce6df; text-align: center; font-size: 14px; line-height: 1.6; }
+.vet-login-registration p { color: #607268; margin: 0; }
+.vet-login-registration a { display: inline-flex; align-items: center; min-height: 44px; }
+.vet-login-note { font-size: 13px; line-height: 1.65; color: #607268; background: #f3f7f4; border-radius: 10px; padding: 12px 14px; margin: 10px 0 12px; }
+.vet-login-back { display: flex; justify-content: center; align-items: center; gap: 8px; min-height: 44px; font-size: 14px; }
+.vet-login-back svg { flex-shrink: 0; }
+@media (max-width: 767px) {
+  .vet-login-page { padding: 16px 16px 24px; }
+  .vet-login-card { max-width: 480px; display: block; border-radius: 16px; }
+  .vet-login-toolbar { max-width: 480px; }
+  .vet-login-art { display: none; }
+  .vet-login-content { padding: 26px 22px; }
+  .vet-login-heading { margin-bottom: 22px; }
+}
+@media (max-width: 360px) { .vet-login-content { padding: 22px 18px; } }

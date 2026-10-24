@@ -1,0 +1,28 @@
+.vet-registration-heading { padding: 22px 24px; background: white; border: 1px solid #d2e0d7; border-radius: 16px; }
+.vet-registration-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-items: start; }
+.vet-registration-fields, .vet-registration-checklist { min-width: 0; }
+.vet-registration-checklist { display: none; }
+.vet-registration-fields .grid > *, .vet-registration-fields .flex > div { min-width: 0; }
+.vet-registration-fields input:not([type="checkbox"]):not([type="file"]), .vet-registration-fields select, .vet-registration-fields textarea { min-width: 0; max-width: 100%; font-size: 16px; }
+.vet-registration-fields h2, .vet-registration-fields h3, .vet-registration-fields p { overflow-wrap: anywhere; }
+.vet-registration-fields .w-10, .vet-registration-fields .w-12 { flex-shrink: 0; }
+.vet-registration-groups fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
+.vet-registration-groups legend { font-weight: 700; padding: 0; margin-bottom: 14px; }
+.vet-registration-groups label { min-height: 44px; padding: 10px 14px; border: 1px solid #cbdcd2; border-radius: 10px; cursor: pointer; }
+.vet-registration-groups label:has(input:checked) { background: #e8f3ec; border-color: #11744e; }
+.vet-registration-groups input { width: 18px; height: 18px; accent-color: #11744e; }
+.vet-registration-services { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: 12px; }
+.vet-registration-services button { min-width: 0; min-height: 76px; padding: 12px; gap: 10px; box-shadow: none; }
+.vet-registration-services button > span:nth-child(2) { flex: 1; overflow-wrap: anywhere; }
+.vet-registration-services button > svg { flex-shrink: 0; }
+.vet-registration-page button:focus-visible, .vet-registration-page input[type="checkbox"]:focus-visible { outline: 2px solid #11744e; outline-offset: 3px; }
+@media (min-width: 1280px) {
+  .vet-registration-layout { grid-template-columns: minmax(0, 1fr) 300px; }
+  .vet-registration-checklist { display: block; position: sticky; top: 24px; }
+  .vet-registration-mobile-submit { display: none; }
+}
+@media (max-width: 639px) {
+  .vet-registration-heading { padding: 18px; }
+  .vet-registration-page .grid-cols-2 { grid-template-columns: minmax(0, 1fr); }
+  .vet-registration-groups fieldset > div { gap: 10px; }
+}

@@ -1,10 +1,22 @@
-const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { trackUpload, deferDeletion } = require('../utils/mediaLifecycle');
+const { S3Client, DeleteObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { Upload } = require('@aws-sdk/lib-storage');
-const multer = require('multer');
+const { createMultipartUpload } = require('../utils/multipartUpload');
+const { createReadStream } = require('node:fs');
 const path = require('path');
 
 const S3_REGION = process.env.AWS_REGION;
 const S3_BUCKET = process.env.AWS_S3_BUCKET;
+const PRIVATE_BUCKET = process.env.AWS_S3_PRIVATE_BUCKET;
+const isPrivateFolder = folder => /^veterinarians\/registration\/(license-documents|degree-certificates|aadhar-documents)/.test(folder);
+const parseObject = value => {
+  if (String(value).startsWith('private:')) {
+    const [, bucket, ...key] = String(value).split(':');
+    if (!PRIVATE_BUCKET || bucket !== PRIVATE_BUCKET) throw new Error('Private document storage is not configured');
+    return { Bucket: bucket, Key: key.join(':') };
+  }
+  return { Bucket: S3_BUCKET, Key: extractKeyFromValue(value) };
+};
 const S3_PUBLIC_BASE_URL = (process.env.AWS_S3_PUBLIC_BASE_URL || '').replace(/\/+$/, '');
 const S3_ENDPOINT = (process.env.AWS_S3_ENDPOINT || '').replace(/\/+$/, '');
 const S3_FORCE_PATH_STYLE = ['1', 'true', 'yes'].includes((process.env.AWS_S3_FORCE_PATH_STYLE || '').toLowerCase());
@@ -132,7 +144,7 @@ const getFileExtension = (file, resourceType) => {
 
 const buildObjectKey = (file, folder, resourceType) => {
   const extension = getFileExtension(file, resourceType);
-  const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${extension}`;
+  const uniqueName = require('node:crypto').randomUUID() + extension;
   return normalizeFolder(folder) ? `${normalizeFolder(folder)}/${uniqueName}` : uniqueName;
 };
 
@@ -200,11 +212,8 @@ const createUploadFields = (
     fieldTypeMap = {},
     defaultAllowedTypes = ['image']
   } = {}
-) => multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: maxFileSizeBytes
-  },
+) => createMultipartUpload(fields, {
+  maxFileSizeBytes,
   fileFilter: (req, file, cb) => {
     const configuredTypes = fieldTypeMap[file.fieldname] || defaultAllowedTypes;
     const allowedTypes = Array.isArray(configuredTypes) ? configuredTypes : [configuredTypes];
@@ -216,7 +225,7 @@ const createUploadFields = (
 
     cb(null, true);
   }
-}).fields(fields);
+});
 
 const uploadFields = createUploadFields([
   { name: 'frontPhoto', maxCount: 1 },
@@ -236,42 +245,57 @@ const uploadToCloudinary = async (file, folderOrType, resourceType) => {
   ensureS3Configured();
 
   const buffer = file?.buffer || file;
-  if (!Buffer.isBuffer(buffer)) {
-    throw new Error('Invalid file buffer type');
+  if (!file?.path && !Buffer.isBuffer(buffer)) {
+    throw new Error('Invalid upload file');
   }
 
   const { folder, resourceType: resolvedResourceType } = resolveUploadOptions(file, folderOrType, resourceType);
   const key = buildObjectKey(file, folder, resolvedResourceType);
+  const privateDocument = isPrivateFolder(folder);
+  if (privateDocument && (!PRIVATE_BUCKET || PRIVATE_BUCKET === S3_BUCKET)) {
+    throw new Error('Configure a separate private document bucket before uploading identity documents');
+  }
+  const bucket = privateDocument ? PRIVATE_BUCKET : S3_BUCKET;
+  const objectId = privateDocument ? 'private:' + bucket + ':' + key : key;
+  const body = file?.path ? createReadStream(file.path) : buffer;
 
   const upload = new Upload({
     client: s3,
+    queueSize: 1,
+    partSize: 5 * 1024 * 1024,
+    ...(file?.abortController ? { abortController: file.abortController } : {}),
     params: {
-      Bucket: S3_BUCKET,
+      Bucket: bucket,
       Key: key,
-      Body: buffer,
+      Body: body,
       ContentType: file?.mimetype || (resolvedResourceType === 'video' ? 'video/mp4' : 'image/jpeg'),
-      CacheControl: resolvedResourceType === 'image'
+      ...(privateDocument ? { ServerSideEncryption: 'AES256' } : {}),
+      CacheControl: privateDocument ? 'private, no-store' : resolvedResourceType === 'image'
         ? 'public, max-age=31536000, immutable'
         : 'public, max-age=86400'
     }
   });
 
-  const result = await upload.done();
+  let result;
+  try { result = await upload.done(); }
+  finally { if (file?.path) body.destroy(); }
+  trackUpload(() => deleteObject(objectId, resolvedResourceType));
 
   return {
-    secure_url: buildPublicUrl(key),
-    public_id: key,
+    secure_url: privateDocument ? objectId : buildPublicUrl(key),
+    public_id: objectId,
     key,
-    bucket: S3_BUCKET,
+    bucket,
     resource_type: resolvedResourceType,
     etag: result?.ETag || null
   };
 };
 
-const deleteFromCloudinary = async (publicIdOrUrl, resourceType = 'image') => {
+const deleteObject = async (publicIdOrUrl, resourceType = 'image') => {
   ensureS3Configured();
 
-  const key = extractKeyFromValue(publicIdOrUrl);
+  const object = parseObject(publicIdOrUrl);
+  const key = object.Key;
   if (!key) {
     return {
       result: 'not_found',
@@ -281,8 +305,7 @@ const deleteFromCloudinary = async (publicIdOrUrl, resourceType = 'image') => {
   }
 
   await s3.send(new DeleteObjectCommand({
-    Bucket: S3_BUCKET,
-    Key: key
+    ...object
   }));
 
   return {
@@ -292,7 +315,18 @@ const deleteFromCloudinary = async (publicIdOrUrl, resourceType = 'image') => {
   };
 };
 
+const deleteFromCloudinary = async (value, type = 'image') => {
+  if (deferDeletion(() => deleteObject(value, type))) return { result: 'deferred' };
+  return deleteObject(value, type);
+};
+
+const readStoredDocument = async value => {
+  ensureS3Configured();
+  return s3.send(new GetObjectCommand(parseObject(value)));
+};
+
 module.exports = {
+  readStoredDocument,
   cloudinary: null,
   s3,
   createUploadFields,

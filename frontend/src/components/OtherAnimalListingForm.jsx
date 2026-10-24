@@ -1,3 +1,4 @@
+import { getAnimalGroup } from '../utils/animalExperience';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -15,8 +16,9 @@ import {
 } from './common';
 import './AnimalListingPage.css';
 import { localizeApiMessage } from '../utils/localizeApiMessage';
+import { listingMediaAccept } from '../utils/listingMedia';
 
-const OtherAnimalListingForm = () => {
+const OtherAnimalListingForm = ({ initialSpecies = '' }) => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -24,7 +26,7 @@ const OtherAnimalListingForm = () => {
   const [errorMessage, setErrorMessage] = useState(null);
   const [success, setSuccess] = useState(false);
   const [formData, setFormData] = useState({
-    animalType: '',
+    animalType: initialSpecies,
     breedName: '',
     age: '',
     gender: 'male',
@@ -78,7 +80,7 @@ const OtherAnimalListingForm = () => {
 
   const resetForm = () => {
     setFormData({
-      animalType: '',
+      animalType: initialSpecies,
       breedName: '',
       age: '',
       gender: 'male',
@@ -115,8 +117,8 @@ const OtherAnimalListingForm = () => {
 
     if (!formData.expectedPrice) {
       newErrors.expectedPrice = t('validation.required') || 'Expected price is required';
-    } else if (parseFloat(formData.expectedPrice) <= 0) {
-      newErrors.expectedPrice = 'Price must be greater than 0';
+    } else if (!Number.isFinite(Number(formData.expectedPrice)) || Number(formData.expectedPrice) <= 0) {
+      newErrors.expectedPrice = t('listing.positivePrice');
     }
 
     if (!formData.frontPhoto && !formData.sidePhoto && !formData.additionalPhoto) {
@@ -129,6 +131,7 @@ const OtherAnimalListingForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
 
     if (!formData.frontPhoto && !formData.sidePhoto && !formData.additionalPhoto) {
       toast.error(t('listing.photoRequired'));
@@ -173,6 +176,7 @@ const OtherAnimalListingForm = () => {
         }
       });
 
+      if (!response.data?.success) throw new Error(response.data?.message || t('listing.createError'));
       if (response.data.success) {
         setSuccess(true);
         toast.success(t('listing.createSuccess') || 'Other animal listing created successfully!');
@@ -217,22 +221,14 @@ const OtherAnimalListingForm = () => {
   ];
 
   return (
-    <form className="listing-form" onSubmit={handleSubmit}>
-      <h2 className="form-title">{t('otherAnimal.listingTitle') || 'List Other Animal for Sale'}</h2>
+    <form className="simple-listing-form" onSubmit={handleSubmit} aria-busy={isSubmitting}>
+      <fieldset disabled={isSubmitting} className="m-0 min-w-0 border-0 p-0">
 
       <FormAlert type="success" message={success ? t('listing.createSuccess') : null} />
       <FormAlert type="error" message={errorMessage} />
 
       <FormSection number="1" title={t('otherAnimal.section1') || 'Animal Type & Basic Details'}>
-        <FormInput
-          label={t('otherAnimal.animalType') || 'Animal Type'}
-          name="animalType"
-          value={formData.animalType}
-          onChange={handleInputChange}
-          placeholder={t('otherAnimal.animalTypePlaceholder') || 'e.g., Sheep, Pig, Rabbit, Camel'}
-          error={errors.animalType}
-          required
-        />
+        <label>{t('otherAnimal.animalType')}<select required name="animalType" value={formData.animalType} onChange={handleInputChange} className="w-full border rounded-lg p-3"><option value="">{t('common.select', 'Select')}</option>{(getAnimalGroup() === 'pet' ? ['rabbit', 'exotic', 'other'] : ['sheep', 'pig', 'chicken', 'duck', 'turkey', 'camel', 'donkey', 'mule', 'rabbit', 'other']).map(species => <option key={species} value={species}>{t(`animalTypes.${species}`, species)}</option>)}</select></label>
 
         <FormInput
           label={t('otherAnimal.breedName') || 'Breed / Type Name'}
@@ -324,7 +320,8 @@ const OtherAnimalListingForm = () => {
           label={t('animal.frontPhoto') || 'Front Photo'}
           name="frontPhoto"
           id="other-frontPhoto"
-          accept="image/*"
+          accept={listingMediaAccept('photo')}
+          mediaKind="photo"
           file={formData.frontPhoto}
           onChange={(file) => handleFileChange('frontPhoto', file)}
           required
@@ -334,7 +331,8 @@ const OtherAnimalListingForm = () => {
           label={t('animal.sidePhoto') || 'Side Photo'}
           name="sidePhoto"
           id="other-sidePhoto"
-          accept="image/*"
+          accept={listingMediaAccept('photo')}
+          mediaKind="photo"
           file={formData.sidePhoto}
           onChange={(file) => handleFileChange('sidePhoto', file)}
         />
@@ -343,7 +341,8 @@ const OtherAnimalListingForm = () => {
           label={t('otherAnimal.additionalPhoto') || 'Additional Photo'}
           name="additionalPhoto"
           id="other-additionalPhoto"
-          accept="image/*"
+          accept={listingMediaAccept('photo')}
+          mediaKind="photo"
           file={formData.additionalPhoto}
           onChange={(file) => handleFileChange('additionalPhoto', file)}
         />
@@ -352,7 +351,8 @@ const OtherAnimalListingForm = () => {
           label={t('animal.video') || 'Video'}
           name="video"
           id="other-video"
-          accept="video/*"
+          accept={listingMediaAccept('video')}
+          mediaKind="video"
           file={formData.video}
           onChange={(file) => handleFileChange('video', file)}
         />
@@ -385,6 +385,7 @@ const OtherAnimalListingForm = () => {
         loadingText={t('listing.submitting') || 'Creating Listing...'}
         submitText={t('listing.submit') || 'Submit Listing'}
       />
+      </fieldset>
     </form>
   );
 };

@@ -2,6 +2,17 @@
 
 Node/Express API for the Kissan Ebazzar web and Expo mobile apps.
 
+## Production dependency and upload updates
+
+- Use Node 20.19 or newer and install from the committed lockfiles with `npm ci` (backend: `npm ci --omit=dev`). Build the frontend with its development dependencies available. Restart existing Node/Vite processes after upgrading dependencies.
+- The Sequelize-only UUID override keeps the patched CommonJS-compatible 11.x release. Do not use `npm audit fix --force` to downgrade Sequelize. bcrypt compatibility and email generation are covered by `npm run production:test` without contacting a database or SMTP service.
+- Both Nginx configurations now allow 160 MiB requests: at most six files of 25 MiB each, plus bounded fields and multipart overhead. Veterinarian documents retain their smaller 6 MiB per-file limit; AI health and profile-photo limits are unchanged. Existing web and mobile clients can keep sending their current multipart fields.
+- Listing/registration uploads use isolated temporary directories and stream to S3 with one 5 MiB multipart buffer per file. At most two such requests run per Node process; additional requests get HTTP 429 and `Retry-After: 5`. Temporary files are removed on success, failure and disconnect. Ensure the OS temporary directory is writable and has adequate disk space; monitor both that directory and Nginx's request-body temporary directory. OS maintenance should remove abandoned temporary files after a process or host crash.
+- Install the updated Nginx configuration, validate it with `nginx -t`, then reload Nginx. Rebuild/redeploy the frontend and restart the backend. No database migration is required for these dependency, upload, logging or error-response changes.
+- Production warnings/errors go to stdout/stderr for PM2/systemd collection with credential redaction. Milk-advice errors preserve only allowlisted public codes; internal provider payloads stay hidden.
+
+Validation: `npm run production:test` uses loopback HTTP and mocked storage only. It covers upload limits, cleanup, concurrency, S3 streaming, production logging/error responses, password hashes and email generation. Recheck both projects with `npm audit --omit=dev` before each deployment.
+
 ## Features
 
 - OTP authentication for users and JWT authentication for users, admins, and veterinarians.

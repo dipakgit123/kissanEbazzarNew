@@ -15,6 +15,7 @@ router.get('/stats', authMiddleware, pregnancyController.getStats);
 router.post('/records', authMiddleware, pregnancyController.createPregnancyRecord);
 router.get('/records', authMiddleware, pregnancyController.getPregnancyRecords);
 router.get('/records/:id', authMiddleware, pregnancyController.getPregnancyRecord);
+router.post('/records/:id/checkups', authMiddleware, pregnancyController.recordCheckup);
 router.put('/records/:id', authMiddleware, pregnancyController.updatePregnancyRecord);
 router.delete('/records/:id', authMiddleware, pregnancyController.deletePregnancyRecord);
 

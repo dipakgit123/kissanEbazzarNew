@@ -120,7 +120,7 @@ const ProfileCompletion = ({ onComplete }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#E9F0F8] to-[#F0F8FF] p-4">
+    <div className="site-background min-h-screen flex items-center justify-center p-4">
       <Toaster position="top-right" />
 
       {/* Language Switcher - Top Right */}
@@ -131,7 +131,7 @@ const ProfileCompletion = ({ onComplete }) => {
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-[#15BB73]/10 to-[#0FA568]/20 rounded-full mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-primary/10 to-primary-hover/20 rounded-full mb-4">
             <UserIcon />
           </div>
           <h2 className="text-2xl font-bold text-gray-800">{t('profileCompletion.title')}</h2>
@@ -154,7 +154,7 @@ const ProfileCompletion = ({ onComplete }) => {
                 value={formData.full_name}
                 onChange={handleChange}
                 className={`w-full pl-10 pr-4 py-3 border-2 ${errors.full_name ? 'border-red-400' : 'border-gray-200'
-                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all`}
+                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all`}
                 placeholder={t('profileCompletion.fullNamePlaceholder')}
                 autoFocus
               />
@@ -181,7 +181,7 @@ const ProfileCompletion = ({ onComplete }) => {
                 value={formData.postal_code}
                 onChange={handleChange}
                 className={`w-full pl-10 pr-4 py-3 border-2 ${errors.postal_code ? 'border-red-400' : 'border-gray-200'
-                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73] transition-all`}
+                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all`}
                 placeholder={t('profileCompletion.pincodePlaceholder')}
                 maxLength="10"
               />
@@ -201,9 +201,9 @@ const ProfileCompletion = ({ onComplete }) => {
           </div>
 
           {/* Info Banner */}
-          <div className="bg-[#15BB73]/10 border border-[#15BB73]/20 rounded-lg p-4">
+          <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
             <div className="flex items-start space-x-3">
-              <svg className="w-5 h-5 text-[#15BB73] mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
               </svg>
               <div className="text-sm text-gray-700">
@@ -219,7 +219,7 @@ const ProfileCompletion = ({ onComplete }) => {
             disabled={isLoading}
             className={`w-full py-3 px-4 rounded-lg font-semibold text-white transition-all duration-300 ${isLoading
                 ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-gradient-to-r from-[#15BB73] to-[#0FA568] hover:shadow-lg transform hover:-translate-y-0.5'
+                : 'bg-primary hover:shadow-lg transform hover:-translate-y-0.5'
               }`}
           >
             {isLoading ? t('common.loading') : t('profileCompletion.continue')}

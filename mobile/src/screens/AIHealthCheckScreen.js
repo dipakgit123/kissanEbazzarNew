@@ -1,4 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import { allowedSpecies, getAnimalGroup } from '../utils/animalExperience';
+import { healthRequest } from '../services/healthReports';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -21,6 +23,9 @@ import { healthCheckService } from '../services/api';
 import FeatureHelpModal from '../components/FeatureHelpModal';
 import { getLocalizedFeatureHelp } from '../constants/featureHelp';
 import AppHeader from '../components/AppHeader';
+import * as FileSystem from 'expo-file-system/legacy';
+import HealthReportTools from '../components/HealthReportTools';
+import { checkedHealthResult, healthError, healthText, urgencyCode } from '../utils/healthReport';
 
 const ANIMAL_TYPES = [
   { id: 'cow', image: require('../assets/cow1.png') },
@@ -29,10 +34,12 @@ const ANIMAL_TYPES = [
   { id: 'horse', image: require('../assets/horse1.png') },
   { id: 'dog', image: require('../assets/dog1.png') },
   { id: 'cat', image: require('../assets/cat1.png') },
+  { id: 'sheep', icon: 'paw-outline' },
   { id: 'other', icon: 'paw-outline' },
 ];
 
 const getScoreColor = (score) => {
+  if (score == null) return COLORS.textMuted;
   const numericScore = Number(score);
   if (numericScore >= 8) return COLORS.success;
   if (numericScore >= 6) return COLORS.warning;
@@ -40,12 +47,7 @@ const getScoreColor = (score) => {
   return COLORS.error;
 };
 
-const getUrgencyColor = (urgency = '') => {
-  const value = String(urgency).toLowerCase();
-  if (value.includes('high') || value.includes('critical') || value.includes('urgent')) return COLORS.error;
-  if (value.includes('medium') || value.includes('moderate')) return COLORS.warning;
-  return COLORS.success;
-};
+const getUrgencyColor = (code) => ['emergency', 'soon'].includes(code) ? COLORS.error : code === 'monitor' ? COLORS.warning : code === 'routine' ? COLORS.primary : COLORS.textMuted;
 
 const toDisplayText = (value, fallback = '-') => {
   if (value === null || value === undefined || value === '') return fallback;
@@ -66,16 +68,17 @@ const normalizeList = (value) => {
 };
 
 const getBodyConditionText = (score, t) => {
+  if (score == null) return '—';
   const numericScore = Number(score);
   if (numericScore <= 2) return t('aiHealthCheck.underweight');
   if (numericScore >= 4) return t('aiHealthCheck.overweight');
   return t('aiHealthCheck.normal');
 };
 
-const AIHealthCheckScreen = ({ navigation }) => {
+const AIHealthCheckScreen = ({ navigation, route }) => {
   const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
-  const [selectedAnimal, setSelectedAnimal] = useState(null);
+  const [selectedAnimal, setSelectedAnimal] = useState(() => allowedSpecies(route?.params?.species) ? route.params.species : null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [symptoms, setSymptoms] = useState('');
   const [age, setAge] = useState('');
@@ -85,6 +88,37 @@ const AIHealthCheckScreen = ({ navigation }) => {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [helpVisible, setHelpVisible] = useState(false);
+  const [report, setReport] = useState(null);
+  const [picking, setPicking] = useState(false);
+  const c = healthText(i18n.language);
+  const version = useRef(0);
+  const uploadKey = useRef(null);
+  useEffect(() => () => { version.current++; }, []);
+  useEffect(() => {
+    if (!route?.params?.animalId || !allowedSpecies(route.params.species)) return;
+    version.current++; uploadKey.current = null;
+    setSelectedAnimal(route.params.species); setSelectedImage(null); setResult(null); setReport(null);
+    setSymptoms(''); setAge(''); setAdditionalInfo(''); setCustomQuestion(''); setError(null); setLoading(false);
+  }, [route?.params?.animalId, route?.params?.species]);
+  const openReport = next => { setResult(checkedHealthResult(next.analysis)); setReport(next.id && next.context ? next : null); };
+  useEffect(() => {
+    if (!route?.params?.reportId) return undefined;
+    let cancelled = false;
+    setLoading(true); setError(null);
+    healthRequest(`/reports/${encodeURIComponent(route.params.reportId)}`).then(response => {
+      if (!cancelled) { const next = response.data; setResult(checkedHealthResult(next.analysis)); setReport(next); }
+    }).catch(err => { if (!cancelled) setError(healthError(err, healthText(i18n.language))); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [route?.params?.reportId, i18n.language]);
+  const acceptImage = async asset => {
+    const info = await FileSystem.getInfoAsync(asset.uri);
+    const size = asset.fileSize || info.size;
+    if (!size || size > 8 * 1024 * 1024 || !['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(asset.mimeType || 'image/jpeg')) {
+      setError(c('photo')); return;
+    }
+    setSelectedImage(asset); setError(null); setResult(null);
+  };
   const aiHealthHelp = getLocalizedFeatureHelp('aiHealth', i18n.resolvedLanguage || i18n.language);
 
   const selectedAnimalMeta = useMemo(
@@ -94,10 +128,13 @@ const AIHealthCheckScreen = ({ navigation }) => {
 
   const primaryRecommendation = result?.recommendations?.[0];
   const healthScore = result?.healthScore || result?.score;
-  const bodyScore = result?.bodyConditionScore || result?.body_condition_score || 3;
-  const urgencyLevel = result?.urgencyLevel || result?.urgency || t('aiHealthCheck.normal');
+  const bodyScore = result?.bodyConditionScore ?? null;
+  const urgencyLevel = c(urgencyCode(result) === 'unknown' ? 'uncertain' : urgencyCode(result));
 
   const pickImage = async () => {
+    if (loading || picking) return;
+    setPicking(true);
+    try {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert(t('aiHealthCheck.permissionRequired'), t('aiHealthCheck.galleryPermission'));
@@ -106,19 +143,20 @@ const AIHealthCheckScreen = ({ navigation }) => {
 
     const pickerResult = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
+      allowsEditing: false,
       quality: 0.72,
     });
 
     if (!pickerResult.canceled) {
-      setSelectedImage(pickerResult.assets[0]);
-      setResult(null);
-      setError(null);
+      await acceptImage(pickerResult.assets[0]);
     }
+    } catch (err) { setError(healthError(err, c)); } finally { setPicking(false); }
   };
 
   const takePhoto = async () => {
+    if (loading || picking) return;
+    setPicking(true);
+    try {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert(t('aiHealthCheck.permissionRequired'), t('aiHealthCheck.cameraPermission'));
@@ -126,16 +164,14 @@ const AIHealthCheckScreen = ({ navigation }) => {
     }
 
     const pickerResult = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [4, 3],
+      allowsEditing: false,
       quality: 0.72,
     });
 
     if (!pickerResult.canceled) {
-      setSelectedImage(pickerResult.assets[0]);
-      setResult(null);
-      setError(null);
+      await acceptImage(pickerResult.assets[0]);
     }
+    } catch (err) { setError(healthError(err, c)); } finally { setPicking(false); }
   };
 
   const chooseImageSource = () => {
@@ -147,6 +183,8 @@ const AIHealthCheckScreen = ({ navigation }) => {
   };
 
   const analyzeHealth = async () => {
+    if (loading || picking) return;
+    const currentVersion = ++version.current;
     if (!selectedAnimal) {
       setError(t('aiHealthCheck.errorSelectAnimal'));
       return;
@@ -169,26 +207,35 @@ const AIHealthCheckScreen = ({ navigation }) => {
         name: selectedImage.fileName || 'health_check.jpg',
       });
       formData.append('animalType', selectedAnimal);
+      if (selectedAnimal === route?.params?.species && route.params.animalId) formData.append('animalId', route.params.animalId);
       formData.append('symptoms', symptoms);
       formData.append('age', age);
       formData.append('additionalInfo', additionalInfo);
       formData.append('customQuestion', customQuestion);
       formData.append('languageHint', i18n.language);
+      const fingerprint = JSON.stringify({ animalId: route?.params?.animalId, selectedAnimal, selectedImage, symptoms, age, additionalInfo, customQuestion, language: i18n.language });
+      if (uploadKey.current?.fingerprint !== fingerprint) uploadKey.current = { fingerprint, id: 'mobile-' + Date.now() + '-' + Math.random().toString(36).slice(2) };
+      formData.append('requestId', uploadKey.current.id);
 
       const response = await healthCheckService.uploadAndAnalyze(formData);
+      if (currentVersion !== version.current) return;
       if (response.success) {
-        setResult(response.data);
+        openReport(response.report || { analysis: response.data });
+        uploadKey.current = null;
       } else {
         setError(response.message || t('aiHealthCheck.errorAnalysisFailed'));
       }
     } catch (err) {
-      setError(err.message || t('aiHealthCheck.errorConnectionFailed'));
+      if (currentVersion === version.current) setError(healthError(err, c));
     } finally {
-      setLoading(false);
+      if (currentVersion === version.current) setLoading(false);
     }
   };
 
   const resetForm = () => {
+    version.current++;
+    uploadKey.current = null;
+    setReport(null);
     setSelectedAnimal(null);
     setSelectedImage(null);
     setSymptoms('');
@@ -223,13 +270,14 @@ const AIHealthCheckScreen = ({ navigation }) => {
           contentContainerStyle={[styles.content, { paddingBottom: 32 + insets.bottom }]}
           showsVerticalScrollIndicator={false}
         >
+          <HealthReportTools report={report} onOpen={openReport} onDelete={resetForm} language={i18n.language} disabled={loading || picking} navigation={navigation} />
           {!result ? (
-            <>
+            <View pointerEvents={loading || picking ? 'none' : 'auto'}>
               <StepHeader currentStep={selectedAnimal ? selectedImage ? 3 : 2 : 1} t={t} />
 
               <Section title={t('aiHealthCheck.selectAnimal')} step="1">
                 <View style={styles.animalGrid}>
-                  {ANIMAL_TYPES.map((animal) => {
+                  {ANIMAL_TYPES.filter(animal => allowedSpecies(animal.id)).map((animal) => {
                     const active = selectedAnimal === animal.id;
                     return (
                       <TouchableOpacity
@@ -257,6 +305,7 @@ const AIHealthCheckScreen = ({ navigation }) => {
                 </View>
               </Section>
 
+              <Text style={styles.disclaimerText}>{c('privacy')}</Text>
               <Section title={t('aiHealthCheck.uploadPhoto')} step="2">
                 <TouchableOpacity style={styles.uploadBox} onPress={chooseImageSource} activeOpacity={0.9}>
                   {selectedImage ? (
@@ -273,7 +322,7 @@ const AIHealthCheckScreen = ({ navigation }) => {
                         <Ionicons name="image-outline" size={30} color={COLORS.primary} />
                       </View>
                       <Text style={styles.uploadTitle}>{t('aiHealthCheck.clickOrChoose')}</Text>
-                      <Text style={styles.uploadHint}>{t('aiHealthCheck.fileFormats')}</Text>
+                      <Text style={styles.uploadHint}>{c('photo')}</Text>
                       <Text style={styles.uploadHintSmall}>{t('aiHealthCheck.autoOptimizeHint')}</Text>
                     </View>
                   )}
@@ -291,12 +340,7 @@ const AIHealthCheckScreen = ({ navigation }) => {
               </Section>
 
               <Section title={t('aiHealthCheck.additionalInfo')} step="3">
-                <Input
-                  label={t('aiHealthCheck.age')}
-                  value={age}
-                  onChangeText={setAge}
-                  placeholder={t('aiHealthCheck.agePlaceholder')}
-                />
+
                 <Input
                   label={t('aiHealthCheck.symptoms')}
                   value={symptoms}
@@ -341,7 +385,7 @@ const AIHealthCheckScreen = ({ navigation }) => {
               <TouchableOpacity
                 style={[styles.analyzeButton, loading && styles.analyzeButtonDisabled]}
                 onPress={analyzeHealth}
-                disabled={loading}
+                disabled={loading || picking}
                 activeOpacity={0.9}
               >
                 {loading ? (
@@ -358,9 +402,13 @@ const AIHealthCheckScreen = ({ navigation }) => {
                 <Ionicons name="information-circle-outline" size={18} color={COLORS.textMuted} />
                 <Text style={styles.disclaimerText}>{t('aiHealthCheck.disclaimer')}</Text>
               </View>
-            </>
+            </View>
           ) : (
             <View style={styles.resultsWrap}>
+              <ListCard title={c('photoLimits')} icon="information-circle-outline" items={result.assessmentLimitations} />
+              <Text style={styles.disclaimerText}>{c('limitations')}</Text>
+              <ListCard title={c('firstAid')} icon="medical-outline" items={result.firstAid} />
+              <ListCard title={c('preventive')} icon="shield-checkmark-outline" items={result.preventiveCare} />
               <ResultCard title={t('aiHealthCheck.results')} icon="document-text-outline">
                 <Text style={styles.resultHeadline}>
                   {toDisplayText(result.overallHealth, t('aiHealthCheck.sectionOverview'))}
@@ -369,9 +417,9 @@ const AIHealthCheckScreen = ({ navigation }) => {
                   {toDisplayText(primaryRecommendation || result.whenToSeeVet || result.disclaimer, t('aiHealthCheck.disclaimer'))}
                 </Text>
                 <View style={styles.badgeRow}>
-                  <Badge label={toDisplayText(urgencyLevel)} color={getUrgencyColor(urgencyLevel)} />
+                  <Badge label={toDisplayText(urgencyLevel)} color={getUrgencyColor(urgencyCode(result))} />
                   <Badge label={toDisplayText(result.animalType || t(`animalTypes.${selectedAnimal}`, { defaultValue: selectedAnimal }))} color={COLORS.primary} />
-                  <Badge label={`${t('aiHealthCheck.bodyCondition')}: ${bodyScore}/5`} color={COLORS.info} />
+                  <Badge label={`${t('aiHealthCheck.bodyCondition')}: ${bodyScore ?? '—'}/5`} color={COLORS.info} />
                 </View>
 
                 <View style={styles.summaryGrid}>
@@ -383,7 +431,7 @@ const AIHealthCheckScreen = ({ navigation }) => {
                   <SummaryItem
                     label={t('aiHealthCheck.bodyCondition')}
                     value={getBodyConditionText(bodyScore, t)}
-                    subvalue={`${bodyScore}/5`}
+                    subvalue={`${bodyScore ?? '—'}/5`}
                     color={COLORS.info}
                   />
                   <SummaryItem
@@ -575,8 +623,8 @@ const IssueCard = ({ title, icon, items }) => {
   return (
     <ResultCard title={title} icon={icon}>
       {list.map((issue, index) => {
-        const severity = issue?.severity || issue?.level || '';
-        const severityColor = getUrgencyColor(severity);
+        const severity = issue?.likelihood || issue?.severity || issue?.level || '';
+        const severityColor = COLORS.textMuted;
         return (
           <View key={`${title}-${index}`} style={styles.issueItem}>
             <View style={styles.issueHeader}>

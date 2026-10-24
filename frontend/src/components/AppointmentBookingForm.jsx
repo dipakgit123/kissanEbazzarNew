@@ -5,13 +5,29 @@ import toast, { Toaster } from 'react-hot-toast';
 import { API_BASE_API } from '../config/api';
 import { safeJsonParse } from '../utils/stringUtils';
 import { localizeApiMessage } from '../utils/localizeApiMessage';
+import { FullPageLoader } from './AppLoader';
 
 const AppointmentBookingForm = () => {
   const { t, i18n } = useTranslation();
   const { vetId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const veterinarian = location.state?.veterinarian;
+  const [veterinarian, setVeterinarian] = useState(location.state?.veterinarian || null);
+  const [loadingVeterinarian, setLoadingVeterinarian] = useState(!location.state?.veterinarian);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoadingVeterinarian(true);
+    fetch(`${API_BASE_API}/veterinarians/${encodeURIComponent(vetId)}`, { signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) throw new Error('Veterinarian not found');
+        return response.json();
+      })
+      .then(result => setVeterinarian(result.data || null))
+      .catch(error => { if (error.name !== 'AbortError') setVeterinarian(null); })
+      .finally(() => { if (!controller.signal.aborted) setLoadingVeterinarian(false); });
+    return () => controller.abort();
+  }, [vetId]);
 
   const [formData, setFormData] = useState({
     animal_type: 'cow',
@@ -53,7 +69,7 @@ const AppointmentBookingForm = () => {
 
   useEffect(() => {
     // Get user info from localStorage
-    const userStr = localStorage.getItem('user');
+    const userStr = localStorage.getItem('userData') || localStorage.getItem('user');
     if (userStr) {
       const user = safeJsonParse(userStr, {});
       if (user) {
@@ -172,13 +188,15 @@ const AppointmentBookingForm = () => {
     return '00:00';
   };
 
+  if (loadingVeterinarian) return <FullPageLoader />;
+
   if (!veterinarian) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="site-background min-h-screen flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-600 mb-4">{t('appointmentBooking.vetUnavailable')}</p>
           <button
-            onClick={() => navigate('/veterinarians')}
+            onClick={() => navigate('/veterinarian')}
             className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
           >
             {t('appointmentBooking.findVeterinarians')}
@@ -189,7 +207,7 @@ const AppointmentBookingForm = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="site-background min-h-screen py-8">
       <Toaster position="top-right" />
       
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">

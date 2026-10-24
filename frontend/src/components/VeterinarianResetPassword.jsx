@@ -65,7 +65,7 @@ const VeterinarianResetPassword = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4">
+    <div className="site-background min-h-screen flex items-center justify-center p-4">
       <Toaster position="top-right" />
       <div className="fixed top-4 right-4 z-50">
         <LanguageSwitcher />
@@ -111,7 +111,7 @@ const VeterinarianResetPassword = () => {
             className={`w-full rounded-xl px-4 py-3.5 font-bold text-white transition-all ${
               isSubmitting
                 ? 'cursor-not-allowed bg-gray-400'
-                : 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-blue-500/40'
+                : 'bg-blue-600 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-blue-500/40'
             }`}
           >
             {isSubmitting

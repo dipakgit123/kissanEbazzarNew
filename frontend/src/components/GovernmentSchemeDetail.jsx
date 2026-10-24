@@ -1,302 +1,110 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
+import { FiHome, FiArrowLeft, FiArrowRight, FiLink, FiExternalLink, FiChevronDown } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { API_BASE_URL } from '../config/api';
-
-const getViewStorageKey = (slug) => `scheme-view-tracked:${slug}`;
-
-const getLocalizedValue = (scheme, field, language) => {
-  const translations = scheme?.translations || {};
-  const languageValue = translations[language]?.[field];
-  const fallbackValue = translations.en?.[field];
-  return languageValue || fallbackValue || scheme?.[field] || '';
-};
-
-const getLocalizedArray = (scheme, field, language) => {
-  const translations = scheme?.translations || {};
-  const languageValue = translations[language]?.[field];
-  const fallbackValue = translations.en?.[field];
-  const rawValue = Array.isArray(languageValue)
-    ? languageValue
-    : Array.isArray(fallbackValue)
-      ? fallbackValue
-      : scheme?.[field];
-  return Array.isArray(rawValue) ? rawValue : [];
-};
+import { schemeLanguage, schemeLocale, schemeText, schemeItems, schemeAmount, schemeDeadline, schemeWebsite } from '../utils/governmentSchemes';
+import './GovernmentSchemes.css';
+import SchemeVisualIcon from './SchemeVisualIcon';
 
 const GovernmentSchemeDetail = () => {
   const { slug } = useParams();
-  const navigate = useNavigate();
   const { t, i18n } = useTranslation();
+  const language = schemeLanguage(i18n.resolvedLanguage || i18n.language);
   const [scheme, setScheme] = useState(null);
   const [relatedSchemes, setRelatedSchemes] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  const language = i18n.resolvedLanguage || i18n.language || 'en';
-
-  const fetchScheme = useCallback(async () => {
-    setLoading(true);
-    const viewStorageKey = getViewStorageKey(slug);
-    const shouldTrackView = sessionStorage.getItem(viewStorageKey) === null;
-
-    if (shouldTrackView) {
-      sessionStorage.setItem(viewStorageKey, 'pending');
-    }
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/government-schemes/${slug}?trackView=${shouldTrackView}`);
-      const data = await response.json();
-
-      if (data.success) {
-        setScheme(data.data);
-        setRelatedSchemes(data.relatedSchemes || []);
-        document.title = `${data.data.title} - ${t('governmentSchemes.detailTitle')}`;
-        if (shouldTrackView) sessionStorage.setItem(viewStorageKey, 'tracked');
-      } else {
-        if (shouldTrackView) sessionStorage.removeItem(viewStorageKey);
-        navigate('/government-schemes', { replace: true });
-      }
-    } catch (error) {
-      if (shouldTrackView) sessionStorage.removeItem(viewStorageKey);
-      console.error('Failed to fetch scheme:', error);
-      navigate('/government-schemes', { replace: true });
-    } finally {
-      setLoading(false);
-    }
-  }, [navigate, slug, t]);
+  const [error, setError] = useState(false);
+  const [notFound, setNotFound] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const [activeSection, setActiveSection] = useState(null);
+  const sectionRefs = useRef({});
 
   useEffect(() => {
-    fetchScheme();
-  }, [fetchScheme]);
+    let active = true;
+    setLoading(true); setError(false); setNotFound(false); setActiveSection(null);
+    const key = `scheme-view-tracked:${slug}`;
+    const trackView = sessionStorage.getItem(key) === null;
+    if (trackView) sessionStorage.setItem(key, 'pending');
+    (async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/government-schemes/${encodeURIComponent(slug)}?trackView=${trackView}`);
+        const result = await response.json();
+        if (!response.ok || !result.success || !result.data) {
+          if (trackView) sessionStorage.removeItem(key);
+          if (active) { setScheme(null); setNotFound(response.status === 404); setError(response.status !== 404); }
+          return;
+        }
+        if (trackView) sessionStorage.setItem(key, 'tracked');
+        if (active) { setScheme(result.data); setRelatedSchemes(Array.isArray(result.relatedSchemes) ? result.relatedSchemes : []); }
+      } catch {
+        if (trackView) sessionStorage.removeItem(key);
+        if (active) { setScheme(null); setError(true); }
+      } finally { if (active) setLoading(false); }
+    })();
+    // Do not repeat view tracking when language changes or let an older route replace the current scheme.
+    return () => { active = false; };
+  }, [slug, retry]);
 
-  const localized = useMemo(() => {
-    if (!scheme) return null;
-    return {
-      title: getLocalizedValue(scheme, 'title', language),
-      shortDescription: getLocalizedValue(scheme, 'short_description', language),
-      description: getLocalizedValue(scheme, 'description', language),
-      benefits: getLocalizedArray(scheme, 'benefits', language),
-      eligibility: getLocalizedArray(scheme, 'eligibility', language),
-      requiredDocuments: getLocalizedArray(scheme, 'required_documents', language),
-      applicationSteps: getLocalizedArray(scheme, 'application_steps', language)
-    };
-  }, [language, scheme]);
+  const title = schemeText(scheme, 'title', language);
+  useEffect(() => {
+    if (!title) return;
+    const previous = document.title;
+    document.title = `${title} - ${t('governmentSchemes.detailTitle')}`;
+    return () => { document.title = previous; };
+  }, [title, t]);
 
   const shareScheme = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      toast.success(t('governmentSchemes.linkCopied'));
-    } catch {
-      toast.error(t('governmentSchemes.linkCopyFailed'));
-    }
+    try { await navigator.clipboard.writeText(window.location.href); toast.success(t('governmentSchemes.linkCopied')); }
+    catch { toast.error(t('governmentSchemes.linkCopyFailed')); }
+  };
+  const officialUrl = schemeWebsite(scheme?.official_url);
+  const description = schemeText(scheme, 'description', language);
+  const sections = [
+    { field: 'benefits', title: 'benefits', empty: 'noBenefits', open: true },
+    { field: 'eligibility', title: 'eligibility', empty: 'noEligibility', open: true },
+    { field: 'required_documents', title: 'requiredDocuments', empty: 'noDocuments' },
+    { field: 'application_steps', title: 'howToApply', empty: 'noSteps', ordered: true }
+  ];
+
+  const openSection = field => {
+    const section = sectionRefs.current[field];
+    if (!section) return;
+    section.open = true;
+    setActiveSection(field);
+    section.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+    section.querySelector('summary')?.focus({ preventScroll: true });
   };
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f8f2e7] text-slate-500">
-        {t('governmentSchemes.loadingDetails')}
-      </div>
-    );
-  }
-
-  if (!scheme || !localized) {
-    return null;
-  }
-
-  return (
-    <main className="min-h-screen bg-[#f8f2e7]">
-      <section className="bg-gradient-to-br from-[#8b520a] via-[#b66f0d] to-[#dd942c] text-white">
-        <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="mb-8 flex items-center justify-between gap-4">
-            <Link to="/government-schemes" className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-bold backdrop-blur hover:bg-white/25">
-              <span aria-hidden="true">&lt;</span>
-              {t('governmentSchemes.backToSchemes')}
-            </Link>
-            <button onClick={shareScheme} className="rounded-full bg-white/15 px-4 py-2 text-sm font-bold backdrop-blur hover:bg-white/25">
-              {t('governmentSchemes.share')}
-            </button>
-          </div>
-
-          <div className="grid gap-8 lg:grid-cols-[1fr_22rem] lg:items-end">
-            <div>
-              <div className="mb-4 flex flex-wrap gap-2">
-                <Badge>{scheme.category}</Badge>
-                <Badge>{scheme.animal_category}</Badge>
-                <Badge>{scheme.government_level}</Badge>
-              </div>
-              <p className="text-sm font-bold uppercase tracking-[0.24em] text-amber-100">{scheme.department || 'Government Scheme'}</p>
-              <h1 className="mt-4 max-w-4xl text-4xl font-black leading-tight sm:text-6xl">{localized.title}</h1>
-              {localized.shortDescription && (
-                <p className="mt-5 max-w-3xl text-lg leading-8 text-amber-50">{localized.shortDescription}</p>
-              )}
-            </div>
-
-            <div className="rounded-[2rem] bg-white p-4 shadow-2xl shadow-black/20">
-              <div className="h-64 overflow-hidden rounded-[1.5rem] bg-amber-100">
-                {scheme.image_url ? (
-                  <img src={scheme.image_url} alt={localized.title} className="h-full w-full object-cover" />
-                ) : (
-                  <div className="flex h-full items-center justify-center">
-                    <SchemeIcon className="h-20 w-20 text-[#b66f0d]" />
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto grid max-w-6xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_20rem] lg:px-8">
-        <div className="space-y-6">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <StatCard label={t('governmentSchemes.amount')} value={scheme.amount_label || '-'} />
-            <StatCard label={t('governmentSchemes.interest')} value={scheme.interest_rate || '-'} />
-            <StatCard label={t('governmentSchemes.status')} value={t(`governmentSchemes.statuses.${scheme.status}`, { defaultValue: scheme.status || '-' })} />
-          </div>
-
-          {localized.description && (
-            <Section title={t('governmentSchemes.schemeDetails')}>
-              <p className="text-base leading-8 text-slate-700">{localized.description}</p>
-            </Section>
-          )}
-
-          <Section title={t('governmentSchemes.benefits')}>
-            <CheckList items={localized.benefits} emptyText={t('governmentSchemes.noBenefits')} />
-          </Section>
-
-          <Section title={t('governmentSchemes.eligibility')}>
-            <CheckList items={localized.eligibility} emptyText={t('governmentSchemes.noEligibility')} />
-          </Section>
-
-          <Section title={t('governmentSchemes.requiredDocuments')}>
-            <TagList items={localized.requiredDocuments} emptyText={t('governmentSchemes.noDocuments')} />
-          </Section>
-
-          <Section title={t('governmentSchemes.howToApply')}>
-            {localized.applicationSteps.length > 0 ? (
-              <ol className="space-y-3">
-                {localized.applicationSteps.map((step, index) => (
-                  <li key={`${step}-${index}`} className="flex gap-4">
-                    <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-emerald-100 text-sm font-black text-emerald-700">{index + 1}</span>
-                    <span className="pt-1 text-sm leading-6 text-slate-700">{step}</span>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="text-sm text-slate-500">{t('governmentSchemes.noSteps')}</p>
-            )}
-          </Section>
-        </div>
-
-        <aside className="space-y-5">
-          <div className="sticky top-24 rounded-[1.8rem] bg-white p-5 shadow-sm ring-1 ring-black/5">
-            <h2 className="text-lg font-black text-slate-900">{t('governmentSchemes.applyForScheme')}</h2>
-            <div className="mt-4 space-y-3 text-sm text-slate-600">
-              <InfoRow label={t('governmentSchemes.deadline')} value={scheme.deadline || t('governmentSchemes.openDeadline')} />
-              <InfoRow label={t('governmentSchemes.state')} value={scheme.state || t('governmentSchemes.allIndia')} />
-              <InfoRow label={t('governmentSchemes.views')} value={scheme.views || 0} />
-            </div>
-            {scheme.official_url ? (
-              <a
-                href={scheme.official_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-5 block rounded-2xl bg-[#b66f0d] px-5 py-4 text-center font-black text-white shadow-lg shadow-amber-900/10 hover:bg-[#9f5f09]"
-              >
-                {t('governmentSchemes.openOfficialWebsite')}
-              </a>
-            ) : (
-              <div className="mt-5 rounded-2xl bg-slate-100 px-5 py-4 text-center text-sm font-bold text-slate-500">
-                {t('governmentSchemes.noOfficialLink')}
-              </div>
-            )}
-            {scheme.contact_info && (
-              <p className="mt-4 rounded-2xl bg-emerald-50 p-4 text-sm leading-6 text-emerald-900">{scheme.contact_info}</p>
-            )}
-          </div>
-
-          {relatedSchemes.length > 0 && (
-            <div className="rounded-[1.8rem] bg-white p-5 shadow-sm ring-1 ring-black/5">
-              <h2 className="text-lg font-black text-slate-900">{t('governmentSchemes.relatedSchemes')}</h2>
-              <div className="mt-4 space-y-3">
-                {relatedSchemes.map((related) => (
-                  <Link key={related.id} to={`/government-schemes/${related.slug}`} className="block rounded-2xl bg-[#f8f2e7] p-4 transition hover:bg-amber-100">
-                    <p className="text-sm font-black leading-5 text-slate-900">{getLocalizedValue(related, 'title', language)}</p>
-                    <p className="mt-1 text-xs capitalize text-slate-500">{related.category}</p>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
+  return <main className="gs-page gs-detail-page"><div className="gs-container">
+    <nav className="gs-toolbar" aria-label={t('governmentSchemes.detailTitle')}><Link to="/government-schemes"><FiArrowLeft aria-hidden="true" />{t('governmentSchemes.backToSchemes')}</Link><button type="button" onClick={shareScheme}><FiLink aria-hidden="true" />{t('schemeUi.copyLink')}</button></nav>
+    {loading ? <div className="gs-empty" role="status">{t('governmentSchemes.loadingDetails')}</div> : error || notFound || !scheme ? <div className="gs-empty" role="alert"><h1>{t(notFound ? 'schemeUi.notFound' : 'schemeUi.detailError')}</h1>{!notFound && <button type="button" className="action-button action-button-secondary" onClick={() => setRetry(value => value + 1)}>{t('schemeUi.retry')}</button>}</div> : <>
+      <header className="gs-detail-header">
+        <div className="gs-detail-identity"><div className="gs-detail-image"><FiHome aria-hidden="true" />{scheme.image_url && <img src={scheme.image_url} alt="" onError={event => { event.currentTarget.hidden = true; }} />}</div><div><div className="gs-detail-labels"><Link to={`/government-schemes?category=${encodeURIComponent(scheme.category || 'general')}`}>{t(`governmentSchemes.categories.${scheme.category || 'general'}`)}</Link><span>{t(`schemeUi.levels.${scheme.government_level || 'other'}`)}</span><span>{t(`governmentSchemes.animalCategories.${scheme.animal_category || 'both'}`)}</span></div><h1>{title}</h1>{scheme.department && <p className="gs-department">{scheme.department}</p>}</div></div>
+        {schemeText(scheme, 'short_description', language) && <p className="gs-intro">{schemeText(scheme, 'short_description', language)}</p>}
+        <dl className="gs-detail-facts"><div><dt>{t('governmentSchemes.amount')}</dt><dd>{schemeAmount(scheme.amount_label, language) || t('schemeUi.notSpecified')}</dd></div><div><dt>{t('governmentSchemes.interest')}</dt><dd>{scheme.interest_rate || t('schemeUi.notSpecified')}</dd></div><div><dt>{t('schemeUi.recordStatus')}</dt><dd>{t(`governmentSchemes.statuses.${scheme.status}`, { defaultValue: scheme.status || t('schemeUi.notSpecified') })}</dd></div></dl>
+      </header>
+      <nav className="gs-section-nav" aria-label={t('schemeVisual.jumpTo')}>
+        {sections.map(section => <button type="button" key={section.field} aria-pressed={activeSection === section.field} aria-controls={`scheme-section-${section.field}`} onClick={() => openSection(section.field)}><SchemeVisualIcon kind={section.field} /><span>{t(`governmentSchemes.${section.title}`)}</span></button>)}
+      </nav>
+      <div className="gs-detail-layout">
+        <aside className="gs-apply-panel"><h2>{t('governmentSchemes.applyForScheme')}</h2><dl><div><dt>{t('governmentSchemes.deadline')}</dt><dd>{schemeDeadline(scheme.deadline, language) || t('schemeUi.notSpecified')}</dd></div><div><dt>{t('governmentSchemes.state')}</dt><dd>{scheme.state || t('governmentSchemes.allIndia')}</dd></div></dl>
+          {officialUrl ? <a href={officialUrl} target="_blank" rel="noopener noreferrer" className="action-button action-button-primary gs-official-link">{t('governmentSchemes.openOfficialWebsite')}<FiExternalLink aria-hidden="true" /></a> : <p className="gs-no-link">{t('governmentSchemes.noOfficialLink')}</p>}
+          {scheme.contact_info && <div className="gs-contact"><h3>{t('schemeUi.contact')}</h3><p>{scheme.contact_info}</p></div>}
+          <p className="gs-view-count">{t('governmentSchemes.views')}: {Number(scheme.views || 0).toLocaleString(schemeLocale(language))}</p>
         </aside>
-      </section>
-    </main>
-  );
+        <div className="gs-detail-sections" key={slug}>
+          {sections.map(section => {
+            const items = schemeItems(scheme, section.field, language);
+            return <details className="gs-detail-section" id={`scheme-section-${section.field}`} ref={element => { sectionRefs.current[section.field] = element; }} key={section.field} open={section.open || undefined} onToggle={event => { if (!event.currentTarget.open && activeSection === section.field) setActiveSection(null); }}><summary><span className="gs-section-icon"><SchemeVisualIcon kind={section.field} /></span><h2>{t(`governmentSchemes.${section.title}`)}</h2><FiChevronDown aria-hidden="true" /></summary><div className="gs-section-body">{items.length ? section.ordered ? <ol className="gs-steps">{items.map((item, index) => <li key={index}><span aria-hidden="true">{(index + 1).toLocaleString(schemeLocale(language))}</span><p>{item}</p></li>)}</ol> : <ul className="gs-checklist">{items.map((item, index) => <li key={index}>{item}</li>)}</ul> : <p className="gs-unspecified">{t(`governmentSchemes.${section.empty}`)}</p>}</div></details>;
+          })}
+          {description && <details className="gs-detail-section"><summary><h2>{t('governmentSchemes.schemeDetails')}</h2><FiChevronDown aria-hidden="true" /></summary><div className="gs-section-body gs-description">{description}</div></details>}
+        </div>
+      </div>
+      {relatedSchemes.length > 0 && <section className="gs-related" aria-labelledby="gs-related-title"><h2 id="gs-related-title">{t('governmentSchemes.relatedSchemes')}</h2><div>{relatedSchemes.map(related => <Link to={`/government-schemes/${related.slug}`} key={related.id}><span><small>{t(`governmentSchemes.categories.${related.category || 'general'}`)}</small><strong>{schemeText(related, 'title', language)}</strong></span><FiArrowRight aria-hidden="true" /></Link>)}</div></section>}
+    </>}
+  </div></main>;
 };
-
-const Section = ({ title, children }) => (
-  <section className="rounded-[1.8rem] bg-white p-6 shadow-sm ring-1 ring-black/5">
-    <h2 className="mb-4 text-xl font-black text-slate-900">{title}</h2>
-    {children}
-  </section>
-);
-
-const CheckList = ({ items, emptyText }) => {
-  if (!items.length) return <p className="text-sm text-slate-500">{emptyText}</p>;
-
-  return (
-    <ul className="space-y-3">
-      {items.map((item, index) => (
-        <li key={`${item}-${index}`} className="flex gap-3">
-          <span className="mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-            </svg>
-          </span>
-          <span className="text-sm leading-6 text-slate-700">{item}</span>
-        </li>
-      ))}
-    </ul>
-  );
-};
-
-const TagList = ({ items, emptyText }) => {
-  if (!items.length) return <p className="text-sm text-slate-500">{emptyText}</p>;
-
-  return (
-    <div className="flex flex-wrap gap-2">
-      {items.map((item, index) => (
-        <span key={`${item}-${index}`} className="rounded-full bg-[#f8f2e7] px-4 py-2 text-sm font-bold text-slate-700 ring-1 ring-black/5">{item}</span>
-      ))}
-    </div>
-  );
-};
-
-const StatCard = ({ label, value }) => (
-  <div className="rounded-[1.4rem] bg-white p-5 text-center shadow-sm ring-1 ring-black/5">
-    <p className="text-2xl font-black text-[#126b4f]">{value}</p>
-    <p className="mt-1 text-sm text-slate-500">{label}</p>
-  </div>
-);
-
-const InfoRow = ({ label, value }) => (
-  <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-3 last:border-b-0">
-    <span>{label}</span>
-    <span className="font-bold text-slate-900">{value}</span>
-  </div>
-);
-
-const Badge = ({ children }) => (
-  <span className="rounded-full bg-white/18 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-white backdrop-blur">
-    {children}
-  </span>
-);
-
-const SchemeIcon = ({ className }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 21h18M5 21V9l7-4 7 4v12M9 21v-6h6v6M9 11h.01M12 11h.01M15 11h.01" />
-  </svg>
-);
 
 export default GovernmentSchemeDetail;

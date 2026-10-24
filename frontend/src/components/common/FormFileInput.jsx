@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { listingMediaError } from '../../utils/listingMedia';
 
 const FormFileInput = ({
   id,
@@ -12,10 +13,12 @@ const FormFileInput = ({
   required = false,
   placeholderImage,
   placeholderAlt,
-  placeholderVariant
+  placeholderVariant,
+  mediaKind
 }) => {
   const [fileName, setFileName] = React.useState('');
   const inputRef = React.useRef(null);
+  const [fileError, setFileError] = React.useState(null);
   const { t } = useTranslation();
 
   React.useEffect(() => {
@@ -25,6 +28,9 @@ const FormFileInput = ({
   const handleChange = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
+      const error = mediaKind ? listingMediaError(selectedFile, mediaKind) : null;
+      setFileError(error);
+      if (error) { e.target.value = ''; return; }
       setFileName(selectedFile.name);
       // Check if onChange expects a file or an event
       if (onChange.length === 1) {
@@ -40,6 +46,7 @@ const FormFileInput = ({
     e.stopPropagation();
 
     setFileName('');
+    setFileError(null);
     if (inputRef.current) {
       inputRef.current.value = '';
     }
@@ -51,7 +58,7 @@ const FormFileInput = ({
 
   return (
     <div className="form-group mb-6">
-      <label className="form-label block mb-2 font-semibold text-gray-700">
+      <label htmlFor={id || name} className="form-label block mb-2 font-semibold text-gray-700">
         {label} {required && <span className="required text-red-500">*</span>}
       </label>
       <div className="file-input-wrapper">
@@ -62,12 +69,14 @@ const FormFileInput = ({
           accept={accept}
           onChange={handleChange}
           required={required}
-          className="hidden"
+          className="sr-only peer"
+          aria-invalid={Boolean(fileError)}
+          aria-describedby={fileError ? `${id || name}-error` : undefined}
           ref={inputRef}
         />
         <label 
           htmlFor={id || name}
-          className={`file-input-label relative flex w-full border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-green-500 hover:bg-green-50 transition-all duration-200 ${
+          className={`file-input-label relative flex w-full min-w-0 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-green-500 hover:bg-green-50 peer-focus-visible:ring-2 peer-focus-visible:ring-green-600 transition-all duration-200 ${
             placeholderImage || placeholderVariant === 'video'
               ? 'min-h-[170px] flex-col justify-center px-4 py-5 text-center'
               : 'items-center justify-center px-4 py-3'
@@ -88,7 +97,7 @@ const FormFileInput = ({
               <svg className="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              <span className="text-green-700 font-medium truncate max-w-xs">{fileName}</span>
+              <span className="min-w-0 max-w-full break-all text-green-700 font-medium pr-8">{fileName}</span>
             </>
           ) : (
             <>
@@ -119,6 +128,7 @@ const FormFileInput = ({
         </label>
       </div>
       {helperText && <p className="text-sm text-gray-500 mt-2">{helperText}</p>}
+      {fileError && <p id={`${id || name}-error`} role="alert" className="mt-2 text-sm text-red-700">{t(fileError)}</p>}
     </div>
   );
 };

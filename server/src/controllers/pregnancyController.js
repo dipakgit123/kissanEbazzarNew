@@ -1,18 +1,58 @@
 'use strict';
 
 const db = require('../models');
+const { calendarDate, addCalendarDays } = require('../utils/businessTime');
+const { validateRecord, validateDelivery, validateCheckup } = require('../utils/pregnancyValidation');
+
+const { pregnancySummary, isOpen } = require('../utils/pregnancySummary');
+const { Op } = require('sequelize');
+const checkupsFor = (id, transaction) => db.PregnancyCheckup.findAll({ where: { pregnancy_record_id: id }, order: [['checked_on', 'DESC'], ['id', 'DESC']], transaction });
+const summaryWithHistory = async (record, transaction) => ({ ...pregnancySummary(record), checkups: await checkupsFor(record.id, transaction) });
 
 class PregnancyController {
   /**
    * Get pregnancy duration info for all animal types
    * GET /api/pregnancy/durations
    */
+  async recordCheckup(req, res) {
+    const record = await db.PregnancyRecord.findOne({ where: { id: req.params.id, user_id: req.user.id }, transaction: req.transaction, lock: req.transaction.LOCK.UPDATE });
+    if (!record) return res.status(404).json({ success: false, message: 'Pregnancy record not found.' });
+    const error = validateCheckup(req.body, record.mating_date);
+    if (error) return res.status(400).json({ success: false, message: error });
+    const { checked_on, result, estimated_age_value, estimated_age_unit, next_check_date, doctor_name, notes, request_id } = req.body;
+    const details = { checked_on, result, estimated_age_value: estimated_age_value === '' || estimated_age_value == null ? null : Number(estimated_age_value), estimated_age_unit: estimated_age_value === '' || estimated_age_value == null ? null : estimated_age_unit, next_check_date: next_check_date || null, doctor_name: doctor_name?.trim() || null, notes: notes?.trim() || null, request_id };
+    const history = await checkupsFor(record.id, req.transaction);
+    const duplicate = history.find(check => check.request_id === req.body.request_id);
+    if (duplicate) {
+      const changed = Object.entries(details).some(([key, value]) => key === 'estimated_age_value' ? (duplicate[key] == null ? null : Number(duplicate[key])) !== value : (duplicate[key] ?? null) !== value);
+      if (changed) return res.status(409).json({ success: false, message: 'This submission was already saved with different details. Close and reopen the doctor check form.' });
+      return res.json({ success: true, data: await summaryWithHistory(record, req.transaction) });
+    }
+    if (!isOpen(record)) return res.status(409).json({ success: false, message: 'This breeding cycle is closed. Start a new record for another attempt.' });
+    const check = await db.PregnancyCheckup.create({ pregnancy_record_id: record.id, recorded_by: req.user.id, ...details }, { transaction: req.transaction });
+    // Backdated history is retained without replacing newer clinical findings.
+    if (!history.length || checked_on >= history[0].checked_on) {
+      record.last_check_result = result;
+      record.next_check_date = result === 'not_pregnant' ? null : (next_check_date || null);
+      if (result === 'pregnant') {
+        record.status = 'pregnant';
+        record.confirmed_on = record.confirmed_on || checked_on;
+        record.confirmation_source = 'doctor_check';
+      } else if (result === 'not_pregnant') {
+        record.status = 'not_pregnant';
+      }
+      // Recheck retains any earlier positive confirmation and makes uncertainty visible.
+      await record.save({ transaction: req.transaction });
+    }
+    return res.status(201).json({ success: true, data: { ...pregnancySummary(record), checkups: [check, ...history].sort((a, b) => b.checked_on.localeCompare(a.checked_on) || b.id - a.id) } });
+  }
+
   async getPregnancyDurations(req, res) {
     try {
       const durations = db.PregnancyRecord.getAllPregnancyDurations();
 
       // Format with more details
-      const formattedDurations = Object.entries(durations).map(([type, days]) => ({
+      const formattedDurations = Object.entries(durations).filter(([type]) => require('../utils/animalGroup').allowsSpecies(req.animalGroup || 'farm', type)).map(([type, days]) => ({
         animal_type: type,
         duration_days: days,
         duration_months: Math.round((days / 30) * 10) / 10,
@@ -84,7 +124,7 @@ class PregnancyController {
       const existingRecords = await db.PregnancyRecord.findAll({
         where: {
           user_id: userId,
-          status: 'pregnant'
+          status: { [Op.in]: ['pregnant', 'pending_confirmation'] }
         },
         attributes: ['listing_id', 'listing_type']
       });
@@ -143,7 +183,12 @@ class PregnancyController {
         });
       }
 
-      const normalizedAnimalType = animal_type.toLowerCase();
+      const normalizedAnimalType = typeof animal_type === 'string' ? animal_type.toLowerCase() : '';
+      if (!Object.hasOwn(db.PregnancyRecord.getAllPregnancyDurations(), normalizedAnimalType)) {
+        return res.status(400).json({ success: false, message: 'Invalid animal type.' });
+      }
+      const validationError = validateRecord(req.body, { type: normalizedAnimalType });
+      if (validationError) return res.status(400).json({ success: false, message: validationError });
       const customDurationDays = Number(pregnancy_duration_days);
 
       if (
@@ -164,13 +209,25 @@ class PregnancyController {
         customDurationDays
       );
 
+      if (listing_id || listing_type) {
+        const models = { cow: 'AnimalListing', buffalo: 'BuffaloListing', goat: 'GoatListing', horse: 'HorseListing', dog: 'DogListing', cat: 'CatListing' };
+        const model = models[listing_type];
+        if (!model || listing_type !== normalizedAnimalType || !Number.isInteger(Number(listing_id)) || Number(listing_id) < 1) return res.status(400).json({ success: false, message: 'Invalid animal listing.' });
+        const animal = await db[model].findOne({ where: { id: listing_id, user_id: userId }, transaction: req.transaction, lock: req.transaction.LOCK.UPDATE });
+        if (!animal) return res.status(404).json({ success: false, message: 'Animal listing not found.' });
+        const existing = await db.PregnancyRecord.findOne({ where: { user_id: userId, listing_id, listing_type, status: { [Op.in]: ['pregnant', 'pending_confirmation'] } }, transaction: req.transaction });
+        if (existing) return res.status(409).json({ success: false, message: 'This animal already has an open breeding record.' });
+      }
       // Create the pregnancy record
       const pregnancyRecord = await db.PregnancyRecord.create({
+        animal_profile_id: req.body.animal_profile_id || null,
         user_id: userId,
+        status: 'pending_confirmation',
+        confirmation_source: 'breeding_recorded',
         listing_id: listing_id || null,
         listing_type: listing_type || null,
         animal_type: normalizedAnimalType,
-        animal_name,
+        animal_name: animal_name.trim(),
         ear_badge_number: ear_badge_number || null,
         breed_name: breed_name || null,
         animal_photo: animal_photo || null,
@@ -180,14 +237,10 @@ class PregnancyController {
         bull_sire_details: bull_sire_details || null,
         mating_type: mating_type || 'natural',
         notes: notes || null
-      });
+      }, { transaction: req.transaction });
 
       // Add calculated fields to response
-      const response = pregnancyRecord.toJSON();
-      response.days_remaining = pregnancyRecord.getDaysRemaining();
-      response.progress_percentage = pregnancyRecord.getProgressPercentage();
-      response.current_trimester = pregnancyRecord.getCurrentTrimester();
-      response.milestones = pregnancyRecord.getMilestones();
+      const response = { ...pregnancySummary(pregnancyRecord), checkups: [] };
 
       res.status(201).json({
         success: true,
@@ -219,6 +272,7 @@ class PregnancyController {
 
       const records = await db.PregnancyRecord.findAll({
         where: whereClause,
+        include: [{ model: db.PregnancyCheckup, as: 'checkups' }],
         order: [
           ['status', 'ASC'],
           ['expected_delivery_date', 'ASC']
@@ -226,13 +280,7 @@ class PregnancyController {
       });
 
       // Add calculated fields
-      const enrichedRecords = records.map(record => {
-        const data = record.toJSON();
-        data.days_remaining = record.getDaysRemaining();
-        data.progress_percentage = record.getProgressPercentage();
-        data.current_trimester = record.getCurrentTrimester();
-        return data;
-      });
+      const enrichedRecords = records.map(record => pregnancySummary(record));
 
       res.json({
         success: true,
@@ -259,7 +307,7 @@ class PregnancyController {
       const { id } = req.params;
 
       const record = await db.PregnancyRecord.findOne({
-        where: { id, user_id: userId }
+        where: { id, user_id: userId }, transaction: req.transaction, lock: req.transaction?.LOCK.UPDATE
       });
 
       if (!record) {
@@ -269,11 +317,7 @@ class PregnancyController {
         });
       }
 
-      const data = record.toJSON();
-      data.days_remaining = record.getDaysRemaining();
-      data.progress_percentage = record.getProgressPercentage();
-      data.current_trimester = record.getCurrentTrimester();
-      data.milestones = record.getMilestones();
+      const data = await summaryWithHistory(record, req.transaction);
 
       res.json({
         success: true,
@@ -297,10 +341,10 @@ class PregnancyController {
     try {
       const userId = req.user.id;
       const { id } = req.params;
-      const updates = req.body;
+      const updates = { ...req.body };
 
       const record = await db.PregnancyRecord.findOne({
-        where: { id, user_id: userId }
+        where: { id, user_id: userId }, transaction: req.transaction, lock: req.transaction?.LOCK.UPDATE
       });
 
       if (!record) {
@@ -310,18 +354,29 @@ class PregnancyController {
         });
       }
 
-      // If mating_date is being updated, recalculate expected delivery date
-      if (updates.mating_date && updates.mating_date !== record.mating_date) {
-        updates.expected_delivery_date = db.PregnancyRecord.calculateExpectedDeliveryDate(
-          updates.mating_date,
-          record.animal_type
-        );
+      const validationError = validateRecord(updates, { partial: true, type: record.animal_type });
+      if (validationError) return res.status(400).json({ success: false, message: validationError });
+      if (updates.mating_date && record.actual_delivery_date && updates.mating_date > record.actual_delivery_date) {
+        return res.status(400).json({ success: false, message: 'Mating date cannot be after the recorded delivery date.' });
+      }
+      if (updates.animal_name !== undefined) updates.animal_name = updates.animal_name.trim();
+      const history = await checkupsFor(record.id, req.transaction);
+      if (updates.mating_date && history.some(check => check.checked_on < updates.mating_date)) return res.status(400).json({ success: false, message: 'Breeding date cannot be after a recorded examination.' });
+      if ((updates.mating_date && updates.mating_date !== record.mating_date) || (record.animal_type === 'other' && updates.pregnancy_duration_days !== undefined && Number(updates.pregnancy_duration_days) !== record.pregnancy_duration_days)) {
+        record.date_corrections = [...(record.date_corrections || []), { previous_mating_date: record.mating_date, mating_date: updates.mating_date || record.mating_date, previous_duration: record.pregnancy_duration_days, duration: record.animal_type === 'other' && updates.pregnancy_duration_days !== undefined ? Number(updates.pregnancy_duration_days) : record.pregnancy_duration_days, recorded_by: userId, recorded_at: new Date().toISOString() }];
+      }
+      // Keep the saved duration when correcting dates, including custom durations.
+      if (record.animal_type === 'other' && updates.pregnancy_duration_days !== undefined) {
+        record.pregnancy_duration_days = Number(updates.pregnancy_duration_days);
+      }
+      if (updates.mating_date !== undefined || updates.pregnancy_duration_days !== undefined) {
+        record.expected_delivery_date = addCalendarDays(updates.mating_date || record.mating_date, record.pregnancy_duration_days);
       }
 
       // Update allowed fields
       const allowedFields = [
         'animal_name', 'ear_badge_number', 'breed_name', 'animal_photo', 'mating_date',
-        'expected_delivery_date', 'bull_sire_details', 'mating_type',
+        'bull_sire_details', 'mating_type',
         'health_status', 'notes', 'vet_checkup_dates', 'vaccination_dates',
         'reminder_enabled'
       ];
@@ -332,12 +387,9 @@ class PregnancyController {
         }
       });
 
-      await record.save();
+      await record.save({ transaction: req.transaction });
 
-      const data = record.toJSON();
-      data.days_remaining = record.getDaysRemaining();
-      data.progress_percentage = record.getProgressPercentage();
-      data.current_trimester = record.getCurrentTrimester();
+      const data = await summaryWithHistory(record, req.transaction);
 
       res.json({
         success: true,
@@ -365,7 +417,7 @@ class PregnancyController {
       const { delivery_date, offspring_count, offspring_gender, offspring_details } = req.body;
 
       const record = await db.PregnancyRecord.findOne({
-        where: { id, user_id: userId }
+        where: { id, user_id: userId }, transaction: req.transaction, lock: req.transaction?.LOCK.UPDATE
       });
 
       if (!record) {
@@ -382,17 +434,22 @@ class PregnancyController {
         });
       }
 
+      const validationError = validateDelivery(req.body, record.mating_date);
+      if (validationError) return res.status(400).json({ success: false, message: validationError });
+      const checks = await checkupsFor(record.id, req.transaction);
+      if (checks.some(check => check.checked_on > delivery_date)) return res.status(400).json({ success: false, message: 'Delivery cannot be before a recorded pregnancy examination.' });
+
       await record.markAsDelivered({
         deliveryDate: delivery_date,
         offspringCount: offspring_count,
         offspringGender: offspring_gender,
         offspringDetails: offspring_details
-      });
+      }, { transaction: req.transaction });
 
       res.json({
         success: true,
         message: 'Pregnancy marked as delivered',
-        data: record.toJSON()
+        data: await summaryWithHistory(record, req.transaction)
       });
     } catch (error) {
       console.error('Mark as delivered error:', error);
@@ -414,7 +471,7 @@ class PregnancyController {
       const { id } = req.params;
       const { status, notes } = req.body;
 
-      const validStatuses = ['pregnant', 'delivered', 'miscarriage', 'false_pregnancy', 'cancelled'];
+      const validStatuses = ['miscarriage', 'false_pregnancy', 'cancelled'];
       if (!validStatuses.includes(status)) {
         return res.status(400).json({
           success: false,
@@ -423,7 +480,7 @@ class PregnancyController {
       }
 
       const record = await db.PregnancyRecord.findOne({
-        where: { id, user_id: userId }
+        where: { id, user_id: userId }, transaction: req.transaction, lock: req.transaction?.LOCK.UPDATE
       });
 
       if (!record) {
@@ -433,14 +490,19 @@ class PregnancyController {
         });
       }
 
+      if (record.status === 'delivered') {
+        return res.status(400).json({ success: false, message: 'A recorded delivery cannot be changed through the status endpoint.' });
+      }
+      if (!isOpen(record)) return res.status(400).json({ success: false, message: 'Start a new breeding record for another attempt.' });
       record.status = status;
+      record.next_check_date = null;
       if (notes) record.notes = notes;
-      await record.save();
+      await record.save({ transaction: req.transaction });
 
       res.json({
         success: true,
         message: 'Pregnancy status updated',
-        data: record.toJSON()
+        data: await summaryWithHistory(record, req.transaction)
       });
     } catch (error) {
       console.error('Update status error:', error);
@@ -462,7 +524,7 @@ class PregnancyController {
       const { id } = req.params;
 
       const record = await db.PregnancyRecord.findOne({
-        where: { id, user_id: userId }
+        where: { id, user_id: userId }, transaction: req.transaction, lock: req.transaction?.LOCK.UPDATE
       });
 
       if (!record) {
@@ -472,7 +534,7 @@ class PregnancyController {
         });
       }
 
-      await record.destroy();
+      await record.destroy({ transaction: req.transaction });
 
       res.json({
         success: true,
@@ -497,13 +559,16 @@ class PregnancyController {
       const userId = req.user.id;
       const { month, year } = req.query;
 
-      const currentDate = new Date();
-      const targetMonth = month ? parseInt(month) - 1 : currentDate.getMonth();
-      const targetYear = year ? parseInt(year) : currentDate.getFullYear();
+      const today = calendarDate();
+      const targetMonth = month === undefined ? Number(today.slice(5, 7)) - 1 : Number(month) - 1;
+      const targetYear = year === undefined ? Number(today.slice(0, 4)) : Number(year);
+      if (!Number.isInteger(targetMonth) || targetMonth < 0 || targetMonth > 11 || !Number.isInteger(targetYear) || targetYear < 1900 || targetYear > 9999) {
+        return res.status(400).json({ success: false, message: 'Invalid calendar month or year.' });
+      }
 
       // Get start and end of month
-      const startOfMonth = new Date(targetYear, targetMonth, 1);
-      const endOfMonth = new Date(targetYear, targetMonth + 1, 0);
+      const startOfMonth = new Date(Date.UTC(targetYear, targetMonth, 1));
+      const endOfMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0));
 
       // Get all active pregnancies
       const pregnancies = await db.PregnancyRecord.findAll({
@@ -531,6 +596,8 @@ class PregnancyController {
             animal_name: pregnancy.animal_name,
             ear_badge_number: pregnancy.ear_badge_number,
             animal_type: pregnancy.animal_type,
+            confirmed_on: pregnancy.confirmed_on,
+            delivery_estimate_provisional: !pregnancy.confirmed_on,
             breed_name: pregnancy.breed_name,
             days_remaining: pregnancy.getDaysRemaining(),
             progress_percentage: pregnancy.getProgressPercentage()
@@ -542,8 +609,8 @@ class PregnancyController {
       const stats = {
         total_active: pregnancies.length,
         due_this_month: Object.values(calendarData).flat().length,
-        due_this_week: pregnancies.filter(p => p.getDaysRemaining() <= 7).length,
-        overdue: pregnancies.filter(p => p.getDaysRemaining() === 0 && new Date(p.expected_delivery_date) < new Date()).length
+        due_this_week: pregnancies.filter(p => p.expected_delivery_date >= today && p.getDaysRemaining() <= 7).length,
+        overdue: pregnancies.filter(p => p.expected_delivery_date < today).length
       };
 
       res.json({
@@ -557,6 +624,8 @@ class PregnancyController {
           animal_name: p.animal_name,
           ear_badge_number: p.ear_badge_number,
           animal_type: p.animal_type,
+          confirmed_on: p.confirmed_on,
+          delivery_estimate_provisional: !p.confirmed_on,
           breed_name: p.breed_name,
           expected_delivery_date: p.expected_delivery_date,
           days_remaining: p.getDaysRemaining(),
@@ -590,6 +659,11 @@ class PregnancyController {
       const stats = {
         total_records: allRecords.length,
         active_pregnancies: 0,
+        confirmed_pregnancies: 0,
+        pending_confirmation: 0,
+        confirmation_unrecorded: 0,
+        not_pregnant: 0,
+        overdue: 0,
         successful_deliveries: 0,
         miscarriages: 0,
         by_animal_type: {},
@@ -601,23 +675,35 @@ class PregnancyController {
         switch (record.status) {
           case 'pregnant':
             stats.active_pregnancies++;
+            if (record.confirmed_on) stats.confirmed_pregnancies++;
+            else stats.confirmation_unrecorded++;
             // Check if due soon
             const daysRemaining = record.getDaysRemaining();
-            if (daysRemaining <= 30) {
+            if (record.expected_delivery_date < calendarDate()) stats.overdue++;
+            if (daysRemaining <= 30 && record.expected_delivery_date >= calendarDate()) {
               stats.upcoming_deliveries.push({
                 id: record.id,
                 animal_name: record.animal_name,
                 animal_type: record.animal_type,
                 expected_delivery_date: record.expected_delivery_date,
+                delivery_estimate_provisional: !record.confirmed_on,
                 days_remaining: daysRemaining
               });
             }
             break;
+          case 'pending_confirmation':
+            stats.pending_confirmation++;
+            break;
+          case 'not_pregnant':
+            stats.not_pregnant++;
+            break;
           case 'delivered':
             stats.successful_deliveries++;
             break;
-          case 'miscarriage':
           case 'false_pregnancy':
+            stats.not_pregnant++;
+            break;
+          case 'miscarriage':
             stats.miscarriages++;
             break;
         }
@@ -650,4 +736,25 @@ class PregnancyController {
   }
 }
 
-module.exports = new PregnancyController();
+// Commit before responding, and serialize every mutation on its pregnancy row.
+const controller = new PregnancyController();
+for (const method of ['createPregnancyRecord', 'updatePregnancyRecord', 'recordCheckup', 'markAsDelivered', 'updateStatus', 'deletePregnancyRecord']) {
+  const handler = controller[method];
+  controller[method] = async (req, res) => {
+    let reply;
+    try {
+      await db.sequelize.transaction(async transaction => {
+        const deferred = { code: 200, status(code) { this.code = code; return this; }, json(body) { reply = { code: this.code, body }; return this; } };
+        await handler.call(controller, { ...req, transaction }, deferred);
+        if (!reply || reply.code >= 400) throw new Error('Response rollback');
+      });
+    } catch (error) {
+      if (!reply || reply.code < 400) {
+        console.error('Pregnancy transaction failed:', error.message);
+        reply = { code: 500, body: { success: false, message: 'Unable to save pregnancy record. Please retry.' } };
+      }
+    }
+    return res.status(reply.code).json(reply.body);
+  };
+}
+module.exports = controller;

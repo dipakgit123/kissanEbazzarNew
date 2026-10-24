@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -7,7 +7,6 @@ import {
   Platform,
   RefreshControl,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -24,6 +23,13 @@ import SkeletonLoader from '../components/SkeletonLoader';
 import AppHeader from '../components/AppHeader';
 import FeatureHelpModal from '../components/FeatureHelpModal';
 import { getLocalizedFeatureHelp } from '../constants/featureHelp';
+
+import { localDate, validDate, normalizeValues, validateValues, calculate, selectTotals, OPTIONAL_FIELDS, USAGE_FIELDS, csvDocument } from '../utils/milkReportMath';
+import { exportMilkCsv } from '../utils/exportMilkCsv';
+import { notebookData } from '../utils/milkNotebook';
+import { notebookCopy } from '../utils/milkNotebookCopy';
+import MilkExpenseNotebook from '../components/MilkExpenseNotebook';
+import MilkAdvice from '../components/MilkAdvice';
 
 const REPORT_TYPES = {
   INDIVIDUAL: 'individual',
@@ -52,8 +58,8 @@ const REPORTS_PER_PAGE = 5;
 const ANIMALS_PER_PAGE = 5;
 const HELP_STORAGE_KEY = 'milkReportsHelpSeen';
 
-const getTodayString = () => new Date().toISOString().slice(0, 10);
-const getCurrentMonthString = () => new Date().toISOString().slice(0, 7);
+const getTodayString = localDate;
+const getCurrentMonthString = () => localDate().slice(0, 7);
 const getCurrentYearString = () => String(new Date().getFullYear());
 
 const initialAnimalForm = {
@@ -66,6 +72,7 @@ const initialAnimalForm = {
 };
 
 const initialReportForm = {
+  ...Object.fromEntries([...OPTIONAL_FIELDS, ...USAGE_FIELDS].map(field => [field, ''])),
   report_type: REPORT_TYPES.INDIVIDUAL,
   report_date: getTodayString(),
   cow_id: '',
@@ -85,7 +92,7 @@ const toNumber = (value) => {
 };
 
 const parseDateString = (value) => {
-  if (!value) return null;
+  if (!validDate(value)) return null;
   const [yearText, monthText, dayText] = value.split('-');
   const year = Number.parseInt(yearText, 10);
   const month = Number.parseInt(monthText, 10);
@@ -105,6 +112,7 @@ const getMonthRange = (monthValue) => {
   const year = Number.parseInt(yearText, 10);
   const month = Number.parseInt(monthText, 10);
   if (!year || !month) return null;
+  if (!/^\d{4}-\d{2}$/.test(monthValue || '') || year < 1900 || month < 1 || month > 12) return null;
   const startDate = new Date(Date.UTC(year, month - 1, 1));
   const endDate = new Date(Date.UTC(year, month, 0));
   return {
@@ -127,7 +135,7 @@ const getWeekRange = (dateValue) => {
 
 const getYearRange = (yearValue) => {
   const year = Number.parseInt(yearValue || getCurrentYearString(), 10);
-  if (!year) return null;
+  if (!/^\d{4}$/.test(String(yearValue)) || year < 1900 || year > 9999) return null;
   return {
     fromDate: `${year}-01-01`,
     toDate: `${year}-12-31`,
@@ -155,78 +163,14 @@ const formatLiters = (value) => `${Number(value || 0).toLocaleString('en-IN', {
 
 const formatDate = (value, locale = 'en-IN') => {
   if (!value) return '';
-  return new Date(value).toLocaleDateString(locale, {
+  return new Date(`${value}T00:00:00Z`).toLocaleDateString(locale, { timeZone: 'UTC',
     day: 'numeric',
     month: 'short',
     year: 'numeric',
   });
 };
 
-const getReportProfitStatus = (report) => {
-  const profit = toNumber(report.profit_or_loss);
-  if (profit > 0) return 'profit';
-  if (profit < 0) return 'loss';
-  return 'same';
-};
-
-const enrichReport = (report) => ({
-  ...report,
-  total_liters: report.total_liters ?? (toNumber(report.morning_liters) + toNumber(report.afternoon_liters)),
-  total_revenue: report.total_revenue ?? ((toNumber(report.morning_liters) + toNumber(report.afternoon_liters)) * toNumber(report.price_per_liter)),
-  total_cost: report.total_cost ?? (
-    toNumber(report.feed_cost) + toNumber(report.medicine_cost) + toNumber(report.labor_cost) + toNumber(report.other_cost)
-  ),
-  profit_or_loss: report.profit_or_loss ?? (
-    ((toNumber(report.morning_liters) + toNumber(report.afternoon_liters)) * toNumber(report.price_per_liter))
-    - (toNumber(report.feed_cost) + toNumber(report.medicine_cost) + toNumber(report.labor_cost) + toNumber(report.other_cost))
-  ),
-});
-
-const buildStats = (reports) => {
-  const stats = {
-    total_reports: reports.length,
-    total_liters: 0,
-    total_revenue: 0,
-    total_cost: 0,
-    net_profit_or_loss: 0,
-    profitable_days: 0,
-    loss_days: 0,
-    all_animal_total: { total_liters: 0, profit_or_loss: 0 },
-    overall_herd_total: { total_liters: 0, profit_or_loss: 0 },
-    best_cow: null,
-    best_buffalo: null,
-  };
-
-  reports.forEach((report) => {
-    const totalLiters = toNumber(report.total_liters);
-    const revenue = toNumber(report.total_revenue);
-    const cost = toNumber(report.total_cost);
-    const profit = toNumber(report.profit_or_loss);
-    const status = getReportProfitStatus(report);
-
-    stats.total_liters += totalLiters;
-    stats.total_revenue += revenue;
-    stats.total_cost += cost;
-    stats.net_profit_or_loss += profit;
-    if (status === 'profit') stats.profitable_days += 1;
-    if (status === 'loss') stats.loss_days += 1;
-
-    if (report.report_type === REPORT_TYPES.OVERALL) {
-      stats.overall_herd_total.total_liters += totalLiters;
-      stats.overall_herd_total.profit_or_loss += profit;
-    } else {
-      stats.all_animal_total.total_liters += totalLiters;
-      stats.all_animal_total.profit_or_loss += profit;
-
-      const currentBestKey = report.animal_type === ANIMAL_TYPES.BUFFALO ? 'best_buffalo' : 'best_cow';
-      if (!stats[currentBestKey] || profit > toNumber(stats[currentBestKey].profit_or_loss)) {
-        stats[currentBestKey] = report;
-      }
-    }
-  });
-
-  return stats;
-};
+const enrichReport = report => ({ ...report, ...calculate(report) });
 
 const buildChartData = (reports, period, range, locale, metric) => {
   if (!range) return [];
@@ -275,11 +219,14 @@ const buildCsv = (reports, t) => {
     t('milkReports.eveningLiters'),
     t('milkReports.totalMilk'),
     t('milkReports.pricePerLiter'),
-    t('milkReports.moneyIn'),
+    t('milkTracking.milkValue'),
     t('milkReports.moneyOut'),
     t('milkReports.result'),
     t('milkReports.notes'),
+    ...[...OPTIONAL_FIELDS, ...USAGE_FIELDS, 'total_sold_liters', 'amount_pending'].map(field => t('milkTracking.' + field)),
+    t('milkTracking.estimatedColumn'), t('milkTracking.included'),
   ];
+  const included = new Set(selectTotals(reports).map(report => report.id));
 
   const rows = reports.map((report) => [
     report.report_date,
@@ -287,19 +234,20 @@ const buildCsv = (reports, t) => {
     report.animal_type ? t(`animalTypes.${report.animal_type}`) : '',
     report.report_type === REPORT_TYPES.OVERALL ? t('milkReports.overallHerd') : (report.cow_name || ''),
     report.cow_tag || '',
-    report.morning_liters ?? '',
-    report.afternoon_liters ?? '',
-    report.total_liters ?? '',
-    report.price_per_liter ?? '',
-    report.total_revenue ?? '',
-    report.total_cost ?? '',
-    report.profit_or_loss ?? '',
+    report.morning_liters == null ? '' : Number(report.morning_liters),
+    report.afternoon_liters == null ? '' : Number(report.afternoon_liters),
+    report.total_liters == null ? '' : Number(report.total_liters),
+    report.price_per_liter == null ? '' : Number(report.price_per_liter),
+    report.total_revenue == null ? '' : Number(report.total_revenue),
+    report.total_cost == null ? '' : Number(report.total_cost),
+    report.profit_or_loss == null ? '' : Number(report.profit_or_loss),
     (report.notes || '').replace(/\r?\n/g, ' '),
+    ...[...OPTIONAL_FIELDS, ...USAGE_FIELDS, 'total_sold_liters', 'amount_pending'].map(field => report[field] == null ? '' : Number(report[field])),
+    t(report.revenue_is_estimated ? 'milkTracking.yes' : 'milkTracking.no'),
+    t(included.has(report.id) ? 'milkTracking.yes' : 'milkTracking.no'),
   ]);
 
-  return [header, ...rows]
-    .map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
-    .join('\n');
+  return csvDocument([header, ...rows]);
 };
 
 const buildAnimalCsv = (animals, t) => {
@@ -321,22 +269,25 @@ const buildAnimalCsv = (animals, t) => {
     (animal.notes || '').replace(/\r?\n/g, ' '),
   ]);
 
-  return [header, ...rows]
-    .map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
-    .join('\n');
+  return csvDocument([header, ...rows]);
 };
 
 const MilkReportsScreen = ({ navigation }) => {
   const { t, i18n } = useTranslation();
+  const c = notebookCopy(i18n.resolvedLanguage || i18n.language);
   const insets = useSafeAreaInsets();
   const locale = i18n.resolvedLanguage === 'mr' ? 'mr-IN' : i18n.resolvedLanguage === 'hi' ? 'hi-IN' : 'en-IN';
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const loadId = useRef(0);
+  const exportPending = useRef(false);
   const [refreshing, setRefreshing] = useState(false);
   const [savingAnimal, setSavingAnimal] = useState(false);
   const [savingReport, setSavingReport] = useState(false);
   const [animals, setAnimals] = useState([]);
   const [allReports, setAllReports] = useState([]);
+  const [allExpenses, setAllExpenses] = useState([]);
   const [selectedPeriod, setSelectedPeriod] = useState(PERIODS.MONTH);
   const [selectedWeekDate, setSelectedWeekDate] = useState(getTodayString());
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthString());
@@ -384,7 +335,11 @@ const MilkReportsScreen = ({ navigation }) => {
       .sort((a, b) => String(b.report_date).localeCompare(String(a.report_date)));
   }, [activeRange, allReports, animalFilter, animalTypeFilter, reportTypeFilter]);
 
-  const stats = useMemo(() => buildStats(filteredReports), [filteredReports]);
+  const stats = useMemo(() => {
+    const expenses = activeRange ? allExpenses.filter(expense => expense.expense_date >= activeRange.fromDate && expense.expense_date <= activeRange.toDate) : [];
+    const data = notebookData(filteredReports, expenses, animalFilter === FILTER_ALL ? '' : animalFilter, 'all', animalTypeFilter);
+    return { ...data, net_profit_or_loss: data.balance, profitable_days: data.days.filter(day => day.balance > 0).length, loss_days: data.days.filter(day => day.balance < 0).length };
+  }, [filteredReports, allExpenses, activeRange, animalFilter, animalTypeFilter]);
   const totalAnimalPages = Math.max(1, Math.ceil(animals.length / ANIMALS_PER_PAGE));
   const totalReportPages = Math.max(1, Math.ceil(filteredReports.length / REPORTS_PER_PAGE));
   const paginatedAnimals = useMemo(() => {
@@ -396,8 +351,8 @@ const MilkReportsScreen = ({ navigation }) => {
     return filteredReports.slice(start, start + REPORTS_PER_PAGE);
   }, [filteredReports, reportPage]);
   const chartData = useMemo(
-    () => buildChartData(filteredReports, selectedPeriod, activeRange, locale, chartMetric),
-    [activeRange, chartMetric, filteredReports, locale, selectedPeriod]
+    () => chartMetric === CHART_METRICS.PROFIT ? stats.days.map(day => ({ key: day.date, label: formatDate(day.date, locale), value: day.balance })) : buildChartData(selectTotals(filteredReports), selectedPeriod, activeRange, locale, chartMetric),
+    [activeRange, chartMetric, filteredReports, locale, selectedPeriod, stats.days]
   );
   const maxChartValue = useMemo(() => {
     const values = chartData.map((point) => Math.abs(toNumber(point.value)));
@@ -405,12 +360,8 @@ const MilkReportsScreen = ({ navigation }) => {
   }, [chartData]);
 
   const preview = useMemo(() => {
-    const totalLiters = toNumber(reportForm.morning_liters) + toNumber(reportForm.afternoon_liters);
-    const revenue = totalLiters * toNumber(reportForm.price_per_liter);
-    const cost = toNumber(reportForm.feed_cost) + toNumber(reportForm.medicine_cost)
-      + toNumber(reportForm.labor_cost) + toNumber(reportForm.other_cost);
-    const profit = revenue - cost;
-    return { totalLiters, revenue, cost, profit };
+    const result = calculate(reportForm);
+    return { totalLiters: result.total_liters, revenue: result.total_revenue, cost: result.total_cost, profit: result.profit_or_loss };
   }, [reportForm]);
 
   const periodLabel = useMemo(() => {
@@ -428,33 +379,37 @@ const MilkReportsScreen = ({ navigation }) => {
   }, [activeRange, locale, selectedMonth, selectedPeriod, selectedWeekDate, selectedYear, t]);
 
   const loadData = useCallback(async ({ showLoader = false } = {}) => {
+    const currentLoad = ++loadId.current;
+    setLoadError(false);
     if (showLoader) setLoading(true);
 
     try {
-      const [animalsResult, reportsResult] = await Promise.all([
+      const [animalsResult, reportsResult, expensesResult] = await Promise.all([
         milkReportService.getCows(),
         milkReportService.getReports(),
+        milkReportService.getExpenses(),
       ]);
 
-      const nextAnimals = animalsResult.success ? animalsResult.data || [] : [];
-      setAnimals(nextAnimals);
-      setAllReports(reportsResult.success ? reportsResult.data || [] : []);
-      setReportForm((current) => {
-        if (current.report_type === REPORT_TYPES.INDIVIDUAL && !current.cow_id && nextAnimals.length > 0) {
-          return { ...current, cow_id: String(nextAnimals[0].id) };
-        }
-        return current;
-      });
+      if (currentLoad !== loadId.current) return;
+      if (!animalsResult?.success || !reportsResult?.success || !expensesResult?.success || !Array.isArray(animalsResult.data) || !Array.isArray(reportsResult.data) || !Array.isArray(expensesResult.data)) throw new Error('Invalid report response');
+      setAnimals(animalsResult.data);
+      setAllReports(reportsResult.data);
+      setAllExpenses(expensesResult.data);
     } catch (error) {
-      Alert.alert(t('common.error'), error.message || t('milkReports.errors.loadData'));
+      if (currentLoad !== loadId.current) return;
+      setAllReports([]);
+      setAllExpenses([]);
+      setAnimals([]);
+      setLoadError(true);
+      Alert.alert(t('common.error'), t('milkTracking.loadError'));
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (currentLoad === loadId.current) { setLoading(false); setRefreshing(false); }
     }
   }, [t]);
 
   useEffect(() => {
     loadData({ showLoader: true });
+    return () => { loadId.current++; };
   }, [loadData]);
 
   useEffect(() => {
@@ -527,6 +482,7 @@ const MilkReportsScreen = ({ navigation }) => {
     setReportForm({
       ...initialReportForm,
       report_date: getTodayString(),
+      report_type: animals.length ? REPORT_TYPES.INDIVIDUAL : REPORT_TYPES.OVERALL,
       cow_id: animals[0]?.id ? String(animals[0].id) : '',
     });
     setReportModalVisible(true);
@@ -535,6 +491,8 @@ const MilkReportsScreen = ({ navigation }) => {
   const openEditReport = (report) => {
     setEditingReportId(report.id);
     setReportForm({
+      ...Object.fromEntries([...OPTIONAL_FIELDS, ...USAGE_FIELDS].map(field => [field, report[field] == null ? '' : String(report[field])])),
+      removed_animal_name: report.report_type !== 'overall' && !report.cow_id ? report.cow_name : '',
       report_type: report.report_type || REPORT_TYPES.INDIVIDUAL,
       report_date: report.report_date || getTodayString(),
       cow_id: report.cow_id ? String(report.cow_id) : '',
@@ -581,28 +539,34 @@ const MilkReportsScreen = ({ navigation }) => {
   };
 
   const handleSaveReport = async () => {
-    if (!reportForm.report_date.trim()) {
-      Alert.alert(t('common.error'), t('milkReports.errors.reportDateRequired'));
+    if (savingReport) return;
+    if (!validDate(reportForm.report_date)) {
+      Alert.alert(t('common.error'), t('milkTracking.invalidDate'));
       return;
     }
 
-    if (reportForm.report_type === REPORT_TYPES.INDIVIDUAL && !reportForm.cow_id) {
+    if (reportForm.report_type === REPORT_TYPES.INDIVIDUAL && !reportForm.cow_id && !(editingReportId && reportForm.removed_animal_name)) {
       Alert.alert(t('common.error'), t('milkReports.errors.selectAnimal'));
       return;
     }
 
+    const validation = validateValues(reportForm);
+    if (validation) { Alert.alert(t('common.error'), t('milkTracking.' + validation.reason)); return; }
     setSavingReport(true);
     try {
+      const payload = { report_date: reportForm.report_date, report_type: reportForm.report_type, notes: reportForm.notes,
+        cow_id: reportForm.report_type === REPORT_TYPES.INDIVIDUAL && reportForm.cow_id ? Number(reportForm.cow_id) : null,
+        ...normalizeValues(reportForm) };
       if (editingReportId) {
-        await milkReportService.updateReport(editingReportId, reportForm);
+        await milkReportService.updateReport(editingReportId, payload);
       } else {
-        await milkReportService.createReport(reportForm);
+        await milkReportService.createReport(payload);
       }
       setReportModalVisible(false);
       await loadData();
       Alert.alert(t('common.success'), editingReportId ? t('milkReports.success.reportUpdated') : t('milkReports.success.reportCreated'));
     } catch (error) {
-      Alert.alert(t('common.error'), error.message || t('milkReports.errors.saveReport'));
+      Alert.alert(t('common.error'), error.response?.data?.code === 'MILK_VALIDATION' ? t('milkTracking.' + error.response.data.reason) : error.message || t('milkReports.errors.saveReport'));
     } finally {
       setSavingReport(false);
     }
@@ -635,6 +599,7 @@ const MilkReportsScreen = ({ navigation }) => {
         onPress: async () => {
           try {
             await milkReportService.deleteCow(animal.id);
+            if (animalFilter === String(animal.id)) setAnimalFilter(FILTER_ALL);
             await loadData();
           } catch (error) {
             Alert.alert(t('common.error'), error.message || t('milkReports.errors.deleteAnimal'));
@@ -644,29 +609,20 @@ const MilkReportsScreen = ({ navigation }) => {
     ]);
   };
 
-  const handleExportCsv = async () => {
-    if (filteredReports.length === 0) {
-      Alert.alert(t('milkReports.noDataYet'), t('milkReports.addEntriesToSeeChart'));
-      return;
-    }
-
-    const csv = buildCsv(filteredReports, t);
-    await Share.share({
-      title: `milk-reports-${selectedPeriod}-${activeRange?.exportLabel || 'all'}.csv`,
-      message: csv,
-    });
+  const shareCsv = async (csv, filename) => {
+    if (exportPending.current || loadError || refreshing) return;
+    exportPending.current = true;
+    try { await exportMilkCsv(csv, filename); }
+    catch { Alert.alert(t('common.error'), t('milkTracking.exportFailed')); }
+    finally { exportPending.current = false; }
   };
-
+  const handleExportCsv = async () => {
+    if (!activeRange || !filteredReports.length || loadError) { Alert.alert(t('milkTracking.noData')); return; }
+    await shareCsv(buildCsv(filteredReports, t), 'milk-reports-' + selectedPeriod + '-' + activeRange.exportLabel + '.csv');
+  };
   const handleExportAnimalsCsv = async () => {
-    if (animals.length === 0) {
-      Alert.alert(t('milkReports.noAnimals'), t('milkReports.noAnimalsDesc'));
-      return;
-    }
-
-    await Share.share({
-      title: 'milk-report-animals.csv',
-      message: buildAnimalCsv(animals, t),
-    });
+    if (!animals.length || loadError) { Alert.alert(t('milkReports.noAnimals')); return; }
+    await shareCsv(buildAnimalCsv(animals, t), 'milk-report-animals.csv');
   };
 
   const renderPeriodButton = (value, label) => (
@@ -689,6 +645,19 @@ const MilkReportsScreen = ({ navigation }) => {
       <Text style={[styles.choicePillText, active && styles.choicePillTextActive]}>{label}</Text>
     </TouchableOpacity>
   );
+
+  const changeReportFilter = value => {
+    setReportTypeFilter(value);
+    if (value === REPORT_TYPES.OVERALL) {
+      setAnimalFilter(FILTER_ALL);
+      setAnimalTypeFilter(FILTER_ALL);
+    }
+  };
+  const changeAnimalTypeFilter = value => {
+    setAnimalTypeFilter(value);
+    if (value !== FILTER_ALL && reportTypeFilter === REPORT_TYPES.OVERALL) setReportTypeFilter(REPORT_TYPES.INDIVIDUAL);
+    if (value !== FILTER_ALL && animals.find(animal => String(animal.id) === animalFilter)?.animal_type !== value) setAnimalFilter(FILTER_ALL);
+  };
 
   const renderPagination = (page, totalPages, setPage) => (
     <View style={styles.pagination}>
@@ -717,6 +686,14 @@ const MilkReportsScreen = ({ navigation }) => {
       </SafeAreaView>
     );
   }
+
+  if (loadError) return <SafeAreaView style={styles.safeArea}>
+    <AppHeader navigation={navigation} title={t('milkReports.title')} />
+    <View style={styles.sectionCard}>
+      <Text accessibilityRole="alert">{t('milkTracking.loadError')}</Text>
+      <TouchableOpacity accessibilityRole="button" style={styles.primaryAction} onPress={() => loadData({ showLoader: true })}><Text style={styles.primaryActionText}>{t('milkTracking.retry')}</Text></TouchableOpacity>
+    </View>
+  </SafeAreaView>;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -801,16 +778,16 @@ const MilkReportsScreen = ({ navigation }) => {
             <>
               <Text style={styles.inputLabel}>{t('milkReports.reportType')}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.choiceRow}>
-                {renderChoice(reportTypeFilter === FILTER_ALL, t('milkReports.allReportTypes'), () => setReportTypeFilter(FILTER_ALL))}
-                {renderChoice(reportTypeFilter === REPORT_TYPES.INDIVIDUAL, t('milkReports.individual'), () => setReportTypeFilter(REPORT_TYPES.INDIVIDUAL))}
-                {renderChoice(reportTypeFilter === REPORT_TYPES.OVERALL, t('milkReports.overall'), () => setReportTypeFilter(REPORT_TYPES.OVERALL))}
+                {renderChoice(reportTypeFilter === FILTER_ALL, t('milkReports.allReportTypes'), () => changeReportFilter(FILTER_ALL))}
+                {renderChoice(reportTypeFilter === REPORT_TYPES.INDIVIDUAL, t('milkReports.individual'), () => changeReportFilter(REPORT_TYPES.INDIVIDUAL))}
+                {renderChoice(reportTypeFilter === REPORT_TYPES.OVERALL, t('milkReports.overall'), () => changeReportFilter(REPORT_TYPES.OVERALL))}
               </ScrollView>
 
               <Text style={styles.inputLabel}>{t('milkReports.animalType')}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.choiceRow}>
-                {renderChoice(animalTypeFilter === FILTER_ALL, t('milkReports.allAnimals'), () => setAnimalTypeFilter(FILTER_ALL))}
-                {renderChoice(animalTypeFilter === ANIMAL_TYPES.COW, t('animalTypes.cow'), () => setAnimalTypeFilter(ANIMAL_TYPES.COW))}
-                {renderChoice(animalTypeFilter === ANIMAL_TYPES.BUFFALO, t('animalTypes.buffalo'), () => setAnimalTypeFilter(ANIMAL_TYPES.BUFFALO))}
+                {renderChoice(animalTypeFilter === FILTER_ALL, t('milkReports.allAnimals'), () => changeAnimalTypeFilter(FILTER_ALL))}
+                {renderChoice(animalTypeFilter === ANIMAL_TYPES.COW, t('animalTypes.cow'), () => changeAnimalTypeFilter(ANIMAL_TYPES.COW))}
+                {renderChoice(animalTypeFilter === ANIMAL_TYPES.BUFFALO, t('animalTypes.buffalo'), () => changeAnimalTypeFilter(ANIMAL_TYPES.BUFFALO))}
               </ScrollView>
 
               <Text style={styles.inputLabel}>{t('milkReports.chooseAnimal')}</Text>
@@ -819,7 +796,7 @@ const MilkReportsScreen = ({ navigation }) => {
                 {animals.map((animal) => renderChoice(
                   String(animalFilter) === String(animal.id),
                   animal.cow_name,
-                  () => setAnimalFilter(String(animal.id)),
+                  () => { setAnimalFilter(String(animal.id)); setAnimalTypeFilter(animal.animal_type); setReportTypeFilter(REPORT_TYPES.INDIVIDUAL); },
                   `filter-animal-${animal.id}`
                 ))}
               </ScrollView>
@@ -827,18 +804,28 @@ const MilkReportsScreen = ({ navigation }) => {
           ) : null}
         </View>
 
+        {!activeRange && <Text accessibilityRole="alert" style={styles.emptySubtitle}>{t('milkTracking.invalidDate')}</Text>}
+        {!!stats.excluded_reports && <Text style={styles.selectedHelp}>{t('milkTracking.overlap', { count: stats.excluded_reports })}</Text>}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsGrid}>
           <StatCard label={t('milkReports.totalMilk')} value={formatLiters(stats.total_liters)} helper={t('milkReports.entriesCount', { count: stats.total_reports })} />
-          <StatCard label={t('milkReports.moneyIn')} value={formatCurrency(stats.total_revenue)} helper={t('milkReports.fromMilkSelling')} />
+          <StatCard label={t('milkTracking.milkValue')} value={formatCurrency(stats.total_revenue)} helper={t('milkTracking.valueHelp')} />
           <StatCard label={t('milkReports.moneyOut')} value={formatCurrency(stats.total_cost)} helper={t('milkReports.costHint')} />
           <StatCard
-            label={t('milkReports.finalResult')}
+            label={c('balance')}
             value={formatCurrency(stats.net_profit_or_loss)}
-            helper={t('milkReports.profitLossCount', { profit: stats.profitable_days, loss: stats.loss_days })}
+            helper={c('figuresHelp')}
             valueStyle={stats.net_profit_or_loss >= 0 ? styles.profitText : styles.lossText}
           />
         </ScrollView>
 
+        <MilkAdvice cows={animals} language={i18n.resolvedLanguage || i18n.language} revision={allReports} onVet={() => navigation.navigate('Veterinarian')} />
+        <MilkExpenseNotebook cows={animals} data={stats} c={c} onSaved={() => loadData()} />
+        <View style={styles.sectionCard}>
+          {stats.counted_reports > stats.unrecorded_payments ? <><SummaryRow label={t('milkTracking.recordedReceived')} value={formatCurrencyPrecise(stats.amount_received)} />
+          <SummaryRow label={t('milkTracking.recordedPending')} value={formatCurrencyPrecise(stats.amount_pending)} /></> : <Text style={styles.selectedHelp}>{c('unknownPayment')}</Text>}
+          {!!stats.estimated_reports && <Text style={styles.selectedHelp}>{t('milkTracking.estimated', { count: stats.estimated_reports })}</Text>}
+          {!!stats.unrecorded_payments && <Text style={styles.selectedHelp}>{t('milkTracking.unknownPayments', { count: stats.unrecorded_payments })}</Text>}
+        </View>
         <CollapsibleSection
           title={t('milkReports.dashboard', { defaultValue: 'Dashboard & analysis' })}
           subtitle={periodLabel}
@@ -849,12 +836,12 @@ const MilkReportsScreen = ({ navigation }) => {
           <View style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>{t('milkReports.easyChart')}</Text>
             <Text style={styles.sectionSubtitle}>
-              {chartMetric === CHART_METRICS.PROFIT ? t('milkReports.chartProfitHelp') : t('milkReports.chartSimpleHelp')}
+              {chartMetric === CHART_METRICS.PROFIT ? c('figuresHelp') : t('milkReports.chartSimpleHelp')}
             </Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.choiceRow}>
               {renderChoice(chartMetric === CHART_METRICS.LITERS, t('milkReports.chartMilk'), () => setChartMetric(CHART_METRICS.LITERS))}
-              {renderChoice(chartMetric === CHART_METRICS.PROFIT, t('milkReports.chartProfitLoss'), () => setChartMetric(CHART_METRICS.PROFIT))}
-              {renderChoice(chartMetric === CHART_METRICS.REVENUE, t('milkReports.chartMoneyIn'), () => setChartMetric(CHART_METRICS.REVENUE))}
+              {renderChoice(chartMetric === CHART_METRICS.PROFIT, c('balance'), () => setChartMetric(CHART_METRICS.PROFIT))}
+              {renderChoice(chartMetric === CHART_METRICS.REVENUE, t('milkTracking.milkValue'), () => setChartMetric(CHART_METRICS.REVENUE))}
             </ScrollView>
 
             {chartData.length === 0 ? (
@@ -897,17 +884,11 @@ const MilkReportsScreen = ({ navigation }) => {
             <View style={[styles.resultBox, stats.net_profit_or_loss >= 0 ? styles.resultProfit : styles.resultLoss]}>
               <Text style={styles.resultLabel}>{t('milkReports.thisTime')}</Text>
               <Text style={[styles.resultTitle, stats.net_profit_or_loss >= 0 ? styles.profitText : styles.lossText]}>
-                {stats.net_profit_or_loss >= 0 ? t('milkReports.youAreInProfit') : t('milkReports.youAreInLoss')}
+                {!stats.days.length ? t('milkTracking.noData') : c('balance')}
               </Text>
               <Text style={styles.resultAmount}>{formatCurrencyPrecise(stats.net_profit_or_loss)}</Text>
             </View>
-            <SummaryRow label={t('milkReports.allAnimalTotal')} value={formatLiters(stats.all_animal_total.total_liters)} helper={formatCurrency(stats.all_animal_total.profit_or_loss)} />
-            <SummaryRow label={t('milkReports.overallHerdTotal')} value={formatLiters(stats.overall_herd_total.total_liters)} helper={formatCurrency(stats.overall_herd_total.profit_or_loss)} />
-            <SummaryRow
-              label={t('milkReports.bestCow')}
-              value={stats.best_cow?.cow_name || '-'}
-              helper={stats.best_cow ? `${formatCurrency(stats.best_cow.profit_or_loss)} - ${formatLiters(stats.best_cow.total_liters)}` : t('milkReports.noDataYet')}
-            />
+            <Text style={styles.selectedHelp}>{c('figuresHelp')}</Text>
           </View>
         </View>
         </CollapsibleSection>
@@ -981,7 +962,7 @@ const MilkReportsScreen = ({ navigation }) => {
                     <Text style={[styles.tableHeaderCell, styles.cellTypeWide]}>{t('milkReports.reportType')}</Text>
                     <Text style={[styles.tableHeaderCell, styles.cellName]}>{t('milkReports.animal')}</Text>
                     <Text style={[styles.tableHeaderCell, styles.cellMilk]}>{t('milkReports.totalMilk')}</Text>
-                    <Text style={[styles.tableHeaderCell, styles.cellMoney]}>{t('milkReports.moneyIn')}</Text>
+                    <Text style={[styles.tableHeaderCell, styles.cellMoney]}>{t('milkTracking.milkValue')}</Text>
                     <Text style={[styles.tableHeaderCell, styles.cellMoney]}>{t('milkReports.moneyOut')}</Text>
                     <Text style={[styles.tableHeaderCell, styles.cellMoney]}>{t('milkReports.result')}</Text>
                     <Text style={[styles.tableHeaderCell, styles.cellAction]}>{t('milkReports.action')}</Text>
@@ -1167,7 +1148,7 @@ const ReportModal = ({ visible, onClose, reportForm, updateReportForm, animals, 
 
           <Input label={t('milkReports.reportDate')} value={reportForm.report_date} onChangeText={(value) => updateReportForm('report_date', value)} placeholder="2026-06-19" />
 
-          {reportForm.report_type === REPORT_TYPES.INDIVIDUAL ? (
+          {reportForm.report_type === REPORT_TYPES.INDIVIDUAL && reportForm.removed_animal_name && !reportForm.cow_id ? <Text style={styles.selectedHelp}>{t('milkTracking.removedAnimal', { name: reportForm.removed_animal_name })}</Text> : reportForm.report_type === REPORT_TYPES.INDIVIDUAL ? (
             <>
               <Text style={styles.inputLabel}>{t('milkReports.selectAnimal')}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.choiceRow}>
@@ -1205,11 +1186,12 @@ const ReportModal = ({ visible, onClose, reportForm, updateReportForm, animals, 
             <Input label={t('milkReports.laborCost')} value={reportForm.labor_cost} onChangeText={(value) => updateReportForm('labor_cost', value)} keyboardType="decimal-pad" placeholder="0" containerStyle={styles.flexInput} />
             <Input label={t('milkReports.otherCost')} value={reportForm.other_cost} onChangeText={(value) => updateReportForm('other_cost', value)} keyboardType="decimal-pad" placeholder="0" containerStyle={styles.flexInput} />
           </View>
+          <MilkSaleFields form={reportForm} onChange={updateReportForm} t={t} />
           <Input label={t('milkReports.notes')} value={reportForm.notes} onChangeText={(value) => updateReportForm('notes', value)} placeholder={t('milkReports.notesPlaceholder')} multiline />
           <View style={styles.previewCard}>
             <Text style={styles.previewTitle}>{t('milkReports.liveSummary')}</Text>
             <Text style={styles.previewText}>{t('milkReports.totalMilk')}: {formatLiters(preview.totalLiters)}</Text>
-            <Text style={styles.previewText}>{t('milkReports.revenue')}: {formatCurrency(preview.revenue)}</Text>
+            <Text style={styles.previewText}>{t('milkTracking.milkValue')}: {formatCurrency(preview.revenue)}</Text>
             <Text style={styles.previewText}>{t('milkReports.cost')}: {formatCurrency(preview.cost)}</Text>
             <Text style={[styles.previewText, preview.profit >= 0 ? styles.profitText : styles.lossText]}>
               {t('milkReports.result')}: {formatCurrency(preview.profit)}
@@ -1223,6 +1205,19 @@ const ReportModal = ({ visible, onClose, reportForm, updateReportForm, animals, 
     </KeyboardAvoidingView>
   </Modal>
 );
+
+const MilkSaleFields = ({ form, onChange, t }) => {
+  const [expanded, setExpanded] = useState(false);
+  return <View>
+    <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded }} onPress={() => setExpanded(value => !value)} style={styles.choicePill}>
+      <Text style={styles.inputLabel}>{t('milkTracking.details')} {expanded ? '−' : '+'}</Text>
+    </TouchableOpacity>
+    {expanded && <View>
+      <Text style={styles.selectedHelp}>{t('milkTracking.detailsHelp')}</Text>
+      {[...OPTIONAL_FIELDS, ...USAGE_FIELDS].map(field => <Input key={field} label={t('milkTracking.' + field)} value={form[field]} onChangeText={value => onChange(field, value)} keyboardType="decimal-pad" />)}
+    </View>}
+  </View>;
+};
 
 const Input = ({ label, containerStyle, multiline = false, ...props }) => (
   <View style={[styles.inputWrap, containerStyle]}>

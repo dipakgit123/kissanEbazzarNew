@@ -2,6 +2,8 @@
 
 const { Op } = require('sequelize');
 const db = require('../models');
+const { validateProfile, pagination, invalid } = require('../utils/petMatingValidation');
+const PUBLIC_EXCLUDE = ['owner_phone', 'admin_notes', 'photo_public_ids', 'video_public_id', 'latitude', 'longitude'];
 const { uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudinary');
 
 const VALID_PET_TYPES = ['dog', 'cat'];
@@ -22,10 +24,10 @@ const cleanNumber = (value) => {
   return Number.isFinite(next) ? next : null;
 };
 
-const getOwnerInclude = () => ([{
+const getOwnerInclude = (privateContact = false) => ([{
   model: db.User,
   as: 'owner',
-  attributes: ['id', 'full_name', 'phone_number', 'city', 'state', 'profile_photo']
+  attributes: ['id', 'full_name', 'city', 'state', 'profile_photo', ...(privateContact ? ['phone_number'] : [])]
 }]);
 
 const buildWhere = (query = {}, admin = false) => {
@@ -43,6 +45,7 @@ const buildWhere = (query = {}, admin = false) => {
 
   if (!admin) {
     where.status = { [Op.in]: PUBLIC_STATUSES };
+    where[Op.and] = [{ [Op.or]: [{ available_to: null }, { available_to: { [Op.gte]: new Date().toISOString().slice(0, 10) } }] }];
   } else if (status && status !== 'all' && VALID_STATUSES.includes(status)) {
     where.status = status;
   }
@@ -84,7 +87,7 @@ const buildWhere = (query = {}, admin = false) => {
   return where;
 };
 
-const buildPayload = (body = {}, existing = null) => {
+const buildPayload = (body = {}, existing = null, admin = false) => {
   const payload = {};
 
   [
@@ -109,7 +112,7 @@ const buildPayload = (body = {}, existing = null) => {
     'admin_notes'
   ].forEach((field) => {
     if (body[field] !== undefined) {
-      payload[field] = cleanString(body[field]);
+      if (field !== 'admin_notes' || admin) payload[field] = cleanString(body[field]);
     }
   });
 
@@ -149,32 +152,30 @@ const buildPayload = (body = {}, existing = null) => {
     payload.preferred_gender = ['male', 'female', 'any'].includes(body.preferred_gender) ? body.preferred_gender : 'any';
   }
 
-  if (body.status !== undefined && VALID_STATUSES.includes(body.status)) {
+  if (body.status !== undefined && (admin ? VALID_STATUSES : ['active', 'paused', 'matched']).includes(body.status) && (admin || !existing || !['pending', 'rejected', 'removed'].includes(existing.status))) {
     payload.status = body.status;
     payload.published_at = body.status === 'active' ? existing?.published_at || new Date() : existing?.published_at;
   }
 
+  if (body.animal_profile_id !== undefined) payload.animal_profile_id = cleanNumber(body.animal_profile_id);
+  else if (existing && body.pet_type && body.pet_type !== existing.pet_type) payload.animal_profile_id = null;
   if (body.age_months !== undefined) payload.age_months = cleanNumber(body.age_months);
   if (body.weight_kg !== undefined) payload.weight_kg = cleanNumber(body.weight_kg);
   if (body.fee_amount !== undefined) payload.fee_amount = cleanNumber(body.fee_amount);
   if (body.latitude !== undefined) payload.latitude = cleanNumber(body.latitude);
   if (body.longitude !== undefined) payload.longitude = cleanNumber(body.longitude);
   if (body.pedigree_available !== undefined) payload.pedigree_available = parseBoolean(body.pedigree_available);
-  if (body.is_featured !== undefined) payload.is_featured = parseBoolean(body.is_featured);
+  if (admin && body.is_featured !== undefined) payload.is_featured = parseBoolean(body.is_featured);
 
   return payload;
 };
 
-const uploadProfileMedia = async (files = {}, existing = null) => {
+const uploadProfileMedia = async (files = {}) => {
   const payload = {};
   const photoFiles = files.photos || [];
   const videoFile = files.video?.[0];
 
   if (photoFiles.length > 0) {
-    if (existing?.photo_public_ids?.length) {
-      await Promise.all(existing.photo_public_ids.map((id) => deleteFromCloudinary(id, 'image').catch(() => null)));
-    }
-
     const uploads = await Promise.all(
       photoFiles.map((file) => uploadToCloudinary(file, 'pet-mating/photos', 'image'))
     );
@@ -183,9 +184,6 @@ const uploadProfileMedia = async (files = {}, existing = null) => {
   }
 
   if (videoFile) {
-    if (existing?.video_public_id) {
-      await deleteFromCloudinary(existing.video_public_id, 'video').catch(() => null);
-    }
     const upload = await uploadToCloudinary(videoFile, 'pet-mating/videos', 'video');
     payload.video_url = upload.secure_url;
     payload.video_public_id = upload.public_id;
@@ -197,18 +195,17 @@ const uploadProfileMedia = async (files = {}, existing = null) => {
 class PetMatingController {
   async getProfiles(req, res) {
     try {
-      const page = Math.max(1, Number(req.query.page || 1));
-      const limit = Math.min(50, Math.max(1, Number(req.query.limit || 12)));
-      const offset = (page - 1) * limit;
+      const { page, limit, offset } = pagination(req.query);
       const where = buildWhere(req.query, false);
       if (req.user?.id) {
         where.user_id = { [Op.ne]: req.user.id };
       }
 
       const { count, rows } = await db.PetMatingProfile.findAndCountAll({
+        attributes: { exclude: PUBLIC_EXCLUDE },
         where,
         include: getOwnerInclude(),
-        order: [['is_featured', 'DESC'], ['published_at', 'DESC'], ['created_at', 'DESC']],
+        order: [['is_featured', 'DESC'], ['published_at', 'DESC'], ['created_at', 'DESC'], ['id', 'DESC']],
         limit,
         offset
       });
@@ -224,14 +221,15 @@ class PetMatingController {
       });
     } catch (error) {
       console.error('Get pet mating profiles error:', error);
-      res.status(500).json({ success: false, message: 'Failed to load pet mating profiles' });
+      res.status(error.status || 500).json({ success: false, fields: error.fields, message: error.status ? error.message : 'Failed to load pet mating profiles' });
     }
   }
 
   async getProfileById(req, res) {
     try {
       const profile = await db.PetMatingProfile.findOne({
-        where: { id: req.params.id, status: { [Op.in]: PUBLIC_STATUSES } },
+        where: { id: req.params.id, ...buildWhere({}, false) },
+        attributes: { exclude: PUBLIC_EXCLUDE },
         include: getOwnerInclude()
       });
 
@@ -239,33 +237,37 @@ class PetMatingController {
         return res.status(404).json({ success: false, message: 'Pet mating profile not found' });
       }
 
-      await profile.increment('views');
-      await profile.reload({ include: getOwnerInclude() });
+      await profile.increment('views', { returning: false });
+      await profile.reload({ include: getOwnerInclude(), attributes: { exclude: PUBLIC_EXCLUDE } });
 
-      res.json({ success: true, data: { profile } });
+      const publicProfile = profile.toJSON();
+      for (const key of PUBLIC_EXCLUDE) delete publicProfile[key];
+      res.json({ success: true, data: { profile: publicProfile } });
     } catch (error) {
       console.error('Get pet mating profile error:', error);
-      res.status(500).json({ success: false, message: 'Failed to load pet mating profile' });
+      res.status(error.status || 500).json({ success: false, fields: error.fields, message: 'Failed to load pet mating profile' });
     }
   }
 
   async getMyProfiles(req, res) {
     try {
       const profiles = await db.PetMatingProfile.findAll({
-        where: { user_id: req.user.id },
+        where: { user_id: req.user.id, status: { [Op.ne]: 'removed' } },
         order: [['created_at', 'DESC']]
       });
 
       res.json({ success: true, data: { profiles } });
     } catch (error) {
       console.error('Get my pet mating profiles error:', error);
-      res.status(500).json({ success: false, message: 'Failed to load your pet mating profiles' });
+      res.status(error.status || 500).json({ success: false, fields: error.fields, message: 'Failed to load your pet mating profiles' });
     }
   }
 
   async createProfile(req, res) {
     try {
+      const ownerPhone = validateProfile(req.body);
       const payload = buildPayload(req.body);
+      payload.owner_phone = ownerPhone;
       payload.user_id = req.user.id;
       payload.status = 'active';
       payload.published_at = new Date();
@@ -286,7 +288,7 @@ class PetMatingController {
       res.status(201).json({ success: true, message: 'Pet mating profile created successfully', data: { profile } });
     } catch (error) {
       console.error('Create pet mating profile error:', error);
-      res.status(500).json({ success: false, message: error.message || 'Failed to create pet mating profile' });
+      res.status(error.status || 500).json({ success: false, fields: error.fields, message: error.status ? error.message : 'Failed to create pet mating profile' });
     }
   }
 
@@ -300,14 +302,21 @@ class PetMatingController {
         return res.status(404).json({ success: false, message: 'Pet mating profile not found' });
       }
 
+      if (['removed', 'rejected', 'pending'].includes(profile.status)) return res.status(409).json({ success: false, message: 'This profile cannot be edited in its current status' });
+      const ownerPhone = validateProfile(req.body, profile);
       const payload = buildPayload(req.body, profile);
-      const mediaPayload = await uploadProfileMedia(req.files || {}, profile);
+      payload.owner_phone = ownerPhone;
+      const oldPhotoIds = [...(profile.photo_public_ids || [])], oldVideoId = profile.video_public_id;
+      const mediaPayload = await uploadProfileMedia(req.files || {});
+      if (parseBoolean(req.body.remove_video) && !mediaPayload.video_url) { mediaPayload.video_url = null; mediaPayload.video_public_id = null; }
       await profile.update({ ...payload, ...mediaPayload });
+      if (mediaPayload.photos) await Promise.all(oldPhotoIds.map(id => deleteFromCloudinary(id, 'image').catch(() => null)));
+      if (oldVideoId && ('video_url' in mediaPayload)) await deleteFromCloudinary(oldVideoId, 'video').catch(() => null);
 
       res.json({ success: true, message: 'Pet mating profile updated successfully', data: { profile } });
     } catch (error) {
       console.error('Update pet mating profile error:', error);
-      res.status(500).json({ success: false, message: error.message || 'Failed to update pet mating profile' });
+      res.status(error.status || 500).json({ success: false, fields: error.fields, message: error.status ? error.message : 'Failed to update pet mating profile' });
     }
   }
 
@@ -325,7 +334,7 @@ class PetMatingController {
       res.json({ success: true, message: 'Pet mating profile removed successfully' });
     } catch (error) {
       console.error('Delete pet mating profile error:', error);
-      res.status(500).json({ success: false, message: 'Failed to remove pet mating profile' });
+      res.status(error.status || 500).json({ success: false, fields: error.fields, message: 'Failed to remove pet mating profile' });
     }
   }
 
@@ -339,18 +348,21 @@ class PetMatingController {
         return res.status(404).json({ success: false, message: 'Pet mating profile not found' });
       }
 
+      if (!['active', 'paused', 'matched'].includes(profile.status)) {
+        return res.status(409).json({ success: false, message: 'This profile is not approved for matching' });
+      }
       await profile.update({ status: 'matched' });
       res.json({ success: true, message: 'Pet mating profile marked as matched', data: { profile } });
     } catch (error) {
       console.error('Mark pet mating matched error:', error);
-      res.status(500).json({ success: false, message: 'Failed to update pet mating profile' });
+      res.status(error.status || 500).json({ success: false, fields: error.fields, message: 'Failed to update pet mating profile' });
     }
   }
 
   async trackContact(req, res) {
     try {
-      const profile = await db.PetMatingProfile.findByPk(req.params.id);
-      if (!profile || profile.status !== 'active') {
+      const profile = await db.PetMatingProfile.findOne({where:{id:req.params.id, ...buildWhere({}, false)}, include:getOwnerInclude(true)});
+      if (!profile) {
         return res.status(404).json({ success: false, message: 'Pet mating profile not found' });
       }
 
@@ -358,45 +370,52 @@ class PetMatingController {
         return res.status(400).json({ success: false, message: 'You cannot contact your own mating profile' });
       }
 
+      const phone = profile.owner_phone || profile.owner?.phone_number;
+      if (!phone) return res.status(409).json({success:false,message:'Contact number is not available'});
       await profile.increment('contact_count');
       res.json({
         success: true,
         data: {
-          owner_phone: profile.owner_phone,
+          owner_phone: phone,
           owner_name: profile.owner_name
         }
       });
     } catch (error) {
       console.error('Track pet mating contact error:', error);
-      res.status(500).json({ success: false, message: 'Failed to track contact' });
+      res.status(error.status || 500).json({ success: false, fields: error.fields, message: 'Failed to track contact' });
     }
+  }
+
+  async updateStatus(req, res) {
+    try {
+      const status = req.body.status;
+      if (!['active', 'paused', 'matched'].includes(status)) invalid('status', 'Choose active, paused or matched');
+      const profile = await db.PetMatingProfile.findOne({where:{id:req.params.id,user_id:req.user.id}});
+      if (!profile) return res.status(404).json({success:false,message:'Pet mating profile not found'});
+      if (!['active','paused','matched'].includes(profile.status)) return res.status(409).json({success:false,message:'This profile cannot be reactivated'});
+      if (status === 'active' && profile.available_to && profile.available_to < new Date().toISOString().slice(0,10)) invalid('available_to','Update the expired availability before reactivating');
+      await profile.update({status});
+      res.json({success:true,data:{profile}});
+    } catch (error) { res.status(error.status || 500).json({success:false,fields:error.fields,message:error.status ? error.message : 'Unable to update status'}); }
   }
 
   async reportProfile(req, res) {
     try {
-      const profile = await db.PetMatingProfile.findByPk(req.params.id);
-      if (!profile || profile.status === 'removed') {
-        return res.status(404).json({ success: false, message: 'Pet mating profile not found' });
-      }
-
-      if (String(profile.user_id) === String(req.user.id)) {
-        return res.status(400).json({ success: false, message: 'You cannot report your own mating profile' });
-      }
-
-      const reason = VALID_REPORT_REASONS.includes(req.body.reason) ? req.body.reason : 'other';
-      const report = await db.PetMatingReport.create({
-        profile_id: profile.id,
-        reporter_id: req.user?.id || null,
-        reason,
-        description: cleanString(req.body.description)
+      if (!VALID_REPORT_REASONS.includes(req.body.reason)) invalid('reason','Choose a report reason');
+      const description = cleanString(req.body.description);
+      if (!description || description.length < 5 || description.length > 2000) invalid('description','Describe the concern in 5 to 2000 characters');
+      const result = await db.sequelize.transaction(async transaction => {
+        const profile = await db.PetMatingProfile.findByPk(req.params.id, {transaction,lock:transaction.LOCK.UPDATE});
+        if (!profile || profile.status !== 'active') return {code:404,message:'Pet mating profile not found'};
+        if (String(profile.user_id) === String(req.user.id)) return {code:400,message:'You cannot report your own mating profile'};
+        const previous = await db.PetMatingReport.findOne({where:{profile_id:profile.id,reporter_id:req.user.id,status:'open'},transaction});
+        if (previous) return {code:409,message:'You already have an open report for this profile'};
+        const report = await db.PetMatingReport.create({profile_id:profile.id,reporter_id:req.user.id,reason:req.body.reason,description},{transaction});
+        await profile.increment('report_count',{transaction});
+        return {code:201,report};
       });
-
-      await profile.increment('report_count');
-      res.status(201).json({ success: true, message: 'Profile reported for review', data: { report } });
-    } catch (error) {
-      console.error('Report pet mating profile error:', error);
-      res.status(500).json({ success: false, message: 'Failed to report profile' });
-    }
+      res.status(result.code).json({success:result.code===201,message:result.message || 'Profile reported for review',data:result.report ? {report:result.report} : undefined});
+    } catch (error) { res.status(error.status || 500).json({success:false,fields:error.fields,message:error.status ? error.message : 'Failed to report profile'}); }
   }
 
   async adminGetProfiles(req, res) {
@@ -425,7 +444,7 @@ class PetMatingController {
       });
     } catch (error) {
       console.error('Admin get pet mating profiles error:', error);
-      res.status(500).json({ success: false, message: 'Failed to load pet mating profiles' });
+      res.status(error.status || 500).json({ success: false, fields: error.fields, message: error.status ? error.message : 'Failed to load pet mating profiles' });
     }
   }
 
@@ -436,12 +455,12 @@ class PetMatingController {
         return res.status(404).json({ success: false, message: 'Pet mating profile not found' });
       }
 
-      const payload = buildPayload(req.body, profile);
+      const payload = buildPayload(req.body, profile, true);
       await profile.update(payload);
       res.json({ success: true, message: 'Pet mating profile updated', data: { profile } });
     } catch (error) {
       console.error('Admin update pet mating profile error:', error);
-      res.status(500).json({ success: false, message: 'Failed to update profile' });
+      res.status(error.status || 500).json({ success: false, fields: error.fields, message: 'Failed to update profile' });
     }
   }
 
@@ -459,7 +478,7 @@ class PetMatingController {
       res.json({ success: true, data: { reports } });
     } catch (error) {
       console.error('Admin get pet mating reports error:', error);
-      res.status(500).json({ success: false, message: 'Failed to load pet mating reports' });
+      res.status(error.status || 500).json({ success: false, fields: error.fields, message: 'Failed to load pet mating reports' });
     }
   }
 }

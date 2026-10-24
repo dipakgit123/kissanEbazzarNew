@@ -40,6 +40,21 @@ exports.logCall = async (req, res) => {
       });
     }
 
+    const receiver = await User.findByPk(receiverId);
+    if (!receiver || receiver.phone_number !== receiverPhoneNumber || receiver.is_blocked || !receiver.is_verified) {
+      return res.status(400).json({ success: false, message: 'Invalid call recipient' });
+    }
+    if (listingId || listingType) {
+      const Model = LISTING_MODEL_MAP[String(listingType || '').toLowerCase()];
+      const listing = Model ? await Model.findByPk(listingId) : null;
+      if (!listing || Number(listing.user_id) !== Number(receiverId) || listing.status !== 'active') {
+        return res.status(400).json({ success: false, message: 'Listing does not belong to this recipient' });
+      }
+    }
+    if (veterinarianId) {
+      // Veterinarian contacts use the dedicated veterinarian interaction endpoint.
+      return res.status(400).json({ success: false, message: 'Use veterinarian contact tracking for veterinarian calls' });
+    }
     // Get user agent from request
     const userAgent = req.headers['user-agent'];
 
@@ -91,8 +106,8 @@ exports.getUserCallHistory = async (req, res) => {
     const totalCalls = await CallLog.count({
       where: {
         [db.Sequelize.Op.or]: [
-          { caller_id: userId },
-          { receiver_id: userId }
+          { caller_id: userId, caller_deleted_at: null },
+          { receiver_id: userId, receiver_deleted_at: null }
         ]
       }
     });
@@ -133,7 +148,7 @@ exports.getCallsMade = async (req, res) => {
     });
 
     const totalCalls = await CallLog.count({
-      where: { caller_id: userId }
+      where: { caller_id: userId, caller_deleted_at: null }
     });
 
     res.json({
@@ -172,7 +187,7 @@ exports.getCallsReceived = async (req, res) => {
     });
 
     const totalCalls = await CallLog.count({
-      where: { receiver_id: userId }
+      where: { receiver_id: userId, receiver_deleted_at: null }
     });
 
     res.json({
@@ -321,3 +336,20 @@ exports.updateCallStatus = async (req, res) => {
 };
 
 module.exports = exports;
+
+exports.deleteCallLog = async (req, res) => {
+  try {
+    const log = await CallLog.findByPk(req.params.id);
+    const userId = Number(req.user.id);
+    if (!log || ![Number(log.callerId), Number(log.receiverId)].includes(userId)) {
+      return res.status(404).json({ success: false, message: 'Call log not found' });
+    }
+    const updates = {};
+    if (Number(log.callerId) === userId) updates.callerDeletedAt = new Date();
+    if (Number(log.receiverId) === userId) updates.receiverDeletedAt = new Date();
+    await log.update(updates);
+    return res.json({ success: true, message: 'Call removed from your history' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Unable to remove call' });
+  }
+};

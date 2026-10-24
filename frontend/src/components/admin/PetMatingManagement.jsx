@@ -58,7 +58,7 @@ const PetMatingManagement = () => {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-slate-700/50 bg-[#1e293b] p-6">
+      <div className="rounded-2xl border border-slate-700/50 bg-slate-800 p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-2xl font-bold text-white">Pet Mating Moderation</h2>
@@ -87,11 +87,11 @@ const PetMatingManagement = () => {
       </div>
 
       {loading ? (
-        <div className="rounded-2xl bg-[#1e293b] p-10 text-center text-slate-300">Loading...</div>
+        <div className="rounded-2xl bg-slate-800 p-10 text-center text-slate-300">Loading...</div>
       ) : (
         <div className="grid gap-5 lg:grid-cols-2">
           {profiles.map((profile) => (
-            <div key={profile.id} className="overflow-hidden rounded-2xl border border-slate-700/50 bg-[#1e293b]">
+            <div key={profile.id} className="overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-800">
               <div className="flex gap-4 p-4">
                 <div className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-xl bg-slate-800">
                   {profile.photos?.[0] ? <img src={profile.photos[0]} alt={profile.pet_name} className="h-full w-full object-cover" /> : null}
@@ -132,7 +132,7 @@ const PetMatingManagement = () => {
 };
 
 const Stat = ({ label, value }) => (
-  <div className="rounded-2xl border border-slate-700/50 bg-[#1e293b] p-5">
+  <div className="rounded-2xl border border-slate-700/50 bg-slate-800 p-5">
     <p className="text-sm font-bold text-slate-400">{label}</p>
     <p className="mt-2 text-3xl font-black text-white">{value}</p>
   </div>

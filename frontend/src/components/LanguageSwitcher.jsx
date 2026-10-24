@@ -1,9 +1,29 @@
-import React, { useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const LanguageSwitcher = () => {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
+  const triggerRef = useRef(null);
+  const optionsRef = useRef(null);
+  const optionsId = useId();
+
+  useEffect(() => {
+    if (isOpen) optionsRef.current?.querySelector('[aria-pressed="true"]')?.focus();
+  }, [isOpen]);
+
+  const handleKeyDown = event => {
+    if (!isOpen) return;
+    if (event.key === 'Escape') {
+      event.preventDefault(); event.stopPropagation(); setIsOpen(false); triggerRef.current?.focus();
+    }
+    if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+      const options = [...optionsRef.current.querySelectorAll('button')];
+      const index = options.indexOf(document.activeElement);
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length;
+      event.preventDefault(); options[next]?.focus();
+    }
+  };
 
   const languages = [
     { code: 'en', name: 'English' },
@@ -11,20 +31,25 @@ const LanguageSwitcher = () => {
     { code: 'mr', name: '\u092e\u0930\u093e\u0920\u0940' }
   ];
 
-  const currentLanguage = languages.find((lang) => lang.code === i18n.language) || languages[0];
+  const currentLanguage = languages.find((lang) => lang.code === (i18n.resolvedLanguage || i18n.language)?.split('-')[0]) || languages[0];
 
   const changeLanguage = (langCode) => {
     i18n.changeLanguage(langCode);
     localStorage.setItem('language', langCode);
     setIsOpen(false);
+    triggerRef.current?.focus();
   };
 
   return (
-    <div className="relative inline-block text-left z-50">
+    <div className="relative inline-block text-left z-50" onKeyDown={handleKeyDown} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setIsOpen(false); }}>
       <button
+        type="button"
+        ref={triggerRef}
+        aria-expanded={isOpen}
+        aria-controls={optionsId}
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg group"
-        aria-label="Select Language"
+        className="flex items-center gap-2 px-3 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg transition-colors group"
+        aria-label={t('common.selectLanguage')}
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
@@ -46,10 +71,12 @@ const LanguageSwitcher = () => {
             onClick={() => setIsOpen(false)}
           />
 
-          <div className="absolute left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:translate-x-0 mt-2 w-36 bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden">
+          <div id={optionsId} ref={optionsRef} className="absolute left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:translate-x-0 mt-2 w-36 bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden">
             <div className="py-0.5">
               {languages.map((lang, index) => (
                 <button
+                  type="button"
+                  aria-pressed={currentLanguage.code === lang.code}
                   key={lang.code}
                   onClick={() => changeLanguage(lang.code)}
                   className={`w-full flex items-center gap-2 px-3 py-2 transition-all duration-150 ${

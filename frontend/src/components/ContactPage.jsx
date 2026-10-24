@@ -1,280 +1,105 @@
-import React, { useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import toast from 'react-hot-toast';
-import {
-  FaEnvelope,
-  FaHeadset,
-  FaPaperPlane,
-  FaPhone,
-  FaRegClock,
-  FaWhatsapp,
-} from 'react-icons/fa6';
+import { Link } from 'react-router-dom';
+import { FaArrowRight, FaEnvelope, FaPaperPlane, FaWhatsapp } from 'react-icons/fa6';
 import { contactService } from '../services/api';
 import { getWhatsAppSupportUrl } from '../config/support';
+import { supportText } from '../utils/supportUi';
+import SupportPageLayout from './SupportPageLayout';
 
-const ContactPage = () => {
-  const { t } = useTranslation();
+const emptyForm = { name: '', email: '', phone: '', subject: '', message: '' };
+const fields = [
+  { name: 'name', autoComplete: 'name', required: true },
+  { name: 'email', type: 'email', autoComplete: 'email', required: true },
+  { name: 'phone', type: 'tel', autoComplete: 'tel' },
+  { name: 'subject', required: true },
+  { name: 'message', required: true, wide: true },
+];
+
+export default function ContactPage() {
+  const { t, i18n } = useTranslation();
+  const ui = supportText(i18n.language);
   const [submitting, setSubmitting] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    subject: '',
-    message: '',
-  });
-
+  const [feedback, setFeedback] = useState(null);
+  const [formData, setFormData] = useState(emptyForm);
+  const pending = useRef(false);
+  const feedbackRef = useRef(null);
   const whatsappUrl = getWhatsAppSupportUrl();
 
-  const contactCards = useMemo(() => ([
-    {
-      key: 'email',
-      title: t('contactPage.emailTitle'),
-      description: t('contactPage.emailDesc'),
-      value: t('contactPage.emailValue'),
-      icon: FaEnvelope,
-      accent: 'border-emerald-100 bg-emerald-50/70 text-emerald-700',
-    },
-    {
-      key: 'whatsapp',
-      title: t('contactPage.whatsAppTitle'),
-      description: t('contactPage.whatsAppDesc'),
-      value: t('contactPage.whatsAppCta'),
-      href: whatsappUrl || undefined,
-      icon: FaWhatsapp,
-      accent: 'border-sky-100 bg-sky-50/70 text-sky-700',
-    },
-    {
-      key: 'hours',
-      title: t('contactPage.hoursTitle'),
-      description: t('contactPage.hoursDesc'),
-      value: t('contactPage.hoursValue'),
-      icon: FaRegClock,
-      accent: 'border-amber-100 bg-amber-50/70 text-amber-700',
-    },
-  ]), [t, whatsappUrl]);
+  useEffect(() => {
+    if (feedback) feedbackRef.current?.focus();
+  }, [feedback]);
 
-  const handleChange = (event) => {
-    const { name, value } = event.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleSubmit = async (event) => {
+  const handleSubmit = async event => {
     event.preventDefault();
-
-    if (!formData.name.trim() || !formData.email.trim() || !formData.subject.trim() || !formData.message.trim()) {
-      toast.error(t('contactPage.validationRequired'));
+    if (pending.current) return;
+    const payload = Object.fromEntries(Object.entries(formData).map(([key, value]) => [key, value.trim()]));
+    const showFeedback = (key, error = true) => {
+      setFeedback({ key, error });
+    };
+    if (fields.some(field => field.required && !payload[field.name])) {
+      showFeedback('validationRequired');
       return;
     }
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-      toast.error(t('contactPage.validationEmail'));
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
+      showFeedback('validationEmail');
       return;
     }
-
+    pending.current = true;
     setSubmitting(true);
-
+    setFeedback(null);
     try {
-      const response = await contactService.submitInquiry(formData);
+      const response = await contactService.submitInquiry(payload);
       if (response?.success) {
-        toast.success(t('contactPage.submitSuccess'));
-        setFormData({
-          name: '',
-          email: '',
-          phone: '',
-          subject: '',
-          message: '',
-        });
+        setFormData(emptyForm);
+        showFeedback('submitSuccess', false);
       } else {
-        toast.error(t('contactPage.submitError'));
+        showFeedback('submitError');
       }
     } catch {
-      toast.error(t('contactPage.submitError'));
+      showFeedback('submitError');
     } finally {
+      pending.current = false;
       setSubmitting(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-[#f4f8f4] text-slate-900">
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
-        <section className="rounded-[32px] border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
-          <div className="grid gap-0 lg:grid-cols-[0.92fr_1.08fr]">
-            <div className="border-b border-slate-200 bg-[linear-gradient(180deg,#f6fff9_0%,#ffffff_100%)] p-6 sm:p-8 lg:border-b-0 lg:border-r">
-              <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-[#0f2b17] text-emerald-300">
-                <FaHeadset className="text-2xl" />
-              </div>
-
-              <p className="mt-6 text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">
-                {t('contactPage.eyebrow')}
-              </p>
-              <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
-                {t('contactPage.title')}
-              </h1>
-              <p className="mt-4 max-w-xl text-sm leading-7 text-slate-600 sm:text-base">
-                {t('contactPage.subtitle')}
-              </p>
-
-              <div className="mt-8 space-y-4">
-                {contactCards.map(({ key, title, description, value, href, icon: Icon, accent }) => {
-                  const content = (
-                    <div className={`rounded-[24px] border p-4 ${accent}`}>
-                      <div className="flex items-start gap-4">
-                        <div className="inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm">
-                          {React.createElement(Icon, { className: 'text-lg' })}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold text-slate-900">{title}</p>
-                          <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>
-                          <p className="mt-2 text-sm font-semibold text-slate-900">{value}</p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-
-                  if (!href) {
-                    return <div key={key}>{content}</div>;
-                  }
-
-                  return (
-                    <a
-                      key={key}
-                      href={href}
-                      target={href.startsWith('http') ? '_blank' : undefined}
-                      rel={href.startsWith('http') ? 'noreferrer' : undefined}
-                      className="block transition-transform hover:-translate-y-0.5"
-                    >
-                      {content}
-                    </a>
-                  );
-                })}
-              </div>
+  return <SupportPageLayout title={t('contactPage.title')} description={ui('contactIntro')} icon={<FaEnvelope />}>
+    <div className="support-columns">
+      <section className="support-panel" aria-labelledby="contact-form-title">
+        <h2 id="contact-form-title">{t('contactPage.formTitle')}</h2>
+        <p id="contact-form-hint" className="support-muted mb-5">{ui('contactHint')} {ui('requiredHint')}</p>
+        {feedback && <div ref={feedbackRef} tabIndex={-1} role={feedback.error ? 'alert' : 'status'} className={`support-feedback${feedback.error ? ' support-feedback-error' : ''}`}>{t(`contactPage.${feedback.key}`)}</div>}
+        <form onSubmit={handleSubmit} aria-labelledby="contact-form-title" aria-describedby="contact-form-hint" aria-busy={submitting}>
+          <fieldset disabled={submitting}>
+            <div className="support-fields">
+              {fields.map(({ name, type = 'text', autoComplete, required, wide }) => {
+                const controlProps = { id: `contact-${name}`, name, required, value: formData[name], onChange: event => setFormData(previous => ({ ...previous, [name]: event.target.value })), placeholder: t(`contactPage.${name}Placeholder`) };
+                return <div key={name} className={`support-field${wide ? ' support-field-wide' : ''}`}>
+                  <label htmlFor={`contact-${name}`}>{t(`contactPage.${name}Label`)}{required && <span aria-hidden="true"> *</span>}</label>
+                  {name === 'message' ? <textarea {...controlProps} rows={5} /> : <input {...controlProps} type={type} autoComplete={autoComplete} />}
+                </div>;
+              })}
             </div>
-
-            <div className="p-6 sm:p-8">
-              <div className="max-w-2xl">
-                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">
-                  {t('contactPage.formLabel')}
-                </p>
-                <h2 className="mt-2 text-2xl font-black text-slate-900 sm:text-3xl">
-                  {t('contactPage.formTitle')}
-                </h2>
-                <p className="mt-3 text-sm leading-7 text-slate-600">
-                  {t('contactPage.formSubtitle')}
-                </p>
-              </div>
-
-              <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-                <div className="grid gap-5 md:grid-cols-2">
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-700">
-                      {t('contactPage.nameLabel')} <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleChange}
-                      placeholder={t('contactPage.namePlaceholder')}
-                      className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-700">
-                      {t('contactPage.emailLabel')} <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      placeholder={t('contactPage.emailPlaceholder')}
-                      className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid gap-5 md:grid-cols-2">
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-700">
-                      {t('contactPage.phoneLabel')}
-                    </label>
-                    <input
-                      type="text"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      placeholder={t('contactPage.phonePlaceholder')}
-                      className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-700">
-                      {t('contactPage.subjectLabel')} <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="subject"
-                      value={formData.subject}
-                      onChange={handleChange}
-                      placeholder={t('contactPage.subjectPlaceholder')}
-                      className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    {t('contactPage.messageLabel')} <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    name="message"
-                    value={formData.message}
-                    onChange={handleChange}
-                    placeholder={t('contactPage.messagePlaceholder')}
-                    rows="7"
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="inline-flex items-center gap-2 text-sm text-slate-500">
-                    <FaPhone className="text-emerald-600" />
-                    <span>{t('contactPage.responseNote')}</span>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="inline-flex items-center justify-center gap-2 rounded-full bg-[#0f2b17] px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-emerald-950/15 transition hover:bg-[#12381e] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {submitting ? (
-                      <>
-                        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                        <span>{t('contactPage.submitting')}</span>
-                      </>
-                    ) : (
-                      <>
-                        <FaPaperPlane className="text-sm" />
-                        <span>{t('contactPage.submit')}</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
+            <div className="support-form-footer">
+              <p className="support-muted">{ui('privacyHint')} <Link className="support-link" to="/privacy">{t('footer.privacyPolicy')}</Link></p>
+              <button type="submit" className="support-action" disabled={submitting}><FaPaperPlane aria-hidden="true" />{t(`contactPage.${submitting ? 'submitting' : 'submit'}`)}</button>
             </div>
-          </div>
+          </fieldset>
+        </form>
+      </section>
+      <aside className="support-stack">
+        <section className="support-panel support-stack">
+          <h2>{t('footer.helpCenter')}</h2>
+          <p className="support-muted">{ui('helpIntro')}</p>
+          <Link className="support-action support-action-secondary" to="/help">{t('footer.helpCenter')}<FaArrowRight aria-hidden="true" /></Link>
         </section>
-      </div>
+        {whatsappUrl && <section className="support-panel support-stack">
+          <h2>{t('contactPage.whatsAppTitle')}</h2>
+          <p className="support-muted">{ui('whatsappHint')}</p>
+          <a className="support-action support-action-secondary" href={whatsappUrl} target="_blank" rel="noopener noreferrer"><FaWhatsapp aria-hidden="true" />{t('contactPage.whatsAppCta')}</a>
+        </section>}
+      </aside>
     </div>
-  );
-};
-
-export default ContactPage;
+  </SupportPageLayout>;
+}

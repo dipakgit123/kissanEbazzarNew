@@ -1,4 +1,5 @@
-﻿import axios from 'axios';
+import { getAnimalGroup } from '../utils/animalExperience';
+import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
 
 const API_URL = API_BASE_URL;
@@ -21,6 +22,7 @@ const vetApi = axios.create({
 // Add token to requests if it exists
 api.interceptors.request.use(
   (config) => {
+    config.headers['X-Animal-Group'] = getAnimalGroup() || 'farm';
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -409,6 +411,11 @@ export const listingReportService = {
 };
 
 export const petMatingService = {
+  updateStatus: async (id, status) => {
+    try { const response = await api.patch(`/api/pet-mating/${id}/status`, {status}); return response.data; }
+    catch (error) { throw error.response?.data || error; }
+  },
+
   getProfiles: async (params = {}) => {
     try {
       const response = await api.get('/api/pet-mating', { params });
@@ -497,6 +504,14 @@ export const petMatingService = {
 
 // Pregnancy Calendar Service
 export const pregnancyService = {
+  recordCheckup: async (id, data) => {
+    try {
+      const response = await api.post(`/api/pregnancy/records/${id}/checkups`, data);
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || error.message);
+    }
+  },
   // Get pregnancy durations for all animal types
   getDurations: async () => {
     try {
@@ -615,6 +630,13 @@ export const pregnancyService = {
 };
 
 export const milkReportService = {
+  getAdvice: async (id, language = 'en') => (await api.get(`/api/milk-reports/cows/${id}/advice`, { params: { language }, timeout: 20000 })).data,
+  saveFeeding: async (id, data) => (await api.put(`/api/milk-reports/cows/${id}/feeding`, data, { timeout: 20000 })).data,
+  generateAdvice: async (id, language = 'en') => (await api.post(`/api/milk-reports/cows/${id}/advice`, { language }, { timeout: 45000 })).data,
+  getExpenses: async (params = {}) => (await api.get('/api/milk-reports/expenses', { params })).data,
+  createExpenses: async data => (await api.post('/api/milk-reports/expenses', data)).data,
+  updateExpense: async (id, data) => (await api.put(`/api/milk-reports/expenses/${id}`, data)).data,
+  deleteExpense: async id => (await api.delete(`/api/milk-reports/expenses/${id}`)).data,
   getCows: async (params = {}) => {
     try {
       const response = await api.get('/api/milk-reports/cows', { params });

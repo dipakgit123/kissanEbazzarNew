@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import {
@@ -17,6 +17,7 @@ import { veterinarianService, vetReviewService } from '../services/api';
 import { resolveUserLocation } from '../utils/userLocation';
 import { InlineLoader } from './AppLoader';
 
+import { vetText } from '../utils/vetUi';
 const API_URL = API_BASE_URL;
 const SPECIALIZATION_OPTIONS = ['general', 'large_animal', 'small_animal', 'livestock', 'surgery', 'emergency', 'reproduction'];
 const NEARBY_RADIUS_KM = 50;
@@ -24,7 +25,15 @@ const NEARBY_RADIUS_KM = 50;
 const VeterinarianPage = () => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const c = vetText(i18n.language);
+  const [page, setPage] = useState(1), [totalPages, setTotalPages] = useState(1);
+  const [query, setQuery] = useState('');
+  const [reload, setReload] = useState(0);
+  const reviewVersion = useRef(0);
+  const selectedVetId = useRef(null);
   const [searchQuery, setSearchQuery] = useState('');
+  useEffect(() => { const timer = setTimeout(() => { setQuery(searchQuery); setPage(1); }, 300); return () => clearTimeout(timer); }, [searchQuery]);
+
   const [veterinarians, setVeterinarians] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -111,77 +120,33 @@ const VeterinarianPage = () => {
   }, []);
 
   useEffect(() => {
-    const fetchVeterinarians = async () => {
-      setLoading(true);
-      setError(null);
-
+    const controller = new AbortController();
+    const run = async () => {
+      setLoading(true); setError(null);
       try {
-        const fetchAllVerifiedVeterinarians = async () => {
-          const allParams = new URLSearchParams({
-            limit: '50',
-          });
-
-          if (specializationFilter) {
-            allParams.append('specialization', specializationFilter);
-          }
-
-          const allResponse = await fetch(`${API_URL}/api/veterinarians?${allParams.toString()}`);
-          const allData = await allResponse.json();
-
-          if (!allData.success) {
-            return [];
-          }
-
-          return allData.data?.veterinarians || [];
-        };
-
-        const fetchNearbyVeterinarians = async () => {
-          if (!userLocation?.latitude || !userLocation?.longitude) {
-            return [];
-          }
-
-          const params = new URLSearchParams({
-            latitude: userLocation.latitude,
-            longitude: userLocation.longitude,
-            radius: NEARBY_RADIUS_KM,
-          });
-
-          if (specializationFilter) {
-            params.append('specialization', specializationFilter);
-          }
-
-          const response = await fetch(`${API_URL}/api/veterinarians/nearby?${params.toString()}`);
-          const data = await response.json();
-
-          if (!data.success) {
-            return [];
-          }
-
-          return Array.isArray(data.data) ? data.data : [];
-        };
-
-        if (viewMode === 'all') {
-          const allVeterinarians = await fetchAllVerifiedVeterinarians();
-          setVeterinarians(allVeterinarians);
-        } else {
-          const nearbyVeterinarians = await fetchNearbyVeterinarians();
-          setVeterinarians(nearbyVeterinarians);
-        }
-      } catch (err) {
-        console.error('Error fetching veterinarians:', err);
-        setError(t('veterinarian.error'));
-      } finally {
-        setLoading(false);
-      }
+        if (viewMode === 'nearby' && !userLocation) { setVeterinarians([]); return; }
+        const params = new URLSearchParams(viewMode === 'all'
+          ? { page: String(page), limit: '50', search: query }
+          : { latitude: userLocation.latitude, longitude: userLocation.longitude, radius: NEARBY_RADIUS_KM });
+        if (specializationFilter) params.set('specialization', specializationFilter);
+        const response = await fetch(`${API_URL}/api/veterinarians${viewMode === 'nearby' ? '/nearby' : ''}?${params}`, { signal: controller.signal });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error('Directory unavailable');
+        if (controller.signal.aborted) return;
+        setVeterinarians(viewMode === 'all' ? data.data.veterinarians : data.data);
+        setTotalPages(viewMode === 'all' ? data.data.totalPages : 1);
+      } catch { if (!controller.signal.aborted) { setVeterinarians([]); setError(t('veterinarian.error')); } }
+      finally { if (!controller.signal.aborted) setLoading(false); }
     };
+    run();
+    return () => controller.abort();
+  }, [page, query, reload, specializationFilter, t, userLocation, viewMode]);
 
-    fetchVeterinarians();
-  }, [specializationFilter, t, userLocation, viewMode]);
-
-  const filteredVets = veterinarians.filter((vet) =>
+  const filteredVets = viewMode === 'all' ? veterinarians : veterinarians.filter((vet) =>
     vet.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     vet.specialization?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    vet.city?.toLowerCase().includes(searchQuery.toLowerCase())
+    vet.city?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    vet.clinic_name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const trackVetInteraction = async (vetId, leadType, sourcePage) => {
@@ -193,6 +158,9 @@ const VeterinarianPage = () => {
   };
 
   const openVetProfile = (vet, sourcePage = 'veterinarian-list') => {
+    selectedVetId.current = vet.id;
+    reviewVersion.current++;
+    setSelectedVetReviews([]); setUserReview(null); setReviewForm({ rating: 5, reviewText: '' }); setReviewsLoading(true);
     setSelectedVet(vet);
     void trackVetInteraction(vet.id, 'profile_view', sourcePage);
   };
@@ -212,6 +180,8 @@ const VeterinarianPage = () => {
   };
 
   const loadSelectedVetReviewData = useCallback(async (vetId) => {
+    if (selectedVetId.current !== vetId) return;
+    const version = ++reviewVersion.current;
     setReviewsLoading(true);
 
     try {
@@ -225,6 +195,7 @@ const VeterinarianPage = () => {
       }
 
       const [vetResponse, reviewsResponse, myReviewResponse] = await Promise.all(requests);
+      if (version !== reviewVersion.current) return;
       const refreshedVet = vetResponse.data || null;
       const reviewItems = reviewsResponse.data?.reviews || [];
       const ownReview = myReviewResponse?.data || null;
@@ -250,10 +221,11 @@ const VeterinarianPage = () => {
         reviewText: ownReview?.review_text || '',
       });
     } catch (error) {
+      if (version !== reviewVersion.current) return;
       console.error('Failed to load veterinarian reviews:', error);
       toast.error(t('veterinarian.reviewLoadFailed', 'Failed to load reviews'));
     } finally {
-      setReviewsLoading(false);
+      if (version === reviewVersion.current) setReviewsLoading(false);
     }
   }, [hasUserToken, t]);
 
@@ -266,6 +238,8 @@ const VeterinarianPage = () => {
     }
 
     loadSelectedVetReviewData(selectedVet.id);
+    const version = reviewVersion;
+    return () => { version.current++; };
   }, [selectedVet?.id, loadSelectedVetReviewData]);
 
   const handleReviewSubmit = async () => {
@@ -325,13 +299,13 @@ const VeterinarianPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#edf6ef_0%,#f7faf8_100%)]">
+    <div className="site-background min-h-screen">
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <section className="mb-12">
           <div className="mb-8 rounded-[28px] border border-emerald-100 bg-white/90 p-5 shadow-sm sm:p-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <h1 className="text-2xl font-bold text-[#000600] sm:text-3xl">
+                <h1 className="text-2xl font-bold text-ink sm:text-3xl">
                   {viewMode === 'nearby' ? t('veterinarian.nearbyVets') : t('veterinarian.allVerifiedVets')}
                 </h1>
                 <p className="mt-2 text-sm text-slate-500">
@@ -355,7 +329,7 @@ const VeterinarianPage = () => {
                   placeholder={t('veterinarian.searchPlaceholder')}
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 pl-11 text-sm text-slate-700 outline-none transition focus:border-[#15BB73] focus:ring-4 focus:ring-[#15BB73]/10"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 pl-11 text-sm text-slate-700 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
                 />
                 <svg className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -368,7 +342,7 @@ const VeterinarianPage = () => {
                   onClick={() => setViewMode('nearby')}
                   className={`flex-1 rounded-[14px] px-4 py-3 text-sm font-semibold transition ${
                     viewMode === 'nearby'
-                      ? 'bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white shadow-sm'
+                      ? 'bg-primary text-white shadow-sm'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -376,10 +350,10 @@ const VeterinarianPage = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setViewMode('all')}
+                  onClick={() => { setPage(1); setViewMode('all'); }}
                   className={`flex-1 rounded-[14px] px-4 py-3 text-sm font-semibold transition ${
                     viewMode === 'all'
-                      ? 'bg-gradient-to-r from-[#15BB73] to-[#0FA568] text-white shadow-sm'
+                      ? 'bg-primary text-white shadow-sm'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -389,13 +363,16 @@ const VeterinarianPage = () => {
             </div>
           </div>
 
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            {viewMode === 'all' && totalPages > 1 && <><button disabled={page <= 1 || loading} onClick={() => setPage(page - 1)} aria-label={c('previous')}>{c('previous')}</button><span>{page} / {totalPages}</span><button disabled={page >= totalPages || loading} onClick={() => setPage(page + 1)} aria-label={c('next')}>{c('next')}</button></>}
+          </div>
           {loading ? (
             <div className="flex items-center justify-center py-14">
               <InlineLoader message={t('common.loading')} size="medium" />
             </div>
           ) : error ? (
             <div className="rounded-[28px] bg-white p-10 text-center shadow-sm">
-              <p className="text-red-500">{error}</p>
+              <p className="text-red-500">{error}</p><button onClick={() => setReload(value => value + 1)}>{c('retry')}</button>
             </div>
           ) : filteredVets.length === 0 ? (
             <div className="rounded-[28px] bg-white p-12 text-center shadow-sm">
@@ -421,26 +398,26 @@ const VeterinarianPage = () => {
                           <img
                             src={vet.profile_photo}
                             alt={vet.full_name}
-                            className="h-16 w-16 rounded-[20px] border border-[#15BB73]/15 object-cover"
+                            className="h-16 w-16 rounded-[20px] border border-primary/15 object-cover"
                           />
                         ) : (
-                          <div className="flex h-16 w-16 items-center justify-center rounded-[20px] bg-[#15BB73]/10 text-2xl font-black text-[#15BB73]">
+                          <div className="flex h-16 w-16 items-center justify-center rounded-[20px] bg-primary/10 text-2xl font-black text-primary">
                             {vet.full_name?.charAt(0) || 'D'}
                           </div>
                         )}
                         <div className="min-w-0">
-                          <h3 className="truncate text-xl font-black text-[#000600]">{vet.full_name}</h3>
+                          <h3 className="truncate text-xl font-black text-ink">{vet.full_name}</h3>
                           <p className="truncate text-sm text-slate-600">{getSpecializationLabel(vet.specialization) || vet.specialization}</p>
                         </div>
                       </div>
 
-                      <span className="rounded-full bg-[#15BB73]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#15BB73]">
+                      <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
                         {t('veterinarian.viewProfile')}
                       </span>
                     </div>
 
-                    <div className="mt-5 rounded-[24px] bg-[#15BB73]/8 px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#15BB73]">{t('veterinarian.profileSummary')}</p>
+                    <div className="mt-5 rounded-[24px] bg-primary/8 px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">{t('veterinarian.profileSummary')}</p>
                       <p className="mt-1 text-sm text-slate-600">{t('veterinarian.tapForDetails')}</p>
                     </div>
 
@@ -500,7 +477,7 @@ const VeterinarianPage = () => {
                           event.stopPropagation();
                           handleCall(vet, 'veterinarian-card');
                         }}
-                        className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#15BB73] to-[#0FA568] px-4 py-3 font-semibold text-white transition hover:shadow-lg"
+                        className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 font-semibold text-white transition hover:shadow-lg"
                       >
                         <FaPhone className="text-sm" />
                         {t('veterinarian.call')}
@@ -527,19 +504,19 @@ const VeterinarianPage = () => {
       </div>
 
       {selectedVet && (
-        <div className="fixed inset-0 z-50 bg-slate-950/65 p-4 backdrop-blur-sm sm:p-6" onClick={() => setSelectedVet(null)}>
+        <div className="fixed inset-0 z-50 bg-slate-950/65 p-4 backdrop-blur-sm sm:p-6" onClick={() => { reviewVersion.current++; selectedVetId.current = null; setSelectedVet(null); }}>
           <div
             className="mx-auto max-h-[92vh] max-w-5xl overflow-y-auto rounded-[30px] bg-white shadow-[0_30px_120px_rgba(15,23,42,0.28)]"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur sm:px-6">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#15BB73]">{t('veterinarian.detailedProfile')}</p>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">{t('veterinarian.detailedProfile')}</p>
                 <h3 className="mt-1 text-2xl font-black text-slate-900">{selectedVet.full_name}</h3>
               </div>
               <button
                 type="button"
-                onClick={() => setSelectedVet(null)}
+                onClick={() => { reviewVersion.current++; selectedVetId.current = null; setSelectedVet(null); }}
                 className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 text-slate-600 transition hover:bg-slate-50"
               >
                 <MdClose className="text-xl" />
@@ -549,16 +526,16 @@ const VeterinarianPage = () => {
             <div className="p-5 sm:p-6">
               <div className="grid gap-6 lg:grid-cols-[1.02fr_0.98fr]">
                 <div className="space-y-6">
-                  <div className="rounded-[28px] bg-gradient-to-br from-[#eafaf2] via-white to-[#edf9f1] p-5">
+                  <div className="rounded-[28px] bg-[#eafaf2] p-5">
                     <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
                       {selectedVet.profile_photo ? (
                         <img
                           src={selectedVet.profile_photo}
                           alt={selectedVet.full_name}
-                          className="h-28 w-28 rounded-[24px] border border-[#15BB73]/15 object-cover shadow-sm"
+                          className="h-28 w-28 rounded-[24px] border border-primary/15 object-cover shadow-sm"
                         />
                       ) : (
-                        <div className="flex h-28 w-28 items-center justify-center rounded-[24px] bg-[#15BB73]/12 text-4xl font-black text-[#15BB73]">
+                        <div className="flex h-28 w-28 items-center justify-center rounded-[24px] bg-primary/12 text-4xl font-black text-primary">
                           {selectedVet.full_name?.charAt(0) || 'D'}
                         </div>
                       )}
@@ -566,7 +543,7 @@ const VeterinarianPage = () => {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-3">
                           <h4 className="text-2xl font-black text-slate-900">{selectedVet.full_name}</h4>
-                          <span className="rounded-full bg-[#15BB73]/12 px-3 py-1 text-sm font-semibold text-[#15BB73]">
+                          <span className="rounded-full bg-primary/12 px-3 py-1 text-sm font-semibold text-primary">
                             {getSpecializationLabel(selectedVet.specialization) || selectedVet.specialization}
                           </span>
                         </div>
@@ -648,7 +625,7 @@ const VeterinarianPage = () => {
                     <div className="mt-4 flex flex-wrap gap-2">
                       {getVetServices(selectedVet).length > 0 ? (
                         getVetServices(selectedVet).map((service, index) => (
-                          <span key={`${service}-${index}`} className="rounded-full bg-[#15BB73]/10 px-3 py-2 text-sm font-medium text-[#0f8d56]">
+                          <span key={`${service}-${index}`} className="rounded-full bg-primary/10 px-3 py-2 text-sm font-medium text-[#0f8d56]">
                             {service}
                           </span>
                         ))
@@ -682,7 +659,7 @@ const VeterinarianPage = () => {
                           <button
                             type="button"
                             onClick={() => navigate('/login')}
-                            className="text-sm font-semibold text-[#15BB73] hover:text-[#0FA568]"
+                            className="text-sm font-semibold text-primary hover:text-primary-hover"
                           >
                             {t('common.login', 'Login')}
                           </button>
@@ -696,7 +673,7 @@ const VeterinarianPage = () => {
                             type="button"
                             onClick={() => setReviewForm((current) => ({ ...current, rating: star }))}
                             className="rounded-full p-1 transition hover:scale-110"
-                            disabled={reviewSubmitting || !hasUserToken}
+                            disabled={reviewsLoading || reviewSubmitting || !hasUserToken}
                           >
                             <FaStar className={`text-xl ${star <= reviewForm.rating ? 'text-yellow-500' : 'text-slate-300'}`} />
                           </button>
@@ -708,16 +685,16 @@ const VeterinarianPage = () => {
                         onChange={(event) => setReviewForm((current) => ({ ...current, reviewText: event.target.value }))}
                         placeholder={t('veterinarian.reviewPlaceholder', 'Share your experience with this veterinarian')}
                         rows={4}
-                        disabled={reviewSubmitting || !hasUserToken}
-                        className="mt-4 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-[#15BB73] focus:ring-4 focus:ring-[#15BB73]/15 disabled:cursor-not-allowed disabled:bg-slate-100"
+                        disabled={reviewsLoading || reviewSubmitting || !hasUserToken}
+                        className="mt-4 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-slate-100"
                       />
 
                       <div className="mt-4 flex flex-wrap items-center gap-3">
                         <button
                           type="button"
                           onClick={handleReviewSubmit}
-                          disabled={reviewSubmitting || !hasUserToken}
-                          className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-[#15BB73] to-[#0FA568] px-5 py-3 text-sm font-semibold text-white transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
+                          disabled={reviewsLoading || reviewSubmitting || !hasUserToken}
+                          className="inline-flex items-center justify-center rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {reviewSubmitting
                             ? t('common.loading', 'Loading...')
@@ -730,7 +707,7 @@ const VeterinarianPage = () => {
                           <button
                             type="button"
                             onClick={handleReviewDelete}
-                            disabled={reviewSubmitting}
+                            disabled={reviewsLoading || reviewSubmitting}
                             className="inline-flex items-center justify-center rounded-2xl border border-red-200 px-5 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             {t('veterinarian.deleteReview', 'Delete Review')}
@@ -782,7 +759,7 @@ const VeterinarianPage = () => {
                     </div>
                   </div>
 
-                  <div className="rounded-[28px] bg-[#0f2b17] p-5 text-white shadow-[0_25px_80px_rgba(15,43,23,0.24)]">
+                  <div className="rounded-[28px] bg-forest p-5 text-white shadow-[0_25px_80px_rgba(15,43,23,0.24)]">
                     <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-200">{t('veterinarian.contactVet')}</p>
                     <h5 className="mt-2 text-2xl font-black">{selectedVet.full_name}</h5>
                     <p className="mt-2 text-sm leading-7 text-emerald-50/80">{t('veterinarian.tapForDetails')}</p>
@@ -790,7 +767,7 @@ const VeterinarianPage = () => {
                     <div className="mt-5 grid gap-3 sm:grid-cols-3">
                       <button
                         onClick={() => handleCall(selectedVet, 'veterinarian-modal')}
-                        className="inline-flex items-center justify-center rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-[#0f2b17] transition hover:bg-slate-100"
+                        className="inline-flex items-center justify-center rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-forest transition hover:bg-slate-100"
                       >
                         {t('veterinarian.call')}
                       </button>

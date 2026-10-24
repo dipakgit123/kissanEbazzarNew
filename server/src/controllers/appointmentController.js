@@ -1,3 +1,4 @@
+const { calendarDate, appointmentInstant } = require('../utils/businessTime');
 'use strict';
 
 const db = require('../models');
@@ -20,21 +21,21 @@ const normalizeTime = (time) => {
 const isFutureAppointment = (date, time) => {
   const normalizedTime = normalizeTime(time);
   if (!date || !normalizedTime) return false;
-  return new Date(`${date}T${normalizedTime}`) > new Date();
+  return appointmentInstant(date, normalizedTime) > new Date();
 };
 
 const mapUserAppointmentFilter = (filter) => {
   if (!filter || filter === 'all') return {};
   if (filter === 'upcoming') {
     return {
-      appointment_date: { [Op.gte]: new Date().toISOString().split('T')[0] },
+      appointment_date: { [Op.gte]: calendarDate() },
       status: { [Op.notIn]: ['cancelled', 'completed', 'no-show'] },
     };
   }
   if (filter === 'past') {
     return {
       [Op.or]: [
-        { appointment_date: { [Op.lt]: new Date().toISOString().split('T')[0] } },
+        { appointment_date: { [Op.lt]: calendarDate() } },
         { status: { [Op.in]: ['completed', 'no-show'] } },
       ],
     };
@@ -209,6 +210,7 @@ class AppointmentController {
         data: completeAppointment
       });
     } catch (error) {
+      if (error.name === 'SequelizeUniqueConstraintError') return res.status(409).json({ success: false, message: 'This appointment slot is already booked' });
       console.error('Create appointment error:', error);
       res.status(500).json({
         success: false,
@@ -266,6 +268,7 @@ class AppointmentController {
         }
       });
     } catch (error) {
+      if (error.name === 'SequelizeUniqueConstraintError') return res.status(409).json({ success: false, message: 'This appointment slot is already booked' });
       console.error('Get user appointments error:', error);
       res.status(500).json({
         success: false,
@@ -314,7 +317,7 @@ class AppointmentController {
       });
 
       // Get today's appointments count
-      const today = new Date().toISOString().split('T')[0];
+      const today = calendarDate();
       const todayCount = await db.Appointment.count({
         where: {
           veterinarian_id: vetId,
@@ -345,6 +348,7 @@ class AppointmentController {
         }
       });
     } catch (error) {
+      if (error.name === 'SequelizeUniqueConstraintError') return res.status(409).json({ success: false, message: 'This appointment slot is already booked' });
       console.error('Get vet appointments error:', error);
       res.status(500).json({
         success: false,
@@ -406,6 +410,7 @@ class AppointmentController {
         data: appointment
       });
     } catch (error) {
+      if (error.name === 'SequelizeUniqueConstraintError') return res.status(409).json({ success: false, message: 'This appointment slot is already booked' });
       console.error('Get appointment by ID error:', error);
       res.status(500).json({
         success: false,
@@ -458,6 +463,10 @@ class AppointmentController {
         });
       }
 
+      const transitions = { pending: ['confirmed', 'cancelled'], confirmed: ['completed', 'cancelled', 'no-show'] };
+      if (status !== appointment.status && !(transitions[appointment.status] || []).includes(status)) {
+        return res.status(409).json({ success: false, message: 'This appointment status transition is not allowed' });
+      }
       const updateData = { status };
 
       if (vet_notes) {
@@ -518,6 +527,7 @@ class AppointmentController {
         data: appointment
       });
     } catch (error) {
+      if (error.name === 'SequelizeUniqueConstraintError') return res.status(409).json({ success: false, message: 'This appointment slot is already booked' });
       console.error('Update appointment status error:', error);
       res.status(500).json({
         success: false,
@@ -601,6 +611,7 @@ class AppointmentController {
         data: appointment
       });
     } catch (error) {
+      if (error.name === 'SequelizeUniqueConstraintError') return res.status(409).json({ success: false, message: 'This appointment slot is already booked' });
       console.error('Cancel appointment error:', error);
       res.status(500).json({
         success: false,
@@ -716,6 +727,7 @@ class AppointmentController {
         data: appointment
       });
     } catch (error) {
+      if (error.name === 'SequelizeUniqueConstraintError') return res.status(409).json({ success: false, message: 'This appointment slot is already booked' });
       console.error('Reschedule appointment error:', error);
       res.status(500).json({
         success: false,
@@ -777,7 +789,7 @@ class AppointmentController {
         for (let minute = 0; minute < 60; minute += 30) {
           const time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
           const normalizedTime = `${time}:00`;
-          const slotDateTime = new Date(`${date}T${normalizedTime}`);
+          const slotDateTime = appointmentInstant(date, normalizedTime);
 
           if (slotDateTime <= now) {
             continue;
@@ -798,6 +810,7 @@ class AppointmentController {
         }
       });
     } catch (error) {
+      if (error.name === 'SequelizeUniqueConstraintError') return res.status(409).json({ success: false, message: 'This appointment slot is already booked' });
       console.error('Get available slots error:', error);
       res.status(500).json({
         success: false,
@@ -814,7 +827,7 @@ class AppointmentController {
   async getVetStats(req, res) {
     try {
       const vetId = req.vet.id;
-      const today = new Date().toISOString().split('T')[0];
+      const today = calendarDate();
 
       const [
         totalAppointments,
@@ -853,6 +866,7 @@ class AppointmentController {
         }
       });
     } catch (error) {
+      if (error.name === 'SequelizeUniqueConstraintError') return res.status(409).json({ success: false, message: 'This appointment slot is already booked' });
       console.error('Get vet stats error:', error);
       res.status(500).json({
         success: false,

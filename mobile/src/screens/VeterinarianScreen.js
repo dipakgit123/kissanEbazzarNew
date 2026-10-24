@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -20,9 +20,12 @@ import SkeletonLoader from '../components/SkeletonLoader';
 import FeatureHelpModal from '../components/FeatureHelpModal';
 import { getLocalizedFeatureHelp } from '../constants/featureHelp';
 
+import { vetText } from '../utils/vetUi';
+
 const NEARBY_RADIUS_OPTIONS = [25, 50, 100];
 
 const normalizeDistance = (distance) => {
+  if (distance == null || distance === '') return null;
   const numericDistance = Number(distance);
   return Number.isFinite(numericDistance) ? numericDistance : null;
 };
@@ -97,6 +100,19 @@ const VeterinarianScreen = ({ navigation }) => {
   const [userLocation, setUserLocation] = useState(null);
   const [nearbyOnly, setNearbyOnly] = useState(true);
   const [nearbyRadius, setNearbyRadius] = useState(25);
+  const c = vetText(i18n.language);
+  const requestVersion = useRef(0);
+  const [allError, setAllError] = useState(false), [nearbyError, setNearbyError] = useState(false);
+  const [page, setPage] = useState(1), [totalPages, setTotalPages] = useState(1);
+  const searchMounted = useRef(false);
+  useEffect(() => {
+    if (!searchMounted.current) { searchMounted.current = true; return; }
+    requestVersion.current++;
+    setLoading(true);
+    const timer = setTimeout(() => { loadVeterinarians(userLocation, nearbyRadius); }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+  useEffect(() => () => { requestVersion.current++; }, []);
   const [helpVisible, setHelpVisible] = useState(false);
   const veterinarianHelp = getLocalizedFeatureHelp('veterinarian', i18n.resolvedLanguage || i18n.language);
 
@@ -134,9 +150,10 @@ const VeterinarianScreen = ({ navigation }) => {
     await loadVeterinarians(resolvedLocation, nearbyRadius);
   };
 
-  const loadVeterinarians = async (location = userLocation, radius = nearbyRadius) => {
+  const loadVeterinarians = async (location = userLocation, radius = nearbyRadius, nextPage = 1, append = false) => {
+    const version = ++requestVersion.current;
     try {
-      const allPromise = veterinarianService.getAll(1, 50);
+      const allPromise = veterinarianService.getAll(nextPage, 50, { search: searchQuery });
       const nearbyPromise = location
         ? veterinarianService.getNearby(location.latitude, location.longitude, radius)
         : null;
@@ -146,8 +163,12 @@ const VeterinarianScreen = ({ navigation }) => {
         nearbyPromise,
       ]);
 
+      if (version !== requestVersion.current) return;
+      setAllError(allResult.status !== 'fulfilled' || !allResult.value?.success);
+      setNearbyError(Boolean(location) && (nearbyResult.status !== 'fulfilled' || !nearbyResult.value?.success));
       if (allResult.status === 'fulfilled' && allResult.value?.success) {
-        setAllVeterinarians(allResult.value.data?.veterinarians || allResult.value.data || []);
+        setAllVeterinarians(previous => append ? [...previous, ...(allResult.value.data?.veterinarians || [])] : allResult.value.data?.veterinarians || []);
+        setPage(nextPage); setTotalPages(allResult.value.data?.totalPages || 1);
       } else {
         setAllVeterinarians([]);
       }
@@ -167,12 +188,13 @@ const VeterinarianScreen = ({ navigation }) => {
         setNearbyVeterinarians([]);
       }
     } catch (error) {
+      if (version !== requestVersion.current) return;
+      setAllError(true); setNearbyError(Boolean(location));
       console.error('Error fetching vets:', error);
       setAllVeterinarians([]);
       setNearbyVeterinarians([]);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (version === requestVersion.current) { setLoading(false); setRefreshing(false); }
     }
   };
 
@@ -240,6 +262,7 @@ const VeterinarianScreen = ({ navigation }) => {
   }, [allVeterinarians, nearbyOnly, nearbyVeterinarians]);
 
   const filteredVets = useMemo(() => {
+    if (!nearbyOnly) return displayedVeterinarians;
     const query = searchQuery.trim().toLowerCase();
 
     return displayedVeterinarians.filter((vet) => {
@@ -252,7 +275,7 @@ const VeterinarianScreen = ({ navigation }) => {
         toDisplayText(vet.clinic_name).toLowerCase().includes(query)
       );
     });
-  }, [displayedVeterinarians, searchQuery]);
+  }, [displayedVeterinarians, searchQuery, nearbyOnly]);
 
   const handleCall = (phone) => {
     const phoneNumber = toDisplayText(phone);
@@ -261,7 +284,7 @@ const VeterinarianScreen = ({ navigation }) => {
       return;
     }
 
-    Linking.openURL(`tel:${phoneNumber.replace('+', '')}`);
+    Linking.openURL(`tel:${phoneNumber}`);
   };
 
   const handleWhatsApp = (phone, name) => {
@@ -453,11 +476,13 @@ const VeterinarianScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.listSection}>
+          {(nearbyOnly ? nearbyError : allError) ? <View><Text accessibilityRole="alert">{c('loadError')}</Text><TouchableOpacity onPress={onRefresh}><Text>{c('retry')}</Text></TouchableOpacity></View> : null}
+          {!nearbyOnly && page < totalPages && <TouchableOpacity disabled={refreshing} onPress={() => { setRefreshing(true); loadVeterinarians(userLocation, nearbyRadius, page + 1, true); }}><Text>{c('more')}</Text></TouchableOpacity>}
           {loading ? (
             <View style={styles.loadingContainer}>
               <SkeletonLoader variant="vetList" count={4} />
             </View>
-          ) : filteredVets.length === 0 ? (
+          ) : (nearbyOnly ? nearbyError : allError) ? null : filteredVets.length === 0 ? (
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIconWrap}>
                 <Ionicons name="medkit-outline" size={34} color={COLORS.primary} />

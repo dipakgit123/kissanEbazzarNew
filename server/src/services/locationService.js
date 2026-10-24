@@ -25,7 +25,7 @@ class LocationService {
 
       // Check if location is already set
       if (user.hasLocation() && user.location_set_at) {
-        await transaction.rollback();
+        if (!transaction.finished) await transaction.rollback();
         throw new Error('Location already set. Use update endpoint to change location.');
       }
 
@@ -73,7 +73,7 @@ class LocationService {
         }
       };
     } catch (error) {
-      await transaction.rollback();
+      if (!transaction.finished) await transaction.rollback();
       throw error;
     }
   }
@@ -94,7 +94,7 @@ class LocationService {
 
       // Check if location is already set
       if (user.hasLocation() && user.location_set_at) {
-        await transaction.rollback();
+        if (!transaction.finished) await transaction.rollback();
         throw new Error('Location already set. Use update endpoint to change location.');
       }
 
@@ -132,7 +132,7 @@ class LocationService {
         }
       };
     } catch (error) {
-      await transaction.rollback();
+      if (!transaction.finished) await transaction.rollback();
       throw error;
     }
   }
@@ -152,7 +152,7 @@ class LocationService {
       }
 
       if (!user.hasLocation()) {
-        await transaction.rollback();
+        if (!transaction.finished) await transaction.rollback();
         throw new Error('No existing location to update. Please set location first.');
       }
 
@@ -228,7 +228,7 @@ class LocationService {
         }
       };
     } catch (error) {
-      await transaction.rollback();
+      if (!transaction.finished) await transaction.rollback();
       throw error;
     }
   }
@@ -436,48 +436,9 @@ async geocodeAddress(addressData) {
  // Update the getUsersNearby method in your locationService.js
 
 async getUsersNearby(latitude, longitude, radiusKm = 10) {
-    const { User } = db;
-    
-    try {
-      // Use the fallback method that works with PostgreSQL
-      // Get all users with location
-      const users = await User.findAll({
-        where: {
-          latitude: { [db.Sequelize.Op.ne]: null },
-          longitude: { [db.Sequelize.Op.ne]: null }
-        },
-        attributes: ['id', 'phone_number', 'latitude', 'longitude', 'city', 'state']
-      });
-  
-      const nearbyUsers = [];
-      
-      for (const user of users) {
-        const distance = this.calculateDistance(
-          latitude, 
-          longitude, 
-          parseFloat(user.latitude), 
-          parseFloat(user.longitude)
-        );
-        
-        if (distance <= radiusKm) {
-          nearbyUsers.push({
-            id: user.id,
-            phone_number: user.phone_number,
-            distance: parseFloat(distance.toFixed(2)),
-            city: user.city,
-            state: user.state
-          });
-        }
-      }
-  
-      // Sort by distance
-      nearbyUsers.sort((a, b) => a.distance - b.distance);
-      
-      return nearbyUsers;
-    } catch (error) {
-      console.error('Get nearby users error:', error);
-      throw error;
-    }
+    const { findNearbyUsers } = require('./nearbyUserService');
+    const users = await findNearbyUsers(latitude, longitude, radiusKm);
+    return users.map(({ id, distance, city, state }) => ({ id, distance, city, state }));
   }
 
   /**

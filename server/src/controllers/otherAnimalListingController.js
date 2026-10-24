@@ -1,3 +1,4 @@
+const { recordListingView } = require('../services/listingViewService');
 const db = require('../models');
 const { validationResult } = require('express-validator');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudinary');
@@ -148,11 +149,11 @@ exports.getAllOtherAnimalListings = async (req, res) => {
       gender,
       healthCondition,
       temperament,
-      sortBy = 'createdAt',
+      sortBy = 'created_at',
       sortOrder = 'DESC'
     } = req.query;
-    const validSortFields = ['createdAt', 'updatedAt', 'expectedPrice', 'views'];
-    const sanitizedSortBy = validSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    const validSortFields = ['created_at', 'updated_at', 'expectedPrice', 'views'];
+    const sanitizedSortBy = validSortFields.includes(sortBy) ? sortBy : 'created_at';
     const sanitizedSortOrder = String(sortOrder).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
     const offset = (page - 1) * limit;
@@ -259,7 +260,7 @@ exports.getOtherAnimalListingById = async (req, res) => {
     }
 
     // Increment views
-    await listing.incrementViews();
+    await recordListingView(req, listing, 'other');
 
     res.json({
       success: true,

@@ -1,3 +1,4 @@
+import { useExperienceText } from '../AnimalExperience';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
@@ -14,6 +15,7 @@ const serializeTags = (tagsInput) => {
 };
 
 const BlogManagement = () => {
+  const experienceText = useExperienceText();
   const { t, i18n } = useTranslation();
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -30,7 +32,7 @@ const BlogManagement = () => {
     title: '',
     content: '',
     excerpt: '',
-    category: 'general',
+    category: 'general', audience: 'unassigned',
     tags: '',
     status: 'draft',
     meta_description: '',
@@ -99,7 +101,7 @@ const BlogManagement = () => {
         title: blog.title,
         content: blog.content,
         excerpt: blog.excerpt || '',
-        category: blog.category || 'general',
+        category: blog.category || 'general', audience: blog.audience || 'unassigned',
         tags: Array.isArray(blog.tags) ? blog.tags.join(', ') : '',
         status: blog.status,
         meta_description: blog.meta_description || '',
@@ -114,7 +116,7 @@ const BlogManagement = () => {
         title: '',
         content: '',
         excerpt: '',
-        category: 'general',
+        category: 'general', audience: 'unassigned',
         tags: '',
         status: 'draft',
         meta_description: '',
@@ -519,6 +521,7 @@ const BlogManagement = () => {
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
+<label className="block p-3">{experienceText.audience}<select className="w-full border rounded p-3" name="audience" value={formData.audience} onChange={handleInputChange}>{['unassigned','farm','pet','both'].map(group => <option key={group} value={group}>{experienceText[group]}</option>)}</select></label>
                 {/* Title */}
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1">

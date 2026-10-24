@@ -1,5 +1,10 @@
+import AnimalDetailExperience from './components/AnimalDetailExperience';
+import AnimalExperience from './components/AnimalExperience';
+import MyAnimals from './components/MyAnimals';
+import { getAnimalGroup, installExperienceFetch, requireAnimalSelection } from './utils/animalExperience';
 // App.js - Corrected to work with your LoginForm that has built-in OTP
 import { Suspense, lazy, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { safeJsonParse } from './utils/stringUtils';
 import './App.css';
@@ -27,7 +32,6 @@ const VeterinarianForgotPassword = lazy(() => import('./components/VeterinarianF
 const VeterinarianResetPassword = lazy(() => import('./components/VeterinarianResetPassword'));
 const VeterinarianDashboard = lazy(() => import('./components/VeterinarianDashboard'));
 const NearbyVeterinarians = lazy(() => import('./components/NearbyVeterinarians'));
-const AppointmentBookingForm = lazy(() => import('./components/AppointmentBookingForm'));
 const WishlistPage = lazy(() => import('./components/WishlistPage'));
 const AIHealthCheck = lazy(() => import('./components/AIHealthCheck'));
 const CallHistory = lazy(() => import('./components/CallHistory'));
@@ -46,9 +50,12 @@ const GovernmentSchemeDetail = lazy(() => import('./components/GovernmentSchemeD
 const SellerListingInsightsPage = lazy(() => import('./components/SellerListingInsightsPage'));
 const PetMatingPage = lazy(() => import('./components/PetMatingPage'));
 
-const routeFallback = (
-  <div className="min-h-screen bg-slate-50" />
-);
+function RouteFallback() {
+  const { t } = useTranslation();
+  return <div role="status" aria-live="polite" className="min-h-[40vh] site-background flex items-center justify-center p-6 text-primary">{t('common.loading')}</div>;
+}
+
+installExperienceFetch();
 
 function App() {
   // Initialize state from localStorage
@@ -89,18 +96,12 @@ function App() {
 
     const hasProfile = !!(response?.user?.full_name && response?.user?.postal_code);
 
-    // Check if user needs to complete profile (first-time login)
-    if (response.requiresProfileCompletion && !hasProfile) {
-      setCurrentPage('profile-completion');
-      localStorage.setItem('currentPage', 'profile-completion');
-      window.location.href = '/profile-completion';
-    }
-    // User is fully set up, go to home
-    else {
-      setCurrentPage('home');
-      localStorage.setItem('currentPage', 'home');
-      window.location.href = '/';
-    }
+    // Every OTP login requires an explicit choice, even for returning users.
+    requireAnimalSelection();
+    const nextPage = hasProfile ? 'home' : 'profile-completion';
+    setCurrentPage(nextPage);
+    localStorage.setItem('currentPage', nextPage);
+    window.location.replace('/choose-experience');
   };
 
   // Handle profile completion (first-time users)
@@ -118,13 +119,13 @@ function App() {
     // Profile completed, location should be set too, go to home
     setCurrentPage('home');
     localStorage.setItem('currentPage', 'home');
-    window.location.href = '/';
+    window.location.href = getAnimalGroup() ? '/' : '/choose-experience';
   };
 
   return (
     <WishlistProvider>
       <ScrollToTop />
-      <Suspense fallback={routeFallback}>
+      <Suspense fallback={<RouteFallback />}>
         <Routes>
         {/* Admin Routes - No Layout */}
         <Route path="/admin/login" element={<AdminLogin />} />
@@ -149,6 +150,7 @@ function App() {
           />
         </Route>
 
+        <Route path="/choose-experience" element={<AnimalExperience />} />
         <Route element={<AuthenticatedRoute />}>
           <Route element={<Layout showHeaderFooter={false} />}>
             <Route
@@ -161,7 +163,7 @@ function App() {
         {/* Protected user app routes with header/footer */}
         <Route element={<UserAppRoute />}>
           <Route path="/veterinarians" element={<NearbyVeterinarians />} />
-          <Route path="/book-appointment/:vetId" element={<AppointmentBookingForm />} />
+          <Route path="/book-appointment/:vetId" element={<Navigate to="/veterinarian" replace />} />
           <Route element={<Layout showHeaderFooter={true} />}>
             <Route
               path="/"
@@ -175,10 +177,11 @@ function App() {
                 )
               }
             />
+            <Route path="/my-animals" element={<MyAnimals />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/buy-animals" element={<BuyAnimalsPage />} />
             <Route path="/sell-animal" element={<AnimalListingPage />} />
-            <Route path="/animal/:animalType/:id" element={<AnimalDetailPage />} />
+            <Route path="/animal/:animalType/:id" element={<AnimalDetailExperience><AnimalDetailPage /></AnimalDetailExperience>} />
             <Route path="/seller-listings/:animalType/:id/insights" element={<SellerListingInsightsPage />} />
             <Route path="/veterinarian" element={<VeterinarianPage />} />
             <Route path="/pregnancy-calendar" element={<PregnancyCalendar />} />

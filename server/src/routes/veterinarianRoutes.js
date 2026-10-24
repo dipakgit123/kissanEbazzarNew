@@ -52,7 +52,7 @@ const handleVeterinarianUpload = (req, res, next) => {
  * @desc    Register a new veterinarian
  * @access  Public
  */
-router.post('/register', uploadLimiter, handleVeterinarianUpload, veterinarianController.register.bind(veterinarianController));
+router.post('/register', uploadLimiter, handleVeterinarianUpload, require('../middlewares/validateAnimalGroups'), veterinarianController.register.bind(veterinarianController));
 
 /**
  * @route   POST /api/veterinarians/send-otp
@@ -99,7 +99,7 @@ router.get('/profile/me', vetAuthMiddleware, veterinarianController.getProfile.b
  * @desc    Update own profile
  * @access  Protected (Veterinarian)
  */
-router.put('/profile/me', vetAuthMiddleware, uploadLimiter, handleVeterinarianUpload, veterinarianController.updateProfile.bind(veterinarianController));
+router.put('/profile/me', vetAuthMiddleware, uploadLimiter, handleVeterinarianUpload, require('../middlewares/validateAnimalGroups'), veterinarianController.updateProfile.bind(veterinarianController));
 
 /**
  * @route   GET /api/veterinarians/dashboard

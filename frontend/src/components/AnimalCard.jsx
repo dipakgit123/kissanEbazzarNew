@@ -304,7 +304,8 @@ const AnimalCard = ({
     setIsWishlistLoading(true);
     
     try {
-      await onToggleWishlist(id);
+      const result = await onToggleWishlist(id);
+      if (result?.success === false) throw new Error(result.message);
       
       // Show success toast
       if (isInWishlist) {
@@ -536,7 +537,7 @@ const AnimalCard = ({
             onSubmit={handleSubmitReport}
             className="w-full max-w-xl overflow-hidden rounded-[1.75rem] bg-white shadow-2xl"
           >
-            <div className="bg-gradient-to-r from-red-600 to-orange-500 px-5 py-5 text-white">
+            <div className="bg-red-600 px-5 py-5 text-white">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.22em] text-red-100">

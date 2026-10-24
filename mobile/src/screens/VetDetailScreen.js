@@ -20,6 +20,7 @@ import { veterinarianService, vetReviewService, vetReportService } from '../serv
 import { useAuth } from '../context/AuthContext';
 import SkeletonLoader from '../components/SkeletonLoader';
 
+
 const getReportTypes = (t) => [
   { value: 'fake_profile', label: t('vetDetail.reportTypes.fake_profile') },
   { value: 'inappropriate_behavior', label: t('vetDetail.reportTypes.inappropriate_behavior') },
@@ -215,7 +216,7 @@ const VetDetailScreen = ({ route, navigation }) => {
     const phoneNumber = toDisplayText(vet?.phone_number);
 
     if (phoneNumber) {
-      Linking.openURL(`tel:${phoneNumber.replace('+', '')}`);
+      Linking.openURL(`tel:${phoneNumber}`);
     }
   };
 

@@ -37,6 +37,22 @@ ChartJS.register(
   Filler
 );
 
+  const openVetDocument = async (event, id, type) => {
+    event.preventDefault();
+    const preview = window.open('', '_blank');
+    if (preview) preview.opener = null;
+    try {
+      const response = await fetch(API_BASE_URL + '/api/admin/veterinarians/' + id + '/documents/' + type, {
+        headers: { Authorization: 'Bearer ' + localStorage.getItem('adminToken') }
+      });
+      if (!response.ok) throw new Error('Unable to open document');
+      const url = URL.createObjectURL(await response.blob());
+      if (preview) preview.location.href = url;
+      else { const link = document.createElement('a'); link.href = url; link.download = type; link.click(); }
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (error) { preview?.close(); toast.error(error.message); }
+  };
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
@@ -51,6 +67,7 @@ const AdminDashboard = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   const API_URL = API_BASE_URL;
+
 
   const fetchDashboardData = useCallback(async () => {
     const token = localStorage.getItem('adminToken');
@@ -170,7 +187,7 @@ const AdminDashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0f172a] flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-center">
           <div className="relative w-20 h-20 mx-auto mb-6">
             <div className="absolute inset-0 rounded-full border-4 border-emerald-500/20"></div>
@@ -184,7 +201,7 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#0f172a] flex overflow-x-hidden">
+    <div className="min-h-screen bg-slate-950 flex overflow-x-hidden">
       {mobileSidebarOpen && (
         <button
           type="button"
@@ -196,7 +213,7 @@ const AdminDashboard = () => {
 
       {/* Sidebar */}
       <aside
-        className={`${sidebarCollapsed ? 'lg:w-20' : 'lg:w-64'} w-64 bg-[#1e293b] border-r border-slate-700/50 flex flex-col fixed inset-y-0 left-0 z-50 transform transition-all duration-300 ${
+        className={`${sidebarCollapsed ? 'lg:w-20' : 'lg:w-64'} w-64 bg-slate-800 border-r border-slate-700/50 flex flex-col fixed inset-y-0 left-0 z-50 transform transition-all duration-300 ${
           mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } lg:translate-x-0`}
       >
@@ -260,7 +277,7 @@ const AdminDashboard = () => {
       {/* Main Content */}
       <div className={`flex-1 min-w-0 ml-0 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'} transition-all duration-300`}>
         {/* Header */}
-        <header className="bg-[#1e293b]/80 backdrop-blur-xl border-b border-slate-700/50 sticky top-0 z-40">
+        <header className="bg-slate-800/80 backdrop-blur-xl border-b border-slate-700/50 sticky top-0 z-40">
           <div className="px-4 sm:px-6 py-4">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex items-start gap-3 min-w-0">
@@ -529,7 +546,7 @@ const OverviewTab = ({ stats, recentActivity, topSellers, locationStats, formatt
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* User Growth Chart */}
-        <div className="lg:col-span-2 bg-[#1e293b] rounded-2xl p-6 border border-slate-700/50">
+        <div className="lg:col-span-2 bg-slate-800 rounded-2xl p-6 border border-slate-700/50">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="text-lg font-bold text-white">User Growth</h3>
@@ -546,7 +563,7 @@ const OverviewTab = ({ stats, recentActivity, topSellers, locationStats, formatt
         </div>
 
         {/* Category Distribution */}
-        <div className="bg-[#1e293b] rounded-2xl p-6 border border-slate-700/50">
+        <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700/50">
           <div className="mb-6">
             <h3 className="text-lg font-bold text-white">Listings by Category</h3>
             <p className="text-sm text-slate-400">Distribution across animal types</p>
@@ -560,7 +577,7 @@ const OverviewTab = ({ stats, recentActivity, topSellers, locationStats, formatt
       {/* Second Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Listings Comparison */}
-        <div className="bg-[#1e293b] rounded-2xl p-6 border border-slate-700/50">
+        <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700/50">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="text-lg font-bold text-white">Active vs Sold</h3>
@@ -583,7 +600,7 @@ const OverviewTab = ({ stats, recentActivity, topSellers, locationStats, formatt
         </div>
 
         {/* Category Cards */}
-        <div className="bg-[#1e293b] rounded-2xl p-6 border border-slate-700/50">
+        <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700/50">
           <div className="mb-6">
             <h3 className="text-lg font-bold text-white">Category Overview</h3>
             <p className="text-sm text-slate-400">Quick stats by animal type</p>
@@ -608,7 +625,7 @@ const OverviewTab = ({ stats, recentActivity, topSellers, locationStats, formatt
       {/* Bottom Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Activity */}
-        <div className="lg:col-span-2 bg-[#1e293b] rounded-2xl p-6 border border-slate-700/50">
+        <div className="lg:col-span-2 bg-slate-800 rounded-2xl p-6 border border-slate-700/50">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="text-lg font-bold text-white">Recent Activity</h3>
@@ -667,7 +684,7 @@ const OverviewTab = ({ stats, recentActivity, topSellers, locationStats, formatt
         </div>
 
         {/* Top Sellers */}
-        <div className="bg-[#1e293b] rounded-2xl p-6 border border-slate-700/50">
+        <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700/50">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="text-lg font-bold text-white">Top Sellers</h3>
@@ -708,7 +725,7 @@ const OverviewTab = ({ stats, recentActivity, topSellers, locationStats, formatt
 
       {/* Location Stats */}
       {locationStats && (
-        <div className="bg-[#1e293b] rounded-2xl p-6 border border-slate-700/50">
+        <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700/50">
           <div className="mb-6">
             <h3 className="text-lg font-bold text-white">Geographic Distribution</h3>
             <p className="text-sm text-slate-400">Users by location</p>
@@ -841,7 +858,7 @@ const AnalyticsTab = ({ stats, getAnimalEmoji }) => {
     <div className="space-y-6">
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-[#1e293b] rounded-2xl p-6 border border-slate-700/50">
+        <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700/50">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-400 mb-1">Verification Rate</p>
@@ -863,7 +880,7 @@ const AnalyticsTab = ({ stats, getAnimalEmoji }) => {
           </div>
         </div>
 
-        <div className="bg-[#1e293b] rounded-2xl p-6 border border-slate-700/50">
+        <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700/50">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-400 mb-1">Conversion Rate</p>
@@ -885,7 +902,7 @@ const AnalyticsTab = ({ stats, getAnimalEmoji }) => {
           </div>
         </div>
 
-        <div className="bg-[#1e293b] rounded-2xl p-6 border border-slate-700/50">
+        <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700/50">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-400 mb-1">Avg Views/Listing</p>
@@ -902,7 +919,7 @@ const AnalyticsTab = ({ stats, getAnimalEmoji }) => {
           </div>
         </div>
 
-        <div className="bg-[#1e293b] rounded-2xl p-6 border border-slate-700/50">
+        <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700/50">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-400 mb-1">Active Pregnancies</p>
@@ -920,7 +937,7 @@ const AnalyticsTab = ({ stats, getAnimalEmoji }) => {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Views by Category */}
-        <div className="bg-[#1e293b] rounded-2xl p-6 border border-slate-700/50">
+        <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700/50">
           <div className="mb-6">
             <h3 className="text-lg font-bold text-white">Views by Category</h3>
             <p className="text-sm text-slate-400">Total views per animal type</p>
@@ -931,7 +948,7 @@ const AnalyticsTab = ({ stats, getAnimalEmoji }) => {
         </div>
 
         {/* Conversion Funnel */}
-        <div className="bg-[#1e293b] rounded-2xl p-6 border border-slate-700/50">
+        <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700/50">
           <div className="mb-6">
             <h3 className="text-lg font-bold text-white">Listing Funnel</h3>
             <p className="text-sm text-slate-400">From listing to sale</p>
@@ -943,7 +960,7 @@ const AnalyticsTab = ({ stats, getAnimalEmoji }) => {
       </div>
 
       {/* Category Performance Table */}
-      <div className="bg-[#1e293b] rounded-2xl p-6 border border-slate-700/50">
+      <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700/50">
         <div className="mb-6">
           <h3 className="text-lg font-bold text-white">Category Performance</h3>
           <p className="text-sm text-slate-400">Detailed breakdown by animal type</p>
@@ -1048,7 +1065,7 @@ const UsersTab = ({ API_URL }) => {
   return (
     <div className="space-y-6">
       {/* Search Bar */}
-      <div className="bg-[#1e293b] rounded-2xl p-4 border border-slate-700/50">
+      <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700/50">
         <div className="relative">
           <svg className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -1064,7 +1081,7 @@ const UsersTab = ({ API_URL }) => {
       </div>
 
       {/* Users Table */}
-      <div className="bg-[#1e293b] rounded-2xl border border-slate-700/50 overflow-hidden">
+      <div className="bg-slate-800 rounded-2xl border border-slate-700/50 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -1193,7 +1210,7 @@ const ListingsTab = ({ API_URL, getAnimalEmoji, formatPrice }) => {
   return (
     <div className="space-y-6">
       {/* Filters */}
-      <div className="bg-[#1e293b] rounded-2xl p-4 border border-slate-700/50">
+      <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700/50">
         <div className="flex flex-wrap gap-4">
           <select
             value={animalType}
@@ -1225,7 +1242,7 @@ const ListingsTab = ({ API_URL, getAnimalEmoji, formatPrice }) => {
       {/* Listings Grid */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {listings.map((listing) => (
-          <div key={`${listing.animalType}-${listing.id}`} className="bg-[#1e293b] rounded-2xl border border-slate-700/50 overflow-hidden group hover:border-emerald-500/50 transition-colors">
+          <div key={`${listing.animalType}-${listing.id}`} className="bg-slate-800 rounded-2xl border border-slate-700/50 overflow-hidden group hover:border-emerald-500/50 transition-colors">
             <div className="aspect-video bg-slate-800 relative overflow-hidden">
               {(listing.front_photo || listing.frontPhoto) ? (
                 <img
@@ -1459,23 +1476,23 @@ const VeterinariansTab = ({ API_URL, formatDate }) => {
     <div className="space-y-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
-        <div className="bg-[#1e293b] rounded-xl p-4 border border-slate-700/50">
+        <div className="bg-slate-800 rounded-xl p-4 border border-slate-700/50">
           <p className="text-sm text-slate-400 mb-1">Total</p>
           <p className="text-3xl font-bold text-white">{stats?.total || 0}</p>
         </div>
-        <div className="bg-[#1e293b] rounded-xl p-4 border border-amber-500/20">
+        <div className="bg-slate-800 rounded-xl p-4 border border-amber-500/20">
           <p className="text-sm text-amber-400 mb-1">Pending</p>
           <p className="text-3xl font-bold text-amber-400">{stats?.pending || 0}</p>
         </div>
-        <div className="bg-[#1e293b] rounded-xl p-4 border border-emerald-500/20">
+        <div className="bg-slate-800 rounded-xl p-4 border border-emerald-500/20">
           <p className="text-sm text-emerald-400 mb-1">Verified</p>
           <p className="text-3xl font-bold text-emerald-400">{stats?.verified || 0}</p>
         </div>
-        <div className="bg-[#1e293b] rounded-xl p-4 border border-red-500/20">
+        <div className="bg-slate-800 rounded-xl p-4 border border-red-500/20">
           <p className="text-sm text-red-400 mb-1">Rejected</p>
           <p className="text-3xl font-bold text-red-400">{stats?.rejected || 0}</p>
         </div>
-        <div className="bg-[#1e293b] rounded-xl p-4 border border-gray-500/20">
+        <div className="bg-slate-800 rounded-xl p-4 border border-gray-500/20">
           <p className="text-sm text-gray-400 mb-1">Suspended</p>
           <p className="text-3xl font-bold text-gray-400">{stats?.suspended || 0}</p>
         </div>
@@ -1490,7 +1507,7 @@ const VeterinariansTab = ({ API_URL, formatDate }) => {
             className={`px-4 py-2 rounded-lg font-medium transition-all capitalize ${
               filter === f
                 ? 'bg-emerald-500 text-white'
-                : 'bg-[#1e293b] text-slate-400 hover:text-white border border-slate-700/50'
+                : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700/50'
             }`}
           >
             {f}
@@ -1499,7 +1516,7 @@ const VeterinariansTab = ({ API_URL, formatDate }) => {
       </div>
 
       {/* Veterinarians List */}
-      <div className="bg-[#1e293b] rounded-2xl border border-slate-700/50 overflow-hidden">
+      <div className="bg-slate-800 rounded-2xl border border-slate-700/50 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full"></div>
@@ -1616,9 +1633,9 @@ const VeterinariansTab = ({ API_URL, formatDate }) => {
       {/* Modal */}
       {showModal && selectedVet && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[#1e293b] rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-slate-700/50">
+          <div className="bg-slate-800 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-slate-700/50">
             {/* Modal Header */}
-            <div className="sticky top-0 bg-[#1e293b] border-b border-slate-700/50 p-6 flex items-center justify-between">
+            <div className="sticky top-0 bg-slate-800 border-b border-slate-700/50 p-6 flex items-center justify-between">
               <div>
                 <h3 className="text-2xl font-bold text-white">Veterinarian Details</h3>
                 <p className="text-slate-400 text-sm mt-1">Review and verify the application</p>
@@ -1740,19 +1757,19 @@ const VeterinariansTab = ({ API_URL, formatDate }) => {
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {selectedVet.license_document && (
-                    <a href={selectedVet.license_document} target="_blank" rel="noopener noreferrer" className="block p-4 bg-slate-700/50 rounded-lg hover:bg-slate-700 transition-colors">
+                    <a href="#document" onClick={(event) => openVetDocument(event, selectedVet.id, 'license_document')} target="_blank" rel="noopener noreferrer" className="block p-4 bg-slate-700/50 rounded-lg hover:bg-slate-700 transition-colors">
                       <p className="text-sm text-white font-medium mb-1">License Document</p>
                       <p className="text-xs text-blue-400">View Document →</p>
                     </a>
                   )}
                   {selectedVet.degree_certificate && (
-                    <a href={selectedVet.degree_certificate} target="_blank" rel="noopener noreferrer" className="block p-4 bg-slate-700/50 rounded-lg hover:bg-slate-700 transition-colors">
+                    <a href="#document" onClick={(event) => openVetDocument(event, selectedVet.id, 'degree_certificate')} target="_blank" rel="noopener noreferrer" className="block p-4 bg-slate-700/50 rounded-lg hover:bg-slate-700 transition-colors">
                       <p className="text-sm text-white font-medium mb-1">Degree Certificate</p>
                       <p className="text-xs text-blue-400">View Document →</p>
                     </a>
                   )}
                   {selectedVet.aadhar_document && (
-                    <a href={selectedVet.aadhar_document} target="_blank" rel="noopener noreferrer" className="block p-4 bg-slate-700/50 rounded-lg hover:bg-slate-700 transition-colors">
+                    <a href="#document" onClick={(event) => openVetDocument(event, selectedVet.id, 'aadhar_document')} target="_blank" rel="noopener noreferrer" className="block p-4 bg-slate-700/50 rounded-lg hover:bg-slate-700 transition-colors">
                       <p className="text-sm text-white font-medium mb-1">Aadhar Document</p>
                       <p className="text-xs text-blue-400">View Document →</p>
                     </a>
@@ -1946,7 +1963,7 @@ const ReportsTab = ({ stats }) => {
   return (
     <div className="space-y-6">
       {/* Quick Summary */}
-      <div className="bg-[#1e293b] rounded-2xl p-6 border border-slate-700/50">
+      <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700/50">
         <h3 className="text-lg font-bold text-white mb-6">Platform Summary Report</h3>
         <div className="grid md:grid-cols-3 gap-6">
           <div className="text-center p-6 bg-slate-800/50 rounded-xl">
@@ -1985,7 +2002,7 @@ const ReportsTab = ({ stats }) => {
         </div>
       </div>
 
-      <div className="bg-[#1e293b] rounded-2xl p-6 border border-slate-700/50">
+      <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700/50">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h3 className="text-lg font-bold text-white">Listing Safety Reports</h3>
@@ -2103,7 +2120,7 @@ const ReportsTab = ({ stats }) => {
       </div>
 
       {/* Download Reports */}
-      <div className="bg-[#1e293b] rounded-2xl p-6 border border-slate-700/50">
+      <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700/50">
         <h3 className="text-lg font-bold text-white mb-6">Generate Reports</h3>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           <button className="p-4 bg-slate-800/50 rounded-xl hover:bg-slate-800 transition-colors text-left group">
@@ -2151,7 +2168,7 @@ const ReportsTab = ({ stats }) => {
       </div>
 
       {/* System Info */}
-      <div className="bg-[#1e293b] rounded-2xl p-6 border border-slate-700/50">
+      <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700/50">
         <h3 className="text-lg font-bold text-white mb-4">System Information</h3>
         <div className="grid md:grid-cols-2 gap-4">
           <div className="p-4 bg-slate-800/50 rounded-xl">

@@ -1,3 +1,4 @@
+const db = require('../models');
 const { VetReview, Veterinarian, User } = require('../models');
 const { Op } = require('sequelize');
 
@@ -273,12 +274,18 @@ exports.markHelpful = async (req, res) => {
       });
     }
 
-    await review.increment('helpful_count');
+    await db.sequelize.transaction(async transaction => {
+      const [, created] = await db.VetReviewHelpfulVote.findOrCreate({
+        where: { review_id: review.id, user_id: req.user.id }, transaction,
+      });
+      if (created) await review.increment('helpful_count', { transaction });
+    });
+    await review.reload();
 
     res.json({
       success: true,
       message: 'Marked as helpful',
-      data: { helpful_count: review.helpful_count + 1 }
+      data: { helpful_count: review.helpful_count }
     });
   } catch (error) {
     console.error('Mark helpful error:', error);

@@ -10,44 +10,9 @@ const config = require(path.join(__dirname, '..', 'config', 'config.js'))[env];
 
 const db = {};
 
-let sequelize;
-if (process.env.DATABASE_URL) {
-  // Use DATABASE_URL for Neon
-  sequelize = new Sequelize(process.env.DATABASE_URL, {
-    dialect: 'postgres',
-    logging: env === 'development' ? console.log : false,
-    dialectOptions: {
-      ssl: {
-        require: true,
-        rejectUnauthorized: false
-      }
-    },
-    pool: {
-      max: 5,
-      min: 0,
-      acquire: 30000,
-      idle: 10000
-    },
-    define: {
-      timestamps: true,
-      underscored: true,
-      createdAt: 'created_at',
-      updatedAt: 'updated_at'
-    }
-  });
-} else if (config.use_env_variable) {
-  sequelize = new Sequelize(process.env[config.use_env_variable], config);
-} else {
-  sequelize = new Sequelize(config.database, config.username, config.password, {
-    ...config,
-    define: {
-      timestamps: true,
-      underscored: true,
-      createdAt: 'created_at',
-      updatedAt: 'updated_at'
-    }
-  });
-}
+const sequelize = config.use_env_variable
+  ? new Sequelize(process.env[config.use_env_variable], config)
+  : new Sequelize(config.database, config.username, config.password, config);
 
 // Read and load all model files
 fs
@@ -83,5 +48,8 @@ Object.keys(db).forEach(modelName => {
 
 db.sequelize = sequelize;
 db.Sequelize = Sequelize;
+
+require('../services/animalGroupScope').install(db);
+require('../services/notificationEvents').install(db);
 
 module.exports = db;

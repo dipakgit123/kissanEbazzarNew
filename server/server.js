@@ -12,12 +12,14 @@ const { startBalanceMonitoring, usesTwilioProvider } = require('./src/utils/twil
 const { startAutoReactivation } = require('./src/utils/whatsappReactivate');
 const logger = require('./src/utils/logger');
 const { logSystemError } = require('./src/utils/systemErrorLogger');
-require('./src/services/scheduledNotifications'); // Start scheduled notification jobs
+const scheduledNotifications = require('./src/services/scheduledNotifications'); // Start scheduled notification jobs
 require('dotenv').config();
 
 const app = express();
 const server = http.createServer(app);
 const fatalLogTimeoutMs = 1500;
+const backgroundIntervals = [];
+let shuttingDown = false;
 
 const logFatalAndExit = (error, metadata) => {
   Promise.race([
@@ -58,7 +60,7 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 
 // Cleanup expired OTPs every 5 minutes
-setInterval(async () => {
+const otpCleanupInterval = setInterval(async () => {
   try {
     await otpService.cleanupExpiredOTPs();
   } catch (error) {
@@ -74,7 +76,7 @@ setInterval(async () => {
 // ✅ FIXED: Start Twilio balance monitoring
 // Check every 60 minutes, alert when balance < $5
 if (usesTwilioProvider() && process.env.TWILIO_ACCOUNT_SID) {
-  startBalanceMonitoring(60, 5.00);
+  backgroundIntervals.push(startBalanceMonitoring(60, 5.00));
   logger.log('✅ Twilio balance monitoring started');
 }
 
@@ -87,7 +89,7 @@ if (
   && process.env.TWILIO_WHATSAPP_NUMBER
 ) {
   if (process.env.ADMIN_PHONE_NUMBER) {
-    startAutoReactivation(60); // Check every 60 minutes, reactivate every 24 hours
+    backgroundIntervals.push(startAutoReactivation(60)); // Check every 60 minutes, reactivate every 24 hours
     logger.log('✅ WhatsApp auto-reactivation started');
   } else {
     logger.log('⚠️ WhatsApp auto-reactivation disabled: ADMIN_PHONE_NUMBER not set in .env');
@@ -100,6 +102,7 @@ const startServer = async () => {
   try {
     getJwtSecret();
     await connectDB();
+    scheduledNotifications.start();
 
     server.listen(PORT, () => {
       console.log(`
@@ -215,11 +218,27 @@ Notes:
 startServer();
 
 // Handle graceful shutdown
-process.on('SIGINT', async () => {
-  console.log('\n📛 Shutting down gracefully...');
-  await require('./src/models').sequelize.close();
-  process.exit(0);
-});
+const shutdown = async () => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  const deadline = setTimeout(() => process.exit(1), 10000);
+  deadline.unref();
+  clearInterval(otpCleanupInterval);
+  backgroundIntervals.forEach(clearInterval);
+  scheduledNotifications.stop();
+  try {
+    await new Promise(resolve => io.close(resolve));
+    if (server.listening) await new Promise(resolve => server.close(resolve));
+    await require('./src/models').sequelize.close();
+    clearTimeout(deadline);
+    process.exit(0);
+  } catch (error) {
+    console.error('Shutdown failed:', error.message);
+    process.exit(1);
+  }
+};
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {

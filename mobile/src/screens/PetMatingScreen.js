@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import SavedAnimalPicker from '../components/SavedAnimalPicker';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Image,
@@ -15,6 +16,8 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { Video, ResizeMode } from 'expo-av';
+import matingCopy from '../utils/petMatingCopy.json';
 import { Picker } from '@react-native-picker/picker';
 import { useTranslation } from 'react-i18next';
 import AppHeader from '../components/AppHeader';
@@ -37,6 +40,8 @@ const emptyForm = {
   city: '',
   state: '',
   description: '',
+  vaccination_status: 'unknown', deworming_status: 'unknown', mating_experience: 'unknown',
+  last_vaccination_date: '', last_deworming_date: '', available_from: '', available_to: '', medical_notes: '',
 };
 
 const getLanguage = (i18n) => (i18n.resolvedLanguage || i18n.language || 'en').split('-')[0];
@@ -61,11 +66,28 @@ const formatFee = (profile, t) => {
   return t('petMating.negotiable', { defaultValue: 'Negotiable' });
 };
 
-const PetMatingScreen = ({ navigation }) => {
+const PetMatingScreen = ({ navigation, route }) => {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const language = getLanguage(i18n);
   const insets = useSafeAreaInsets();
+  const copy = matingCopy[language] || matingCopy.en;
+  const [editing, setEditing] = useState(null);
+  const [showHealth, setShowHealth] = useState(false);
+  const [removeVideo, setRemoveVideo] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ total: 0, pages: 1 });
+  const [loadError, setLoadError] = useState('');
+  const [reportTarget, setReportTarget] = useState(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDescription, setReportDescription] = useState('');
+  const [reportBusy, setReportBusy] = useState(false);
+  const [detailPhoto, setDetailPhoto] = useState(0);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const requestSequence = useRef(0);
+  const actionLock = useRef(false);
+  const submitLock = useRef(false);
+  const detailSequence = useRef(0);
   const [profiles, setProfiles] = useState([]);
   const [myProfiles, setMyProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -78,11 +100,13 @@ const PetMatingScreen = ({ navigation }) => {
   const [photos, setPhotos] = useState([]);
   const [video, setVideo] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  useEffect(() => () => { detailSequence.current += 1; }, []);
 
   const breedOptions = useMemo(() => {
     const getOptions = form.pet_type === 'cat' ? getCatBreedOptions : getDogBreedOptions;
-    return getOptions(language, t('petMating.selectBreed', { defaultValue: 'Select breed' }));
-  }, [form.pet_type, language, t]);
+    const options = getOptions(language, t('petMating.selectBreed', { defaultValue: 'Select breed' }));
+    return form.breed && !options.some(item => item.value === form.breed) ? [...options, { label: form.breed, value: form.breed }] : options;
+  }, [form.pet_type, form.breed, language, t]);
 
   const filterBreedOptions = useMemo(() => {
     const placeholder = t('petMating.allBreeds', { defaultValue: 'All breeds' });
@@ -116,8 +140,10 @@ const PetMatingScreen = ({ navigation }) => {
   }, [user?.id, user?.userId]);
 
   const loadProfiles = useCallback(async () => {
+    const sequence = ++requestSequence.current;
+    setLoadError('');
     try {
-      const params = { limit: 40 };
+      const params = { limit: 12, page };
       if (filters.petType !== 'all') params.petType = filters.petType;
       if (filters.breed !== 'all') params.breed = filters.breed;
       if (filters.gender !== 'all') params.gender = filters.gender;
@@ -125,10 +151,14 @@ const PetMatingScreen = ({ navigation }) => {
 
       const [publicResponse, myResponse] = await Promise.all([
         petMatingService.getProfiles(params),
-        petMatingService.getMyProfiles().catch(() => ({ data: { profiles: [] } })),
+        petMatingService.getMyProfiles(),
       ]);
 
-      const nextMyProfiles = getProfilesFromResponse(myResponse);
+      if (sequence !== requestSequence.current) return;
+      const paging = publicResponse.data || {};
+      setPagination({ total: paging.total || 0, pages: Math.max(1, paging.totalPages || 1) });
+      if (page > Math.max(1, paging.totalPages || 1)) setPage(Math.max(1, paging.totalPages || 1));
+      const nextMyProfiles = getProfilesFromResponse(myResponse).filter(profile => profile.status !== 'removed');
       const ownProfileIds = new Set(nextMyProfiles.map((profile) => String(profile.id)));
       const nextProfiles = getProfilesFromResponse(publicResponse).filter(
         (profile) => !ownProfileIds.has(String(profile.id)) && !isOwnProfile(profile)
@@ -137,27 +167,27 @@ const PetMatingScreen = ({ navigation }) => {
       setProfiles(nextProfiles);
       setMyProfiles(nextMyProfiles);
     } catch (error) {
-      console.error('Error loading pet mating profiles:', error);
-      Alert.alert(t('common.error', { defaultValue: 'Error' }), error?.message || t('petMating.loadFailed', { defaultValue: 'Failed to load pet mating profiles' }));
+      if (sequence === requestSequence.current) setLoadError(error?.message || t('petMating.loadFailed', { defaultValue: 'Failed to load pet mating profiles' }));
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (sequence === requestSequence.current) { setLoading(false); setRefreshing(false); }
     }
-  }, [filters, isOwnProfile, t]);
+  }, [filters, page, isOwnProfile, t]);
 
   useEffect(() => {
-    loadProfiles();
-  }, [loadProfiles]);
+    const timer = setTimeout(loadProfiles, 300);
+    return () => { clearTimeout(timer); requestSequence.current += 1; };
+  }, [loadProfiles, route?.params?.profileId]);
 
   const updateForm = (field, value) => {
     setForm((current) => ({
       ...current,
       [field]: value,
-      ...(field === 'pet_type' ? { breed: '' } : {}),
+      ...(field === 'pet_type' ? { breed: '', animal_profile_id: null } : {}),
     }));
   };
 
   const updateFilter = (field, value) => {
+    setPage(1);
     setFilters((current) => ({
       ...current,
       [field]: value,
@@ -165,7 +195,15 @@ const PetMatingScreen = ({ navigation }) => {
     }));
   };
 
+  const openEditor = (profile = null) => {
+    setEditing(profile);
+    setForm(profile ? Object.fromEntries(Object.entries(emptyForm).map(([key, fallback]) => [key, profile[key] == null ? fallback : String(profile[key])])) : { ...emptyForm });
+    if (profile?.animal_profile_id) setForm(current => ({ ...current, animal_profile_id: profile.animal_profile_id }));
+    setPhotos([]); setVideo(null); setRemoveVideo(false); setShowHealth(false); setShowForm(true);
+  };
+
   const resetForm = () => {
+    setEditing(null);
     setForm(emptyForm);
     setPhotos([]);
     setVideo(null);
@@ -191,6 +229,7 @@ const PetMatingScreen = ({ navigation }) => {
     });
 
     if (!result.canceled) {
+      if ((result.assets || []).some(asset => asset.fileSize > 25 * 1024 * 1024)) { Alert.alert(copy.newPhotos, copy.mediaLimit); return; }
       setPhotos((result.assets || []).slice(0, 5));
     }
   };
@@ -209,6 +248,7 @@ const PetMatingScreen = ({ navigation }) => {
     });
 
     if (!result.canceled) {
+      if (result.assets?.[0]?.fileSize > 25 * 1024 * 1024) { Alert.alert(copy.video, copy.mediaLimit); return; }
       setVideo(result.assets?.[0] || null);
     }
   };
@@ -216,11 +256,10 @@ const PetMatingScreen = ({ navigation }) => {
   const buildFormData = () => {
     const data = new FormData();
     Object.entries(form).forEach(([key, value]) => {
-      if (value !== '' && value !== null && value !== undefined) {
-        data.append(key, String(value));
-      }
+      data.append(key, value == null ? '' : String(value));
     });
 
+    if (removeVideo && !video) data.append('remove_video', 'true');
     photos.forEach((photo, index) => {
       const extension = photo.uri?.split('.').pop() || 'jpg';
       data.append('photos', {
@@ -243,20 +282,23 @@ const PetMatingScreen = ({ navigation }) => {
   };
 
   const submitProfile = async () => {
+    if (submitLock.current) return;
     if (!form.pet_name.trim() || !form.breed || !form.owner_phone.trim()) {
       Alert.alert(t('common.error', { defaultValue: 'Error' }), t('petMating.requiredFields', { defaultValue: 'Pet name, breed and owner phone are required' }));
       return;
     }
 
-    if (photos.length === 0) {
+    if (photos.length === 0 && !editing?.photos?.length) {
       Alert.alert(t('common.error', { defaultValue: 'Error' }), t('petMating.photoRequired', { defaultValue: 'Please add at least one pet photo' }));
       return;
     }
 
+    submitLock.current = true;
     setSubmitting(true);
     try {
-      await petMatingService.createProfile(buildFormData());
-      Alert.alert(t('common.success', { defaultValue: 'Success' }), t('petMating.created', { defaultValue: 'Pet mating profile created' }));
+      if (editing) await petMatingService.updateProfile(editing.id, buildFormData());
+      else await petMatingService.createProfile(buildFormData());
+      Alert.alert(t('common.success', { defaultValue: 'Success' }), editing ? copy.updated : copy.saved);
       resetForm();
       setShowForm(false);
       await loadProfiles();
@@ -264,6 +306,7 @@ const PetMatingScreen = ({ navigation }) => {
       Alert.alert(t('common.error', { defaultValue: 'Error' }), error?.message || t('petMating.createFailed', { defaultValue: 'Failed to create profile' }));
     } finally {
       setSubmitting(false);
+      submitLock.current = false;
     }
   };
 
@@ -275,12 +318,12 @@ const PetMatingScreen = ({ navigation }) => {
 
     try {
       const response = await petMatingService.trackContact(profile.id);
-      const phone = response?.data?.owner_phone || profile.owner_phone || profile.owner?.phone_number;
+      const phone = response?.data?.owner_phone;
       if (!phone) {
         Alert.alert(t('common.error', { defaultValue: 'Error' }), t('petMating.noPhone', { defaultValue: 'Owner phone number is not available' }));
         return;
       }
-      Linking.openURL(`tel:${phone}`);
+      await Linking.openURL(`tel:${phone}`);
     } catch (error) {
       Alert.alert(t('common.error', { defaultValue: 'Error' }), error?.message || t('petMating.contactFailed', { defaultValue: 'Unable to contact owner' }));
     }
@@ -294,7 +337,7 @@ const PetMatingScreen = ({ navigation }) => {
 
     try {
       const response = await petMatingService.trackContact(profile.id);
-      const phone = response?.data?.owner_phone || profile.owner_phone || profile.owner?.phone_number;
+      const phone = response?.data?.owner_phone;
       const normalizedPhone = normalizePhoneForWhatsApp(phone);
       if (!normalizedPhone) {
         Alert.alert(t('common.error', { defaultValue: 'Error' }), t('petMating.noPhone', { defaultValue: 'Owner phone number is not available' }));
@@ -307,37 +350,39 @@ const PetMatingScreen = ({ navigation }) => {
       });
       const appUrl = `whatsapp://send?phone=${normalizedPhone}&text=${encodeURIComponent(message)}`;
       const webUrl = `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(message)}`;
-      Linking.openURL(appUrl).catch(() => Linking.openURL(webUrl));
+      await Linking.openURL(appUrl).catch(() => Linking.openURL(webUrl));
     } catch (error) {
       Alert.alert(t('common.error', { defaultValue: 'Error' }), error?.message || t('petMating.contactFailed', { defaultValue: 'Unable to contact owner' }));
     }
   };
 
   const reportProfile = (profile) => {
-    if (isOwnProfile(profile)) {
-      Alert.alert(t('common.error', { defaultValue: 'Error' }), t('petMating.cannotReportOwnProfile', { defaultValue: 'You cannot report your own mating profile.' }));
-      return;
-    }
-
-    Alert.alert(
-      t('petMating.reportProfile', { defaultValue: 'Report profile' }),
-      t('petMating.reportConfirm', { defaultValue: 'Report this profile for admin review?' }),
-      [
-        { text: t('common.cancel', { defaultValue: 'Cancel' }), style: 'cancel' },
-        {
-          text: t('petMating.reportProfile', { defaultValue: 'Report profile' }),
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await petMatingService.reportProfile(profile.id, { reason: 'other', description: 'Reported from mobile app' });
-              Alert.alert(t('common.success', { defaultValue: 'Success' }), t('petMating.reported', { defaultValue: 'Profile reported for review' }));
-            } catch (error) {
-              Alert.alert(t('common.error', { defaultValue: 'Error' }), error?.message || t('petMating.reportFailed', { defaultValue: 'Failed to report profile' }));
-            }
-          },
-        },
-      ]
-    );
+    setSelectedProfile(null); setReportReason(''); setReportDescription(''); setReportTarget(profile);
+  };
+  const submitReport = async () => {
+    if (actionLock.current || !reportReason || reportDescription.trim().length < 5) return;
+    actionLock.current = true; setReportBusy(true);
+    try {
+      await petMatingService.reportProfile(reportTarget.id, { reason: reportReason, description: reportDescription.trim() });
+      setReportTarget(null); Alert.alert(copy.report, copy.reportSent);
+    } catch (error) { Alert.alert(copy.report, error.message); }
+    finally { actionLock.current = false; setReportBusy(false); }
+  };
+  const changeStatus = async (profile, status) => {
+    if (actionLock.current) return;
+    actionLock.current = true;
+    try { await petMatingService.updateStatus(profile.id, status); await loadProfiles(); }
+    catch (error) { Alert.alert(copy.edit, error.message); }
+    finally { actionLock.current = false; }
+  };
+  const openDetails = async (profile) => {
+    const sequence = ++detailSequence.current;
+    setDetailLoading(true);
+    try {
+      const response = await petMatingService.getProfile(profile.id);
+      if (sequence === detailSequence.current) { setSelectedProfile(response.data?.profile || response.profile); setDetailPhoto(0); }
+    } catch (error) { Alert.alert(copy.details, error.message); }
+    finally { if (sequence === detailSequence.current) setDetailLoading(false); }
   };
 
   const markMatched = async (profile) => {
@@ -378,7 +423,7 @@ const PetMatingScreen = ({ navigation }) => {
       key={profile.id}
       style={styles.card}
     >
-      <TouchableOpacity onPress={() => setSelectedProfile(profile)} activeOpacity={0.88}>
+      <TouchableOpacity onPress={() => openDetails(profile)} activeOpacity={0.88}>
         <View style={styles.cardImageWrap}>
           {getPhoto(profile) ? (
             <Image source={{ uri: getPhoto(profile) }} style={styles.cardImage} />
@@ -389,7 +434,7 @@ const PetMatingScreen = ({ navigation }) => {
           )}
           <View style={styles.cardBadges}>
             <Text style={styles.typePill}>{t(`animalTypes.${profile.pet_type}`, { defaultValue: profile.pet_type })}</Text>
-            <Text style={styles.statusPill}>{profile.status}</Text>
+            <Text style={styles.statusPill}>{copy[profile.status === 'matched' ? 'matchedStatus' : profile.status] || profile.status}</Text>
           </View>
         </View>
         <View style={styles.cardBody}>
@@ -442,7 +487,7 @@ const PetMatingScreen = ({ navigation }) => {
         title={t('petMating.title', { defaultValue: 'Pet Mating' })}
         subtitle={t('petMating.mobileSubtitle', { defaultValue: 'Dog and cat mating profiles' })}
         navigation={navigation}
-        rightActions={[{ icon: 'add', onPress: () => setShowForm(true), accessibilityLabel: t('petMating.createProfile', { defaultValue: 'Create mating profile' }) }]}
+        
       />
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: 110 + insets.bottom }]}
@@ -452,11 +497,11 @@ const PetMatingScreen = ({ navigation }) => {
           <View style={styles.heroCompactText}>
             <Text style={styles.heroKicker}>{t('petMating.kicker', { defaultValue: 'Pet mating' })}</Text>
             <Text style={styles.heroCompactTitle}>{t('petMating.heroTitle', { defaultValue: 'Find trusted mates for dogs and cats.' })}</Text>
-            <Text style={styles.heroCompactSubtitle} numberOfLines={1}>
-              {t('petMating.trustPhotoTitle', { defaultValue: 'Clear photo first' })} - {t('petMating.trustContactTitle', { defaultValue: 'Verified contact' })}
+            <Text style={styles.heroCompactSubtitle}>
+              {copy.intro}
             </Text>
           </View>
-          <TouchableOpacity style={styles.createCompactButton} onPress={() => setShowForm(true)}>
+          <TouchableOpacity style={styles.createCompactButton} onPress={() => openEditor()}>
             <Ionicons name="add" size={18} color={COLORS.primaryDark} />
             <Text style={styles.createCompactButtonText}>{t('petMating.createProfile', { defaultValue: 'Create mating profile' })}</Text>
           </TouchableOpacity>
@@ -468,7 +513,7 @@ const PetMatingScreen = ({ navigation }) => {
               <Ionicons name="search-outline" size={18} color={COLORS.textMuted} />
               <TextInput
                 value={filters.search}
-                onChangeText={(value) => setFilters((current) => ({ ...current, search: value }))}
+                onChangeText={(value) => updateFilter('search', value)}
                 placeholder={t('petMating.searchPlaceholder', { defaultValue: 'Search breed, city, pet name' })}
                 placeholderTextColor="#8D928B"
                 style={styles.searchInput}
@@ -519,20 +564,21 @@ const PetMatingScreen = ({ navigation }) => {
                 <Text style={styles.sectionTitle}>{t('petMating.myProfiles', { defaultValue: 'My pet mating profiles' })}</Text>
               </View>
             </View>
-            {myProfiles.map((profile) => (
+            {[...myProfiles].sort((a, b) => Number(String(b.id) === String(route?.params?.profileId)) - Number(String(a.id) === String(route?.params?.profileId))).map((profile) => (
               <View key={profile.id} style={styles.myProfileRow}>
                 <View style={styles.myProfileInfo}>
                   {getPhoto(profile) ? <Image source={{ uri: getPhoto(profile) }} style={styles.myProfileImage} /> : <View style={styles.myProfileImageFallback} />}
                   <View style={styles.myProfileText}>
                     <Text style={styles.myProfileTitle} numberOfLines={1}>{profile.pet_name} - {profile.breed}</Text>
-                    <Text style={styles.myProfileStatus}>{profile.status}</Text>
+                    <Text style={styles.myProfileStatus}>{copy[profile.status === 'matched' ? 'matchedStatus' : profile.status] || profile.status}</Text>
                     <Text style={styles.myProfileHint} numberOfLines={2}>
                       {t('petMating.foundMatchHint', { defaultValue: 'Use Found match after your pet gets a mating partner. It hides this profile from public search.' })}
                     </Text>
                   </View>
                 </View>
                 <View style={styles.myProfileActions}>
-                  {profile.status !== 'matched' ? (
+                  {['active', 'paused', 'matched'].includes(profile.status) && <><TouchableOpacity style={styles.miniAction} onPress={() => openEditor(profile)}><Text style={styles.miniActionText}>{copy.edit}</Text></TouchableOpacity><TouchableOpacity style={styles.miniAction} onPress={() => changeStatus(profile, profile.status === 'active' ? 'paused' : 'active')}><Text style={styles.miniActionText}>{profile.status === 'active' ? copy.pause : copy.activate}</Text></TouchableOpacity></>}
+                  {['active', 'paused'].includes(profile.status) ? (
                     <TouchableOpacity style={styles.miniAction} onPress={() => markMatched(profile)}>
                       <Text style={styles.miniActionText}>{t('petMating.hideAfterMatch', { defaultValue: 'Found match' })}</Text>
                     </TouchableOpacity>
@@ -552,27 +598,33 @@ const PetMatingScreen = ({ navigation }) => {
               <Text style={styles.sectionKicker}>{t('petMating.browseProfiles', { defaultValue: 'Browse profiles' })}</Text>
               <Text style={styles.sectionTitle}>{t('petMating.availableProfiles', { defaultValue: 'Available pet profiles' })}</Text>
             </View>
-            <Text style={styles.countPill}>{profiles.length}</Text>
+            <Text style={styles.countPill}>{pagination.total}</Text>
           </View>
-          {profiles.length === 0 ? (
+          {loadError ? <View style={styles.emptyCard}><Text style={styles.emptySubtitle}>{loadError}</Text><TouchableOpacity style={styles.emptyButton} onPress={loadProfiles}><Text style={styles.emptyButtonText}>{copy.retry}</Text></TouchableOpacity></View> : profiles.length === 0 ? (
             <View style={styles.emptyCard}>
               <Ionicons name="paw-outline" size={34} color={COLORS.primary} />
               <Text style={styles.emptyTitle}>{t('petMating.emptyTitle', { defaultValue: 'No pet mating profiles yet' })}</Text>
               <Text style={styles.emptySubtitle}>{t('petMating.emptySubtitle', { defaultValue: 'Create the first trusted profile for your area.' })}</Text>
-              <TouchableOpacity style={styles.emptyButton} onPress={() => setShowForm(true)}>
+              <TouchableOpacity style={styles.emptyButton} onPress={() => openEditor()}>
                 <Text style={styles.emptyButtonText}>{t('petMating.createProfile', { defaultValue: 'Create mating profile' })}</Text>
               </TouchableOpacity>
             </View>
           ) : profiles.map(renderProfileCard)}
+          {detailLoading && <Text accessibilityRole="alert">{copy.loadingDetails}</Text>}
+          {!loadError && pagination.pages > 1 && <View style={styles.pagination}>
+            <TouchableOpacity disabled={page <= 1} style={[styles.miniAction, page <= 1 && styles.disabledButton]} onPress={() => setPage(value => value - 1)}><Text style={styles.miniActionText}>{copy.previous}</Text></TouchableOpacity>
+            <Text>{copy.page} {page} {copy.of} {pagination.pages}</Text>
+            <TouchableOpacity disabled={page >= pagination.pages} style={[styles.miniAction, page >= pagination.pages && styles.disabledButton]} onPress={() => setPage(value => value + 1)}><Text style={styles.miniActionText}>{copy.next}</Text></TouchableOpacity>
+          </View>}
         </View>
       </ScrollView>
 
       <Modal visible={showForm} animationType="slide" onRequestClose={closeForm}>
         <SafeAreaView style={styles.modalSafe}>
           <View style={styles.modalHeader}>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={styles.modalKicker}>{t('petMating.simpleProfile', { defaultValue: 'Simple profile' })}</Text>
-              <Text style={styles.modalTitle}>{t('petMating.formTitle', { defaultValue: 'Add pet mating profile' })}</Text>
+              <Text style={styles.modalTitle}>{editing ? copy.edit : copy.create}</Text>
               <Text style={styles.modalHint}>{t('petMating.simpleFormHint', { defaultValue: 'Only the important details. You can keep optional fields blank.' })}</Text>
             </View>
             <TouchableOpacity style={styles.modalCloseButton} onPress={closeForm}>
@@ -580,27 +632,28 @@ const PetMatingScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
-          <ScrollView contentContainerStyle={[styles.formContent, { paddingBottom: 132 + insets.bottom }]}>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.formContent, { paddingBottom: 132 + insets.bottom }]}>
             <MediaPicker photos={photos} video={video} t={t} onPickPhotos={pickPhotos} onRemovePhotos={() => setPhotos([])} onPickVideo={pickVideo} onRemoveVideo={() => setVideo(null)} />
-            <View style={styles.formGrid}>
+            {editing && !photos.length && <><Text style={styles.modalHint}>{copy.existingPhotos}</Text><ScrollView horizontal contentContainerStyle={{ gap: 8 }}>{editing.photos?.map(uri => <Image key={uri} source={{ uri }} style={{ width: 64, height: 64, borderRadius: 8 }} />)}</ScrollView></>}
+            {editing?.video_url && !video && <TouchableOpacity style={styles.miniAction} onPress={() => setRemoveVideo(value => !value)}><Text>{removeVideo ? "[x] " : "[ ] "}{copy.removeVideo}</Text></TouchableOpacity>}
+            {!editing && <SavedAnimalPicker supportedSpecies={['dog','cat']} onSelect={animal => { updateForm('pet_type', animal.species); updateForm('pet_name', animal.name); updateForm('breed', animal.breed || ''); updateForm('animal_profile_id', animal.id); }} />}<View style={styles.formGrid}>
               <Segmented value={form.pet_type} options={[['dog', t('animalTypes.dog', { defaultValue: 'Dog' })], ['cat', t('animalTypes.cat', { defaultValue: 'Cat' })]]} onChange={(value) => updateForm('pet_type', value)} />
               <Dropdown label={t('petMating.selectBreed', { defaultValue: 'Select breed' })} selectedValue={form.breed} items={breedOptions} onValueChange={(value) => updateForm('breed', value)} />
               <Input label={t('petMating.petName', { defaultValue: 'Pet name' })} value={form.pet_name} onChangeText={(value) => updateForm('pet_name', value)} />
               <Segmented value={form.gender} options={[['male', t('petMating.male', { defaultValue: 'Male' })], ['female', t('petMating.female', { defaultValue: 'Female' })]]} onChange={(value) => updateForm('gender', value)} />
               <Input label={t('petMating.ageMonths', { defaultValue: 'Age in months' })} keyboardType="numeric" value={form.age_months} onChangeText={(value) => updateForm('age_months', value)} />
-              <Input
-                label={t('petMating.feePrice', { defaultValue: 'Fees / Price' })}
-                keyboardType="numeric"
-                value={form.fee_amount}
-                onChangeText={(value) => {
-                  updateForm('fee_amount', value);
-                  updateForm('fee_type', value ? 'paid' : 'negotiable');
-                }}
-              />
+              <Dropdown label={copy.feeType} selectedValue={form.fee_type} items={['free', 'paid', 'negotiable'].map(value => ({ value, label: copy[value] }))} onValueChange={value => { updateForm('fee_type', value); if (value !== 'paid') updateForm('fee_amount', ''); }} />
+              {form.fee_type === 'paid' && <Input label={t('petMating.feePrice', { defaultValue: 'Fee' })} keyboardType="decimal-pad" value={form.fee_amount} onChangeText={value => updateForm('fee_amount', value)} />}
               <Input label={t('petMating.ownerPhone', { defaultValue: 'Owner phone' })} keyboardType="phone-pad" value={form.owner_phone} onChangeText={(value) => updateForm('owner_phone', value)} />
               <Input label={t('petMating.city', { defaultValue: 'City' })} value={form.city} onChangeText={(value) => updateForm('city', value)} />
               <Input label={t('petMating.state', { defaultValue: 'State' })} value={form.state} onChangeText={(value) => updateForm('state', value)} />
-              <Input label={t('petMating.description', { defaultValue: 'Description, health notes, mating preference' })} multiline value={form.description} onChangeText={(value) => updateForm('description', value)} />
+              <Input label={t('petMating.description', { defaultValue: 'Description, health notes, mating preference' })} multiline maxLength={4000} value={form.description} onChangeText={(value) => updateForm('description', value)} />
+              <TouchableOpacity style={styles.miniAction} onPress={() => setShowHealth(value => !value)}><Text style={styles.miniActionText}>{showHealth ? '- ' : '+ '}{copy.health}</Text></TouchableOpacity>
+              {showHealth && <>
+                {[['vaccination_status', 'vaccination', ['unknown', 'not_vaccinated', 'partial', 'up_to_date']], ['deworming_status', 'deworming', ['unknown', 'not_done', 'done']], ['mating_experience', 'experience', ['unknown', 'first_time', 'experienced']]].map(([field, label, values]) => <Dropdown key={field} label={copy[label]} selectedValue={form[field]} items={values.map(value => ({ value, label: copy[value] }))} onValueChange={value => updateForm(field, value)} />)}
+                {[['last_vaccination_date', 'vaccinationDate'], ['last_deworming_date', 'dewormingDate'], ['available_from', 'from'], ['available_to', 'until']].map(([field, label]) => <Input key={field} label={copy[label]} placeholder={copy.dateFormat} maxLength={10} value={form[field]} onChangeText={value => updateForm(field, value)} />)}
+                <Input label={copy.medical} value={form.medical_notes} multiline maxLength={2000} onChangeText={value => updateForm('medical_notes', value)} />
+              </>}
             </View>
           </ScrollView>
 
@@ -609,7 +662,7 @@ const PetMatingScreen = ({ navigation }) => {
               <Text style={styles.cancelButtonText}>{t('common.cancel', { defaultValue: 'Cancel' })}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.submitButton, submitting && styles.disabledButton]} disabled={submitting} onPress={submitProfile}>
-              <Text style={styles.submitButtonText}>{submitting ? t('common.loading', { defaultValue: 'Loading...' }) : t('petMating.submitProfile', { defaultValue: 'Submit profile' })}</Text>
+              <Text style={styles.submitButtonText}>{submitting ? t('common.loading', { defaultValue: 'Loading...' }) : copy.save}</Text>
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -618,18 +671,19 @@ const PetMatingScreen = ({ navigation }) => {
       <Modal visible={!!selectedProfile} transparent animationType="fade" onRequestClose={() => setSelectedProfile(null)}>
         <View style={styles.detailOverlay}>
           <View style={styles.detailCard}>
+            <TouchableOpacity accessibilityLabel={copy.close} style={{ alignSelf: 'flex-end', padding: 14 }} onPress={() => setSelectedProfile(null)}><Ionicons name="close" size={24} color={COLORS.text} /></TouchableOpacity>
             {selectedProfile ? (
-              <>
-                {getPhoto(selectedProfile) ? <Image source={{ uri: getPhoto(selectedProfile) }} style={styles.detailImage} /> : null}
+              <ScrollView>
+                {getPhoto(selectedProfile) ? <Image source={{ uri: selectedProfile.photos[detailPhoto] || getPhoto(selectedProfile) }} style={styles.detailImage} resizeMode="contain" /> : null}
+                <ScrollView horizontal contentContainerStyle={{ padding: 12, gap: 8 }}>{(selectedProfile.photos || []).map((uri, index) => <TouchableOpacity key={uri} accessibilityLabel={`${copy.details} ${index + 1}`} accessibilityState={{ selected: detailPhoto === index }} onPress={() => setDetailPhoto(index)}><Image source={{ uri }} style={{ width: 62, height: 62, borderRadius: 8, borderWidth: detailPhoto === index ? 2 : 0, borderColor: COLORS.primary }} /></TouchableOpacity>)}</ScrollView>
+                {selectedProfile.video_url && <Video source={{ uri: selectedProfile.video_url }} style={styles.detailImage} useNativeControls resizeMode={ResizeMode.CONTAIN} />}
                 <View style={styles.detailBody}>
                   <View style={styles.detailHeaderRow}>
                     <View style={styles.detailTitleBlock}>
                       <Text style={styles.detailType}>{t(`animalTypes.${selectedProfile.pet_type}`, { defaultValue: selectedProfile.pet_type })}</Text>
                       <Text style={styles.detailTitle}>{selectedProfile.pet_name}</Text>
                     </View>
-                    <TouchableOpacity style={styles.detailCloseIcon} onPress={() => setSelectedProfile(null)}>
-                      <Ionicons name="close" size={20} color={COLORS.text} />
-                    </TouchableOpacity>
+
                   </View>
                   <Text style={styles.detailMeta}>{selectedProfile.breed} - {t(`petMating.${selectedProfile.gender}`, { defaultValue: selectedProfile.gender })}</Text>
                   <View style={styles.detailInfoGrid}>
@@ -637,6 +691,14 @@ const PetMatingScreen = ({ navigation }) => {
                     <InfoItem label={t('petMating.ageMonths', { defaultValue: 'Age in months' })} value={selectedProfile.age_months || '-'} />
                     <InfoItem label={t('petMating.city', { defaultValue: 'City' })} value={getLocation(selectedProfile) || '-'} />
                   </View>
+                  <View style={styles.detailInfoGrid}>
+                    <InfoItem label={copy.vaccination} value={copy[selectedProfile.vaccination_status] || copy.unknown} />
+                    <InfoItem label={copy.deworming} value={copy[selectedProfile.deworming_status] || copy.unknown} />
+                    <InfoItem label={copy.experience} value={copy[selectedProfile.mating_experience] || copy.unknown} />
+                    {[['last_vaccination_date', 'vaccinationDate'], ['last_deworming_date', 'dewormingDate'], ['available_from', 'from'], ['available_to', 'until']].filter(([field]) => selectedProfile[field]).map(([field, label]) => <InfoItem key={field} label={copy[label]} value={selectedProfile[field]} />)}
+                  </View>
+                  {!!selectedProfile.medical_notes && <Text style={styles.detailDescription}>{selectedProfile.medical_notes}</Text>}
+                  <Text style={styles.modalHint}>{copy.healthNote}</Text>
                   <Text style={styles.detailDescription}>{selectedProfile.description || t('petMating.noDescription', { defaultValue: 'No description added.' })}</Text>
                   <View style={styles.detailActions}>
                     <TouchableOpacity style={styles.primaryAction} onPress={() => contactOwner(selectedProfile)}>
@@ -652,10 +714,19 @@ const PetMatingScreen = ({ navigation }) => {
                     </TouchableOpacity>
                   </View>
                 </View>
-              </>
+              </ScrollView>
             ) : null}
           </View>
         </View>
+      </Modal>
+      <Modal visible={!!reportTarget} animationType="slide" onRequestClose={() => !reportBusy && setReportTarget(null)}>
+        <SafeAreaView style={styles.modalSafe}><ScrollView contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled">
+          <Text style={styles.modalTitle}>{copy.report}</Text>
+          <Dropdown label={copy.reason} selectedValue={reportReason} onValueChange={setReportReason} items={[{ value: '', label: copy.chooseReason }, ...['fake', 'inappropriate', 'wrong_information', 'spam', 'animal_welfare', 'other'].map(value => ({ value, label: copy[value] }))]} />
+          <Input label={copy.details} multiline maxLength={2000} value={reportDescription} onChangeText={setReportDescription} />
+          <TouchableOpacity disabled={reportBusy || !reportReason || reportDescription.trim().length < 5} style={[styles.submitButton, (reportBusy || !reportReason || reportDescription.trim().length < 5) && styles.disabledButton]} onPress={submitReport}><Text style={styles.submitButtonText}>{copy.submitReport}</Text></TouchableOpacity>
+          <TouchableOpacity disabled={reportBusy} style={styles.cancelButton} onPress={() => setReportTarget(null)}><Text style={styles.cancelButtonText}>{copy.cancel}</Text></TouchableOpacity>
+        </ScrollView></SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
@@ -666,6 +737,7 @@ const Input = ({ label, multiline, ...props }) => (
     <Text style={styles.inputLabel}>{label}</Text>
     <TextInput
       {...props}
+      accessibilityLabel={label}
       multiline={multiline}
       style={[styles.input, multiline && styles.textArea]}
       placeholderTextColor="#8D928B"
@@ -688,6 +760,7 @@ const Dropdown = ({ label, selectedValue, items, onValueChange }) => (
     <Text style={styles.inputLabel}>{label}</Text>
     <View style={styles.dropdownBox}>
       <Picker
+        accessibilityLabel={label}
         selectedValue={selectedValue}
         onValueChange={onValueChange}
         dropdownIconColor={COLORS.primaryDark}
@@ -746,17 +819,18 @@ const InfoItem = ({ label, value }) => (
 );
 
 const styles = StyleSheet.create({
+  pagination: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 16 },
   safeArea: { flex: 1, backgroundColor: COLORS.background },
   modalSafe: { flex: 1, backgroundColor: COLORS.background },
   loadingCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
   content: { padding: 14, gap: 12 },
   hero: { backgroundColor: COLORS.primaryDeep, borderRadius: 24, padding: 16, gap: 16 },
-  heroCompact: { backgroundColor: COLORS.primaryDeep, borderRadius: 20, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  heroCompactText: { flex: 1, minWidth: 0 },
+  heroCompact: { backgroundColor: COLORS.primaryDeep, borderRadius: 18, padding: 16, gap: 12 },
+  heroCompactText: { minWidth: 0 },
   heroCompactTitle: { marginTop: 4, color: COLORS.surface, fontSize: 19, lineHeight: 24, fontWeight: '900' },
-  heroCompactSubtitle: { marginTop: 4, color: COLORS.secondary, fontSize: 11, fontWeight: '800' },
-  createCompactButton: { maxWidth: 132, minHeight: 44, borderRadius: 15, backgroundColor: COLORS.surface, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 10 },
-  createCompactButtonText: { flexShrink: 1, color: COLORS.primaryDark, fontSize: 11, lineHeight: 14, fontWeight: '900', textAlign: 'center' },
+  heroCompactSubtitle: { marginTop: 4, color: COLORS.secondary, fontSize: 14, lineHeight: 21 },
+  createCompactButton: { alignSelf: 'stretch', minHeight: 44, borderRadius: 15, backgroundColor: COLORS.surface, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 10 },
+  createCompactButtonText: { flexShrink: 1, color: COLORS.primaryDark, fontSize: 14, lineHeight: 20, fontWeight: '700', textAlign: 'center' },
   heroTextBlock: { gap: 8 },
   heroKicker: { color: COLORS.secondary, fontSize: 11, fontWeight: '900', letterSpacing: 1.6, textTransform: 'uppercase' },
   heroTitle: { color: COLORS.surface, fontSize: 25, lineHeight: 31, fontWeight: '900' },
@@ -868,7 +942,7 @@ const styles = StyleSheet.create({
   submitButtonText: { color: COLORS.surface, fontSize: 14, fontWeight: '900' },
   disabledButton: { backgroundColor: COLORS.borderStrong },
   detailOverlay: { flex: 1, backgroundColor: 'rgba(17,24,21,0.72)', justifyContent: 'center', padding: 18 },
-  detailCard: { maxHeight: '88%', overflow: 'hidden', borderRadius: 28, backgroundColor: COLORS.surface },
+  detailCard: { width: '100%', maxWidth: 620, maxHeight: '90%', overflow: 'hidden', borderRadius: 20, backgroundColor: COLORS.surface },
   detailImage: { width: '100%', height: 245 },
   detailBody: { padding: 18 },
   detailHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },

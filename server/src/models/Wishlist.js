@@ -2,6 +2,7 @@
 
 module.exports = (sequelize, DataTypes) => {
   const Wishlist = sequelize.define('Wishlist', {
+  animal_group: { type: DataTypes.STRING(8), allowNull: true },
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,

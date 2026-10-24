@@ -59,9 +59,7 @@ const OTPVerificationScreen = ({ route, navigation }) => {
       if (response.success) {
         await login(response.token, response.user);
 
-        if (response.requiresProfileCompletion) {
-          navigation.replace('ProfileCompletion');
-        }
+        // The root navigator handles experience selection and profile completion.
         return;
       }
 

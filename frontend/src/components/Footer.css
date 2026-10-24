@@ -1,0 +1,19 @@
+.site-footer {
+  --footer-background: #12382b;
+  --footer-text: #d0ded5;
+  background-color: var(--footer-background);
+  color: rgb(var(--palette-cream));
+  border-top: 4px solid rgb(var(--palette-gold));
+}
+
+.site-footer .footer-muted { color: var(--footer-text); }
+.site-footer .footer-brand-icon { background: #fffdf6; padding: 4px; }
+.site-footer .footer-brand-logo { display: block; width: 100%; height: 100%; object-fit: contain; border-radius: 7px; }
+.site-footer .footer-brand-name { color: #fffdf6; }
+.site-footer .footer-link { color: var(--footer-text); transition: color .15s; }
+.site-footer .footer-link:hover { color: rgb(var(--palette-gold)); text-decoration: underline; text-underline-offset: 4px; }
+.site-footer a:focus-visible { outline: 2px solid rgb(var(--palette-gold)); outline-offset: 5px; border-radius: 4px; }
+.site-footer .footer-bottom { border-top: 1px solid #416052; color: var(--footer-text); }
+.site-footer .footer-social { border-color: #597465; background: #234c3b; color: #fffdf6; }
+.site-footer .footer-social[aria-disabled="true"] { cursor: not-allowed; opacity: .55; }
+.site-footer .footer-social[aria-disabled="false"]:hover { background: rgb(var(--palette-gold)); border-color: rgb(var(--palette-gold)); color: var(--footer-background); }

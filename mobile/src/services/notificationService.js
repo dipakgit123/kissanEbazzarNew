@@ -11,6 +11,8 @@ import { COLORS } from '../utils/constants';
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const TOKEN_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const INSTALLATION_ID_KEY = 'notificationInstallationId';
+let registrationGeneration = 0;
+export const cancelPendingRegistration = () => { registrationGeneration += 1; };
 
 const isUnauthorizedError = (error) => error?.response?.status === 401 || error?.status === 401;
 const getAuthConfig = (authToken) => (
@@ -150,7 +152,7 @@ export const registerForPushNotifications = async ({ requestPermission = true } 
   // Expo tokens are used only when Expo is explicitly configured, never as a
   // silent fallback for an Android Firebase build.
   try {
-    if (!token && configuredProvider !== 'firebase') {
+    if (!token && (Platform.OS === 'ios' || configuredProvider !== 'firebase')) {
       const projectId = Constants.expoConfig?.extra?.eas?.projectId;
 
       // Validate projectId exists
@@ -184,11 +186,13 @@ const getInstallationId = async () => {
  * Register device token with backend (with retry logic)
  */
 export const registerTokenWithBackend = async (token, provider = 'expo', retries = 3, authToken = null, recipientKey = null) => {
+  const generation = registrationGeneration;
   if (typeof token !== 'string' || !token) {
     throw new Error('A push token is required');
   }
 
   for (let i = 0; i < retries; i++) {
+    if (generation !== registrationGeneration) throw new Error('Registration cancelled');
     try {
       const deviceId = await getInstallationId();
       const response = await api.post('/api/notifications/register-token', {
@@ -198,6 +202,10 @@ export const registerTokenWithBackend = async (token, provider = 'expo', retries
         device_id: deviceId,
         app_version: Constants.expoConfig?.version || null,
       }, getAuthConfig(authToken));
+      if (generation !== registrationGeneration) {
+        await api.post('/api/notifications/unregister-token', { token }, { ...getAuthConfig(authToken), timeout: 3000 }).catch(() => {});
+        throw new Error('Registration cancelled');
+      }
       logger.log('Token registered with backend');
 
       // Save token to AsyncStorage
@@ -212,6 +220,7 @@ export const registerTokenWithBackend = async (token, provider = 'expo', retries
       return response.data;
     } catch (error) {
       logger.error(`Token registration attempt ${i + 1} failed:`, error.message);
+      if (generation !== registrationGeneration) throw error;
       if (i < retries - 1) {
         await sleep(Math.pow(2, i) * 1000); // Exponential backoff
       } else {
@@ -264,7 +273,7 @@ export const shouldReregisterToken = async (currentToken, recipientKey = null) =
  */
 export const unregisterToken = async (token, authToken = null) => {
   try {
-    const response = await api.post('/api/notifications/unregister-token', { token }, getAuthConfig(authToken));
+    const response = await api.post('/api/notifications/unregister-token', { token }, { ...getAuthConfig(authToken), timeout: 3000 });
     await AsyncStorage.removeItem('pushTokenRecipientKey');
     await AsyncStorage.removeItem('pushTokenRegisteredAt');
     return response.data;
@@ -307,8 +316,9 @@ export const getNotificationPage = async (limit = 30, offset = 0, authToken = nu
       ...getAuthConfig(authToken),
     });
     const payload = response?.data || response;
+    if (!payload?.success || !Array.isArray(payload.data)) throw new Error('Invalid notification response');
     return {
-      items: Array.isArray(payload?.data) ? payload.data : [],
+      items: payload.data,
       total: Number(payload?.total || 0),
       unreadCount: Number(payload?.unread_count || 0),
     };
@@ -478,6 +488,8 @@ export const setBadgeCount = async (count) => {
 };
 
 export default {
+  cancelPendingRegistration,
+  getSavedToken,
   registerForPushNotifications,
   setupNotificationChannels,
   getNotificationPermissionStatus,

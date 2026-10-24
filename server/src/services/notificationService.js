@@ -71,12 +71,16 @@ const toFirebaseData = (data = {}) => Object.entries(data).reduce((payload, [key
 }, {});
 
 const getCategoryPreference = (type = 'system') => {
+  if (type === 'milk_reminder') return 'milk_reminders_enabled';
+  if (type === 'health_report') return 'health_enabled';
+  if (type === 'pet_status') return 'pet_mating_enabled';
+  if (['blog_published', 'scheme_published'].includes(type)) return 'content_enabled';
   if (type === 'appointment_reminder' || type.includes('reminder') || type.includes('pregnancy')) {
     return 'reminders_enabled';
   }
   if (type.includes('appointment')) return 'appointments_enabled';
   if (['new_listing', 'price_drop', 'listing_sold'].includes(type)) return 'marketplace_enabled';
-  if (type === 'contact' || type.includes('call') || type.includes('message') || type.includes('inquiry')) {
+  if (type === 'vet_contact' || type === 'contact' || type.includes('call') || type.includes('message') || type.includes('inquiry')) {
     return 'communication_enabled';
   }
   return 'system_enabled';
@@ -86,7 +90,7 @@ const getChannelForType = (type = 'system') => {
   if (type.includes('appointment') || type.includes('call')) return 'high-priority';
   if (type.includes('reminder') || type.includes('pregnancy')) return 'reminders';
   if (['new_listing', 'price_drop', 'listing_sold'].includes(type)) return 'marketplace';
-  if (type === 'contact' || type.includes('message') || type.includes('inquiry')) return 'communications';
+  if (type === 'vet_contact' || type === 'contact' || type.includes('message') || type.includes('inquiry')) return 'communications';
   return 'default';
 };
 
@@ -264,69 +268,63 @@ const deliverNotification = async ({
 }) => {
   const normalizedRecipientType = normalizeRecipientType(recipientType);
   const notificationType = type || data.type || 'system';
+  if (notificationType.includes('appointment')) return { delivered: false, suppressed: true, notification: null };
+  const recipientModel = normalizedRecipientType === 'veterinarian' ? db?.Veterinarian : db?.User;
+  if (recipientModel) {
+    const recipient = await recipientModel.findByPk(recipientId);
+    const denied = !recipient || (normalizedRecipientType === 'veterinarian'
+      ? ((!recipient.is_active || recipient.verification_status !== 'verified') && notificationType !== 'vet_status')
+      : !recipient.is_verified || (recipient.is_blocked && (!recipient.blocked_until || new Date(recipient.blocked_until) > new Date())));
+    if (denied) {
+      global.io?.in(getSocketRoom(recipientId, normalizedRecipientType)).disconnectSockets(true);
+      return { delivered: false, suppressed: true, notification: null };
+    }
+  }
+  if (!data.animal_group && data.animal_type === 'other' && data.listing_id && db.OtherAnimalListing) {
+    const listing = await db.OtherAnimalListing.findByPk(data.listing_id);
+    data = { ...data, animal_group: listing?.animal_group };
+  }
   const preferences = await getNotificationPreferences(db, recipientId, normalizedRecipientType);
+  data = { ...data, animal_group: data.animal_group || require('../utils/animalGroup').groupForSpecies(data.animal_type) || (notificationType === 'milk_reminder' || notificationType === 'scheme_published' ? 'farm' : notificationType === 'pet_status' ? 'pet' : undefined) };
+  if (['farm', 'pet'].includes(data.animal_group) && preferences?.[data.animal_group + '_enabled'] === false) return { delivered: false, suppressed: true, notification: null };
+  if (data.animal_group === 'both' && preferences?.farm_enabled === false && preferences?.pet_enabled === false) return { delivered: false, suppressed: true, notification: null };
   const categoryFlag = getCategoryPreference(notificationType);
+  const translated = require('./notificationText').renderMessage(data.message_key || notificationType, preferences?.language, data.message_args);
+  if (translated) { title = translated.title; body = translated.body; }
 
   if (preferences && preferences[categoryFlag] === false) {
     return { delivered: false, suppressed: true, notification: null };
   }
 
-  let notification = null;
-  let payloadData = normalizeNotificationData(notificationType, data);
-  if (db?.Notification) {
-    const notificationValues = {
+  // Save the inbox item and its dispatch job atomically. Delivery happens in the worker.
+  if (!db?.Notification || !db?.NotificationJob) throw new Error('Notification storage is required');
+  const queue = require('./notificationQueue');
+  let created = true;
+  let notification;
+  await db.sequelize.transaction(async transaction => {
+    const values = {
       ...buildRecipientPayload(recipientId, normalizedRecipientType), title, message: body,
-      type: notificationType, data: payloadData, is_read: false,
-      dedupe_key: data.dedupe_key || null,
+      type: notificationType, data: normalizeNotificationData(notificationType, data), is_read: false,
+      dedupe_key: data.dedupe_key || null, push_status: preferences?.push_enabled === false ? 'suppressed' : 'queued',
     };
-    if (data.dedupe_key) {
-      const [storedNotification, created] = await db.Notification.findOrCreate({
-        where: { dedupe_key: data.dedupe_key },
-        defaults: notificationValues,
-      });
-      if (!created) {
-        return { delivered: false, suppressed: false, duplicate: true, notification: storedNotification };
+    if (values.dedupe_key) [notification, created] = await db.Notification.findOrCreate({ where: { dedupe_key: values.dedupe_key }, defaults: values, transaction });
+    else notification = await db.Notification.create(values, { transaction });
+    if (!created) return;
+    await notification.update({ data: { ...values.data, notification_id: notification.id, recipient_id: recipientId, recipient_type: normalizedRecipientType } }, { transaction });
+    if (preferences?.push_enabled !== false) {
+      let expiresAt;
+      if (notificationType === 'milk_reminder' && data.report_date) {
+        const { addCalendarDays, appointmentInstant } = require('../utils/businessTime');
+        expiresAt = appointmentInstant(addCalendarDays(data.report_date, 1), '00:00:00', process.env.NOTIFICATION_TIMEZONE || 'Asia/Kolkata');
       }
-      notification = storedNotification;
-    } else {
-      notification = await db.Notification.create(notificationValues);
+      await queue.enqueue(db, 'notification', `notification:${notification.id}`, { notificationId: notification.id }, { transaction, expiresAt });
     }
-    payloadData = { ...payloadData, notification_id: notification.id };
-    await notification.update({ data: payloadData });
-  }
+  });
+  if (created) global.io?.to(getSocketRoom(recipientId, normalizedRecipientType)).emit('notification', {
+    id: notification.id, title, body, type: notificationType, data: notification.data, timestamp: notification.created_at,
+  });
+  return { delivered: false, stored: true, queued: created && preferences?.push_enabled !== false, duplicate: !created, suppressed: false, notification };
 
-  const socketPayload = {
-    id: notification?.id || null,
-    title,
-    body,
-    type: notificationType,
-    data: payloadData,
-    timestamp: notification?.created_at || new Date().toISOString(),
-  };
-  if (global.io) {
-    global.io.to(getSocketRoom(recipientId, normalizedRecipientType)).emit('notification', socketPayload);
-  }
-
-  const pushEnabled = !preferences || preferences.push_enabled !== false;
-  if (pushEnabled && db?.DeviceToken) {
-    const tokens = await db.DeviceToken.findAll({
-      where: buildRecipientTokenWhere(recipientId, normalizedRecipientType),
-      attributes: ['token'],
-    });
-    if (tokens.length > 0) {
-      const badge = db.Notification
-        ? await db.Notification.count({
-          where: buildRecipientWhere(recipientId, normalizedRecipientType, { is_read: false }),
-        })
-        : undefined;
-      await sendBulkPushNotifications(tokens.map((row) => row.token), title, body, payloadData, {
-        badge,
-        ...pushOptions,
-      });
-    }
-  }
-
-  return { delivered: true, suppressed: false, notification };
 };
 
 const sendRealtimeNotification = async (
@@ -334,7 +332,7 @@ const sendRealtimeNotification = async (
 ) => {
   try {
     const notificationType = String(data.type || 'system');
-    await deliverNotification({
+    const result = await deliverNotification({
       db,
       recipientId,
       recipientType,
@@ -346,7 +344,7 @@ const sendRealtimeNotification = async (
         channelId: data.channelId || data.channel_id || getChannelForType(notificationType),
       },
     });
-    return true;
+    return Boolean(result.stored || result.suppressed || result.duplicate);
   } catch (error) {
     logger.error('Notification delivery failed:', error);
     return false;
@@ -437,7 +435,34 @@ const cleanupInactiveTokens = async (db = require('../models'), days = 30) => {
   });
 };
 
+// A single provider attempt. The durable worker owns retries and Expo receipts.
+const sendPushAttempt = async (token, notification, badge, ttlMs = 86400000) => {
+  const data = notification.data || {};
+  try {
+    if (token.provider === 'expo' || isExpoToken(token.token)) {
+      const [ticket] = await expo.sendPushNotificationsAsync([buildExpoMessage(token.token, notification.title, notification.message, data, { badge, ttl: Math.max(1, Math.floor(ttlMs / 1000)), channelId: getChannelForType(notification.type) })]);
+      if (ticket?.status === 'ok' && ticket.id) return { receiptId: ticket.id };
+      const code = ticket?.details?.error || ticket?.message || 'expo_send_failed';
+      await recordTokenFailure(token.token, code, EXPO_INVALID_TOKEN_ERRORS.has(code));
+      return { error: code, permanent: EXPO_INVALID_TOKEN_ERRORS.has(code) };
+    }
+    const messaging = getMessaging();
+    if (!messaging) return { error: 'push_provider_unavailable' };
+    await messaging.send({ token: token.token, notification: { title: notification.title, body: notification.message }, data: toFirebaseData(data),
+      android: { priority: 'high', ttl: Math.max(0, ttlMs), notification: { channelId: getChannelForType(notification.type), sound: 'default' } },
+      apns: { headers: { 'apns-expiration': String(Math.floor((Date.now() + ttlMs) / 1000)) }, payload: { aps: { badge, sound: 'default' } } },
+    });
+    return { accepted: true };
+  } catch (error) {
+    const code = error.code || 'push_send_failed';
+    await recordTokenFailure(token.token, code, FIREBASE_INVALID_TOKEN_CODES.has(code));
+    return { error: code, permanent: FIREBASE_INVALID_TOKEN_CODES.has(code) };
+  }
+};
+const getExpoReceipt = async id => (await expo.getPushNotificationReceiptsAsync([id]))[id];
+
 module.exports = {
+  getCategoryPreference, buildRecipientWhere, sendPushAttempt, getExpoReceipt, recordTokenFailure,
   buildRecipientTokenWhere,
   cleanupInactiveTokens,
   createSystemNotification,

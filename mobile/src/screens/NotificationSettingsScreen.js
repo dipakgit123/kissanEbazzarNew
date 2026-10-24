@@ -1,3 +1,4 @@
+import { useExperienceText } from '../context/AnimalExperienceContext';
 import React from 'react';
 import {
   Alert,
@@ -13,12 +14,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import AppHeader from '../components/AppHeader';
 import SkeletonLoader from '../components/SkeletonLoader';
+import { notificationText } from '../utils/notificationUi';
 import { useNotifications } from '../context/NotificationContext';
 import { COLORS } from '../utils/constants';
 
 const NotificationSettingsScreen = ({ navigation }) => {
-  const { t } = useTranslation();
+  const { i18n } = useTranslation();
+  const experienceText = useExperienceText();
+  const c = notificationText(i18n.language);
   const {
+    error, loadPreferences, preferenceSaving, isVeterinarian,
     permissionStatus,
     pushToken,
     pushRegistrationStatus,
@@ -34,40 +39,38 @@ const NotificationSettingsScreen = ({ navigation }) => {
     {
       key: 'push_enabled',
       icon: 'phone-portrait-outline',
-      title: t('notifications.pushNotifications', { defaultValue: 'Push notifications' }),
-      subtitle: t('notifications.pushNotificationsDesc', { defaultValue: 'Show alerts when the app is closed' }),
-    },
-    {
-      key: 'appointments_enabled',
-      icon: 'medkit-outline',
-      title: t('notifications.appointments', { defaultValue: 'Appointments' }),
-      subtitle: t('notifications.appointmentsDesc', { defaultValue: 'Bookings, confirmations, and changes' }),
+      title: c('push'),
+      subtitle: c('pushDesc'),
     },
     {
       key: 'marketplace_enabled',
       icon: 'pricetag-outline',
-      title: t('notifications.marketplace', { defaultValue: 'Marketplace' }),
-      subtitle: t('notifications.marketplaceDesc', { defaultValue: 'Nearby listings and price updates' }),
+      title: c('market'),
+      subtitle: c('marketDesc'),
     },
     {
       key: 'reminders_enabled',
       icon: 'alarm-outline',
-      title: t('notifications.reminders', { defaultValue: 'Reminders' }),
-      subtitle: t('notifications.remindersDesc', { defaultValue: 'Appointment and pregnancy reminders' }),
+      title: c('reminderTitle'),
+      subtitle: c('reminders'),
     },
     {
       key: 'communication_enabled',
       icon: 'chatbubble-ellipses-outline',
-      title: t('notifications.communication', { defaultValue: 'Calls and messages' }),
-      subtitle: t('notifications.communicationDesc', { defaultValue: 'Incoming calls and direct inquiries' }),
+      title: c('communication'),
+      subtitle: c('communicationDesc'),
     },
     {
       key: 'system_enabled',
       icon: 'shield-checkmark-outline',
-      title: t('notifications.system', { defaultValue: 'Account and system' }),
-      subtitle: t('notifications.systemDesc', { defaultValue: 'Important account and service updates' }),
+      title: c('system'),
+      subtitle: c('systemDesc'),
     },
   ];
+
+  for (const [key, title, desc] of [['health_enabled', 'health', 'healthDesc'], ['pet_mating_enabled', 'pet', 'petDesc'], ['content_enabled', 'content', 'contentDesc'], ['milk_reminders_enabled', 'milk', 'milkDesc']]) rows.push({ key, icon: 'notifications-outline', title: c(title), subtitle: c(desc) });
+
+  if (!isVeterinarian) for (const group of ['farm', 'pet']) rows.push({ key: group + '_enabled', icon: 'paw-outline', title: experienceText[group], subtitle: experienceText[group + 'Species'] });
 
   const enableDeviceNotifications = async () => {
     if (permissionStatus === 'denied' && supportsSystemNotificationSettings) {
@@ -78,34 +81,32 @@ const NotificationSettingsScreen = ({ navigation }) => {
     const registration = await requestPushPermission();
     if (!registration?.token && registration?.permissionStatus === 'denied') {
       Alert.alert(
-        t('notifications.permissionRequired', { defaultValue: 'Permission required' }),
-        t('notifications.permissionRequiredDesc', {
-          defaultValue: 'Enable notifications in your device settings to receive alerts.',
-        })
+        c('disabled'),
+        c('permission')
       );
     }
   };
 
   const permissionEnabled = permissionStatus === 'granted';
-  const firebaseConnected = permissionEnabled
+  const alertsReady = permissionEnabled
     && Boolean(pushToken)
     && pushRegistrationStatus === 'registered';
-  const connectionTitle = firebaseConnected
-    ? 'Firebase push connected'
+  const connectionTitle = alertsReady
+    ? c('connected')
     : pushRegistrationStatus === 'registering'
-      ? 'Connecting Firebase push'
+      ? c('connecting')
       : permissionEnabled
-        ? 'Firebase push not connected'
-        : 'Device alerts disabled';
-  const connectionStatus = firebaseConnected
-    ? 'FCM token registered'
-    : pushRegistrationError || permissionStatus;
+        ? c('registration')
+        : c('disabled');
+  const connectionStatus = alertsReady
+    ? c('ready')
+    : pushRegistrationError ? c('registration') : c('permission');
 
   return (
     <View style={styles.container}>
       <AppHeader
         navigation={navigation}
-        title={t('notifications.settings', { defaultValue: 'Notification settings' })}
+        title={c('settingsTitle')}
       />
 
       {preferencesLoading ? (
@@ -114,12 +115,13 @@ const NotificationSettingsScreen = ({ navigation }) => {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
+          {error === 'settings' && <View accessibilityRole="alert"><Text>{c('settings')}</Text><TouchableOpacity onPress={loadPreferences} style={{ padding: 12 }}><Text>{c('retry')}</Text></TouchableOpacity></View>}
           <View style={styles.permissionBand}>
             <View style={styles.permissionIcon}>
               <Ionicons
-                name={firebaseConnected ? 'notifications' : 'notifications-off-outline'}
+                name={alertsReady ? 'notifications' : 'notifications-off-outline'}
                 size={24}
-                color={firebaseConnected ? COLORS.primary : COLORS.warning}
+                color={alertsReady ? COLORS.primary : COLORS.warning}
               />
             </View>
             <View style={styles.permissionCopy}>
@@ -128,19 +130,19 @@ const NotificationSettingsScreen = ({ navigation }) => {
               </Text>
               <Text style={styles.permissionStatus}>{connectionStatus}</Text>
             </View>
-            {!firebaseConnected && pushRegistrationStatus !== 'registering' && (
+            {!alertsReady && pushRegistrationStatus !== 'registering' && (
               <TouchableOpacity style={styles.enableButton} onPress={enableDeviceNotifications}>
                 <Text style={styles.enableButtonText}>
                   {permissionEnabled
-                    ? t('common.retry', { defaultValue: 'Retry' })
-                    : t('common.enable', { defaultValue: 'Enable' })}
+                    ? c('retry')
+                    : c('enable')}
                 </Text>
               </TouchableOpacity>
             )}
           </View>
 
           <View style={styles.settingsGroup}>
-            {rows.map((row, index) => (
+            {rows.filter(row => !isVeterinarian || ['push_enabled', 'communication_enabled', 'system_enabled'].includes(row.key)).map((row, index) => (
               <View
                 key={row.key}
                 style={[styles.settingRow, index < rows.length - 1 && styles.settingDivider]}
@@ -153,7 +155,8 @@ const NotificationSettingsScreen = ({ navigation }) => {
                   <Text style={styles.settingSubtitle}>{row.subtitle}</Text>
                 </View>
                 <Switch
-                  value={preferences[row.key] !== false}
+                  disabled={preferenceSaving}
+                  value={preferences[row.key] === true}
                   onValueChange={(value) => updatePreference(row.key, value)}
                   trackColor={{ false: COLORS.borderStrong, true: COLORS.primaryLight }}
                   thumbColor={preferences[row.key] !== false ? COLORS.primaryDark : COLORS.surface}

@@ -1,3 +1,4 @@
+import { allowedSpecies, getAnimalGroup } from '../utils/animalExperience';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
@@ -83,6 +84,7 @@ const SellAnimalScreen = ({ navigation }) => {
   }, [navigation, selectedAnimal]);
 
   const animalTypes = [
+    { id: 'sheep', name: t('animalTypes.sheep'), icon: 'paw', color: COLORS.primary, bgColor: '#EEFDF6' },
     { id: 'cow', name: t('animalTypes.cow') || 'Cow', image: require('../assets/cow1.png'), color: COLORS.primary, bgColor: '#EEFDF6' },
     { id: 'buffalo', name: t('animalTypes.buffalo') || 'Buffalo', image: require('../assets/buffalo1.png'), color: '#5F5E5A', bgColor: '#FBF1EE' },
     { id: 'goat', name: t('animalTypes.goat') || 'Goat', image: require('../assets/goat1.png'), color: '#D85A30', bgColor: '#FFF3EA' },
@@ -114,8 +116,10 @@ const SellAnimalScreen = ({ navigation }) => {
         return <DogListingForm {...formProps} />;
       case 'cat':
         return <CatListingForm {...formProps} />;
+      case 'sheep':
+        return <OtherAnimalListingForm key="sheep" initialSpecies="sheep" {...formProps} />;
       case 'other':
-        return <OtherAnimalListingForm {...formProps} />;
+        return <OtherAnimalListingForm key="other" {...formProps} />;
       default:
         return null;
     }
@@ -141,7 +145,7 @@ const SellAnimalScreen = ({ navigation }) => {
         <View style={styles.selectorDivider} />
 
         <View style={styles.animalGrid}>
-          {animalTypes.map((animal) => (
+          {animalTypes.filter(animal => allowedSpecies(animal.id)).map((animal) => (
             <TouchableOpacity
               key={animal.id}
               style={styles.animalCategoryItem}

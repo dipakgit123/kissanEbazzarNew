@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Children, cloneElement, isValidElement, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
+import SavedAnimalPicker from './SavedAnimalPicker';
 import { getCatBreedOptions } from '../constants/catBreeds';
 import { getDogBreedOptions } from '../constants/dogBreeds';
-import { petMatingService } from '../services/api';
-
-const emptyForm = {
+import { petMatingService as api } from '../services/api';
+import translations from '../utils/petMatingCopy.json';
+import './PetMatingPage.css';
+const empty = {
   pet_type: 'dog',
   pet_name: '',
   breed: '',
@@ -17,536 +19,408 @@ const emptyForm = {
   city: '',
   state: '',
   description: '',
+  vaccination_status: 'unknown',
+  last_vaccination_date: '',
+  deworming_status: 'unknown',
+  last_deworming_date: '',
+  mating_experience: 'unknown',
+  medical_notes: '',
+  available_from: '',
+  available_to: '',
+  animal_profile_id: ''
 };
-
-const getLanguage = (i18n) => (i18n.resolvedLanguage || i18n.language || 'en').split('-')[0];
-const getBreedOptions = (type, language, label) => (
-  type === 'cat' ? getCatBreedOptions(language, label) : getDogBreedOptions(language, label)
-);
-const getPhoto = (profile) => profile?.photos?.[0] || null;
-const getLocation = (profile) => [profile.city, profile.state].filter(Boolean).join(', ');
-
-const formatFee = (profile, t) => {
-  if (profile.fee_type === 'free') return t('petMating.free', { defaultValue: 'Free' });
-  if (profile.fee_type === 'paid') {
-    return profile.fee_amount ? `Rs. ${Number(profile.fee_amount).toLocaleString('en-IN')}` : t('petMating.paid', { defaultValue: 'Paid' });
-  }
-  return t('petMating.negotiable', { defaultValue: 'Negotiable' });
-};
-
-const PetMatingPage = () => {
-  const { t, i18n } = useTranslation();
-  const language = getLanguage(i18n);
-  const [profiles, setProfiles] = useState([]);
-  const [myProfiles, setMyProfiles] = useState([]);
-  const [selected, setSelected] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-  const [filters, setFilters] = useState({ petType: 'all', gender: 'all', search: '' });
-  const [form, setForm] = useState(emptyForm);
-  const [photos, setPhotos] = useState([]);
-  const [video, setVideo] = useState(null);
-
-  const breedOptions = useMemo(
-    () => getBreedOptions(form.pet_type, language, t('petMating.selectBreed', { defaultValue: 'Select breed' })),
-    [form.pet_type, language, t]
-  );
-
-  const loadProfiles = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = { limit: 40 };
-      if (filters.petType !== 'all') params.petType = filters.petType;
-      if (filters.gender !== 'all') params.gender = filters.gender;
-      if (filters.search.trim()) params.search = filters.search.trim();
-
-      const [publicResponse, myResponse] = await Promise.all([
-        petMatingService.getProfiles(params),
-        petMatingService.getMyProfiles().catch(() => ({ data: { profiles: [] } })),
-      ]);
-      setProfiles(publicResponse?.data?.profiles || []);
-      setMyProfiles(myResponse?.data?.profiles || []);
-    } catch (error) {
-      toast.error(error?.message || t('petMating.loadFailed', { defaultValue: 'Failed to load pet mating profiles' }));
-    } finally {
-      setLoading(false);
-    }
-  }, [filters, t]);
-
+const reasons = ['fake', 'inappropriate', 'wrong_information', 'spam', 'animal_welfare', 'other'];
+const where = p => [p.city, p.state].filter(Boolean).join(', ');
+const message = e => e?.response?.data?.message || e?.message || 'Unable to complete this request';
+const fee = (p, ui, lang) => p.fee_type === 'paid' ? new Intl.NumberFormat(lang === 'en' ? 'en-IN' : `${lang}-IN`, {
+  style: 'currency',
+  currency: 'INR',
+  maximumFractionDigits: 0
+}).format(Number(p.fee_amount || 0)) : ui[p.fee_type] || ui.negotiable;
+function Dialog({
+  title,
+  children,
+  onClose,
+  busy = false,
+  ui
+}) {
+  const ref = useRef(null),
+    close = useRef(onClose),
+    blocked = useRef(busy);
+  close.current = onClose;
+  blocked.current = busy;
   useEffect(() => {
-    loadProfiles();
-  }, [loadProfiles]);
-
-  const updateForm = (field, value) => {
-    setForm((current) => ({
-      ...current,
-      [field]: value,
-      ...(field === 'pet_type' ? { breed: '' } : {}),
-    }));
-  };
-
-  const resetForm = () => {
-    setForm(emptyForm);
-    setPhotos([]);
-    setVideo(null);
-  };
-
-  const buildFormData = () => {
-    const formData = new FormData();
-    Object.entries(form).forEach(([key, value]) => {
-      if (value !== '' && value !== null && value !== undefined) {
-        formData.append(key, value);
-      }
-    });
-    photos.forEach((file) => formData.append('photos', file));
-    if (video) formData.append('video', video);
-    return formData;
-  };
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    if (photos.length === 0) {
-      toast.error(t('petMating.photoRequired', { defaultValue: 'Please add at least one pet photo' }));
+    const el = ref.current,
+      trigger = document.activeElement,
+      overflow = document.body.style.overflow;
+    el.showModal();
+    document.body.style.overflow = 'hidden';
+    return () => {
+      el.close();
+      document.body.style.overflow = overflow;
+      if (trigger?.isConnected) trigger.focus();
+    };
+  }, []);
+  return <dialog ref={ref} className="mating-dialog" aria-labelledby="mating-dialog-title" onCancel={e => {
+    e.preventDefault();
+    if (!blocked.current) close.current();
+  }}><header><h2 id="mating-dialog-title">{title}</h2><button type="button" disabled={busy} aria-label={ui.close} onClick={onClose}>×</button></header><div className="mating-dialog-body">{children}</div></dialog>;
+}
+function Field({
+  label,
+  children,
+  error
+}) {
+  const id = useId();
+  return <div className="mating-field"><label htmlFor={id}>{label}</label>{Children.map(children, child => isValidElement(child) && ['input', 'select', 'textarea'].includes(child.type) ? cloneElement(child, { id, 'aria-describedby': error ? `${id}-error` : undefined }) : child)}{error && <small id={`${id}-error`} role="alert">{error}</small>}</div>;
+}
+function Gallery({
+  profile,
+  ui
+}) {
+  const [index, setIndex] = useState(0),
+    photos = profile.photos || [];
+  return <div className="mating-gallery">{photos.length > 0 && <img className="mating-main-photo" src={photos[index] || photos[0]} alt={profile.pet_name} />}{photos.length > 1 && <div className="mating-thumbnails">{photos.map((src, i) => <button key={src + i} type="button" aria-label={`${profile.pet_name} ${i + 1}/${photos.length}`} aria-pressed={i === index} onClick={() => setIndex(i)}><img src={src} alt="" /></button>)}</div>}{profile.video_url && <video controls preload="metadata" playsInline src={profile.video_url} aria-label={ui.video} />}</div>;
+}
+function Editor({
+  profile,
+  onClose,
+  onSaved,
+  t,
+  ui,
+  lang
+}) {
+  const [form, setForm] = useState(() => Object.fromEntries(Object.entries(empty).map(([key, value]) => [key, profile?.[key] ?? value])));
+  const [photos, setPhotos] = useState([]),
+    [video, setVideo] = useState(null),
+    [removeVideo, setRemoveVideo] = useState(false),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState(''),
+    [fields, setFields] = useState({});
+  const lock = useRef(false);
+  const update = (key, value) => setForm(old => ({
+    ...old,
+    [key]: value,
+    ...(key === 'pet_type' ? {
+      breed: '',
+      animal_profile_id: ''
+    } : {}),
+    ...(key === 'fee_type' && value !== 'paid' ? {
+      fee_amount: ''
+    } : {})
+  }));
+  const breeds = useMemo(() => {
+    const list = (form.pet_type === 'cat' ? getCatBreedOptions : getDogBreedOptions)(lang, t('petMating.selectBreed'));
+    return form.breed && !list.some(b => b.value === form.breed) ? [...list, {
+      value: form.breed,
+      label: form.breed
+    }] : list;
+  }, [form.pet_type, form.breed, lang, t]);
+  const previews = useMemo(() => photos.map(file => URL.createObjectURL(file)), [photos]);
+  useEffect(() => () => previews.forEach(url => URL.revokeObjectURL(url)), [previews]);
+  const input = (key, label, props = {}) => <Field label={label} error={fields[key]}><input {...props} name={key} value={form[key]} onChange={e => update(key, e.target.value)} aria-invalid={Boolean(fields[key])} /></Field>;
+  const select = (key, label, values) => <Field label={label} error={fields[key]}><select name={key} value={form[key]} onChange={e => update(key, e.target.value)}>{values.map(v => <option key={v} value={v}>{ui[v] || t(`petMating.${v}`, {
+          defaultValue: v
+        })}</option>)}</select></Field>;
+  const submit = async e => {
+    e.preventDefault();
+    if (lock.current) return;
+    if (!photos.length && !profile?.photos?.length) {
+      setError(t('petMating.photoRequired'));
       return;
     }
-
-    setSubmitting(true);
+    lock.current = true;
+    setBusy(true);
+    setError('');
+    setFields({});
+    const data = new FormData();
+    Object.entries(form).forEach(([key, value]) => data.append(key, value ?? ''));
+    photos.forEach(file => data.append('photos', file));
+    if (video) data.append('video', video);
+    if (removeVideo && !video) data.append('remove_video', 'true');
     try {
-      await petMatingService.createProfile(buildFormData());
-      toast.success(t('petMating.created', { defaultValue: 'Pet mating profile created' }));
-      resetForm();
-      setShowForm(false);
-      await loadProfiles();
-    } catch (error) {
-      toast.error(error?.message || t('petMating.createFailed', { defaultValue: 'Failed to create profile' }));
+      if (profile) await api.updateProfile(profile.id, data);else await api.createProfile(data);
+      toast.success(ui.saved);
+      onSaved();
+    } catch (e) {
+      setError(message(e));
+      setFields(e?.fields || e?.response?.data?.fields || {});
     } finally {
-      setSubmitting(false);
+      lock.current = false;
+      setBusy(false);
     }
   };
-
-  const handleContact = async (profile) => {
-    try {
-      const response = await petMatingService.trackContact(profile.id);
-      const phone = response?.data?.owner_phone || profile.owner_phone || profile.owner?.phone_number;
-      if (phone) {
-        window.location.href = `tel:${phone}`;
-      } else {
-        toast.error(t('petMating.noPhone', { defaultValue: 'Owner phone number is not available' }));
-      }
-    } catch (error) {
-      toast.error(error?.message || t('petMating.contactFailed', { defaultValue: 'Unable to contact owner' }));
-    }
-  };
-
-  const handleReport = async (profile) => {
-    const description = window.prompt(t('petMating.reportPrompt', { defaultValue: 'Tell us what is wrong with this profile' }));
-    if (!description) return;
-
-    try {
-      await petMatingService.reportProfile(profile.id, { reason: 'other', description });
-      toast.success(t('petMating.reported', { defaultValue: 'Profile reported for review' }));
-    } catch (error) {
-      toast.error(error?.message || t('petMating.reportFailed', { defaultValue: 'Failed to report profile' }));
-    }
-  };
-
-  const handleMatched = async (profile) => {
-    try {
-      await petMatingService.markMatched(profile.id);
-      toast.success(t('petMating.markedMatched', { defaultValue: 'Profile marked as matched' }));
-      await loadProfiles();
-    } catch (error) {
-      toast.error(error?.message || t('petMating.updateFailed', { defaultValue: 'Failed to update profile' }));
-    }
-  };
-
-  const handleDelete = async (profile) => {
-    const confirmed = window.confirm(t('petMating.deleteConfirm', { defaultValue: 'Delete this pet mating profile?' }));
-    if (!confirmed) return;
-
-    try {
-      await petMatingService.deleteProfile(profile.id);
-      toast.success(t('petMating.deleted', { defaultValue: 'Profile deleted' }));
-      await loadProfiles();
-    } catch (error) {
-      toast.error(error?.message || t('petMating.deleteFailed', { defaultValue: 'Failed to delete profile' }));
-    }
-  };
-
-  return (
-    <main className="min-h-screen bg-[#F7F5EE] text-[#243129]">
-      <section className="border-b border-[#E1DACD] bg-[#F7F5EE]">
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-          <div className="rounded-[1.5rem] bg-[#0F6E56] p-4 text-white shadow-lg shadow-[#0F6E56]/10 sm:p-5">
-            <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.2em] text-[#C9F4DF]">{t('petMating.kicker', { defaultValue: 'Pet mating' })}</p>
-                <h1 className="mt-2 max-w-4xl text-2xl font-black leading-tight sm:text-3xl lg:text-4xl">
-                  {t('petMating.heroTitle', { defaultValue: 'Find trusted mates for dogs and cats.' })}
-                </h1>
-                <div className="mt-3 flex flex-wrap gap-2 text-[0.7rem] font-black text-[#D9F7EA]">
-                  <span className="rounded-full bg-white/12 px-3 py-1.5">{t('petMating.trustPhotoTitle', { defaultValue: 'Clear photo first' })}</span>
-                  <span className="rounded-full bg-white/12 px-3 py-1.5">{t('petMating.trustContactTitle', { defaultValue: 'Verified contact' })}</span>
-                  <span className="rounded-full bg-white/12 px-3 py-1.5">{t('petMating.trustReportTitle', { defaultValue: 'Report unsafe profiles' })}</span>
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-3 lg:justify-end">
-                <MiniStat value={profiles.length} label={t('petMating.profilesCount', { defaultValue: 'profiles' })} />
-                <button type="button" onClick={() => setShowForm(true)} className="rounded-2xl bg-white px-4 py-2.5 text-sm font-black text-[#0F6E56] shadow-lg transition hover:-translate-y-0.5">
-                  {t('petMating.createProfile', { defaultValue: 'Create mating profile' })}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div id="pet-mating-list" className="mt-3 rounded-[1.5rem] border border-[#E1DACD] bg-white p-3 shadow-sm">
-            <div className="grid gap-2 lg:grid-cols-[1fr_11rem_11rem_auto] lg:items-end">
-              <FilterInput label={t('petMating.searchLabel', { defaultValue: 'Search profiles' })} value={filters.search} onChange={(value) => setFilters((current) => ({ ...current, search: value }))} placeholder={t('petMating.searchPlaceholder', { defaultValue: 'Search breed, city, pet name' })} />
-              <FilterSelect label={t('petMating.petType', { defaultValue: 'Pet type' })} value={filters.petType} onChange={(value) => setFilters((current) => ({ ...current, petType: value }))}>
-                <option value="all">{t('petMating.allPets', { defaultValue: 'All pets' })}</option>
-                <option value="dog">{t('animalTypes.dog', { defaultValue: 'Dog' })}</option>
-                <option value="cat">{t('animalTypes.cat', { defaultValue: 'Cat' })}</option>
-              </FilterSelect>
-              <FilterSelect label={t('petMating.gender', { defaultValue: 'Gender' })} value={filters.gender} onChange={(value) => setFilters((current) => ({ ...current, gender: value }))}>
-                <option value="all">{t('petMating.allGenders', { defaultValue: 'All genders' })}</option>
-                <option value="male">{t('petMating.male', { defaultValue: 'Male' })}</option>
-                <option value="female">{t('petMating.female', { defaultValue: 'Female' })}</option>
-              </FilterSelect>
-              <button type="button" onClick={() => setShowForm(true)} className="rounded-2xl bg-[#0F6E56] px-4 py-2.5 text-sm font-black text-white shadow-md shadow-[#0F6E56]/10 transition hover:bg-[#0B5C49]">
-                {t('petMating.createProfile', { defaultValue: 'Create mating profile' })}
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
-        {myProfiles.length > 0 && (
-          <section className="mb-8 rounded-[2rem] border border-[#E4E0D5] bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0F6E56]">{t('petMating.ownerDashboard', { defaultValue: 'Owner dashboard' })}</p>
-                <h2 className="mt-1 text-2xl font-black text-[#243129]">{t('petMating.myProfiles', { defaultValue: 'My pet mating profiles' })}</h2>
-              </div>
-              <p className="text-sm font-bold text-[#6C716A]">{t('petMating.manageProfilesHint', { defaultValue: 'Manage visibility after your pet finds a match.' })}</p>
-            </div>
-            <div className="mt-5 grid gap-3 md:grid-cols-2">
-              {myProfiles.map((profile) => (
-                <OwnerProfileRow key={profile.id} profile={profile} t={t} onMatched={() => handleMatched(profile)} onDelete={() => handleDelete(profile)} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        <div className="mb-5 flex items-center justify-between gap-4">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0F6E56]">{t('petMating.browseProfiles', { defaultValue: 'Browse profiles' })}</p>
-            <h2 className="mt-1 text-3xl font-black text-[#243129]">{t('petMating.availableProfiles', { defaultValue: 'Available pet profiles' })}</h2>
-          </div>
-          <span className="rounded-full bg-[#E1F5EE] px-4 py-2 text-sm font-black text-[#0F6E56]">
-            {profiles.length} {t('petMating.profilesCount', { defaultValue: 'profiles' })}
-          </span>
-        </div>
-
-        {loading ? (
-          <div className="rounded-[2rem] bg-white p-10 text-center font-bold text-[#6C716A] shadow-sm">{t('common.loading', { defaultValue: 'Loading...' })}</div>
-        ) : profiles.length === 0 ? (
-          <EmptyState t={t} onCreate={() => setShowForm(true)} />
-        ) : (
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {profiles.map((profile) => (
-              <ProfileCard key={profile.id} profile={profile} t={t} onSelect={() => setSelected(profile)} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {showForm && (
-        <PetMatingFormModal
-          t={t}
-          form={form}
-          photos={photos}
-          video={video}
-          breedOptions={breedOptions}
-          submitting={submitting}
-          updateForm={updateForm}
-          setPhotos={setPhotos}
-          setVideo={setVideo}
-          onSubmit={handleSubmit}
-          onClose={() => !submitting && setShowForm(false)}
-        />
-      )}
-
-      {selected && (
-        <ProfileDetailModal
-          profile={selected}
-          t={t}
-          onClose={() => setSelected(null)}
-          onContact={() => handleContact(selected)}
-          onReport={() => handleReport(selected)}
-        />
-      )}
-    </main>
-  );
-};
-
-const MiniStat = ({ value, label }) => (
-  <div className="rounded-2xl bg-white/12 px-4 py-2 text-center">
-    <p className="text-xl font-black text-white">{value}</p>
-    <p className="text-[0.65rem] font-black uppercase tracking-[0.14em] text-[#C9F4DF]">{label}</p>
+  return <Dialog title={profile ? ui.edit : ui.create} onClose={onClose} busy={busy} ui={ui}><form onSubmit={submit} className="mating-editor">
+  {!profile && <SavedAnimalPicker supportedSpecies={['dog', 'cat']} onSelect={a => setForm(old => ({
+        ...old,
+        pet_type: a.species,
+        pet_name: a.name,
+        breed: a.breed || '',
+        animal_profile_id: a.id
+      }))} />}
+  <Field label={t('petMating.addPhotos')}><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple onChange={e => {
+          const files = Array.from(e.target.files || []);
+          if (files.length > 5 || files.some(f => f.size > 25 * 1024 * 1024 || !f.type.startsWith('image/'))) {
+            setError(ui.mediaLimit);
+            e.target.value = '';
+            return;
+          }
+          setPhotos(files);
+          setError('');
+        }} /><small>{ui.newPhotos}</small></Field>
+  <div className="mating-thumbnails">{(previews.length ? previews : profile?.photos || []).map((src, i) => <img key={src} src={src} alt={`${ui.existingPhotos} ${i + 1}`} />)}</div>
+  <div className="mating-form-grid">
+   <Field label={t('petMating.petType')}><select value={form.pet_type} onChange={e => update('pet_type', e.target.value)}>{['dog', 'cat'].map(v => <option key={v} value={v}>{t(`animalTypes.${v}`)}</option>)}</select></Field>
+   {input('pet_name', t('petMating.petName'), {
+          required: true,
+          maxLength: 120
+        })}
+   <Field label={t('petMating.selectBreed')} error={fields.breed}><select required value={form.breed} onChange={e => update('breed', e.target.value)}>{breeds.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}</select></Field>
+   {select('gender', t('petMating.gender'), ['male', 'female'])}{input('age_months', t('petMating.ageMonths'), {
+          type: 'number',
+          min: 1,
+          max: 600,
+          step: 1
+        })}{input('owner_phone', t('petMating.ownerPhone'), {
+          type: 'tel',
+          required: true,
+          maxLength: 30,
+          autoComplete: 'tel'
+        })}
+   {select('fee_type', ui.feeType, ['negotiable', 'free', 'paid'])}{form.fee_type === 'paid' && input('fee_amount', t('petMating.feePrice'), {
+          type: 'number',
+          required: true,
+          min: 0.01,
+          max: 100000000,
+          step: 0.01
+        })}{input('city', t('petMating.city'), {
+          maxLength: 120
+        })}{input('state', t('petMating.state'), {
+          maxLength: 120
+        })}
   </div>
-);
-
-const FilterInput = ({ label, value, onChange, placeholder }) => (
-  <label>
-    <span className="mb-1 block text-[0.65rem] font-black uppercase tracking-[0.16em] text-[#6C716A]">{label}</span>
-    <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="w-full rounded-xl border border-[#E4E0D5] bg-[#FCFBF7] px-3 py-2.5 text-sm font-bold outline-none transition focus:border-[#0F6E56] focus:ring-4 focus:ring-[#0F6E56]/10" />
-  </label>
-);
-
-const FilterSelect = ({ label, value, onChange, children }) => (
-  <label>
-    <span className="mb-1 block text-[0.65rem] font-black uppercase tracking-[0.16em] text-[#6C716A]">{label}</span>
-    <select value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-xl border border-[#E4E0D5] bg-[#FCFBF7] px-3 py-2.5 text-sm font-bold outline-none transition focus:border-[#0F6E56] focus:ring-4 focus:ring-[#0F6E56]/10">
-      {children}
-    </select>
-  </label>
-);
-
-const OwnerProfileRow = ({ profile, t, onMatched, onDelete }) => (
-  <div className="flex flex-col gap-4 rounded-3xl border border-[#E9E5DB] bg-[#FCFBF7] p-4 sm:flex-row sm:items-center sm:justify-between">
-    <div className="flex min-w-0 items-center gap-3">
-      <div className="h-14 w-14 overflow-hidden rounded-2xl bg-[#E1F5EE]">
-        {getPhoto(profile) ? <img src={getPhoto(profile)} alt={profile.pet_name} className="h-full w-full object-cover" /> : null}
-      </div>
-      <div className="min-w-0">
-        <p className="truncate font-black text-[#243129]">{profile.pet_name} - {profile.breed}</p>
-        <p className="mt-1 text-sm font-bold capitalize text-[#6C716A]">{profile.status}</p>
-      </div>
-    </div>
-    <div className="flex flex-wrap gap-2">
-      {profile.status === 'active' && (
-        <button type="button" onClick={onMatched} className="rounded-xl bg-[#1D9E75] px-4 py-2 text-sm font-black text-white">
-          {t('petMating.markMatched', { defaultValue: 'Mark matched' })}
-        </button>
-      )}
-      <button type="button" onClick={onDelete} className="rounded-xl border border-[#E03131] bg-white px-4 py-2 text-sm font-black text-[#E03131]">
-        {t('petMating.deleteProfile', { defaultValue: 'Delete' })}
-      </button>
-    </div>
-  </div>
-);
-
-const ProfileCard = ({ profile, t, onSelect }) => (
-  <article className="group overflow-hidden rounded-[1.7rem] border border-[#E4E0D5] bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-    <button type="button" onClick={onSelect} className="block w-full text-left">
-      <div className="relative h-56 bg-[#E1F5EE]">
-        {getPhoto(profile) ? (
-          <img src={getPhoto(profile)} alt={profile.pet_name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
-        ) : (
-          <div className="flex h-full items-center justify-center text-xl font-black uppercase tracking-[0.18em] text-[#0F6E56]">Pet</div>
-        )}
-        <div className="absolute left-4 top-4 flex gap-2">
-          <span className="rounded-full bg-white/95 px-3 py-1 text-xs font-black uppercase text-[#0F6E56] shadow">{profile.pet_type}</span>
-          <span className="rounded-full bg-[#243129]/85 px-3 py-1 text-xs font-black capitalize text-white shadow">{profile.status}</span>
-        </div>
-      </div>
-      <div className="p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="truncate text-2xl font-black text-[#243129]">{profile.pet_name}</h3>
-            <p className="mt-1 font-bold text-[#6C716A]">{profile.breed} - {t(`petMating.${profile.gender}`, { defaultValue: profile.gender })}</p>
-          </div>
-          <span className="shrink-0 rounded-full bg-[#FAECE7] px-3 py-1 text-xs font-black text-[#D85A30]">{formatFee(profile, t)}</span>
-        </div>
-        <p className="mt-4 line-clamp-2 min-h-[3rem] text-sm font-semibold leading-6 text-[#6C716A]">{profile.description || t('petMating.noDescription', { defaultValue: 'No description added.' })}</p>
-        <div className="mt-5 flex items-center justify-between gap-3">
-          <p className="truncate text-sm font-black text-[#0F6E56]">{getLocation(profile) || t('profile.locationNotSet', { defaultValue: 'Location not set' })}</p>
-          <span className="rounded-full bg-[#F7F5EE] px-3 py-2 text-xs font-black text-[#243129]">{t('petMating.viewDetails', { defaultValue: 'View details' })}</span>
-        </div>
-      </div>
-    </button>
-  </article>
-);
-
-const PetMatingFormModal = ({
-  t,
-  form,
-  photos,
-  video,
-  breedOptions,
-  submitting,
-  updateForm,
-  setPhotos,
-  setVideo,
-  onSubmit,
+  <details className="mating-optional"><summary>{ui.health}</summary><div className="mating-form-grid">
+   {select('vaccination_status', ui.vaccination, ['unknown', 'not_vaccinated', 'partial', 'up_to_date'])}{input('last_vaccination_date', ui.vaccinationDate, {
+            type: 'date',
+            max: new Date().toISOString().slice(0, 10)
+          })}{select('deworming_status', ui.deworming, ['unknown', 'not_done', 'done'])}{input('last_deworming_date', ui.dewormingDate, {
+            type: 'date',
+            max: new Date().toISOString().slice(0, 10)
+          })}{select('mating_experience', ui.experience, ['unknown', 'first_time', 'experienced'])}{input('available_from', ui.from, {
+            type: 'date'
+          })}{input('available_to', ui.until, {
+            type: 'date',
+            min: form.available_from || undefined
+          })}
+  </div><Field label={ui.medical}><textarea maxLength={2000} value={form.medical_notes} onChange={e => update('medical_notes', e.target.value)} /></Field></details>
+  <Field label={t('petMating.description')}><textarea maxLength={4000} rows={3} value={form.description} onChange={e => update('description', e.target.value)} /></Field>
+  <Field label={t('petMating.addVideoOptional')}><input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={e => {
+          const file = e.target.files?.[0];
+          if (file && file.size > 25 * 1024 * 1024) {
+            setError(ui.mediaLimit);
+            e.target.value = '';
+            return;
+          }
+          setVideo(file || null);
+          setRemoveVideo(false);
+        }} /></Field>
+  {profile?.video_url && !video && <label className="mating-checkbox"><input type="checkbox" checked={removeVideo} onChange={e => setRemoveVideo(e.target.checked)} />{ui.removeVideo}</label>}{error && <p className="mating-error" role="alert">{error}</p>}
+  <div className="mating-actions"><button type="button" disabled={busy} onClick={onClose}>{ui.cancel}</button><button className="primary" disabled={busy}>{busy ? t('common.loading') : ui.save}</button></div>
+ </form></Dialog>;
+}
+function Report({
+  profile,
   onClose,
-}) => (
-  <div className="fixed inset-0 z-50 overflow-y-auto bg-[#111815]/70 p-4 backdrop-blur-sm">
-    <div className="mx-auto my-6 max-w-3xl overflow-hidden rounded-[2rem] bg-white shadow-2xl">
-      <div className="border-b border-[#E4E0D5] bg-[#FCFBF7] px-5 py-4 sm:px-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0F6E56]">{t('petMating.simpleProfile', { defaultValue: 'Simple profile' })}</p>
-            <h2 className="mt-1 text-2xl font-black text-[#243129]">{t('petMating.formTitle', { defaultValue: 'Add pet mating profile' })}</h2>
-            <p className="mt-1 text-sm font-semibold text-[#6C716A]">{t('petMating.simpleFormHint', { defaultValue: 'Only the important details. You can keep optional fields blank.' })}</p>
-          </div>
-          <button type="button" onClick={onClose} className="rounded-2xl bg-white px-4 py-2 text-lg font-black text-[#243129]" aria-label={t('common.close', { defaultValue: 'Close' })}>x</button>
-        </div>
-      </div>
-
-      <form onSubmit={onSubmit} className="max-h-[calc(100vh-8rem)] overflow-y-auto p-5 sm:p-6">
-        <div className="grid gap-4 md:grid-cols-2">
-          <FileField
-            className="md:col-span-2"
-            label={t('petMating.addPhotos', { defaultValue: 'Add photos' })}
-            helper={t('petMating.photoHelp', { defaultValue: 'At least one clear photo is required. Maximum 5 photos.' })}
-            value={photos.length > 0 ? `${photos.length} ${t('petMating.photosSelected', { defaultValue: 'photos selected' })}` : t('petMating.choosePhotos', { defaultValue: 'Choose photos' })}
-            accept="image/*"
-            multiple
-            onChange={(files) => setPhotos(Array.from(files || []).slice(0, 5))}
-          />
-          <SelectField label={t('petMating.petType', { defaultValue: 'Pet type' })} value={form.pet_type} onChange={(value) => updateForm('pet_type', value)}>
-            <option value="dog">{t('animalTypes.dog', { defaultValue: 'Dog' })}</option>
-            <option value="cat">{t('animalTypes.cat', { defaultValue: 'Cat' })}</option>
-          </SelectField>
-          <SelectField required label={t('petMating.selectBreed', { defaultValue: 'Select breed' })} value={form.breed} onChange={(value) => updateForm('breed', value)}>
-            {breedOptions.map((option) => <option key={option.value || 'empty'} value={option.value}>{option.label}</option>)}
-          </SelectField>
-          <TextField required label={t('petMating.petName', { defaultValue: 'Pet name' })} value={form.pet_name} onChange={(value) => updateForm('pet_name', value)} />
-          <SelectField label={t('petMating.gender', { defaultValue: 'Gender' })} value={form.gender} onChange={(value) => updateForm('gender', value)}>
-            <option value="male">{t('petMating.male', { defaultValue: 'Male' })}</option>
-            <option value="female">{t('petMating.female', { defaultValue: 'Female' })}</option>
-          </SelectField>
-          <TextField min="0" type="number" label={t('petMating.ageMonths', { defaultValue: 'Age in months' })} value={form.age_months} onChange={(value) => updateForm('age_months', value)} />
-          <TextField
-            min="0"
-            type="number"
-            label={t('petMating.feePrice', { defaultValue: 'Fees / Price' })}
-            value={form.fee_amount}
-            onChange={(value) => {
-              updateForm('fee_amount', value);
-              updateForm('fee_type', value ? 'paid' : 'negotiable');
-            }}
-          />
-          <TextField required label={t('petMating.ownerPhone', { defaultValue: 'Owner phone' })} value={form.owner_phone} onChange={(value) => updateForm('owner_phone', value)} />
-          <TextField label={t('petMating.city', { defaultValue: 'City' })} value={form.city} onChange={(value) => updateForm('city', value)} />
-          <TextField label={t('petMating.state', { defaultValue: 'State' })} value={form.state} onChange={(value) => updateForm('state', value)} />
-          <FileField
-            label={t('petMating.addVideoOptional', { defaultValue: 'Add video optional' })}
-            helper={t('petMating.videoHelp', { defaultValue: 'Short optional video helps buyers understand the pet better.' })}
-            value={video ? video.name : t('petMating.chooseVideo', { defaultValue: 'Choose video' })}
-            accept="video/*"
-            onChange={(files) => setVideo(files?.[0] || null)}
-          />
-          <TextArea className="md:col-span-2" label={t('petMating.description', { defaultValue: 'Description, health notes, mating preference' })} value={form.description} onChange={(value) => updateForm('description', value)} />
-        </div>
-
-        <div className="sticky bottom-0 -mx-5 mt-6 border-t border-[#E4E0D5] bg-white/95 px-5 py-4 backdrop-blur sm:-mx-6 sm:px-6">
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <button type="button" onClick={onClose} disabled={submitting} className="rounded-2xl border border-[#E4E0D5] px-6 py-3 font-black text-[#243129] disabled:opacity-60">
-              {t('common.cancel', { defaultValue: 'Cancel' })}
-            </button>
-            <button disabled={submitting} className="rounded-2xl bg-[#0F6E56] px-6 py-3 font-black text-white shadow-lg shadow-[#0F6E56]/15 disabled:bg-[#B4B2A9]">
-              {submitting ? t('common.loading', { defaultValue: 'Loading...' }) : t('petMating.submitProfile', { defaultValue: 'Submit profile' })}
-            </button>
-          </div>
-        </div>
-      </form>
-    </div>
-  </div>
-);
-
-const TextField = ({ label, value, onChange, className = '', ...props }) => (
-  <label className={`block ${className}`}>
-    <span className="mb-2 block text-sm font-black text-[#243129]">{label}</span>
-    <input {...props} value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-2xl border border-[#E4E0D5] bg-white px-4 py-3 font-bold text-[#243129] outline-none transition placeholder:text-[#9A9D96] focus:border-[#0F6E56] focus:ring-4 focus:ring-[#0F6E56]/10" />
-  </label>
-);
-
-const SelectField = ({ label, value, onChange, children, className = '', ...props }) => (
-  <label className={`block ${className}`}>
-    <span className="mb-2 block text-sm font-black text-[#243129]">{label}</span>
-    <select {...props} value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-2xl border border-[#E4E0D5] bg-white px-4 py-3 font-bold text-[#243129] outline-none transition focus:border-[#0F6E56] focus:ring-4 focus:ring-[#0F6E56]/10">
-      {children}
-    </select>
-  </label>
-);
-
-const TextArea = ({ label, value, onChange, className = '' }) => (
-  <label className={`block ${className}`}>
-    <span className="mb-2 block text-sm font-black text-[#243129]">{label}</span>
-    <textarea value={value} onChange={(event) => onChange(event.target.value)} className="min-h-[6rem] w-full rounded-2xl border border-[#E4E0D5] bg-white px-4 py-3 font-bold text-[#243129] outline-none transition placeholder:text-[#9A9D96] focus:border-[#0F6E56] focus:ring-4 focus:ring-[#0F6E56]/10" />
-  </label>
-);
-
-const FileField = ({ label, helper, value, accept, multiple, onChange, className = '' }) => (
-  <label className={`block rounded-3xl border border-dashed border-[#B9B5A9] bg-[#FCFBF7] p-4 transition hover:border-[#0F6E56] ${className}`}>
-    <span className="block text-sm font-black text-[#243129]">{label}</span>
-    <span className="mt-1 block text-xs font-semibold leading-5 text-[#6C716A]">{helper}</span>
-    <span className="mt-3 inline-flex rounded-2xl bg-[#E1F5EE] px-4 py-2 text-sm font-black text-[#0F6E56]">{value}</span>
-    <input type="file" accept={accept} multiple={multiple} onChange={(event) => onChange(event.target.files)} className="hidden" />
-  </label>
-);
-
-const EmptyState = ({ t, onCreate }) => (
-  <div className="rounded-[2rem] border border-[#E4E0D5] bg-white p-10 text-center shadow-sm">
-    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-[#E1F5EE] text-sm font-black uppercase tracking-[0.16em] text-[#0F6E56]">Pet</div>
-    <h2 className="mt-4 text-2xl font-black text-[#243129]">{t('petMating.emptyTitle', { defaultValue: 'No pet mating profiles yet' })}</h2>
-    <p className="mt-2 font-semibold text-[#6C716A]">{t('petMating.emptySubtitle', { defaultValue: 'Create the first trusted profile for your area.' })}</p>
-    <button type="button" onClick={onCreate} className="mt-5 rounded-2xl bg-[#0F6E56] px-6 py-3 font-black text-white">
-      {t('petMating.createProfile', { defaultValue: 'Create mating profile' })}
-    </button>
-  </div>
-);
-
-const ProfileDetailModal = ({ profile, t, onClose, onContact, onReport }) => (
-  <div className="fixed inset-0 z-50 overflow-y-auto bg-[#111815]/70 p-4 backdrop-blur-sm">
-    <div className="mx-auto my-8 max-w-4xl overflow-hidden rounded-[2rem] bg-white shadow-2xl">
-      <div className="grid lg:grid-cols-[1fr_1.1fr]">
-        <div className="bg-[#E1F5EE]">
-          {getPhoto(profile) ? (
-            <img src={getPhoto(profile)} alt={profile.pet_name} className="h-full min-h-[24rem] w-full object-cover" />
-          ) : (
-            <div className="flex min-h-[24rem] items-center justify-center text-xl font-black uppercase tracking-[0.18em] text-[#0F6E56]">Pet</div>
-          )}
-        </div>
-        <div className="p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-black uppercase tracking-[0.16em] text-[#0F6E56]">{profile.pet_type}</p>
-              <h2 className="mt-2 text-4xl font-black text-[#243129]">{profile.pet_name}</h2>
-              <p className="mt-2 font-bold text-[#6C716A]">{profile.breed} - {t(`petMating.${profile.gender}`, { defaultValue: profile.gender })}</p>
-            </div>
-            <button type="button" onClick={onClose} className="rounded-full bg-[#F7F5EE] px-4 py-2 text-xl font-black text-[#243129]" aria-label={t('common.close', { defaultValue: 'Close' })}>x</button>
-          </div>
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            <Info label={t('petMating.fee', { defaultValue: 'Fee' })} value={formatFee(profile, t)} />
-            <Info label={t('petMating.ageMonths', { defaultValue: 'Age in months' })} value={profile.age_months} />
-            <Info label={t('petMating.city', { defaultValue: 'City' })} value={getLocation(profile)} />
-            <Info label={t('petMating.experience', { defaultValue: 'Experience' })} value={profile.mating_experience} />
-          </div>
-          <p className="mt-6 whitespace-pre-line text-sm font-semibold leading-7 text-[#6C716A]">{profile.description || t('petMating.noDescription', { defaultValue: 'No description added.' })}</p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button type="button" onClick={onContact} className="rounded-2xl bg-[#0F6E56] px-5 py-3 font-black text-white">
-              {t('petMating.callOwner', { defaultValue: 'Call owner' })}
-            </button>
-            <button type="button" onClick={onReport} className="rounded-2xl border border-[#E03131] px-5 py-3 font-black text-[#E03131]">
-              {t('petMating.reportProfile', { defaultValue: 'Report profile' })}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
-const Info = ({ label, value }) => (
-  <div className="rounded-2xl bg-[#F7F5EE] p-4">
-    <p className="text-xs font-black uppercase tracking-[0.12em] text-[#6C716A]">{label}</p>
-    <p className="mt-1 font-black text-[#243129]">{value || '-'}</p>
-  </div>
-);
-
-export default PetMatingPage;
+  ui
+}) {
+  const [reason, setReason] = useState(''),
+    [description, setDescription] = useState(''),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState('');
+  return <Dialog title={ui.report} onClose={onClose} busy={busy} ui={ui}><form className="mating-editor" onSubmit={async e => {
+      e.preventDefault();
+      if (busy) return;
+      setBusy(true);
+      try {
+        await api.reportProfile(profile.id, {
+          reason,
+          description
+        });
+        toast.success(ui.reportSent);
+        onClose();
+      } catch (e) {
+        setError(message(e));
+      } finally {
+        setBusy(false);
+      }
+    }}><Field label={ui.reason}><select required value={reason} onChange={e => setReason(e.target.value)}><option value="">{ui.chooseReason}</option>{reasons.map(v => <option key={v} value={v}>{ui[v]}</option>)}</select></Field><Field label={ui.details}><textarea required minLength={5} maxLength={2000} rows={4} value={description} onChange={e => setDescription(e.target.value)} /></Field>{error && <p className="mating-error" role="alert">{error}</p>}<button className="primary" disabled={busy}>{ui.submitReport}</button></form></Dialog>;
+}
+export default function PetMatingPage() {
+  const {
+      t,
+      i18n
+    } = useTranslation(),
+    lang = (i18n.resolvedLanguage || i18n.language || 'en').split('-')[0],
+    ui = translations[lang] || translations.en;
+  const [filters, setFilters] = useState({
+      petType: 'all',
+      breed: '',
+      gender: 'all',
+      search: ''
+    }),
+    [search, setSearch] = useState(''),
+    [page, setPage] = useState(1),
+    [pages, setPages] = useState(1),
+    [total, setTotal] = useState(0);
+  const [profiles, setProfiles] = useState([]),
+    [mine, setMine] = useState([]),
+    [loading, setLoading] = useState(true),
+    [error, setError] = useState(''),
+    [editor, setEditor] = useState(null),
+    [selected, setSelected] = useState(null),
+    [report, setReport] = useState(null),
+    [actionBusy, setActionBusy] = useState(false);
+  const filterBreeds = useMemo(() => {
+    const placeholder = t('petMating.allBreeds', { defaultValue: 'All breeds' });
+    const options = filters.petType === 'dog' ? getDogBreedOptions(lang, placeholder) : filters.petType === 'cat' ? getCatBreedOptions(lang, placeholder) : [...getDogBreedOptions(lang, placeholder), ...getCatBreedOptions(lang, placeholder)];
+    return options.filter((item, index) => options.findIndex(other => other.value === item.value) === index);
+  }, [filters.petType, lang, t]);
+  const request = useRef(0),
+    detailRequest = useRef(0);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPage(1);
+      setFilters(old => old.search === search ? old : {
+        ...old,
+        search
+      });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+  const load = useCallback(async () => {
+    const id = ++request.current;
+    setLoading(true);
+    setError('');
+    try {
+      const [publicData, ownData] = await Promise.all([api.getProfiles({
+        ...filters,
+        page,
+        limit: 12
+      }), api.getMyProfiles()]);
+      if (id !== request.current) return;
+      const data = publicData.data;
+      setProfiles(data.profiles || []);
+      setMine((ownData.data?.profiles || []).filter(p => p.status !== 'removed'));
+      setTotal(data.total || 0);
+      setPages(data.totalPages || 1);
+      if (page > data.totalPages) setPage(Math.max(1, data.totalPages));
+    } catch (e) {
+      if (id === request.current) setError(message(e));
+    } finally {
+      if (id === request.current) setLoading(false);
+    }
+  }, [filters, page]);
+  useEffect(() => {
+    load();
+    return () => {
+      request.current++;
+    };
+  }, [load]);
+  const open = async p => {
+    const id = ++detailRequest.current;
+    setSelected({
+      loading: true
+    });
+    try {
+      const r = await api.getProfile(p.id);
+      if (id === detailRequest.current) setSelected(r.data.profile);
+    } catch (e) {
+      if (id === detailRequest.current) {
+        setSelected(null);
+        toast.error(message(e));
+      }
+    }
+  };
+  const closeDetail = () => {
+    detailRequest.current++;
+    setSelected(null);
+  };
+  const status = async (p, value) => {
+    if (actionBusy) return;
+    setActionBusy(true);
+    try {
+      await api.updateStatus(p.id, value);
+      toast.success(ui.updated);
+      await load();
+    } catch (e) {
+      toast.error(message(e));
+    } finally {
+      setActionBusy(false);
+    }
+  };
+  const remove = async p => {
+    if (actionBusy || !window.confirm(t('petMating.deleteConfirm'))) return;
+    setActionBusy(true);
+    try {
+      await api.deleteProfile(p.id);
+      await load();
+    } catch (e) {
+      toast.error(message(e));
+    } finally {
+      setActionBusy(false);
+    }
+  };
+  const contact = async (p, whatsapp = false) => {
+    if (actionBusy) return;
+    setActionBusy(true);
+    try {
+      const r = await api.trackContact(p.id);
+      const phone = String(r.data.owner_phone || '').replace(/[^\d+]/g, '');
+      if (!phone) throw Error(t('petMating.noPhone'));
+      if (whatsapp) {
+        const digits = phone.replace(/\D/g, '');
+        window.location.href = `https://wa.me/${digits.length === 10 ? '91' + digits : digits}`;
+      } else window.location.href = `tel:${phone}`;
+    } catch (e) {
+      toast.error(message(e));
+    } finally {
+      setActionBusy(false);
+    }
+  };
+  const filter = (key, value) => {
+    setPage(1);
+    setFilters(old => ({
+      ...old,
+      [key]: value,
+      ...(key === 'petType' ? { breed: '' } : {})
+    }));
+  };
+  return <main className="mating-page"><header className="mating-page-header"><div><h1>{ui.title}</h1><p>{ui.intro}</p></div><button className="primary" onClick={() => setEditor({})}>{ui.create}</button></header>
+  <section className="mating-filters" aria-label={t('common.filter', {
+      defaultValue: 'Filters'
+    })}><Field label={t('petMating.searchLabel')}><input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder={t('petMating.searchPlaceholder')} /></Field><Field label={t('petMating.petType')}><select value={filters.petType} onChange={e => filter('petType', e.target.value)}><option value="all">{t('petMating.allPets')}</option>{['dog', 'cat'].map(v => <option key={v} value={v}>{t(`animalTypes.${v}`)}</option>)}</select></Field><Field label={t('petMating.selectBreed')}><select value={filters.breed} onChange={e => filter('breed', e.target.value)}>{filterBreeds.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}</select></Field><Field label={t('petMating.gender')}><select value={filters.gender} onChange={e => filter('gender', e.target.value)}><option value="all">{t('petMating.allGenders')}</option>{['male', 'female'].map(v => <option key={v} value={v}>{t(`petMating.${v}`)}</option>)}</select></Field></section>
+  {mine.length > 0 && <details className="mating-mine" open><summary>{ui.mine} ({mine.length})</summary><div className="mating-owner-grid">{mine.map(p => <article key={p.id}><div><strong>{p.pet_name}</strong><p>{p.breed} · {ui[p.status === 'matched' ? 'matchedStatus' : p.status]}</p></div><div className="mating-actions">{['active', 'paused', 'matched'].includes(p.status) && <><button disabled={actionBusy} onClick={() => setEditor(p)}>{ui.edit}</button><button disabled={actionBusy} onClick={() => status(p, p.status === 'active' ? 'paused' : 'active')}>{p.status === 'active' ? ui.pause : ui.activate}</button>{p.status !== 'matched' && <button disabled={actionBusy} onClick={() => status(p, 'matched')}>{ui.matched}</button>}</>}<button className="danger" disabled={actionBusy} onClick={() => remove(p)}>{ui.delete}</button></div></article>)}</div></details>}
+  <div className="mating-section-title"><h2>{ui.browse}</h2><span>{total} {ui.total}</span></div>
+  {error ? <div className="mating-empty" role="alert"><p>{error}</p><button onClick={load}>{ui.retry}</button></div> : loading ? <div className="mating-empty" role="status">{t('common.loading')}</div> : profiles.length ? <div className="mating-profile-grid">{profiles.map(p => <article className="mating-profile-card" key={p.id}><button onClick={() => open(p)}><img src={p.photos?.[0]} alt={p.pet_name} loading="lazy" /><div><div className="mating-section-title"><h3>{p.pet_name}</h3><span>{fee(p, ui, lang)}</span></div><p>{t(`animalTypes.${p.pet_type}`)} · {p.breed} · {t(`petMating.${p.gender}`)}</p><p>{where(p) || t('profile.locationNotSet')}</p><span className="mating-view">{t('petMating.viewDetails', {
+                defaultValue: 'View details'
+              })} →</span></div></button></article>)}</div> : <div className="mating-empty"><h3>{ui.empty}</h3><button onClick={() => {
+        setSearch('');
+        setFilters({
+          petType: 'all',
+          gender: 'all',
+          search: ''
+        });
+        setPage(1);
+      }}>{ui.clear}</button></div>}
+  {pages > 1 && <nav className="mating-pagination" aria-label={ui.page}><button disabled={loading || page <= 1} onClick={() => setPage(p => p - 1)}>{ui.previous}</button><span>{ui.page} {page} / {pages}</span><button disabled={loading || page >= pages} onClick={() => setPage(p => p + 1)}>{ui.next}</button></nav>}
+  {editor && <Editor profile={editor.id ? editor : null} onClose={() => setEditor(null)} onSaved={() => {
+      setEditor(null);
+      load();
+    }} t={t} ui={ui} lang={lang} />}
+  {selected && <Dialog title={selected.pet_name || ui.loadingDetails} onClose={closeDetail} ui={ui}>{selected.loading ? <p role="status">{ui.loadingDetails}</p> : <><div className="mating-detail-grid"><Gallery profile={selected} ui={ui} /><div><h3>{selected.breed} · {t(`petMating.${selected.gender}`)}</h3><dl className="mating-facts">{[[ui.feeType, fee(selected, ui, lang)], [t('petMating.ageMonths'), selected.age_months], [t('petMating.city'), where(selected)], [ui.vaccination, ui[selected.vaccination_status]], [ui.vaccinationDate, selected.last_vaccination_date], [ui.deworming, ui[selected.deworming_status]], [ui.dewormingDate, selected.last_deworming_date], [ui.experience, ui[selected.mating_experience]], [ui.from, selected.available_from], [ui.until, selected.available_to]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value || ui.unknown}</dd></div>)}</dl><p className="mating-description">{selected.description}</p>{selected.medical_notes && <p className="mating-description">{selected.medical_notes}</p>}</div></div><p className="mating-note">{ui.healthNote}</p><div className="mating-actions"><button className="primary" disabled={actionBusy} onClick={() => contact(selected)}>{ui.contact}</button><button disabled={actionBusy} onClick={() => contact(selected, true)}>{ui.whatsapp}</button><button className="danger" onClick={() => {
+            setReport(selected);
+            closeDetail();
+          }}>{ui.report}</button></div></>}</Dialog>}
+  {report && <Report profile={report} onClose={() => setReport(null)} ui={ui} />}
+ </main>;
+}

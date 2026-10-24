@@ -26,6 +26,9 @@ const listingReportRoutes = require('../routes/listingReportRoutes');
 const petMatingRoutes = require('../routes/petMatingRoutes');
 
 const setupRoutes = (app) => {
+  app.use('/api', require('../services/animalGroupScope').middleware);
+  app.use('/api/experience', require('../routes/experienceRoutes'));
+  app.use('/api/my-animals', require('../routes/animalProfileRoutes'));
   // Routes
   app.use('/api/auth', authRoutes);
   app.use('/api/location', locationRoutes);

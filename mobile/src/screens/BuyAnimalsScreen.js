@@ -1,3 +1,4 @@
+import { allowedSpecies, getAnimalGroup } from '../utils/animalExperience';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
@@ -41,6 +42,7 @@ const BuyAnimalsScreen = ({ navigation }) => {
   const buyHelp = getLocalizedFeatureHelp('buyAnimals', i18n.resolvedLanguage || i18n.language);
 
   const categories = [
+    { id: 'sheep', name: t('animalTypes.sheep'), icon: 'paw', cardColor: '#EEFDF6' },
     { id: 'cow', name: t('categories.cow'), image: require('../assets/cow1.png'), cardColor: '#EEFDF6' },
     { id: 'buffalo', name: t('categories.buffalo'), image: require('../assets/buffalo1.png'), cardColor: '#FBF1EE' },
     { id: 'goat', name: t('categories.goat'), image: require('../assets/goat1.png'), cardColor: '#FFF3EA' },
@@ -54,7 +56,7 @@ const BuyAnimalsScreen = ({ navigation }) => {
   const matchesSelectedCategory = useCallback((animal, category) => {
     if (!category) return true;
 
-    const animalType = animal.animal_type?.toLowerCase();
+    const animalType = (animal.species || animal.animal_type)?.toLowerCase();
     const normalizedCategory = category.toLowerCase();
 
     if (normalizedCategory === 'other') {
@@ -327,7 +329,7 @@ const BuyAnimalsScreen = ({ navigation }) => {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.categoriesScrollContent}
           >
-            {categories.map((category) => (
+            {categories.filter(category => allowedSpecies(category.id)).map((category) => (
               <TouchableOpacity
                 key={category.id}
                 style={[

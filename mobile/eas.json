@@ -8,16 +8,14 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://184.73.111.59",
         "EXPO_PUBLIC_ALLOW_CLEARTEXT": "true"
       }
     },
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://184.73.111.59",
         "EXPO_PUBLIC_PUSH_PROVIDER": "firebase",
-        "EXPO_PUBLIC_ALLOW_CLEARTEXT": "true"
+        "EXPO_PUBLIC_ALLOW_CLEARTEXT": "false"
       },
       "android": {
         "buildType": "apk",
@@ -25,9 +23,7 @@
       }
     },
     "production": {
-      "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.kissanebazzar.example"
-      },
+      "env": {},
       "android": {
         "buildType": "apk"
       }

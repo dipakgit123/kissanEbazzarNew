@@ -5,6 +5,13 @@ const authMiddleware = require('../middlewares/authMiddleware');
 const vetAuthMiddleware = require('../middlewares/vetAuthMiddleware');
 const userOrVetAuthMiddleware = require('../middlewares/userOrVetAuthMiddleware');
 
+router.param('id', (req, res, next, id) => {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+    return res.status(400).json({ success: false, message: 'Invalid appointment id' });
+  }
+  next();
+});
+
 // ============ USER ROUTES (Protected with authMiddleware) ============
 
 /**

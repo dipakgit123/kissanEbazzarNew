@@ -171,7 +171,7 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#E9F0F8] to-[#F0F8FF] p-4">
+    <div className="site-background min-h-screen flex items-center justify-center p-4">
       <Toaster position="top-right" />
 
       {/* Language Switcher - Top Right */}
@@ -182,7 +182,7 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-[#15BB73]/10 to-[#0FA568]/20 rounded-full mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-primary/10 to-primary-hover/20 rounded-full mb-4">
             <LocationIcon />
           </div>
           <h2 className="text-2xl font-bold text-gray-800">{t('location.setupLocation')}</h2>
@@ -195,10 +195,10 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
             <button
               onClick={getCurrentLocation}
               disabled={isLoading}
-              className="w-full flex items-center justify-between p-4 border-2 border-gray-200 rounded-lg hover:border-[#15BB73] hover:bg-[#15BB73]/5 transition-all group"
+              className="w-full flex items-center justify-between p-4 border-2 border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-all group"
             >
               <div className="flex items-center space-x-3">
-                <div className="p-2 bg-[#15BB73]/10 rounded-lg group-hover:bg-[#15BB73]/20 transition-colors">
+                <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
                   <CurrentLocationIcon />
                 </div>
                 <div className="text-left">
@@ -206,17 +206,17 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
                   <p className="text-sm text-gray-600">{t('location.detectingLocation')?.replace('...', '')}</p>
                 </div>
               </div>
-              <svg className="w-5 h-5 text-gray-400 group-hover:text-[#15BB73]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-gray-400 group-hover:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
 
             <button
               onClick={() => setStep('manual')}
-              className="w-full flex items-center justify-between p-4 border-2 border-gray-200 rounded-lg hover:border-[#15BB73] hover:bg-[#15BB73]/5 transition-all group"
+              className="w-full flex items-center justify-between p-4 border-2 border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-all group"
             >
               <div className="flex items-center space-x-3">
-                <div className="p-2 bg-[#15BB73]/10 rounded-lg group-hover:bg-[#15BB73]/20 transition-colors">
+                <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
                   <ManualLocationIcon />
                 </div>
                 <div className="text-left">
@@ -224,7 +224,7 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
                   <p className="text-sm text-gray-600">{t('profileCompletion.address') || 'Type your address details'}</p>
                 </div>
               </div>
-              <svg className="w-5 h-5 text-gray-400 group-hover:text-[#15BB73]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-gray-400 group-hover:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
@@ -243,8 +243,8 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
         {/* Current Location Loading */}
         {step === 'current' && isLoading && (
           <div className="text-center py-12">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-[#15BB73]/10 rounded-full mb-4">
-              <svg className="animate-spin h-8 w-8 text-[#15BB73]" fill="none" viewBox="0 0 24 24">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-full mb-4">
+              <svg className="animate-spin h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
@@ -265,7 +265,7 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
                 type="text"
                 value={manualLocation.address}
                 onChange={(e) => setManualLocation({ ...manualLocation, address: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73]"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 placeholder="Street address"
               />
             </div>
@@ -278,7 +278,7 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
                 type="text"
                 value={manualLocation.city}
                 onChange={(e) => setManualLocation({ ...manualLocation, city: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73]"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 placeholder="City name"
               />
             </div>
@@ -291,7 +291,7 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
                 type="text"
                 value={manualLocation.state}
                 onChange={(e) => setManualLocation({ ...manualLocation, state: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73]"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 placeholder="State or province"
               />
             </div>
@@ -304,7 +304,7 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
                 type="text"
                 value={manualLocation.country}
                 onChange={(e) => setManualLocation({ ...manualLocation, country: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73]"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 placeholder="Country"
               />
             </div>
@@ -317,7 +317,7 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
                 type="text"
                 value={manualLocation.postal_code}
                 onChange={(e) => setManualLocation({ ...manualLocation, postal_code: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#15BB73]/20 focus:border-[#15BB73]"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 placeholder="ZIP/Postal code"
               />
             </div>
@@ -335,7 +335,7 @@ const LocationSetup = ({ onLocationSet, skipAllowed = false }) => {
                 disabled={isLoading || !manualLocation.city || !manualLocation.country}
                 className={`flex-1 py-2 px-4 rounded-lg font-medium text-white transition-all ${isLoading || !manualLocation.city || !manualLocation.country
                     ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-[#15BB73] to-[#0FA568] hover:shadow-lg'
+                    : 'bg-primary hover:shadow-lg'
                   }`}
               >
                 {isLoading ? t('common.loading') : t('location.setupLocation')}

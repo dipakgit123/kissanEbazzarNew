@@ -6,6 +6,8 @@ const petMatingController = require('../controllers/petMatingController');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { createUploadFields } = require('../config/cloudinary');
 const { uploadLimiter } = require('../config/rateLimiter');
+const rateLimit = require('express-rate-limit');
+const interactionLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 40, standardHeaders: true, legacyHeaders: false, message: {success:false,message:'Too many contact or report attempts. Please try again later.'} });
 
 const optionalUserAuth = (req, res, next) => {
   if (!req.headers.authorization) {
@@ -44,8 +46,9 @@ router.put(
   petMatingController.updateProfile.bind(petMatingController)
 );
 router.patch('/:id/matched', authMiddleware, petMatingController.markMatched.bind(petMatingController));
+router.patch('/:id/status', authMiddleware, petMatingController.updateStatus.bind(petMatingController));
 router.delete('/:id', authMiddleware, petMatingController.deleteProfile.bind(petMatingController));
-router.post('/:id/contact', authMiddleware, petMatingController.trackContact.bind(petMatingController));
-router.post('/:id/report', authMiddleware, petMatingController.reportProfile.bind(petMatingController));
+router.post('/:id/contact', authMiddleware, interactionLimiter, petMatingController.trackContact.bind(petMatingController));
+router.post('/:id/report', authMiddleware, interactionLimiter, petMatingController.reportProfile.bind(petMatingController));
 
 module.exports = router;

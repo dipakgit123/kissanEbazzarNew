@@ -17,7 +17,8 @@ export const VetAuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    const subscription = DeviceEventEmitter.addListener('auth:unauthorized', async () => {
+    const subscription = DeviceEventEmitter.addListener('auth:unauthorized', async (event) => {
+      if (event?.role && event.role !== 'veterinarian') return;
       await AsyncStorage.removeItem('vetToken');
       await AsyncStorage.removeItem('veterinarianData');
       setVetToken(null);
@@ -79,18 +80,15 @@ export const VetAuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
+    notificationService.cancelPendingRegistration();
+    // Local sign-out must succeed even if push cleanup or the network fails.
     try {
-      const savedPushToken = await notificationService.getSavedToken();
-      if (vetToken && savedPushToken.token) {
-        await notificationService.unregisterToken(savedPushToken.token, vetToken).catch(() => {});
-      }
-      await AsyncStorage.removeItem('vetToken');
-      await AsyncStorage.removeItem('veterinarianData');
-      setVetToken(null);
-      setVeterinarian(null);
-      setIsVetAuthenticated(false);
-    } catch (error) {
-      console.log('Error during vet logout:', error);
+      const saved = await notificationService.getSavedToken();
+      if (vetToken && saved.token) await notificationService.unregisterToken(saved.token, vetToken);
+    } catch (error) { console.log('Push cleanup deferred:', error.message); }
+    finally {
+      try { await AsyncStorage.multiRemove(['vetToken', 'veterinarianData', 'pushTokenRecipientKey', 'pushTokenRegisteredAt']); }
+      finally { setVetToken(null); setVeterinarian(null); setIsVetAuthenticated(false); }
     }
   };
 

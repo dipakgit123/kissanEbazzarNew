@@ -15,36 +15,53 @@
     "db:reset": "npm run db:migrate:undo:all && npm run db:migrate && npm run db:seed",
     "storage:test-s3": "node scripts/test-s3-upload.js",
     "notification:test": "node scripts/test-notification-delivery.js",
-    "storage:migrate-cloudinary-to-s3": "node scripts/migrate-cloudinary-to-s3.js"
+    "storage:migrate-cloudinary-to-s3": "node scripts/migrate-cloudinary-to-s3.js",
+    "runtime:preflight": "node scripts/check-runtime-data.js",
+    "runtime:test": "node scripts/test-runtime-utilities.js && node scripts/test-notification-delivery.js",
+    "otp:resend:test": "node scripts/test-otp-resend.js",
+    "milk:test": "node scripts/test-milk-reports.cjs",
+    "milk-advice:test": "node --test scripts/test-milk-advice.cjs",
+    "experience:test": "node --test scripts/test-animal-experiences.cjs",
+    "pet-mating:test": "node --test scripts/test-pet-mating.cjs",
+    "health:test": "node scripts/test-ai-health.cjs",
+    "production:test": "node --test scripts/test-production-hardening.cjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1062.0",
     "@aws-sdk/lib-storage": "^3.1062.0",
     "@google/generative-ai": "^0.24.1",
-    "axios": "^1.13.2",
-    "bcrypt": "^5.1.1",
+    "axios": "^1.20.0",
+    "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "expo-server-sdk": "^4.0.0",
-    "express": "^4.18.2",
+    "express": "^4.22.3",
     "express-rate-limit": "^7.1.5",
-    "express-validator": "^7.0.1",
-    "firebase-admin": "^14.1.0",
+    "express-validator": "^7.3.2",
+    "firebase-admin": "^14.5.0",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
-    "morgan": "^1.10.0",
-    "multer": "^2.0.2",
+    "morgan": "^1.12.1",
+    "multer": "^2.5.0",
     "node-cron": "^4.2.1",
-    "nodemailer": "^7.0.12",
+    "nodemailer": "^10.2.1",
     "pg": "^8.11.3",
     "pg-hstore": "^2.3.4",
-    "sequelize": "^6.37.7",
+    "sequelize": "^6.37.8",
     "sequelize-cli": "^6.6.1",
     "socket.io": "^4.8.3",
     "twilio": "^4.19.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
+  },
+  "overrides": {
+    "sequelize": {
+      "uuid": "^11.1.1"
+    }
+  },
+  "engines": {
+    "node": ">=20.19.0"
   }
 }

@@ -11,18 +11,21 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [requiresAnimalSelection, setRequiresAnimalSelection] = useState(false);
 
   useEffect(() => {
     loadStoredData();
   }, []);
 
   useEffect(() => {
-    const subscription = DeviceEventEmitter.addListener('auth:unauthorized', async () => {
+    const subscription = DeviceEventEmitter.addListener('auth:unauthorized', async (event) => {
+      if (event?.role && event.role !== 'user') return;
       await AsyncStorage.removeItem('token');
       await AsyncStorage.removeItem('userData');
       setToken(null);
       setUser(null);
       setIsAuthenticated(false);
+      setRequiresAnimalSelection(false);
     });
 
     return () => subscription.remove();
@@ -34,6 +37,7 @@ export const AuthProvider = ({ children }) => {
       const storedUser = await AsyncStorage.getItem('userData');
 
       if (storedToken) {
+        setRequiresAnimalSelection(await AsyncStorage.getItem('animalSelectionRequired') === 'true');
         setToken(storedToken);
         setIsAuthenticated(true);
 
@@ -61,10 +65,12 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (authToken, userData) => {
     try {
+      await AsyncStorage.setItem('animalSelectionRequired', 'true');
       await AsyncStorage.setItem('token', authToken);
       if (userData) {
         await AsyncStorage.setItem('userData', JSON.stringify(userData));
       }
+      setRequiresAnimalSelection(true);
       setToken(authToken);
       setUser(userData);
       setIsAuthenticated(true);
@@ -74,19 +80,21 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const completeAnimalSelection = async () => {
+    await AsyncStorage.removeItem('animalSelectionRequired');
+    setRequiresAnimalSelection(false);
+  };
+
   const logout = async () => {
+    notificationService.cancelPendingRegistration();
+    // Local sign-out must succeed even if push cleanup or the network fails.
     try {
-      const savedPushToken = await notificationService.getSavedToken();
-      if (token && savedPushToken.token) {
-        await notificationService.unregisterToken(savedPushToken.token, token).catch(() => {});
-      }
-      await AsyncStorage.removeItem('token');
-      await AsyncStorage.removeItem('userData');
-      setToken(null);
-      setUser(null);
-      setIsAuthenticated(false);
-    } catch (error) {
-      console.log('Error during logout:', error);
+      const saved = await notificationService.getSavedToken();
+      if (token && saved.token) await notificationService.unregisterToken(saved.token, token);
+    } catch (error) { console.log('Push cleanup deferred:', error.message); }
+    finally {
+      try { await AsyncStorage.multiRemove(['token', 'userData', 'animalSelectionRequired', 'pushTokenRecipientKey', 'pushTokenRegisteredAt']); }
+      finally { setToken(null); setUser(null); setIsAuthenticated(false); setRequiresAnimalSelection(false); }
     }
   };
 
@@ -106,6 +114,8 @@ export const AuthProvider = ({ children }) => {
         token,
         loading,
         isAuthenticated,
+        requiresAnimalSelection,
+        completeAnimalSelection,
         login,
         logout,
         updateUser,

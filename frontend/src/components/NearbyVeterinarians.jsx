@@ -1,4 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { vetText } from '../utils/vetUi';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { API_BASE_API } from '../config/api';
@@ -9,8 +11,12 @@ import { veterinarianService } from '../services/api';
 
 const NearbyVeterinarians = () => {
   const { t, i18n } = useTranslation();
+  const c = vetText(i18n.language);
   const [veterinarians, setVeterinarians] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const requestRef = useRef(null);
+  useEffect(() => () => requestRef.current?.abort(), []);
   const [userLocation, setUserLocation] = useState(null);
   const [radius, setRadius] = useState(100); // Default 100km
   const [selectedSpecialization, setSelectedSpecialization] = useState('');
@@ -40,6 +46,10 @@ const NearbyVeterinarians = () => {
   }, [t]);
 
   const fetchNearbyVeterinarians = useCallback(async () => {
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
+    setError(false);
     try {
       setLoading(true);
       const params = new URLSearchParams({
@@ -52,12 +62,14 @@ const NearbyVeterinarians = () => {
         params.append('specialization', selectedSpecialization);
       }
 
-      const response = await fetch(`${API_BASE_API}/veterinarians/nearby?${params}`);
+      const response = await fetch(`${API_BASE_API}/veterinarians/nearby?${params}`, { signal: controller.signal });
       const data = await response.json();
 
-      if (data.success) {
+      if (controller.signal.aborted) return;
+      if (response.ok && data.success) {
         setVeterinarians(data.data);
       } else {
+        setError(true); setVeterinarians([]);
         toast.error(
           localizeApiMessage(
             i18n,
@@ -69,10 +81,12 @@ const NearbyVeterinarians = () => {
         );
       }
     } catch (error) {
+      if (controller.signal.aborted) return;
+      setError(true); setVeterinarians([]);
       console.error('Error fetching veterinarians:', error);
       toast.error(t('veterinarian.fetchNearbyFailed'));
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   }, [i18n, radius, selectedSpecialization, t, userLocation]);
 
@@ -127,7 +141,8 @@ const NearbyVeterinarians = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="site-background min-h-screen py-8">
+      <div className="mx-auto max-w-7xl px-4 py-2"><Link to="/veterinarian">{t('veterinarian.showAllVets')}</Link>{error && <p role="alert">{c('loadError')} <button onClick={fetchNearbyVeterinarians}>{c('retry')}</button></p>}</div>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
@@ -188,7 +203,7 @@ const NearbyVeterinarians = () => {
         </div>
 
         {/* Veterinarians List */}
-        {veterinarians.length === 0 ? (
+        {error ? null : veterinarians.length === 0 ? (
           <div className="bg-white rounded-lg shadow-md p-12 text-center">
             <svg className="w-24 h-24 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -207,7 +222,7 @@ const NearbyVeterinarians = () => {
             {veterinarians.map((vet) => (
               <div key={vet.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300">
                 {/* Vet Photo */}
-                <div className="relative h-48 bg-gradient-to-br from-green-400 to-blue-500">
+                <div className="relative h-48 bg-primary">
                   {vet.profile_photo ? (
                     <img
                       src={vet.profile_photo}
@@ -226,7 +241,7 @@ const NearbyVeterinarians = () => {
                   {/* Distance Badge */}
                   <div className="absolute top-4 right-4 bg-white rounded-full px-3 py-1 shadow-lg">
                     <span className="text-sm font-semibold text-gray-700">
-                      📍 {vet.distance?.toFixed(1)} km
+                      📍 {vet.distance != null && Number.isFinite(Number(vet.distance)) ? Number(vet.distance).toFixed(1) : '—'} km
                     </span>
                   </div>
                 </div>
@@ -260,12 +275,12 @@ const NearbyVeterinarians = () => {
                         <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" />
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd" />
                       </svg>
-                      <span className="font-semibold text-green-600">₹{vet.consultation_fee || '500'}</span>
+                      <span className="font-semibold text-green-600">{vet.consultation_fee == null || vet.consultation_fee === '' ? c('fee') : `₹${vet.consultation_fee}`}</span>
                     </div>
                     {vet.rating > 0 && (
                       <div className="flex items-center text-sm">
                         <span className="text-yellow-500 mr-1">⭐</span>
-                        <span className="font-semibold">{vet.rating.toFixed(1)}</span>
+                        <span className="font-semibold">{Number(vet.rating).toFixed(1)}</span>
                         <span className="text-gray-500 ml-1">({vet.total_reviews} reviews)</span>
                       </div>
                     )}

@@ -56,6 +56,9 @@ module.exports = (sequelize) => {
       allowNull: false
     },
 
+    callerDeletedAt: { type: DataTypes.DATE, allowNull: true, field: 'caller_deleted_at' },
+    receiverDeletedAt: { type: DataTypes.DATE, allowNull: true, field: 'receiver_deleted_at' },
+
     // Caller Information
     callerId: {
       type: DataTypes.INTEGER,
@@ -157,8 +160,8 @@ module.exports = (sequelize) => {
     return await this.findAll({
       where: {
         [sequelize.Sequelize.Op.or]: [
-          { caller_id: userId },
-          { receiver_id: userId }
+          { caller_id: userId, caller_deleted_at: null },
+          { receiver_id: userId, receiver_deleted_at: null }
         ]
       },
       include: [
@@ -184,7 +187,7 @@ module.exports = (sequelize) => {
     const { limit = 50, offset = 0 } = options;
 
     return await this.findAll({
-      where: { caller_id: userId },
+      where: { caller_id: userId, caller_deleted_at: null },
       include: [
         {
           model: sequelize.models.User,
@@ -203,7 +206,7 @@ module.exports = (sequelize) => {
     const { limit = 50, offset = 0 } = options;
 
     return await this.findAll({
-      where: { receiver_id: userId },
+      where: { receiver_id: userId, receiver_deleted_at: null },
       include: [
         {
           model: sequelize.models.User,
@@ -220,18 +223,18 @@ module.exports = (sequelize) => {
   // Get call statistics for a user
   CallLog.getUserStats = async function(userId) {
     const callsMade = await this.count({
-      where: { caller_id: userId }
+      where: { caller_id: userId, caller_deleted_at: null }
     });
 
     const callsReceived = await this.count({
-      where: { receiver_id: userId }
+      where: { receiver_id: userId, receiver_deleted_at: null }
     });
 
     const recentCalls = await this.count({
       where: {
         [sequelize.Sequelize.Op.or]: [
-          { caller_id: userId },
-          { receiver_id: userId }
+          { caller_id: userId, caller_deleted_at: null },
+          { receiver_id: userId, receiver_deleted_at: null }
         ],
         created_at: {
           [sequelize.Sequelize.Op.gte]: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Last 7 days

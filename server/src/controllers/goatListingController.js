@@ -1,3 +1,5 @@
+const { recordListingView } = require('../services/listingViewService');
+const { pickListingUpdates } = require('../utils/editableFields');
 const db = require('../models');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudinary');
 const { validationResult } = require('express-validator');
@@ -232,7 +234,7 @@ exports.getGoatListingById = async (req, res) => {
     }
 
     // Increment view count
-    await listing.incrementViews();
+    await recordListingView(req, listing, 'goat');
 
     res.json({
       success: true,
@@ -377,7 +379,7 @@ exports.updateGoatListing = async (req, res) => {
       });
     }
 
-    const updateData = { ...req.body };
+    const updateData = pickListingUpdates(req.body, 'goat');
 
     // Handle file uploads if present
     if (req.files) {

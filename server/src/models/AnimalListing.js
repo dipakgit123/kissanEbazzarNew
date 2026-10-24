@@ -155,8 +155,7 @@ module.exports = (sequelize) => {
 
   // Instance methods
   AnimalListing.prototype.incrementViews = async function() {
-    this.views += 1;
-    await this.save();
+    await this.increment('views');
   };
 
   AnimalListing.prototype.markAsSold = async function() {

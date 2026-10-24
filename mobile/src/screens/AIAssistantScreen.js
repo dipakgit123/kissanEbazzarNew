@@ -1,6 +1,9 @@
+import { experienceAnswer, petAssistantCopy, assistantExperienceCopy } from '../utils/experienceAssistant';
+import { getAnimalGroup } from '../utils/animalExperience';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Dimensions,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -122,8 +125,15 @@ const AIAssistantScreen = ({ navigation }) => {
   const scrollViewRef = useRef(null);
 
   const getFixedT = (language = selectedLanguage) => i18n.getFixedT(normalizeLanguage(language));
-  const assistantT = (key, options = {}) => getFixedT()(key, options);
-  const assistantTFor = (language, key, options = {}) => getFixedT(language)(key, options);
+  const assistantTFor = (language, key, options = {}) => {
+    const copy = getAnimalGroup() === 'pet' ? petAssistantCopy(language) : assistantExperienceCopy(language, 'farm');
+    if (key === 'aiAssistant.title') return copy.title;
+    if (key === 'aiAssistant.subtitle') return copy.subtitle;
+    if (key === 'aiAssistant.greeting') return copy.greeting;
+    return getFixedT(language)(key, options);
+  };
+  const assistantT = (key, options = {}) => assistantTFor(selectedLanguage, key, options);
+  const assistantImage = getAnimalGroup() === 'pet' ? require('../assets/pet-features/assistant.jpg') : require('../assets/ai_assistant.png');
 
   const getAssistantList = (key) => {
     const localized = assistantT(key, { returnObjects: true });
@@ -157,11 +167,13 @@ const AIAssistantScreen = ({ navigation }) => {
     const normalizedLanguage = normalizeLanguage(language);
     setSelectedLanguage(normalizedLanguage);
     setLanguageSelected(true);
-    setMessages([createAiMessage(assistantTFor(normalizedLanguage, 'aiAssistant.greeting'))]);
+    setMessages([createAiMessage(getAnimalGroup() === 'pet' ? petAssistantCopy(normalizedLanguage).greeting : assistantTFor(normalizedLanguage, 'aiAssistant.greeting'))]);
     setShowBackToMenu(false);
   };
 
   const getAIResponse = (message) => {
+    const scopedAnswer = experienceAnswer(message, selectedLanguage);
+    if (scopedAnswer) return scopedAnswer;
     const lowerMessage = message.toLowerCase();
     const match = responseMatchers.find(({ keywords }) => (
       keywords.some((keyword) => lowerMessage.includes(keyword))
@@ -236,9 +248,9 @@ const AIAssistantScreen = ({ navigation }) => {
   const renderHeader = (showReset = false) => (
     <AppHeader
       navigation={navigation}
-      title={t('aiAssistant.title')}
-      subtitle={t('aiAssistant.subtitle')}
-      leading={<Ionicons name="sparkles" size={20} color={COLORS.primary} />}
+      title={assistantT('aiAssistant.title')}
+      subtitle={assistantT('aiAssistant.subtitle')}
+      leading={<Image source={assistantImage} style={{ width: 42, height: 42, borderRadius: 12 }} accessible={false} />}
       rightActions={showReset ? [
         {
           icon: 'refresh',
@@ -290,8 +302,8 @@ const AIAssistantScreen = ({ navigation }) => {
   }
 
   const quickQuestions = [
-    ...getAssistantList('aiAssistant.quickReplies'),
-    ...getAssistantList('aiAssistant.projectQuickReplies'),
+    ...(getAnimalGroup() === 'pet' ? petAssistantCopy(selectedLanguage).questions : getAssistantList('aiAssistant.quickReplies')),
+    ...(getAnimalGroup() === 'pet' ? petAssistantCopy(selectedLanguage).websiteQuestions : getAssistantList('aiAssistant.projectQuickReplies')),
   ];
 
   return (
